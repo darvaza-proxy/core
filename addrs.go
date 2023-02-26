@@ -123,3 +123,30 @@ func GetInterfacesNames(except ...string) ([]string, error) {
 	}
 	return out, nil
 }
+
+// ParseAddr turns a string into netip.Addr
+func ParseAddr(s string) (addr netip.Addr, err error) {
+	switch s {
+	case "0":
+		addr = netip.IPv4Unspecified()
+	case "::":
+		addr = netip.IPv6Unspecified()
+	default:
+		addr, err = netip.ParseAddr(s)
+		if err != nil {
+			return addr, err
+		}
+	}
+
+	return addr, nil
+}
+
+// ParseNetIP turns a string into a net.IP
+func ParseNetIP(s string) (ip net.IP, err error) {
+	addr, err := ParseAddr(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return asNetIPAddresses(addr.Unmap())[0], nil
+}
