@@ -23,3 +23,26 @@ func MapListContainsFn[K comparable, T any](m map[K]*list.List, key K, match fun
 	}
 	return false
 }
+
+// MapListForEach calls a function for each value on a map entry until told to stop
+func MapListForEach[K comparable, T any](m map[K]*list.List, key K, fn func(v T) bool) {
+	if m == nil || fn == nil {
+		return
+	}
+
+	if l, ok := m[key]; ok {
+		ListForEach(l, fn)
+	}
+}
+
+// MapListForEachElement calls a function for each element on a map entry until told to stop
+func MapListForEachElement[K comparable](m map[K]*list.List, key K,
+	fn func(el *list.Element) bool) {
+	if m == nil || fn == nil {
+		return
+	}
+
+	if l, ok := m[key]; ok {
+		ListForEachElement(l, fn)
+	}
+}
