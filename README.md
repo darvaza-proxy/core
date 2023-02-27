@@ -23,6 +23,8 @@ This package contains helpers shared by:
 * SliceMinus/SliceMinusFn
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
+* MapContains
+* MapListContains/MapListContainsFn
 
 ## Errrors
 
