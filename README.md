@@ -21,6 +21,8 @@ This package contains helpers shared by:
 
 * SliceContains/SliceContainsFn
 * SliceMinus/SliceMinusFn
+* ListContains/ListContainsFn
+* ListForEach/ListForEachElement
 
 ## Errrors
 
