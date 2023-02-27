@@ -34,22 +34,24 @@ func GetNetIPAddresses(ifaces ...string) ([]net.IP, error) {
 }
 
 func asNetIPAddresses(addrs ...netip.Addr) []net.IP {
-	out := make([]net.IP, len(addrs))
-	for i, addr := range addrs {
-		var ip net.IP
-
-		if addr.Is4() {
-			a4 := addr.As4()
-			ip = a4[:]
-		} else {
-			a16 := addr.As16()
-			ip = a16[:]
+	out := make([]net.IP, 0, len(addrs))
+	for _, addr := range addrs {
+		if addr.IsValid() {
+			out = append(out, asNetIP(addr.Unmap()))
 		}
-
-		out[i] = ip
 	}
 
 	return out
+}
+
+func asNetIP(addr netip.Addr) net.IP {
+	if addr.Is4() {
+		a4 := addr.As4()
+		return a4[:]
+	}
+
+	a16 := addr.As16()
+	return a16[:]
 }
 
 // GetIPAddresses returns a list of netip.Addr bound to the given
@@ -84,22 +86,28 @@ func GetIPAddresses(ifaces ...string) ([]netip.Addr, error) {
 }
 
 func appendNetIPAsIP(out []netip.Addr, addrs ...net.Addr) []netip.Addr {
-	for _, addr := range addrs {
-		var s []byte
-
-		switch v := addr.(type) {
-		case *net.IPAddr:
-			s = v.IP
-		case *net.IPNet:
-			s = v.IP
-		}
-
-		if ip, ok := netip.AddrFromSlice(s); ok {
-			out = append(out, ip.Unmap())
+	for _, ip := range addrs {
+		addr, ok := AddrFromNetIP(ip)
+		if ok && addr.IsValid() {
+			out = append(out, addr.Unmap())
 		}
 	}
 
 	return out
+}
+
+// AddrFromNetIP attempts to convert a net.Addr into a netip.Addr
+func AddrFromNetIP(addr net.Addr) (netip.Addr, bool) {
+	var s []byte
+
+	switch v := addr.(type) {
+	case *net.IPAddr:
+		s = v.IP
+	case *net.IPNet:
+		s = v.IP
+	}
+
+	return netip.AddrFromSlice(s)
 }
 
 // GetInterfacesNames returns the list of interfaces,
@@ -148,5 +156,5 @@ func ParseNetIP(s string) (ip net.IP, err error) {
 		return nil, err
 	}
 
-	return asNetIPAddresses(addr.Unmap())[0], nil
+	return asNetIP(addr.Unmap()), nil
 }
