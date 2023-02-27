@@ -8,3 +8,20 @@ This package contains helpers shared by:
 * [github.com/darvaza-proxy/darvaza/agent](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/agent)
 * [github.com/darvaza-proxy/darvaza/shared](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/shared)
 * [github.com/darvaza-proxy/darvaza/server](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/server)
+
+## Network
+
+* GetInterfacesNames
+* ParseAddr/ParseNetIP
+* AddrPort
+* AddrFromNetIP
+* GetIPAddresses/GetNetIPAddresses/GetStringIPAddresses
+
+## Generics
+
+* SliceContains/SliceContainsFn
+* SliceMinus/SliceMinusFn
+
+## Errrors
+
+* Wrap/Wrapf
