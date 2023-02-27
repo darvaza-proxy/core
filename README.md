@@ -26,6 +26,8 @@ This package contains helpers shared by:
 * MapContains
 * MapListContains/MapListContainsFn
 * MapListForEach/MapListForEachElement
+* MapAllListContains/MapAllListContainsFn
+* MapAllListForEach/MapAllListForEachElement
 
 ## Errrors
 
