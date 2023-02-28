@@ -27,6 +27,8 @@ This package contains helpers shared by:
 * MapListContains/MapListContainsFn
 * MapListForEach/MapListForEachElement
 * MapListInsert/MapListAppend
+* MapListInsertUnique/MapListInsertUniqueFn
+* MapListAppendUnique/MapListAppendUniqueFn
 * MapAllListContains/MapAllListContainsFn
 * MapAllListForEach/MapAllListForEachElement
 

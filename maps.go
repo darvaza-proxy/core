@@ -64,9 +64,45 @@ func getMapList[K comparable](m map[K]*list.List, key K) *list.List {
 	return l
 }
 
+// MapListInsertUnique adds a value at the front of the list of a map entry
+// if it's not already there
+func MapListInsertUnique[K comparable, T comparable](m map[K]*list.List, key K, v T) {
+	MapListInsertUniqueFn(m, key, v, func(v0 T) bool {
+		return v == v0
+	})
+}
+
+// MapListInsertUniqueFn adds a value at the front of the list of a map entry
+// if it's not already there usign a function to compare values
+func MapListInsertUniqueFn[K comparable, T any](m map[K]*list.List, key K, v T,
+	match func(v T) bool) {
+	l := getMapList(m, key)
+	if !ListContainsFn(l, match) {
+		l.PushFront(v)
+	}
+}
+
 // MapListAppend adds a value at the end of the list of a map entry
 func MapListAppend[K comparable, T any](m map[K]*list.List, key K, v T) {
 	getMapList(m, key).PushBack(v)
+}
+
+// MapListAppendUnique adds a value at the end of the list of a map entry
+// if it's not already there
+func MapListAppendUnique[K comparable, T comparable](m map[K]*list.List, key K, v T) {
+	MapListAppendUniqueFn(m, key, v, func(v0 T) bool {
+		return v == v0
+	})
+}
+
+// MapListAppendUniqueFn adds a value at the end of the list of a map entry
+// if it's not already there usign a function to compare values
+func MapListAppendUniqueFn[K comparable, T any](m map[K]*list.List, key K, v T,
+	match func(v T) bool) {
+	l := getMapList(m, key)
+	if !ListContainsFn(l, match) {
+		l.PushBack(v)
+	}
 }
 
 // MapAllListContains check if a value exists on any entry of the map
