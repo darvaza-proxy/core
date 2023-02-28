@@ -45,9 +45,18 @@ func ListForEachElement(l *list.List, fn func(*list.Element) bool) {
 		return
 	}
 
-	for e := l.Front(); e != nil; e = e.Next() {
+	e, next := listIterStep(l.Front())
+	for e != nil {
 		if fn(e) {
 			break
 		}
+		e, next = listIterStep(next)
 	}
+}
+
+func listIterStep(ref *list.Element) (e *list.Element, next *list.Element) {
+	if ref != nil {
+		next = ref.Next()
+	}
+	return ref, next
 }
