@@ -47,6 +47,28 @@ func MapListForEachElement[K comparable](m map[K]*list.List, key K,
 	}
 }
 
+// MapListInsert adds a value at the front of the list of a map entry
+func MapListInsert[K comparable, T any](m map[K]*list.List, key K, v T) {
+	getMapList(m, key).PushFront(v)
+}
+
+func getMapList[K comparable](m map[K]*list.List, key K) *list.List {
+	var l *list.List
+	var ok bool
+
+	if l, ok = m[key]; !ok {
+		l = list.New()
+		m[key] = l
+	}
+
+	return l
+}
+
+// MapListAppend adds a value at the end of the list of a map entry
+func MapListAppend[K comparable, T any](m map[K]*list.List, key K, v T) {
+	getMapList(m, key).PushBack(v)
+}
+
 // MapAllListContains check if a value exists on any entry of the map
 func MapAllListContains[K comparable, T comparable](m map[K]*list.List, v T) bool {
 	if m != nil {
