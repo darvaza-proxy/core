@@ -20,19 +20,34 @@ func (wg *WaitGroup) OnError(fn func(error)) {
 
 // Go spawns a supervised goroutine
 func (wg *WaitGroup) Go(fn func() error) {
+	wg.GoCatch(fn, nil)
+}
+
+// GoCatch spawns a supervised goroutine, and uses a given function
+// to intercept the returned error
+func (wg *WaitGroup) GoCatch(fn func() error, catch func(error) error) {
 	if fn != nil {
 		wg.wg.Add(1)
 
 		go func() {
 			defer wg.wg.Done()
 
-			wg.run(fn)
+			wg.run(fn, catch)
 		}()
 	}
 }
 
-func (wg *WaitGroup) run(fn func() error) {
+func (wg *WaitGroup) run(fn func() error, catch func(error) error) {
 	var c Catcher
+
+	if catch != nil {
+		fx := func() error {
+			var cx Catcher
+
+			return catch(cx.Do(fn))
+		}
+		fn = fx
+	}
 
 	if err := c.Do(fn); err != nil {
 		if wg.err.CompareAndSwap(nil, err) {
