@@ -40,3 +40,4 @@ This package contains helpers shared by:
 * WaitGroup
 * Frame/Stack
 * Here/StackFrame/StackTrace
+* CallStacker

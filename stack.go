@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+// CallStacker represents an object with a method CallStack()
+// returning a Stack
+type CallStacker interface {
+	CallStack() Stack
+}
+
 const (
 	// MaxDepth is the maximum depth we will go in the stack.
 	MaxDepth = 32
