@@ -34,7 +34,7 @@ This package contains helpers shared by:
 
 ## Errors
 
-* Wrap/Wrapf
+* Wrap/Wrapf/Unwrappable
 * Recover/Recovered
 * Catcher
 * WaitGroup

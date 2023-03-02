@@ -4,6 +4,16 @@ import (
 	"fmt"
 )
 
+var (
+	_ Unwrappable = (*WrappedError)(nil)
+)
+
+// Unwrappable represents an error that can be Unwrap() to get the cause
+type Unwrappable interface {
+	Error() string
+	Unwrap() error
+}
+
 // Wrapf annotates an error with a formated string. if %w is used the argument
 // will be unwrapped
 func Wrapf(err error, format string, args ...any) error {
