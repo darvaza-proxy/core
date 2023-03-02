@@ -6,19 +6,19 @@ import (
 
 // ListContains checks if a container/list contains an element
 func ListContains[T comparable](l *list.List, val T) bool {
-	return ListContainsFn(l, func(v T) bool {
-		return v == val
+	return ListContainsFn(l, val, func(va, vb T) bool {
+		return va == vb
 	})
 }
 
 // ListContainsFn checks if a container/list contains an element
 // that satisfies a given function
-func ListContainsFn[T any](l *list.List, match func(T) bool) bool {
+func ListContainsFn[T any](l *list.List, val T, eq func(T, T) bool) bool {
 	var found bool
 
-	if l != nil && match != nil {
+	if l != nil && eq != nil {
 		ListForEach(l, func(v T) bool {
-			found = match(v)
+			found = eq(val, v)
 			return found
 		})
 	}
