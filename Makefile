@@ -9,10 +9,9 @@ GOGENERATE_FLAGS = -v
 GOPATH ?= $(shell $(GO) env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 
-REVIVE ?= $(GOBIN)/revive
 REVIVE_CONF ?= $(CURDIR)/tools/revive.toml
 REVIVE_RUN_ARGS ?= -config $(REVIVE_CONF) -formatter friendly
-REVIVE_INSTALL_URL ?= github.com/mgechev/revive
+REVIVE ?= $(GO) run -v github.com/mgechev/revive
 
 V = 0
 Q = $(if $(filter 1,$V),,@)
@@ -28,14 +27,13 @@ clean: ; $(info $(M) cleaning…)
 fmt: ; $(info $(M) reformatting sources…)
 	$Q find . -name '*.go' | xargs -r $(GOFMT) $(GOFMT_FLAGS)
 
-tidy: | fmt $(REVIVE) ; $(info $(M) tidying up…)
+tidy: | fmt ; $(info $(M) tidying up…)
 	$Q $(GO) mod tidy
 	$Q $(GO) vet ./...
 	$Q $(REVIVE) $(REVIVE_RUN_ARGS) ./...
 
 get: ; $(info $(M) downloading dependencies…)
 	$Q $(GO) get -v -tags tools ./...
-	$Q $(GO) install -v $(REVIVE_INSTALL_URL)
 
 build: ; $(info $(M) building…)
 	$Q $(GO) build -v ./...
@@ -46,10 +44,6 @@ test: ; $(info $(M) building…)
 up: ; $(info $(M) updating dependencies…)
 	$Q $(GO) get -u -v ./...
 	$Q $(GO) mod tidy
-	$Q $(GO) install -v $(REVIVE_INSTALL_URL)
 
 generate: ; $(info $(M) generating data…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)
-
-$(REVIVE):
-	$Q $(GO) install -v $(REVIVE_INSTALL_URL)
