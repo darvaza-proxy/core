@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"sync/atomic"
 )
 
@@ -22,28 +21,9 @@ func Recover() Recovered {
 		return p
 	} else {
 		// wrap it
-		return &panicError{rvr}
+		return NewPanicError(2, rvr)
 	}
 	// revive:enable:defer
-}
-
-type panicError struct {
-	payload any
-}
-
-func (p *panicError) Error() string {
-	return fmt.Sprintf("panic: %s", p.payload)
-}
-
-func (p *panicError) Unwrap() error {
-	if err, ok := p.payload.(error); ok {
-		return err
-	}
-	return nil
-}
-
-func (p *panicError) Recovered() any {
-	return p.payload
 }
 
 // Catcher is a runner that catches panics

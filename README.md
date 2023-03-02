@@ -37,6 +37,7 @@ This package contains helpers shared by:
 * Wrap/Wrapf/Unwrappable
 * Recover/Recovered
 * Catcher
+* PanicError
 * WaitGroup
 * Frame/Stack
 * Here/StackFrame/StackTrace
