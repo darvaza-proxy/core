@@ -9,13 +9,29 @@ import (
 type WaitGroup struct {
 	wg      sync.WaitGroup
 	err     atomic.Value
-	onError func(error)
+	errCh   chan error
+	onError func(error) error
 }
 
 // OnError sets a helper that will be called when
-// the first worker returns an error or panics
-func (wg *WaitGroup) OnError(fn func(error)) {
+// a workers returns an error or panics
+func (wg *WaitGroup) OnError(fn func(error) error) {
 	wg.onError = fn
+}
+
+func (wg *WaitGroup) watchErrCh() {
+	for {
+		err, ok := <-wg.errCh
+		if !ok {
+			break
+		}
+		if wg.onError != nil {
+			err = wg.onError(err)
+		}
+		if err != nil {
+			wg.err.CompareAndSwap(nil, err)
+		}
+	}
 }
 
 // Go spawns a supervised goroutine
@@ -26,6 +42,11 @@ func (wg *WaitGroup) Go(fn func() error) {
 // GoCatch spawns a supervised goroutine, and uses a given function
 // to intercept the returned error
 func (wg *WaitGroup) GoCatch(fn func() error, catch func(error) error) {
+	if wg.errCh == nil {
+		wg.errCh = make(chan error)
+		go wg.watchErrCh()
+	}
+
 	if fn != nil {
 		wg.wg.Add(1)
 
@@ -50,33 +71,42 @@ func (wg *WaitGroup) run(fn func() error, catch func(error) error) {
 	}
 
 	if err := c.Do(fn); err != nil {
-		if wg.err.CompareAndSwap(nil, err) {
-			wg.callOnError(err)
-		}
+		wg.tryReportError(err)
 	}
 }
 
-func (wg *WaitGroup) callOnError(err error) {
-	if fn := wg.onError; fn != nil {
-		var c Catcher
+func (wg *WaitGroup) tryReportError(err error) {
+	wg.wg.Add(1)
 
-		wg.wg.Add(1)
-		go func() {
-			defer wg.wg.Done()
-
-			_ = c.Do(func() error {
-				fn(err)
-				return nil
-			})
+	go func() {
+		defer wg.wg.Done()
+		defer func() {
+			recover()
 		}()
-	}
+
+		wg.errCh <- err
+	}()
+}
+
+func (wg *WaitGroup) tryCloseErrCh() {
+	defer func() {
+		recover()
+	}()
+
+	close(wg.errCh)
 }
 
 // Wait waits until all workers have finished, and returns
 // the first error
 func (wg *WaitGroup) Wait() error {
 	wg.wg.Wait()
+	defer wg.tryCloseErrCh()
 
+	return wg.Err()
+}
+
+// Err returns the first error
+func (wg *WaitGroup) Err() error {
 	if err, ok := wg.err.Load().(error); ok {
 		return err
 	}
