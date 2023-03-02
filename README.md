@@ -37,3 +37,4 @@ This package contains helpers shared by:
 * Wrap/Wrapf
 * Recover/Recovered
 * Catcher
+* WaitGroup
