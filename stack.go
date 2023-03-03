@@ -198,8 +198,7 @@ func StackTrace(skip int) Stack {
 	if n := runtime.Callers(2, pcs[:]); n > skip {
 		var frames []Frame
 
-		n = n - skip
-		frames = make([]Frame, 0, n)
+		frames = make([]Frame, 0, n-skip)
 
 		for _, pc := range pcs[skip:n] {
 			frames = append(frames, frameForPC(pc))
