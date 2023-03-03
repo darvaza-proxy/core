@@ -32,6 +32,9 @@ This package contains helpers shared by:
 * MapAllListContains/MapAllListContainsFn
 * MapAllListForEach/MapAllListForEachElement
 
-## Errrors
+## Errors
 
 * Wrap/Wrapf
+* Recover/Recovered
+* Catcher
+* WaitGroup
