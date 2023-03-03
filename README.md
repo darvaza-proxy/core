@@ -1,13 +1,10 @@
 # Core of helpers for darvaza.org projects
 
-This package contains helpers shared by:
+[![Go Reference](https://pkg.go.dev/badge/github.com/darvaza-proxy/core.svg)](https://pkg.go.dev/github.com/darvaza-proxy/core)
 
-* [github.com/darvaza-proxy/slog](https://pkg.go.dev/github.com/darvaza-proxy/slog)
-* [github.com/darvaza-proxy/gossipcache](https://pkg.go.dev/github.com/darvaza-proxy/gossipcache)
-* [github.com/darvaza-proxy/darvaza/acme](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/acme)
-* [github.com/darvaza-proxy/darvaza/agent](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/agent)
-* [github.com/darvaza-proxy/darvaza/shared](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/shared)
-* [github.com/darvaza-proxy/darvaza/server](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/server)
+This package contains simple mechanisms used by other darvaza-proxy projects.
+It's not allowed to have dependencies outside of Go' Standard Library, and if something
+should be on a subdirectory, it shouldn't be here.
 
 ## Network
 
@@ -42,3 +39,12 @@ This package contains helpers shared by:
 * Frame/Stack
 * Here/StackFrame/StackTrace
 * CallStacker
+
+## See also
+
+* [github.com/darvaza-proxy/slog](https://pkg.go.dev/github.com/darvaza-proxy/slog)
+* [github.com/darvaza-proxy/gossipcache](https://pkg.go.dev/github.com/darvaza-proxy/gossipcache)
+* [github.com/darvaza-proxy/darvaza/acme](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/acme)
+* [github.com/darvaza-proxy/darvaza/agent](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/agent)
+* [github.com/darvaza-proxy/darvaza/server](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/server)
+* [github.com/darvaza-proxy/darvaza/shared](https://pkg.go.dev/github.com/darvaza-proxy/darvaza/shared)
