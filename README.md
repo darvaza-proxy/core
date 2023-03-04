@@ -35,6 +35,7 @@ should be on a subdirectory, it shouldn't be here.
 * Recover/Recovered
 * Catcher
 * PanicError
+* Panic/Panicf/PanicWrap/PanicWrapf
 * WaitGroup
 * Frame/Stack
 * Here/StackFrame/StackTrace
