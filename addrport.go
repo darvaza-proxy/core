@@ -7,6 +7,11 @@ import (
 
 // AddrPort attempts to extract a netip.AddrPort from an object
 func AddrPort(v any) (netip.AddrPort, bool) {
+	// known types first
+	if addr, ok := typeSpecificAddrPort(v); ok {
+		return addr, ok
+	}
+
 	// via interfaces
 	if p, ok := v.(interface {
 		AddrPort() netip.AddrPort
@@ -26,12 +31,16 @@ func AddrPort(v any) (netip.AddrPort, bool) {
 		return AddrPort(p.RemoteAddr())
 	}
 
-	// known types
-	return typeSpecificAddrPort(v)
+	// sorry
+	return netip.AddrPort{}, false
 }
 
 func typeSpecificAddrPort(v any) (netip.AddrPort, bool) {
 	switch addr := v.(type) {
+	case netip.AddrPort:
+		return addr, true
+	case *netip.AddrPort:
+		return *addr, true
 	case *net.TCPAddr:
 		if ip, ok := netip.AddrFromSlice(addr.IP); ok {
 			return netip.AddrPortFrom(ip, uint16(addr.Port)), true
