@@ -10,10 +10,10 @@ type Recovered interface {
 	Recovered() any
 }
 
-// Recover attempts to recover from a panic
-func Recover() Recovered {
-	// revive:disable:defer
-	if rvr := recover(); rvr == nil {
+// AsRecovered receives the value from recover()
+// and wraps it as a Recovered error
+func AsRecovered(rvr any) Recovered {
+	if rvr == nil {
 		// no panic
 		return nil
 	} else if p, ok := rvr.(Recovered); ok {
@@ -23,7 +23,6 @@ func Recover() Recovered {
 		// wrap it
 		return NewPanicError(2, rvr)
 	}
-	// revive:enable:defer
 }
 
 // Catcher is a runner that catches panics
@@ -53,7 +52,7 @@ func (p *Catcher) Do(fn func() error) error {
 func (p *Catcher) Try(fn func() error) error {
 	if fn != nil {
 		defer func() {
-			if err := Recover(); err != nil {
+			if err := AsRecovered(recover()); err != nil {
 				p.recovered.CompareAndSwap(nil, err)
 			}
 		}()
