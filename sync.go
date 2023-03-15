@@ -59,18 +59,16 @@ func (wg *WaitGroup) GoCatch(fn func() error, catch func(error) error) {
 }
 
 func (wg *WaitGroup) run(fn func() error, catch func(error) error) {
-	var c Catcher
+	var c1, c2 Catcher
 
-	if catch != nil {
-		fx := func() error {
-			var cx Catcher
-
-			return catch(cx.Do(fn))
-		}
-		fn = fx
+	err := c1.Do(fn)
+	if err != nil && catch != nil {
+		err = c2.Do(func() error {
+			return catch(err)
+		})
 	}
 
-	if err := c.Do(fn); err != nil {
+	if err != nil {
 		wg.tryReportError(err)
 	}
 }
