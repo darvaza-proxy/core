@@ -9,15 +9,16 @@ GOGENERATE_FLAGS = -v
 GOPATH ?= $(shell $(GO) env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 
-REVIVE_CONF ?= $(CURDIR)/tools/revive.toml
+TMPDIR ?= $(CURDIR)/.tmp
+TOOLSDIR = $(CURDIR)/tools
+
+REVIVE_CONF ?= $(TOOLSDIR)/revive.toml
 REVIVE_RUN_ARGS ?= -config $(REVIVE_CONF) -formatter friendly
 REVIVE ?= $(GO) run -v github.com/mgechev/revive
 
 V = 0
 Q = $(if $(filter 1,$V),,@)
 M = $(shell if [ "$$(tput colors 2> /dev/null || echo 0)" -ge 8 ]; then printf "\033[34;1m▶\033[0m"; else printf "▶"; fi)
-
-TMPDIR ?= .tmp
 
 all: get generate tidy build
 
