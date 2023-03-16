@@ -16,13 +16,15 @@ func AsRecovered(rvr any) Recovered {
 	if rvr == nil {
 		// no panic
 		return nil
-	} else if p, ok := rvr.(Recovered); ok {
+	}
+
+	if p, ok := rvr.(Recovered); ok {
 		// pass-through
 		return p
-	} else {
-		// wrap it
-		return NewPanicError(2, rvr)
 	}
+
+	// wrap it
+	return NewPanicError(2, rvr)
 }
 
 // Catcher is a runner that catches panics
