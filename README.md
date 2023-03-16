@@ -16,6 +16,7 @@ should be on a subdirectory, it shouldn't be here.
 
 ## Generics
 
+* Coalesce
 * SliceContains/SliceContainsFn
 * SliceMinus/SliceMinusFn
 * ListContains/ListContainsFn
