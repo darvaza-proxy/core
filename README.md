@@ -32,7 +32,7 @@ should be on a subdirectory, it shouldn't be here.
 ## Errors
 
 * Wrap/Wrapf/Unwrappable
-* Recover/Recovered
+* AsRecovered/Recovered
 * Catcher
 * PanicError
 * Panic/Panicf/PanicWrap/PanicWrapf
