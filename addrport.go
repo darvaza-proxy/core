@@ -5,6 +5,27 @@ import (
 	"net/netip"
 )
 
+// SplitHostPort is like net.SplitHostPort but doesn't fail if the
+// port isn't part of the string
+func SplitHostPort(hostport string) (host, port string, err error) {
+	h, p, err := net.SplitHostPort(hostport)
+	if err == nil {
+		// good pair
+		return h, p, nil
+	}
+
+	if addrErr, ok := err.(*net.AddrError); ok {
+		if addrErr.Err == "missing port in address" {
+			// didn't have a port. let's add one and validate the host
+			// part again
+			h, _, err = SplitHostPort(net.JoinHostPort(hostport, "0"))
+			return h, "", err
+		}
+	}
+
+	return "", "", err
+}
+
 // AddrPort attempts to extract a netip.AddrPort from an object
 func AddrPort(v any) (netip.AddrPort, bool) {
 	// known types first
