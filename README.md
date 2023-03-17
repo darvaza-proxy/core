@@ -10,6 +10,7 @@ should be on a subdirectory, it shouldn't be here.
 
 * GetInterfacesNames
 * ParseAddr/ParseNetIP
+* SplitHostPort
 * AddrPort
 * AddrFromNetIP
 * GetIPAddresses/GetNetIPAddresses/GetStringIPAddresses
