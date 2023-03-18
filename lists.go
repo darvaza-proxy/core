@@ -60,3 +60,39 @@ func listIterStep(ref *list.Element) (e *list.Element, next *list.Element) {
 	}
 	return ref, next
 }
+
+// ListForEachBackward calls a function for each value until told to stop
+func ListForEachBackward[T any](l *list.List, fn func(v T) bool) {
+	if l == nil || fn == nil {
+		return
+	}
+
+	ListForEachBackwardElement(l, func(e *list.Element) bool {
+		if v, ok := e.Value.(T); ok {
+			return fn(v)
+		}
+		return false
+	})
+}
+
+// ListForEachBackwardElement calls a function for each element until told to stop
+func ListForEachBackwardElement(l *list.List, fn func(*list.Element) bool) {
+	if l == nil || fn == nil {
+		return
+	}
+
+	e, prev := listIterBackwardStep(l.Back())
+	for e != nil {
+		if fn(e) {
+			break
+		}
+		e, prev = listIterBackwardStep(prev)
+	}
+}
+
+func listIterBackwardStep(ref *list.Element) (e *list.Element, prev *list.Element) {
+	if ref != nil {
+		prev = ref.Prev()
+	}
+	return ref, prev
+}

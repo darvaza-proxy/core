@@ -22,6 +22,7 @@ should be on a subdirectory, it shouldn't be here.
 * SliceMinus/SliceMinusFn
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
+* ListForEachBackward/ListForEachBackwardElement
 * MapContains
 * MapListContains/MapListContainsFn
 * MapListForEach/MapListForEachElement
