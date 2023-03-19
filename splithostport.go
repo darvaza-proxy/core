@@ -2,7 +2,6 @@ package core
 
 import (
 	"net"
-	"net/netip"
 	"strconv"
 	"strings"
 
@@ -99,12 +98,12 @@ func validPort(s string) bool {
 }
 
 func validIP(s string) bool {
-	_, err := netip.ParseAddr(s)
+	_, err := ParseAddr(s)
 	return err == nil
 }
 
 func validIPv6(s string) bool {
-	addr, err := netip.ParseAddr(s)
+	addr, err := ParseAddr(s)
 	return err == nil && addr.Is6()
 }
 
