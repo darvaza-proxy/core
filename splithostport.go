@@ -2,6 +2,7 @@ package core
 
 import (
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -31,10 +32,13 @@ func SplitHostPort(hostport string) (host, port string, err error) {
 	} else if port == "" {
 		// host:
 		err = addrErr(hostport, "missing port after ':'")
+	} else if host == "" {
+		// :port
+		host = "::" // use undetermined host
 	} else if strings.ContainsRune(host, ':') {
 		// unbracketed ipv6?
-		if validIPv6(hostport) {
-			return hostport, "", nil
+		if host, ok = validIP(hostport); ok {
+			return host, "", nil
 		}
 
 		err = addrErr(hostport, "invalid address")
@@ -43,14 +47,18 @@ func SplitHostPort(hostport string) (host, port string, err error) {
 	if err == nil {
 		// successful split, but is it valid?
 
-		switch {
-		case port != "" && !validPort(port):
+		if port != "" && !validPort(port) {
+			// bad port
 			err = addrErr(hostport, "invalid port")
-		case !validIP(host) && !validName(host):
+		} else if s, ok := validIP(host); ok {
+			// valid IP
+			return s, port, nil
+		} else if s, ok := validName(host); ok {
+			// valid name
+			return s, port, nil
+		} else {
+			// bad address
 			err = addrErr(hostport, "invalid address")
-		default:
-			// all good
-			return host, port, nil
 		}
 	}
 
@@ -97,19 +105,25 @@ func validPort(s string) bool {
 	return err == nil
 }
 
-func validIP(s string) bool {
-	_, err := ParseAddr(s)
-	return err == nil
-}
-
-func validIPv6(s string) bool {
+func validIP(s string) (string, bool) {
 	addr, err := ParseAddr(s)
-	return err == nil && addr.Is6()
+	if err == nil {
+		return addr.String(), true
+	}
+	return "", false
 }
 
-func validName(s string) bool {
-	_, err := idna.ToUnicode(s)
-	return err == nil
+var nameRE = regexp.MustCompile(`^(([\p{L}\p{M}\p{N}_%+-]+\.)+)?[\p{L}\p{M}\p{N}-]+$`)
+
+func validName(s string) (string, bool) {
+	if nameRE.MatchString(s) {
+		s, err := idna.Display.ToUnicode(s)
+		if err == nil {
+			return s, true
+		}
+	}
+
+	return "", false
 }
 
 func addrErr(addr, why string) error {
