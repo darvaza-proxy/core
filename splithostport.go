@@ -2,6 +2,7 @@ package core
 
 import (
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -112,11 +113,16 @@ func validIP(s string) (string, bool) {
 	return "", false
 }
 
+var nameRE = regexp.MustCompile(`^(([\p{L}\p{M}\p{N}_%+-]+\.)+)?[\p{L}\p{M}\p{N}-]+$`)
+
 func validName(s string) (string, bool) {
-	s, err := idna.Display.ToUnicode(s)
-	if err == nil {
-		return s, true
+	if nameRE.MatchString(s) {
+		s, err := idna.Display.ToUnicode(s)
+		if err == nil {
+			return s, true
+		}
 	}
+
 	return "", false
 }
 

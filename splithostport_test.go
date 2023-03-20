@@ -35,6 +35,8 @@ func TestSplitHostPort(t *testing.T) {
 		{"name:123456", "", "", false},                         // port out of range             BAD
 		{"name:port", "", "", false},                           // host but bad port             BAD
 		{"bad name", "", "", false},                            // bad host no port              BAD
+		{"bad..name", "", "", false},                           // bad host no port              BAD
+		{".name", "", "", false},                               // bad host no port              BAD
 		{"Hello.\u4E16\u754C", "hello.\u4E16\u754C", "", true}, // international name            OK
 		{"hello.xn--rhqv96g", "hello.\u4E16\u754C", "", true},  // puny code                     OK
 		{"good.name", "good.name", "", true},                   // name with dot and no port     OK
