@@ -54,3 +54,26 @@ func SliceUnique[T comparable](a []T) []T {
 	}
 	return list
 }
+
+// SliceUniquify returns the same slice, reduced to
+// only contain unique elements
+func SliceUniquify[T comparable](ptr *[]T) []T {
+	if ptr == nil {
+		return []T{}
+	}
+
+	keys := make(map[T]bool, len(*ptr))
+	j := 0
+	for i, entry := range *ptr {
+		if _, known := keys[entry]; !known {
+			keys[entry] = true
+			if i != j {
+				(*ptr)[j] = entry
+			}
+			j++
+		}
+	}
+
+	*ptr = (*ptr)[:j]
+	return *ptr
+}

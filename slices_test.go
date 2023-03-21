@@ -27,6 +27,16 @@ func TestSliceUniqueInt(t *testing.T) {
 	if !slices.Equal(s, expectInts) {
 		t.Errorf("%v != %v", s, expectInts)
 	}
+
+	s = slices.Clone(ints)
+	s2 := SliceUniquify(&s)
+	slices.Sort(s)
+	if !slices.Equal(s, expectInts) {
+		t.Errorf("%v != %v", s, expectInts)
+	}
+	if !slices.Equal(s2, s) {
+		t.Errorf("%v != %v", s2, s)
+	}
 }
 
 func TestSliceUniqueFloat(t *testing.T) {
@@ -37,6 +47,13 @@ func TestSliceUniqueFloat(t *testing.T) {
 	if !slices.Equal(s, expectFloat64s) {
 		t.Errorf("%v != %v", s, expectFloat64s)
 	}
+
+	s = slices.Clone(float64s)
+	s2 := SliceUniquify(&s)
+	slices.Sort(s)
+	if !slices.Equal(s2, s) {
+		t.Errorf("%v != %v", s2, s)
+	}
 }
 
 func TestSliceUniqueString(t *testing.T) {
@@ -46,5 +63,15 @@ func TestSliceUniqueString(t *testing.T) {
 	slices.Sort(s)
 	if !slices.Equal(s, expectStrs) {
 		t.Errorf("%v != %v", s, expectStrs)
+	}
+
+	s = slices.Clone(strs)
+	s2 := SliceUniquify(&s)
+	slices.Sort(s)
+	if !slices.Equal(s, expectStrs) {
+		t.Errorf("%v != %v", s, expectStrs)
+	}
+	if !slices.Equal(s2, s) {
+		t.Errorf("%v != %v", s2, s)
 	}
 }
