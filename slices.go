@@ -44,10 +44,10 @@ func SliceContainsFn[T any](a []T, v T, eq func(T, T) bool) bool {
 // SliceUnique returns a new slice containing only
 // unique elements
 func SliceUnique[T comparable](a []T) []T {
-	keys := make(map[T]bool)
-	list := []T{}
+	keys := make(map[T]bool, len(a))
+	list := make([]T, 0, len(a))
 	for _, entry := range a {
-		if _, value := keys[entry]; !value {
+		if _, known := keys[entry]; !known {
 			keys[entry] = true
 			list = append(list, entry)
 		}
