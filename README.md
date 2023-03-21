@@ -20,6 +20,7 @@ should be on a subdirectory, it shouldn't be here.
 * Coalesce
 * SliceContains/SliceContainsFn
 * SliceMinus/SliceMinusFn
+* SliceUnique
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
