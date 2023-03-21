@@ -20,28 +20,31 @@ var (
 )
 
 func TestSliceUniqueInt(t *testing.T) {
-	uniqInt := SliceUnique(ints)
-	slices.Sort(uniqInt)
 	slices.Sort(expectInts)
-	if !slices.Equal(uniqInt, expectInts) {
-		t.Fail()
+
+	s := SliceUnique(ints)
+	slices.Sort(s)
+	if !slices.Equal(s, expectInts) {
+		t.Errorf("%v != %v", s, expectInts)
 	}
 }
 
 func TestSliceUniqueFloat(t *testing.T) {
-	uniqFloat := SliceUnique(float64s)
-	slices.Sort(uniqFloat)
 	slices.Sort(expectFloat64s)
-	if !slices.Equal(uniqFloat, expectFloat64s) {
-		t.Fail()
+
+	s := SliceUnique(float64s)
+	slices.Sort(s)
+	if !slices.Equal(s, expectFloat64s) {
+		t.Errorf("%v != %v", s, expectFloat64s)
 	}
 }
 
 func TestSliceUniqueString(t *testing.T) {
-	uniqStr := SliceUnique(strs)
-	slices.Sort(uniqStr)
 	slices.Sort(expectStrs)
-	if !slices.Equal(uniqStr, expectStrs) {
-		t.Fail()
+
+	s := SliceUnique(strs)
+	slices.Sort(s)
+	if !slices.Equal(s, expectStrs) {
+		t.Errorf("%v != %v", s, expectStrs)
 	}
 }
