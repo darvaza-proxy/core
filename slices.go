@@ -55,6 +55,18 @@ func SliceUnique[T comparable](a []T) []T {
 	return list
 }
 
+// SliceUniqueFn returns a new slice containing only
+// unique elements according to the callback eq
+func SliceUniqueFn[T any](a []T, eq func(T, T) bool) []T {
+	list := make([]T, 0, len(a))
+	for _, entry := range a {
+		if !SliceContainsFn(list, entry, eq) {
+			list = append(list, entry)
+		}
+	}
+	return list
+}
+
 // SliceUniquify returns the same slice, reduced to
 // only contain unique elements
 func SliceUniquify[T comparable](ptr *[]T) []T {
@@ -67,6 +79,27 @@ func SliceUniquify[T comparable](ptr *[]T) []T {
 	for i, entry := range *ptr {
 		if _, known := keys[entry]; !known {
 			keys[entry] = true
+			if i != j {
+				(*ptr)[j] = entry
+			}
+			j++
+		}
+	}
+
+	*ptr = (*ptr)[:j]
+	return *ptr
+}
+
+// SliceUniquifyFn returns the same slice, reduced to
+// only contain unique elements according to the callback eq
+func SliceUniquifyFn[T any](ptr *[]T, eq func(T, T) bool) []T {
+	if ptr == nil {
+		return []T{}
+	}
+
+	j := 0
+	for i, entry := range *ptr {
+		if !SliceContainsFn((*ptr)[:j], entry, eq) {
 			if i != j {
 				(*ptr)[j] = entry
 			}
