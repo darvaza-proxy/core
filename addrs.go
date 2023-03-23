@@ -1,8 +1,10 @@
 package core
 
 import (
+	"fmt"
 	"net"
 	"net/netip"
+	"strconv"
 )
 
 // GetStringIPAddresses returns a list of text IP addresses bound
@@ -157,4 +159,30 @@ func ParseNetIP(s string) (ip net.IP, err error) {
 	}
 
 	return asNetIP(addr.Unmap()), nil
+}
+
+// ParsePort validates a string as a TCP port
+func ParsePort(s string) (port uint16, err error) {
+	if s == "" {
+		return 0, nil
+	}
+
+	prt, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	outOfRangeErr := fmt.Errorf("value out of range for a port")
+	max := int64(^uint16(0))
+
+	if 0 > prt {
+		if prt > -max {
+			return uint16(-prt), nil
+		}
+		return 0, outOfRangeErr
+	}
+	if prt <= max {
+		return uint16(prt), nil
+	}
+	return 0, outOfRangeErr
 }
