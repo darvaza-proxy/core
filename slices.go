@@ -110,3 +110,17 @@ func SliceUniquifyFn[T any](ptr *[]T, eq func(T, T) bool) []T {
 	*ptr = (*ptr)[:j]
 	return *ptr
 }
+
+// SliceReplaceFn replaces or skips entries in a slice
+func SliceReplaceFn[T any](s []T,
+	fn func(partial []T, before T) (after T, replace bool)) []T {
+	//
+	j := 0
+	for _, v := range s {
+		if w, ok := fn(s[:j], v); ok {
+			s[j] = w
+			j++
+		}
+	}
+	return s[:j]
+}
