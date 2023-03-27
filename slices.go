@@ -124,3 +124,18 @@ func SliceReplaceFn[T any](s []T,
 	}
 	return s[:j]
 }
+
+// SliceCopyFn conditionally copies a slice allowing
+// modifications of the items
+func SliceCopyFn[T any](s []T,
+	fn func(partial []T, before T) (after T, replace bool)) []T {
+	//
+	result := make([]T, 0, len(s))
+	for _, v := range s {
+		if w, ok := fn(result, v); ok {
+			result = append(result, w)
+		}
+	}
+
+	return result
+}
