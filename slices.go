@@ -11,16 +11,16 @@ func SliceMinus[T comparable](a []T, b []T) []T {
 // SliceMinusFn returns a new slice containing only elements
 // of slice A that aren't on slice B according to the callback
 // eq
-func SliceMinusFn[T any](a []T, b []T, eq func(T, T) bool) []T {
-	out := make([]T, 0, len(a))
-
-	for _, v := range a {
-		if !SliceContainsFn(b, v, eq) {
-			out = append(out, v)
+func SliceMinusFn[T any](a, b []T, eq func(T, T) bool) []T {
+	fn := func(_ []T, v T) (T, bool) {
+		if SliceContainsFn(b, v, eq) {
+			return v, false // skip
 		}
+
+		return v, true // keep
 	}
 
-	return out
+	return SliceCopyFn(a, fn)
 }
 
 // SliceContains tells if a slice contains a given element
@@ -45,26 +45,36 @@ func SliceContainsFn[T any](a []T, v T, eq func(T, T) bool) bool {
 // unique elements
 func SliceUnique[T comparable](a []T) []T {
 	keys := make(map[T]bool, len(a))
-	list := make([]T, 0, len(a))
-	for _, entry := range a {
+
+	// keep only new elements
+	fn := func(_ []T, entry T) (T, bool) {
+		var keep bool
 		if _, known := keys[entry]; !known {
 			keys[entry] = true
-			list = append(list, entry)
+			keep = true
 		}
+		return entry, keep
 	}
-	return list
+
+	return SliceCopyFn(a, fn)
 }
 
 // SliceUniqueFn returns a new slice containing only
 // unique elements according to the callback eq
 func SliceUniqueFn[T any](a []T, eq func(T, T) bool) []T {
-	list := make([]T, 0, len(a))
-	for _, entry := range a {
-		if !SliceContainsFn(list, entry, eq) {
-			list = append(list, entry)
+	// keep only elements not present on the partial
+	// result already
+	fn := func(partial []T, entry T) (T, bool) {
+		var keep bool
+
+		if !SliceContainsFn(partial, entry, eq) {
+			keep = true
 		}
+
+		return entry, keep
 	}
-	return list
+
+	return SliceCopyFn(a, fn)
 }
 
 // SliceUniquify returns the same slice, reduced to
@@ -75,18 +85,18 @@ func SliceUniquify[T comparable](ptr *[]T) []T {
 	}
 
 	keys := make(map[T]bool, len(*ptr))
-	j := 0
-	for i, entry := range *ptr {
+
+	// keep only new elements
+	fn := func(_ []T, entry T) (T, bool) {
+		var keep bool
 		if _, known := keys[entry]; !known {
 			keys[entry] = true
-			if i != j {
-				(*ptr)[j] = entry
-			}
-			j++
+			keep = true
 		}
+		return entry, keep
 	}
 
-	*ptr = (*ptr)[:j]
+	*ptr = SliceReplaceFn(*ptr, fn)
 	return *ptr
 }
 
@@ -97,17 +107,18 @@ func SliceUniquifyFn[T any](ptr *[]T, eq func(T, T) bool) []T {
 		return []T{}
 	}
 
-	j := 0
-	for i, entry := range *ptr {
-		if !SliceContainsFn((*ptr)[:j], entry, eq) {
-			if i != j {
-				(*ptr)[j] = entry
-			}
-			j++
+	// keep only elements not present on the partial
+	// result already
+	fn := func(partial []T, entry T) (T, bool) {
+		var keep bool
+
+		if !SliceContainsFn(partial, entry, eq) {
+			keep = true
 		}
+		return entry, keep
 	}
 
-	*ptr = (*ptr)[:j]
+	*ptr = SliceReplaceFn(*ptr, fn)
 	return *ptr
 }
 
