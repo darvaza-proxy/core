@@ -22,6 +22,7 @@ should be on a subdirectory, it shouldn't be here.
 * SliceMinus/SliceMinusFn
 * SliceUnique/SliceUniqueFn
 * SliceUniquify/SliceUniquifyFn
+* SliceReplaceFn/SliceCopyFn
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
