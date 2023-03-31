@@ -6,7 +6,9 @@ import (
 	"testing"
 )
 
+// revive:disable:cognitive-complexity
 func TestNewContextKey(t *testing.T) {
+	// revive:enable:cognitive-complexity
 	k0 := NewContextKey[int]("k0")
 	// name
 	if k0.String() != "k0" {
