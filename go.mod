@@ -1,4 +1,4 @@
-module github.com/darvaza-proxy/core
+module darvaza.org/core
 
 go 1.19
 
