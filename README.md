@@ -39,6 +39,7 @@ should be on a subdirectory, it shouldn't be here.
 ## Errors
 
 * Wrap/Wrapf/Unwrappable
+* Errors/CompoundError
 * AsRecovered/Recovered
 * Catcher
 * PanicError
