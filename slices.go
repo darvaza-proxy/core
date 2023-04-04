@@ -1,5 +1,10 @@
 package core
 
+import (
+	"crypto/rand"
+	"math/big"
+)
+
 // SliceMinus returns a new slice containing only the
 // elements of one slice not present on the second
 func SliceMinus[T comparable](a []T, b []T) []T {
@@ -124,7 +129,8 @@ func SliceUniquifyFn[T any](ptr *[]T, eq func(T, T) bool) []T {
 
 // SliceReplaceFn replaces or skips entries in a slice
 func SliceReplaceFn[T any](s []T,
-	fn func(partial []T, before T) (after T, replace bool)) []T {
+	fn func(partial []T, before T) (after T, replace bool),
+) []T {
 	//
 	j := 0
 	for _, v := range s {
@@ -139,7 +145,8 @@ func SliceReplaceFn[T any](s []T,
 // SliceCopyFn conditionally copies a slice allowing
 // modifications of the items
 func SliceCopyFn[T any](s []T,
-	fn func(partial []T, before T) (after T, replace bool)) []T {
+	fn func(partial []T, before T) (after T, replace bool),
+) []T {
 	//
 	result := make([]T, 0, len(s))
 	for _, v := range s {
@@ -149,4 +156,22 @@ func SliceCopyFn[T any](s []T,
 	}
 
 	return result
+}
+
+// SliceRandom returns a random element from a slice
+// if the slice is empty it will return the zero value
+// of the slice type and false
+func SliceRandom[T any](a []T) (T, bool) {
+	var result T
+
+	switch len(a) {
+	case 0:
+		return result, false
+	case 1:
+		result = a[0]
+	default:
+		id, _ := rand.Int(rand.Reader, big.NewInt(int64(len(a))))
+		result = a[id.Uint64()]
+	}
+	return result, true
 }
