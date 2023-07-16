@@ -9,60 +9,66 @@ import (
 	"golang.org/x/net/idna"
 )
 
-// revive:disable:cognitive-complexity
-// revive:disable:cyclomatic
-
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
 // port isn't part of the string and it validates it if present.
 // SplitHostPort will also validate the host is a valid IP or name
 func SplitHostPort(hostport string) (host, port string, err error) {
-	// revive:enable:cognitive-complexity
-	// revive:enable:cyclomatic
-	var ok bool
+	host, port, err = splitHostPortUnsafe(hostport)
 
-	if hostport == "" {
-		// empty
-		err = addrErr(hostport, "empty address")
-	} else if hostport[0] == '[' {
-		// [host]:port [host]
-		host, port, err = splitHostPortBracketed(hostport)
-	} else if host, port, ok = splitLastRune(':', hostport); !ok {
-		// host without port
-		host, port = hostport, ""
-	} else if port == "" {
-		// host:
-		err = addrErr(hostport, "missing port after ':'")
-	} else if host == "" {
-		// :port
-		host = "::" // use undetermined host
-	} else if strings.ContainsRune(host, ':') {
-		// unbracketed ipv6?
-		if host, ok = validIP(hostport); ok {
-			return host, "", nil
+	switch {
+	case err != nil:
+		// failed split
+		return "", "", err
+	case port != "" && !validPort(port):
+		// bad port
+		err = addrErr(hostport, "invalid port")
+		return "", "", err
+	default:
+		if s, ok := validIP(host); ok {
+			// valid IP
+			return s, port, nil
+		}
+
+		if s, ok := validName(host); ok {
+			// valid name
+			return s, port, nil
 		}
 
 		err = addrErr(hostport, "invalid address")
+		return "", "", err
+	}
+}
+
+func splitHostPortUnsafe(hostport string) (host, port string, err error) {
+	var ok bool
+
+	switch {
+	case hostport == "":
+		// empty
+		err = addrErr(hostport, "empty address")
+		return "", "", err
+	case hostport[0] == '[':
+		// [host]:port [host]
+		return splitHostPortBracketed(hostport)
+	case strings.Count(hostport, ":") > 1:
+		// unbracketed IPv6
+		return hostport, "", nil
 	}
 
-	if err == nil {
-		// successful split, but is it valid?
-
-		if port != "" && !validPort(port) {
-			// bad port
-			err = addrErr(hostport, "invalid port")
-		} else if s, ok := validIP(host); ok {
-			// valid IP
-			return s, port, nil
-		} else if s, ok := validName(host); ok {
-			// valid name
-			return s, port, nil
-		} else {
-			// bad address
-			err = addrErr(hostport, "invalid address")
-		}
+	host, port, ok = splitLastRune(':', hostport)
+	switch {
+	case !ok:
+		// host without port
+		host, port = hostport, ""
+	case port == "":
+		// host:
+		err = addrErr(hostport, "missing port after ':'")
+	case host == "":
+		// :port
+		host = "::" // use undetermined host
 	}
 
-	return "", "", err
+	return host, port, err
 }
 
 func splitHostPortBracketed(hostport string) (host, port string, err error) {
