@@ -1,6 +1,7 @@
 # Core of helpers for darvaza.org projects
 
 [![Go Reference](https://pkg.go.dev/badge/darvaza.org/core.svg)](https://pkg.go.dev/darvaza.org/core)
+[![Codebeat Score](https://codebeat.co/badges/aaee3212-75a8-4f4d-8fe8-58bc8bcc108f)](https://codebeat.co/projects/github-com-darvaza-proxy-core-main)
 
 This package contains simple mechanisms used by other darvaza-proxy projects.
 It's not allowed to have dependencies outside of Go' Standard Library, and if something
