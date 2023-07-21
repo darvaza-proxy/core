@@ -58,3 +58,15 @@ func (w *WrappedError) Error() string {
 func (w *WrappedError) Unwrap() error {
 	return w.cause
 }
+
+// CoalesceError returns the first non-nil error argument.
+// error isn't compatible with Coalesce's comparable generic
+// type.
+func CoalesceError(errs ...error) error {
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
