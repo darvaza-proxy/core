@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/mgechev/revive v1.3.2
-	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
+	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/net v0.12.0
 )
 
