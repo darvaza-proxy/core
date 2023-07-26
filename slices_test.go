@@ -157,7 +157,7 @@ func TestSliceRandom(t *testing.T) {
 		if tc.name != "random" {
 			got, ok := SliceRandom(tc.input)
 			if ok != tc.wantok {
-				t.Fatalf("an error occured in %s", tc.name)
+				t.Fatalf("an error occurred in %s", tc.name)
 			}
 			if tc.want != got {
 				t.Fatalf("%s: expected: %v, got: %v", tc.name, tc.want, got)
@@ -165,7 +165,7 @@ func TestSliceRandom(t *testing.T) {
 		} else {
 			u, ok := SliceRandom(tc.input)
 			if ok != tc.wantok {
-				t.Fatalf("error occured in %s", tc.name)
+				t.Fatalf("error occurred in %s", tc.name)
 			}
 			t.Logf("random from one,two,three,four,five,six: %s", u)
 		}
