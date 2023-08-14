@@ -23,7 +23,7 @@ const (
 // Frame represents a function call on the call Stack.
 // This implementation is heavily based on
 // github.com/pkg/errors.Frame but all parts are resolved
-// immediatelly for later consumption.
+// immediately for later consumption.
 type Frame struct {
 	pc    uintptr
 	entry uintptr
