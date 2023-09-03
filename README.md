@@ -26,6 +26,7 @@ should be on a subdirectory, it shouldn't be here.
 
 ## Generics
 
+* Zero/IsZero
 * Coalesce/IIf
 * SliceContains/SliceContainsFn
 * SliceMinus/SliceMinusFn
