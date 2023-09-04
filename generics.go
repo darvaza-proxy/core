@@ -1,16 +1,14 @@
 package core
 
 // Coalesce returns the first non-zero argument
-func Coalesce[T comparable](opts ...T) T {
-	var zero T
-
+func Coalesce[T any](opts ...T) T {
 	for _, v := range opts {
-		if v != zero {
+		if !IsZero(v) {
 			return v
 		}
 	}
 
-	return zero
+	return Zero[T](nil)
 }
 
 // revive:disable:flag-parameter
