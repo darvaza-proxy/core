@@ -3,7 +3,7 @@ module darvaza.org/core
 go 1.19
 
 require (
-	github.com/mgechev/revive v1.3.3
+	github.com/mgechev/revive v1.3.4
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/net v0.15.0
 )
