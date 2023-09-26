@@ -65,11 +65,23 @@ func (f Frame) Name() string {
 // FuncName returns the name of the function,
 // without the package name
 func (f Frame) FuncName() string {
-	name := f.name
-	if i := strings.LastIndexAny(name, "./"); i > 0 {
-		name = name[i+1:]
+	_, s := f.SplitName()
+	return s
+}
+
+// PkgName returns the package name
+func (f Frame) PkgName() string {
+	s, _ := f.SplitName()
+	return s
+}
+
+// SplitName returns package name and function name
+func (f Frame) SplitName() (pkgName string, funcName string) {
+	i := strings.LastIndexAny(f.name, "./")
+	if i < 0 {
+		return "", f.name
 	}
-	return name
+	return f.name[:i], f.name[i+1:]
 }
 
 // File returns the file name of the source code
