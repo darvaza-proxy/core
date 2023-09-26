@@ -56,9 +56,32 @@ func frameForPC(pc uintptr) Frame {
 	}
 }
 
-// Name returns the name of the function.
+// Name returns the name of the function,
+// including package name
 func (f Frame) Name() string {
 	return f.name
+}
+
+// FuncName returns the name of the function,
+// without the package name
+func (f Frame) FuncName() string {
+	_, s := f.SplitName()
+	return s
+}
+
+// PkgName returns the package name
+func (f Frame) PkgName() string {
+	s, _ := f.SplitName()
+	return s
+}
+
+// SplitName returns package name and function name
+func (f Frame) SplitName() (pkgName string, funcName string) {
+	i := strings.LastIndexAny(f.name, "./")
+	if i < 0 {
+		return "", f.name
+	}
+	return f.name[:i], f.name[i+1:]
 }
 
 // File returns the file name of the source code
@@ -100,32 +123,44 @@ func (f Frame) FileLine() string {
 func (f Frame) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 's':
-		switch {
-		case s.Flag('+'):
-			writeFormat(s, f.name)
-			writeFormat(s, "\n\t")
-			writeFormat(s, f.file)
-		default:
-			writeFormat(s, path.Base(f.file))
-		}
+		f.formatFile(s)
 	case 'd':
-		writeFormat(s, strconv.Itoa(f.line))
+		f.formatLine(s)
 	case 'n':
-		n := f.name
-		switch {
-		case s.Flag('+'):
-			writeFormat(s, n)
-		default:
-			writeFormat(s, funcname(n))
-		}
+		f.formatName(s)
 	case 'v':
-		f.Format(s, 's')
+		f.formatFile(s)
 		writeFormat(s, ":")
-		f.Format(s, 'd')
+		f.formatLine(s)
 	}
 }
 
-func writeFormat(s fmt.State, str string) {
+func (f Frame) formatFile(s fmt.State) {
+	switch {
+	case s.Flag('+'):
+		writeFormat(s, f.name)
+		writeFormat(s, "\n\t")
+		writeFormat(s, f.file)
+	default:
+		writeFormat(s, path.Base(f.file))
+	}
+}
+
+func (f Frame) formatLine(s fmt.State) {
+	writeFormat(s, strconv.Itoa(f.line))
+}
+
+func (f Frame) formatName(s fmt.State) {
+	var name string
+	if s.Flag('+') {
+		name = f.Name()
+	} else {
+		name = f.FuncName()
+	}
+	writeFormat(s, name)
+}
+
+func writeFormat(s io.Writer, str string) {
 	n, err := io.WriteString(s, str)
 	if err != nil {
 		panic(fmt.Errorf("Frame: failed to write %q to buffer", str))
@@ -139,7 +174,7 @@ func writeFormat(s fmt.State, str string) {
 type Stack []Frame
 
 // Format formats the stack of Frames following the rules
-// explained in Frame.Format with the adition of the '#' flag.
+// explained in Frame.Format with the addition of the '#' flag.
 //
 // when '#' is passed, like for example %#+v each row
 // will be prefixed by [i/n] indicating the position in the stack
@@ -157,13 +192,6 @@ func (st Stack) Format(s fmt.State, verb rune) {
 			f.Format(s, verb)
 		}
 	}
-}
-
-func funcname(name string) string {
-	i := strings.LastIndex(name, "/")
-	name = name[i+1:]
-	i = strings.Index(name, ".")
-	return name[i+1:]
 }
 
 // Here returns the Frame corresponding to where it was called,
