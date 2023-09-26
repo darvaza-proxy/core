@@ -79,7 +79,8 @@ func (wg *WaitGroup) tryReportError(err error) {
 	go func() {
 		defer wg.wg.Done()
 		defer func() {
-			recover()
+			// ignore if errCh is closed
+			_ = recover()
 		}()
 
 		wg.errCh <- err
@@ -88,7 +89,8 @@ func (wg *WaitGroup) tryReportError(err error) {
 
 func (wg *WaitGroup) tryCloseErrCh() {
 	defer func() {
-		recover()
+		// ignore if errCh is already closed
+		_ = recover()
 	}()
 
 	close(wg.errCh)
