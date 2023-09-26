@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/slices"
 )
 
@@ -22,124 +23,56 @@ var (
 	expectStrs = []string{"", "Hello", "foo", "bar", "f00", "%*&^*&^&"}
 )
 
-func TestSliceUniqueInt(t *testing.T) {
-	slices.Sort(expectInts)
+func testSliceUnique[T constraints.Ordered](t *testing.T, before, after []T) {
+	slices.Sort(after)
 
-	eq := func(a, b int) bool {
+	eq := func(a, b T) bool {
 		return a == b
 	}
 
-	s := SliceUnique(ints)
+	s := SliceUnique(before)
 	slices.Sort(s)
-	if !slices.Equal(s, expectInts) {
-		t.Errorf("%v != %v", s, expectInts)
+	if !slices.Equal(s, after) {
+		t.Errorf("%v != %v", s, after)
 	}
 
-	s = SliceUniqueFn(ints, eq)
+	s = SliceUniqueFn(before, eq)
 	slices.Sort(s)
-	if !slices.Equal(s, expectInts) {
-		t.Errorf("%v != %v", s, expectInts)
+	if !slices.Equal(s, after) {
+		t.Errorf("%v != %v", s, after)
 	}
 
-	s = slices.Clone(ints)
+	s = slices.Clone(before)
 	s2 := SliceUniquify(&s)
 	slices.Sort(s)
-	if !slices.Equal(s, expectInts) {
-		t.Errorf("%v != %v", s, expectInts)
+	if !slices.Equal(s, after) {
+		t.Errorf("%v != %v", s, after)
 	}
 	if !slices.Equal(s2, s) {
 		t.Errorf("%v != %v", s2, s)
 	}
 
-	s = slices.Clone(ints)
+	s = slices.Clone(before)
 	s2 = SliceUniquifyFn(&s, eq)
 	slices.Sort(s)
-	if !slices.Equal(s, expectInts) {
-		t.Errorf("%v != %v", s, expectInts)
+	if !slices.Equal(s, after) {
+		t.Errorf("%v != %v", s, after)
 	}
 	if !slices.Equal(s2, s) {
 		t.Errorf("%v != %v", s2, s)
 	}
+}
+
+func TestSliceUniqueInt(t *testing.T) {
+	testSliceUnique(t, ints, expectInts)
 }
 
 func TestSliceUniqueFloat(t *testing.T) {
-	slices.Sort(expectFloat64s)
-
-	eq := func(a, b float64) bool {
-		return a == b
-	}
-
-	s := SliceUnique(float64s)
-	slices.Sort(s)
-	if !slices.Equal(s, expectFloat64s) {
-		t.Errorf("%v != %v", s, expectFloat64s)
-	}
-
-	s = SliceUniqueFn(float64s, eq)
-	slices.Sort(s)
-	if !slices.Equal(s, expectFloat64s) {
-		t.Errorf("%v != %v", s, expectFloat64s)
-	}
-
-	s = slices.Clone(float64s)
-	s2 := SliceUniquify(&s)
-	slices.Sort(s)
-	if !slices.Equal(s, expectFloat64s) {
-		t.Errorf("%v != %v", s, expectFloat64s)
-	}
-	if !slices.Equal(s2, s) {
-		t.Errorf("%v != %v", s2, s)
-	}
-
-	s = slices.Clone(float64s)
-	s2 = SliceUniquifyFn(&s, eq)
-	slices.Sort(s)
-	if !slices.Equal(s, expectFloat64s) {
-		t.Errorf("%v != %v", s, expectFloat64s)
-	}
-	if !slices.Equal(s2, s) {
-		t.Errorf("%v != %v", s2, s)
-	}
+	testSliceUnique(t, float64s, expectFloat64s)
 }
 
 func TestSliceUniqueString(t *testing.T) {
-	slices.Sort(expectStrs)
-
-	eq := func(a, b string) bool {
-		return a == b
-	}
-
-	s := SliceUnique(strs)
-	slices.Sort(s)
-	if !slices.Equal(s, expectStrs) {
-		t.Errorf("%v != %v", s, expectStrs)
-	}
-
-	s = SliceUniqueFn(strs, eq)
-	slices.Sort(s)
-	if !slices.Equal(s, expectStrs) {
-		t.Errorf("%v != %v", s, expectStrs)
-	}
-
-	s = slices.Clone(strs)
-	s2 := SliceUniquify(&s)
-	slices.Sort(s)
-	if !slices.Equal(s, expectStrs) {
-		t.Errorf("%v != %v", s, expectStrs)
-	}
-	if !slices.Equal(s2, s) {
-		t.Errorf("%v != %v", s2, s)
-	}
-
-	s = slices.Clone(strs)
-	s2 = SliceUniquifyFn(&s, eq)
-	slices.Sort(s)
-	if !slices.Equal(s, expectStrs) {
-		t.Errorf("%v != %v", s, expectStrs)
-	}
-	if !slices.Equal(s2, s) {
-		t.Errorf("%v != %v", s2, s)
-	}
+	testSliceUnique(t, strs, expectStrs)
 }
 
 func TestSliceRandom(t *testing.T) {
