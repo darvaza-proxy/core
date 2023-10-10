@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -42,16 +43,27 @@ func (p *PanicError) CallStack() Stack {
 
 // NewPanicError creates a new PanicError with arbitrary payload
 func NewPanicError(skip int, payload any) *PanicError {
+	if s, ok := payload.(string); ok {
+		payload = errors.New(s)
+	}
 	return &PanicError{
 		payload: payload,
 		stack:   StackTrace(skip + 1),
 	}
 }
 
-// NewPanicErrorf creates a new PanicError with a formatted string as payload
+// NewPanicErrorf creates a new PanicError annotated with
+// a string, optionally formatted. %w is expanded.
 func NewPanicErrorf(skip int, format string, args ...any) *PanicError {
+	var payload error
+	if len(args) > 0 {
+		payload = fmt.Errorf(format, args...)
+	} else {
+		payload = errors.New(format)
+	}
+
 	return &PanicError{
-		payload: fmt.Errorf(format, args...),
+		payload: payload,
 		stack:   StackTrace(skip + 1),
 	}
 }
