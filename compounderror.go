@@ -56,7 +56,7 @@ func (w *CompoundError) AppendError(err error) {
 		// one of us
 		w.Errs = append(w.Errs, v.Errs...)
 	case Errors:
-		// cosin, I can't trust you don't have nil entries
+		// cousin, I can't trust you don't have nil entries
 		// there
 		for _, e := range v.Errors() {
 			w.AppendError(e)

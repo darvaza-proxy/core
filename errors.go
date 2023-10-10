@@ -14,7 +14,7 @@ type Unwrappable interface {
 	Unwrap() error
 }
 
-// Wrapf annotates an error with a formated string. if %w is used the argument
+// Wrapf annotates an error with a formatted string. if %w is used the argument
 // will be unwrapped
 func Wrapf(err error, format string, args ...any) error {
 	if err == nil {

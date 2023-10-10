@@ -48,7 +48,7 @@ func NewPanicError(skip int, payload any) *PanicError {
 	}
 }
 
-// NewPanicErrorf creates a new PanicError with a formated string as payload
+// NewPanicErrorf creates a new PanicError with a formatted string as payload
 func NewPanicErrorf(skip int, format string, args ...any) *PanicError {
 	return &PanicError{
 		payload: fmt.Errorf(format, args...),
@@ -66,7 +66,7 @@ func NewPanicWrap(skip int, err error, msg string) *PanicError {
 }
 
 // NewPanicWrapf creates a new PanicError wrapping a given error
-// annotated with a formated string
+// annotated with a formatted string
 func NewPanicWrapf(skip int, err error, format string, args ...any) *PanicError {
 	return &PanicError{
 		payload: Wrapf(err, format, args...),
@@ -79,7 +79,7 @@ func Panic(payload any) {
 	panic(NewPanicError(1, payload))
 }
 
-// Panicf emits a PanicError with a formated string as payload
+// Panicf emits a PanicError with a formatted string as payload
 func Panicf(format string, args ...any) {
 	panic(NewPanicErrorf(1, format, args...))
 }
@@ -89,7 +89,7 @@ func PanicWrap(err error, msg string) {
 	panic(NewPanicWrap(1, err, msg))
 }
 
-// PanicWrapf emits a PanicError wrapping an error annotated with a formated string
+// PanicWrapf emits a PanicError wrapping an error annotated with a formatted string
 func PanicWrapf(err error, format string, args ...any) {
 	panic(NewPanicWrapf(1, err, format, args...))
 }
