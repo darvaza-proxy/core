@@ -49,17 +49,21 @@ should be on a subdirectory, it shouldn't be here.
 
 ## Errors
 
-* Wrap/Wrapf/Unwrappable
+* Wrap/Unwrappable
 * Errors/CompoundError
 * CoalesceError
 * AsRecovered/Recovered
 * Catcher
 * PanicError
-* Panic/Panicf/PanicWrap/PanicWrapf
+* Panic/Panicf/PanicWrap
 * WaitGroup
 * Frame/Stack
 * Here/StackFrame/StackTrace
 * CallStacker
+
+* ErrNotImplemented
+* ErrExists/ErrNotExists
+* ErrInvalid/ErrUnknown
 
 ## See also
 

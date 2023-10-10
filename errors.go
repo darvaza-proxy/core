@@ -1,7 +1,21 @@
 package core
 
 import (
+	"errors"
 	"fmt"
+)
+
+var (
+	// ErrNotImplemented indicates something hasn't been implemented yet
+	ErrNotImplemented = errors.New("not implemented")
+	// ErrExists indicates something already exists
+	ErrExists = errors.New("already exists")
+	// ErrNotExists indicates something doesn't exist
+	ErrNotExists = errors.New("does not exist")
+	// ErrInvalid indicates an argument isn't valid
+	ErrInvalid = errors.New("invalid argument")
+	// ErrUnknown indicates something isn't recognized
+	ErrUnknown = errors.New("unknown")
 )
 
 var (
@@ -14,20 +28,19 @@ type Unwrappable interface {
 	Unwrap() error
 }
 
-// Wrapf annotates an error with a formatted string. if %w is used the argument
-// will be unwrapped
-func Wrapf(err error, format string, args ...any) error {
+// Wrap annotates an error, optionally with a formatted string.
+// if %w is used the argument will be unwrapped
+func Wrap(err error, format string, args ...any) error {
+	var note string
+
 	if err == nil {
 		return nil
 	}
 
-	return Wrap(err, fmt.Errorf(format, args...).Error())
-}
-
-// Wrap annotates an error with a string
-func Wrap(err error, note string) error {
-	if err == nil {
-		return nil
+	if len(args) > 0 {
+		note = fmt.Errorf(format, args...).Error()
+	} else {
+		note = format
 	}
 
 	if len(note) == 0 {
