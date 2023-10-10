@@ -60,7 +60,7 @@ func NewPanicErrorf(skip int, format string, args ...any) *PanicError {
 // annotated with a string message
 func NewPanicWrap(skip int, err error, msg string) *PanicError {
 	return &PanicError{
-		payload: Wrapf(err, msg),
+		payload: Wrap(err, msg),
 		stack:   StackTrace(skip + 1),
 	}
 }
@@ -69,7 +69,7 @@ func NewPanicWrap(skip int, err error, msg string) *PanicError {
 // annotated with a formatted string
 func NewPanicWrapf(skip int, err error, format string, args ...any) *PanicError {
 	return &PanicError{
-		payload: Wrapf(err, format, args...),
+		payload: Wrap(err, format, args...),
 		stack:   StackTrace(skip + 1),
 	}
 }
