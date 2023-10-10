@@ -1,7 +1,21 @@
 package core
 
 import (
+	"errors"
 	"fmt"
+)
+
+var (
+	// ErrNotImplemented indicates something hasn't been implemented yet
+	ErrNotImplemented = errors.New("not implemented")
+	// ErrExists indicates something already exists
+	ErrExists = errors.New("already exists")
+	// ErrNotExists indicates something doesn't exist
+	ErrNotExists = errors.New("does not exist")
+	// ErrInvalid indicates an argument isn't valid
+	ErrInvalid = errors.New("invalid argument")
+	// ErrUnknown indicates something isn't recognized
+	ErrUnknown = errors.New("unknown")
 )
 
 var (

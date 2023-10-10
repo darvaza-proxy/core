@@ -61,6 +61,10 @@ should be on a subdirectory, it shouldn't be here.
 * Here/StackFrame/StackTrace
 * CallStacker
 
+* ErrNotImplemented
+* ErrExists/ErrNotExists
+* ErrInvalid/ErrUnknown
+
 ## See also
 
 * [darvaza.org/slog](https://pkg.go.dev/darvaza.org/slog)
