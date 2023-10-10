@@ -3,7 +3,7 @@ package core
 import "container/list"
 
 // MapContains tells if a given map contains a key.
-// this helper is inteded for switch/case conditions
+// this helper is intended for switch/case conditions
 func MapContains[K comparable](m map[K]any, key K) bool {
 	_, ok := m[key]
 	return ok
@@ -80,7 +80,7 @@ func MapListInsertUnique[K comparable, T comparable](m map[K]*list.List, key K, 
 }
 
 // MapListInsertUniqueFn adds a value at the front of the list of a map entry
-// if it's not already there usign a function to compare values
+// if it's not already there using a function to compare values
 func MapListInsertUniqueFn[K comparable, T any](m map[K]*list.List, key K, v T,
 	eq func(va, vb T) bool) {
 	if m == nil || eq == nil {
@@ -107,7 +107,7 @@ func MapListAppendUnique[K comparable, T comparable](m map[K]*list.List, key K, 
 }
 
 // MapListAppendUniqueFn adds a value at the end of the list of a map entry
-// if it's not already there usign a function to compare values
+// if it's not already there using a function to compare values
 func MapListAppendUniqueFn[K comparable, T any](m map[K]*list.List, key K, v T,
 	eq func(T, T) bool) {
 	if m != nil && eq != nil {

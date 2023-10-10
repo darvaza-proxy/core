@@ -36,7 +36,7 @@ func (ck *ContextKey[T]) String() string {
 	return ck.name
 }
 
-// GoString renders this key in Go systax for %v
+// GoString renders this key in Go syntax for %v
 func (ck *ContextKey[T]) GoString() string {
 	var zero T
 	return fmt.Sprintf("core.NewContextKey[%T](%q)",
