@@ -13,8 +13,8 @@ import (
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
 // port isn't part of the string and it validates it if present.
 // SplitHostPort will also validate the host is a valid IP or name
-func SplitHostPort(hostport string) (host, port string, err error) {
-	host, port, err = splitHostPortUnsafe(hostport)
+func SplitHostPort(hostPort string) (host, port string, err error) {
+	host, port, err = splitHostPortUnsafe(hostPort)
 
 	switch {
 	case err != nil:
@@ -22,7 +22,7 @@ func SplitHostPort(hostport string) (host, port string, err error) {
 		return "", "", err
 	case port != "" && !validPort(port):
 		// bad port
-		err = addrErr(hostport, "invalid port")
+		err = addrErr(hostPort, "invalid port")
 		return "", "", err
 	default:
 		if s, ok := validIP(host); ok {
@@ -35,7 +35,7 @@ func SplitHostPort(hostport string) (host, port string, err error) {
 			return s, port, nil
 		}
 
-		err = addrErr(hostport, "invalid address")
+		err = addrErr(hostPort, "invalid address")
 		return "", "", err
 	}
 }
@@ -72,30 +72,30 @@ func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	return addr, port, nil
 }
 
-func splitHostPortUnsafe(hostport string) (host, port string, err error) {
+func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 	var ok bool
 
 	switch {
-	case hostport == "":
+	case hostPort == "":
 		// empty
-		err = addrErr(hostport, "empty address")
+		err = addrErr(hostPort, "empty address")
 		return "", "", err
-	case hostport[0] == '[':
+	case hostPort[0] == '[':
 		// [host]:port [host]
-		return splitHostPortBracketed(hostport)
-	case strings.Count(hostport, ":") > 1:
+		return splitHostPortBracketed(hostPort)
+	case strings.Count(hostPort, ":") > 1:
 		// unbracketed IPv6
-		return hostport, "", nil
+		return hostPort, "", nil
 	}
 
-	host, port, ok = splitLastRune(':', hostport)
+	host, port, ok = splitLastRune(':', hostPort)
 	switch {
 	case !ok:
 		// host without port
-		host, port = hostport, ""
+		host, port = hostPort, ""
 	case port == "":
 		// host:
-		err = addrErr(hostport, "missing port after ':'")
+		err = addrErr(hostPort, "missing port after ':'")
 	case host == "":
 		// :port
 		host = "::" // use undetermined host
@@ -104,13 +104,13 @@ func splitHostPortUnsafe(hostport string) (host, port string, err error) {
 	return host, port, err
 }
 
-func splitHostPortBracketed(hostport string) (host, port string, err error) {
-	host, s, ok := splitLastRune(']', hostport[1:])
+func splitHostPortBracketed(hostPort string) (host, port string, err error) {
+	host, s, ok := splitLastRune(']', hostPort[1:])
 	switch {
 	case !ok:
 		// [host
 		host = ""
-		err = addrErr(hostport, "missing ']' in address")
+		err = addrErr(hostPort, "missing ']' in address")
 	case s == "":
 		// [host]
 	case s[0] == ':':
@@ -118,12 +118,12 @@ func splitHostPortBracketed(hostport string) (host, port string, err error) {
 		port = s[1:]
 		if port == "" {
 			// [host]:
-			err = addrErr(hostport, "missing port after ':'")
+			err = addrErr(hostPort, "missing port after ':'")
 		}
 	default:
 		// [host]...
 		host = ""
-		err = addrErr(hostport, "invalid character after ']'")
+		err = addrErr(hostPort, "invalid character after ']'")
 	}
 
 	return host, port, err
