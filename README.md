@@ -19,7 +19,7 @@ should be on a subdirectory, it shouldn't be here.
 
 * GetInterfacesNames
 * ParseAddr/ParseNetIP
-* SplitHostPort
+* SplitHostPort/SplitAddrPort
 * AddrPort
 * AddrFromNetIP
 * GetIPAddresses/GetNetIPAddresses/GetStringIPAddresses
