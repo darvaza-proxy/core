@@ -2,6 +2,7 @@ package core
 
 import (
 	"net"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -37,6 +38,38 @@ func SplitHostPort(hostport string) (host, port string, err error) {
 		err = addrErr(hostport, "invalid address")
 		return "", "", err
 	}
+}
+
+// SplitAddrPort splits a string containing an IP address and an optional port,
+// and validates it.
+func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
+	// split
+	host, sPort, err := splitHostPortUnsafe(addrPort)
+	if err != nil {
+		// failed to split
+		return netip.Addr{}, 0, err
+	}
+
+	// port
+	if sPort != "" {
+		port, err = parsePort(sPort)
+		if err != nil {
+			// bad port
+			err = addrErr(addrPort, "invalid port")
+			return netip.Addr{}, 0, err
+		}
+	}
+
+	// addr
+	addr, err = ParseAddr(host)
+	if err != nil {
+		// bad address
+		err = addrErr(addrPort, "invalid address")
+		return netip.Addr{}, 0, err
+	}
+
+	// success
+	return addr, port, nil
 }
 
 func splitHostPortUnsafe(hostport string) (host, port string, err error) {
@@ -106,8 +139,16 @@ func splitLastRune(r rune, s string) (before, after string, found bool) {
 	return s[:i], s[i+1:], true
 }
 
+func parsePort(s string) (uint16, error) {
+	u64, err := strconv.ParseUint(s, 10, 16)
+	if err != nil {
+		return 0, err
+	}
+	return uint16(u64), nil
+}
+
 func validPort(s string) bool {
-	_, err := strconv.ParseUint(s, 10, 16)
+	_, err := parsePort(s)
 	return err == nil
 }
 
