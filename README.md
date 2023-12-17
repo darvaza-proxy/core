@@ -56,7 +56,7 @@ should be on a subdirectory, it shouldn't be here.
 * Catcher
 * PanicError
 * Panic/Panicf/PanicWrap
-* WaitGroup
+* WaitGroup/ErrGroup
 * Frame/Stack
 * Here/StackFrame/StackTrace
 * CallStacker
