@@ -30,16 +30,25 @@ func (wg *WaitGroup) OnError(fn func(error) error) {
 }
 
 func (wg *WaitGroup) watchErrCh() {
+	defer close(wg.errCh)
+
 	for {
 		err, ok := <-wg.errCh
-		if !ok {
-			break
-		}
-		if wg.onError != nil {
+		switch {
+		case !ok:
+			// wtf
+			return
+		case wg.onError != nil:
+			// process
 			err = wg.onError(err)
 		}
-		if err != nil {
-			wg.err.CompareAndSwap(nil, err)
+
+		switch {
+		case err == nil:
+			// error dismissed
+		case wg.err.CompareAndSwap(nil, err):
+			// first, we are done.
+			return
 		}
 	}
 }
@@ -94,21 +103,10 @@ func (wg *WaitGroup) tryReportError(err error) {
 	}()
 }
 
-func (wg *WaitGroup) tryCloseErrCh() {
-	defer func() {
-		// ignore if errCh is already closed
-		_ = recover()
-	}()
-
-	close(wg.errCh)
-}
-
 // Wait waits until all workers have finished, and returns
 // the first error
 func (wg *WaitGroup) Wait() error {
 	wg.wg.Wait()
-	defer wg.tryCloseErrCh()
-
 	return wg.Err()
 }
 
