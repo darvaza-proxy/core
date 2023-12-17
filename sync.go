@@ -7,10 +7,20 @@ import (
 
 // WaitGroup is a safer way to run workers
 type WaitGroup struct {
+	mu      sync.Mutex
 	wg      sync.WaitGroup
 	err     atomic.Value
 	errCh   chan error
 	onError func(error) error
+}
+
+func (wg *WaitGroup) init() {
+	wg.mu.Lock()
+	if wg.errCh == nil {
+		wg.errCh = make(chan error)
+		go wg.watchErrCh()
+	}
+	wg.mu.Unlock()
 }
 
 // OnError sets a helper that will be called when
@@ -42,10 +52,7 @@ func (wg *WaitGroup) Go(fn func() error) {
 // GoCatch spawns a supervised goroutine, and uses a given function
 // to intercept the returned error
 func (wg *WaitGroup) GoCatch(fn func() error, catch func(error) error) {
-	if wg.errCh == nil {
-		wg.errCh = make(chan error)
-		go wg.watchErrCh()
-	}
+	wg.init()
 
 	if fn != nil {
 		wg.wg.Add(1)
