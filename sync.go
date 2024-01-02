@@ -111,6 +111,17 @@ func (wg *WaitGroup) Wait() error {
 	return wg.Err()
 }
 
+// Done returns a channel that gets closed when all workers
+// have finished.
+func (wg *WaitGroup) Done() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.wg.Wait()
+	}()
+	return done
+}
+
 // Err returns the first error
 func (wg *WaitGroup) Err() error {
 	if err, ok := wg.err.Load().(error); ok {
@@ -213,11 +224,19 @@ func (eg *ErrGroup) Context() context.Context {
 // been cancelled and the shutdown has been initiated.
 //
 // Cancelled() doesn't indicate all workers have finished, for that
-// call [ErrGroup.Wait]
+// call [ErrGroup.Wait] or [ErrGroup.Done].
 func (eg *ErrGroup) Cancelled() <-chan struct{} {
 	eg.init()
 
 	return eg.ctx.Done()
+}
+
+// Done returns a channel that gets closed when all workers
+// have finished.
+func (eg *ErrGroup) Done() <-chan struct{} {
+	eg.init()
+
+	return eg.wg.Done()
 }
 
 // IsCancelled tells the [ErrGroup] has been cancelled
