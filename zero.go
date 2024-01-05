@@ -18,5 +18,10 @@ func IsZero(vi any) bool {
 		return p.IsZero()
 	}
 
-	return reflect.ValueOf(vi).IsZero()
+	v := reflect.ValueOf(vi)
+	if v.IsValid() {
+		return v.IsZero()
+	}
+
+	return true
 }
