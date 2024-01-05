@@ -15,7 +15,7 @@ type ContextKey[T any] struct {
 	name string
 }
 
-// WithValue safely attaches a value to a context.Context under this key
+// WithValue safely attaches a value to a context.Context under this key.
 func (ck *ContextKey[T]) WithValue(ctx context.Context, v T) context.Context {
 	switch ctx {
 	case nil, context.TODO():
@@ -26,7 +26,13 @@ func (ck *ContextKey[T]) WithValue(ctx context.Context, v T) context.Context {
 }
 
 // Get attempts to extract a value bound to this key in a [context.Context]
+// For convenience this method will safely operate over a nil receiver.
 func (ck *ContextKey[T]) Get(ctx context.Context) (T, bool) {
+	if ck == nil {
+		var zero T
+		return zero, false
+	}
+
 	v, ok := ctx.Value(ck).(T)
 	return v, ok
 }
