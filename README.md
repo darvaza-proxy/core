@@ -61,7 +61,7 @@ should be on a subdirectory, it shouldn't be here.
 * Here/StackFrame/StackTrace
 * CallStacker
 
-* ErrNotImplemented
+* ErrNotImplemented/ErrTODO
 * ErrExists/ErrNotExists
 * ErrInvalid/ErrUnknown
 

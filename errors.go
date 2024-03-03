@@ -8,6 +8,9 @@ import (
 var (
 	// ErrNotImplemented indicates something hasn't been implemented yet
 	ErrNotImplemented = errors.New("not implemented")
+	// ErrTODO is like ErrNotImplemented but used especially to
+	// indicate something needs to be implemented
+	ErrTODO = Wrap(ErrNotImplemented, "TODO")
 	// ErrExists indicates something already exists
 	ErrExists = errors.New("already exists")
 	// ErrNotExists indicates something doesn't exist
