@@ -166,3 +166,37 @@ func IsErrorFn(check func(error) bool, errs ...error) bool {
 
 	return false
 }
+
+// IsErrorFn2 recursively checks if any of the given errors gets a
+// certain answer from the check function.
+// As opposed to IsErrorFn, IsErrorFn2 will stop when it has certainty
+// of a false result.
+//
+// revive:disable:cognitive-complexity
+func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is bool, known bool) {
+	// revive:enable:cognitive-complexity
+	if check == nil || len(errs) == 0 {
+		return false, true
+	}
+
+	// direct match first
+	for _, e := range errs {
+		if e != nil {
+			if is, known = check(e); known {
+				return is, true
+			}
+		}
+	}
+
+	// and unwrapping
+	for _, e := range errs {
+		if errs := Unwrap(e); len(errs) > 0 {
+			if is, known = IsErrorFn2(check, errs...); known {
+				return is, true
+			}
+		}
+	}
+
+	// unknown
+	return false, false
+}
