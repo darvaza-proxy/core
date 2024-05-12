@@ -52,6 +52,7 @@ should be on a subdirectory, it shouldn't be here.
 * Wrap/Unwrappable/Unwrap
 * Errors/CompoundError
 * CoalesceError
+* IsError/IsErrorFn
 * AsRecovered/Recovered
 * Catcher
 * PanicError

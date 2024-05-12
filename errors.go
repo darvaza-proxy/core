@@ -115,3 +115,54 @@ func Unwrap(err error) []error {
 		return err, err != nil
 	})
 }
+
+// IsError recursively check if the given error is in in the given list,
+// or just non-nil if no options to check are given.
+func IsError(err error, errs ...error) bool {
+	switch {
+	case err == nil:
+		return false
+	case len(errs) == 0:
+		return true
+	}
+
+	fn := func(err error) bool {
+		for _, e := range errs {
+			if err == e {
+				return true
+			}
+		}
+		return false
+	}
+
+	return IsErrorFn(fn, err)
+}
+
+// IsErrorFn recursively checks if any of the given errors satisfies
+// the specified check function.
+//
+// revive:disable:cognitive-complexity
+func IsErrorFn(check func(error) bool, errs ...error) bool {
+	// revive:enable:cognitive-complexity
+	if check == nil || len(errs) == 0 {
+		return false
+	}
+
+	// direct match first
+	for _, e := range errs {
+		if e != nil && check(e) {
+			return true
+		}
+	}
+
+	// and unwrapping
+	for _, e := range errs {
+		if errs := Unwrap(e); len(errs) > 0 {
+			if IsErrorFn(check, errs...) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
