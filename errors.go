@@ -86,3 +86,32 @@ func CoalesceError(errs ...error) error {
 	}
 	return nil
 }
+
+// Unwrap unwraps one layer of a compound error,
+// ensuring there are no nil entries.
+func Unwrap(err error) []error {
+	var errs []error
+
+	if err == nil {
+		return nil
+	}
+
+	switch w := err.(type) {
+	case interface {
+		Unwrap() []error
+	}:
+		errs = w.Unwrap()
+	case interface {
+		Errors() []error
+	}:
+		errs = w.Errors()
+	case interface {
+		Unwrap() error
+	}:
+		errs = append(errs, w.Unwrap())
+	}
+
+	return SliceReplaceFn(errs, func(_ []error, err error) (error, bool) {
+		return err, err != nil
+	})
+}

@@ -49,7 +49,7 @@ should be on a subdirectory, it shouldn't be here.
 
 ## Errors
 
-* Wrap/Unwrappable
+* Wrap/Unwrappable/Unwrap
 * Errors/CompoundError
 * CoalesceError
 * AsRecovered/Recovered
