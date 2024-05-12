@@ -33,6 +33,11 @@ func (w *CompoundError) Errors() []error {
 	return w.Errs
 }
 
+// Unwrap returns the contained slice of errors
+func (w *CompoundError) Unwrap() []error {
+	return w.Errs
+}
+
 // Ok tells when there are no errors stored
 func (w *CompoundError) Ok() bool {
 	return len(w.Errs) == 0
