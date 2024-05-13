@@ -86,3 +86,117 @@ func CoalesceError(errs ...error) error {
 	}
 	return nil
 }
+
+// Unwrap unwraps one layer of a compound error,
+// ensuring there are no nil entries.
+func Unwrap(err error) []error {
+	var errs []error
+
+	if err == nil {
+		return nil
+	}
+
+	switch w := err.(type) {
+	case interface {
+		Unwrap() []error
+	}:
+		errs = w.Unwrap()
+	case interface {
+		Errors() []error
+	}:
+		errs = w.Errors()
+	case interface {
+		Unwrap() error
+	}:
+		errs = append(errs, w.Unwrap())
+	}
+
+	return SliceReplaceFn(errs, func(_ []error, err error) (error, bool) {
+		return err, err != nil
+	})
+}
+
+// IsError recursively check if the given error is in in the given list,
+// or just non-nil if no options to check are given.
+func IsError(err error, errs ...error) bool {
+	switch {
+	case err == nil:
+		return false
+	case len(errs) == 0:
+		return true
+	}
+
+	fn := func(err error) bool {
+		for _, e := range errs {
+			if err == e {
+				return true
+			}
+		}
+		return false
+	}
+
+	return IsErrorFn(fn, err)
+}
+
+// IsErrorFn recursively checks if any of the given errors satisfies
+// the specified check function.
+//
+// revive:disable:cognitive-complexity
+func IsErrorFn(check func(error) bool, errs ...error) bool {
+	// revive:enable:cognitive-complexity
+	if check == nil || len(errs) == 0 {
+		return false
+	}
+
+	// direct match first
+	for _, e := range errs {
+		if e != nil && check(e) {
+			return true
+		}
+	}
+
+	// and unwrapping
+	for _, e := range errs {
+		if errs := Unwrap(e); len(errs) > 0 {
+			if IsErrorFn(check, errs...) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// IsErrorFn2 recursively checks if any of the given errors gets a
+// certain answer from the check function.
+// As opposed to IsErrorFn, IsErrorFn2 will stop when it has certainty
+// of a false result.
+//
+// revive:disable:cognitive-complexity
+func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is bool, known bool) {
+	// revive:enable:cognitive-complexity
+	if check == nil || len(errs) == 0 {
+		return false, true
+	}
+
+	// direct match first
+	for _, e := range errs {
+		if e != nil {
+			if is, known = check(e); known {
+				return is, true
+			}
+		}
+	}
+
+	// and unwrapping
+	for _, e := range errs {
+		if errs := Unwrap(e); len(errs) > 0 {
+			if is, known = IsErrorFn2(check, errs...); known {
+				return is, true
+			}
+		}
+	}
+
+	// unknown
+	return false, false
+}
