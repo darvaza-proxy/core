@@ -9,21 +9,28 @@ func Zero[T any](_ *T) T {
 	return zero
 }
 
-// IsZero checks if a given value is zero, either using
-// the IsZero() bool interface or reflection
+// IsZero checks if a non-zero value has been set
+// either by using the `IsZero() bool“ interface
+// or reflection.
+// nil and (*T)(nil) are considered to be zero.
 func IsZero(vi any) bool {
-	if vi == nil {
+	switch p := vi.(type) {
+	case nil:
+		// nil
 		return true
-	} else if p, ok := vi.(interface {
+	case interface {
 		IsZero() bool
-	}); ok {
+	}:
+		// interface
 		return p.IsZero()
-	}
+	default:
+		// reflection
+		v := reflect.ValueOf(vi)
+		if v.IsValid() {
+			return v.IsZero()
+		}
 
-	v := reflect.ValueOf(vi)
-	if v.IsValid() {
-		return v.IsZero()
+		// nil
+		return true
 	}
-
-	return true
 }
