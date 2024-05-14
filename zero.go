@@ -12,7 +12,9 @@ func Zero[T any](_ *T) T {
 // IsZero checks if a given value is zero, either using
 // the IsZero() bool interface or reflection
 func IsZero(vi any) bool {
-	if p, ok := vi.(interface {
+	if vi == nil {
+		return true
+	} else if p, ok := vi.(interface {
 		IsZero() bool
 	}); ok {
 		return p.IsZero()
