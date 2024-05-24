@@ -201,6 +201,32 @@ func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is bool, known b
 	return false, false
 }
 
+// CheckIsTemporary tests an error for Temporary(), IsTemporary(),
+// Timeout() and IsTimeout() without unwrapping.
+func CheckIsTemporary(err error) (is, known bool) {
+	switch e := err.(type) {
+	case nil:
+		return false, true
+	case interface {
+		Temporary() bool
+	}:
+		return e.Temporary(), true
+	case interface {
+		IsTemporary() bool
+	}:
+		return e.IsTemporary(), true
+	default:
+		return CheckIsTimeout(err)
+	}
+}
+
+// IsTemporary tests an error for Temporary(), IsTemporary(),
+// Timeout() and IsTimeout() recursively.
+func IsTemporary(err error) bool {
+	is, _ := IsErrorFn2(CheckIsTemporary, err)
+	return is
+}
+
 // CheckIsTimeout tests an error for Timeout() and IsTimeout()
 // without unwrapping.
 func CheckIsTimeout(err error) (is, known bool) {
