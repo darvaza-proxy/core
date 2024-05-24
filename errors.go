@@ -200,3 +200,29 @@ func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is bool, known b
 	// unknown
 	return false, false
 }
+
+// CheckIsTimeout tests an error for Timeout() and IsTimeout()
+// without unwrapping.
+func CheckIsTimeout(err error) (is, known bool) {
+	switch e := err.(type) {
+	case nil:
+		return false, true
+	case interface {
+		Timeout() bool
+	}:
+		return e.Timeout(), true
+	case interface {
+		IsTimeout() bool
+	}:
+		return e.IsTimeout(), true
+	default:
+		return false, false
+	}
+}
+
+// IsTimeout tests an error for Timeout() and IsTimeout()
+// recursively.
+func IsTimeout(err error) bool {
+	is, _ := IsErrorFn2(CheckIsTimeout, err)
+	return is
+}

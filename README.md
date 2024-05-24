@@ -53,6 +53,7 @@ should be on a subdirectory, it shouldn't be here.
 * Errors/CompoundError
 * CoalesceError
 * IsError/IsErrorFn/IsErrorFn2
+* IsTimeout/CheckIsTimeout
 * AsRecovered/Recovered
 * Catcher
 * PanicError
