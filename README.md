@@ -53,10 +53,13 @@ should be on a subdirectory, it shouldn't be here.
 * Errors/CompoundError
 * CoalesceError
 * IsError/IsErrorFn/IsErrorFn2
+* IsTemporary/CheckIsTemporary
+* IsTimeout/CheckIsTimeout
 * AsRecovered/Recovered
 * Catcher
 * PanicError
 * Panic/Panicf/PanicWrap
+* TemporaryError/NewTemporaryError/NewTimeoutError
 * WaitGroup/ErrGroup
 * Frame/Stack
 * Here/StackFrame/StackTrace

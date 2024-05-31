@@ -75,6 +75,67 @@ func (w *WrappedError) Unwrap() error {
 	return w.cause
 }
 
+// TemporaryError is an error wrapper that satisfies IsTimeout()
+// and IsTemporary()
+type TemporaryError struct {
+	cause   error
+	timeout bool
+}
+
+func (w *TemporaryError) Error() string {
+	var cause string
+
+	switch {
+	case w == nil:
+		return ""
+	case w.cause != nil:
+		cause = w.cause.Error()
+	}
+
+	switch {
+	case !w.timeout:
+		return cause
+	case cause == "":
+		return "time-out"
+	default:
+		return fmt.Sprintf("%s: %s", "time-out", cause)
+	}
+}
+
+// IsTemporary tells this error is temporary.
+func (*TemporaryError) IsTemporary() bool { return true }
+
+// IsTimeout tells if this error is a time-out or not.
+func (w *TemporaryError) IsTimeout() bool {
+	if w != nil {
+		return w.timeout
+	}
+	return false
+}
+
+// Temporary tells this error is temporary.
+func (*TemporaryError) Temporary() bool { return true }
+
+// Timeout tells if this error is a time-out or not.
+func (w *TemporaryError) Timeout() bool { return w.IsTimeout() }
+
+// NewTimeoutError returns an error that returns true
+// to IsTimeout() and IsTemporary()
+func NewTimeoutError(err error) error {
+	return &TemporaryError{
+		cause:   err,
+		timeout: true,
+	}
+}
+
+// NewTemporaryError returns an error that returns false
+// to IsTimeout() and true to IsTemporary()
+func NewTemporaryError(err error) error {
+	return &TemporaryError{
+		cause: err,
+	}
+}
+
 // CoalesceError returns the first non-nil error argument.
 // error isn't compatible with Coalesce's comparable generic
 // type.
@@ -199,4 +260,56 @@ func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is bool, known b
 
 	// unknown
 	return false, false
+}
+
+// CheckIsTemporary tests an error for Temporary(), IsTemporary(),
+// Timeout() and IsTimeout() without unwrapping.
+func CheckIsTemporary(err error) (is, known bool) {
+	switch e := err.(type) {
+	case nil:
+		return false, true
+	case interface {
+		Temporary() bool
+	}:
+		return e.Temporary(), true
+	case interface {
+		IsTemporary() bool
+	}:
+		return e.IsTemporary(), true
+	default:
+		return CheckIsTimeout(err)
+	}
+}
+
+// IsTemporary tests an error for Temporary(), IsTemporary(),
+// Timeout() and IsTimeout() recursively.
+func IsTemporary(err error) bool {
+	is, _ := IsErrorFn2(CheckIsTemporary, err)
+	return is
+}
+
+// CheckIsTimeout tests an error for Timeout() and IsTimeout()
+// without unwrapping.
+func CheckIsTimeout(err error) (is, known bool) {
+	switch e := err.(type) {
+	case nil:
+		return false, true
+	case interface {
+		Timeout() bool
+	}:
+		return e.Timeout(), true
+	case interface {
+		IsTimeout() bool
+	}:
+		return e.IsTimeout(), true
+	default:
+		return false, false
+	}
+}
+
+// IsTimeout tests an error for Timeout() and IsTimeout()
+// recursively.
+func IsTimeout(err error) bool {
+	is, _ := IsErrorFn2(CheckIsTimeout, err)
+	return is
 }
