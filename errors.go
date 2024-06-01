@@ -32,17 +32,15 @@ type Unwrappable interface {
 }
 
 // Wrap annotates an error, optionally with a formatted string.
-// if %w is used the argument will be unwrapped
 func Wrap(err error, format string, args ...any) error {
 	var note string
 
-	if err == nil {
+	switch {
+	case err == nil:
 		return nil
-	}
-
-	if len(args) > 0 {
-		note = fmt.Errorf(format, args...).Error()
-	} else {
+	case len(args) > 0:
+		note = fmt.Sprintf(format, args...)
+	default:
 		note = format
 	}
 
