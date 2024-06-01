@@ -32,17 +32,25 @@ type Unwrappable interface {
 }
 
 // Wrap annotates an error, optionally with a formatted string.
-// if %w is used the argument will be unwrapped
 func Wrap(err error, format string, args ...any) error {
+	return doWrap(err, false, format, args...)
+}
+
+// QuietWrap replaces the text of the error it's wrapping.
+// if %w is used the argument will be unwrapped.
+func QuietWrap(err error, format string, args ...any) error {
+	return doWrap(err, true, format, args...)
+}
+
+func doWrap(err error, quiet bool, format string, args ...any) error {
 	var note string
 
-	if err == nil {
+	switch {
+	case err == nil:
 		return nil
-	}
-
-	if len(args) > 0 {
-		note = fmt.Errorf(format, args...).Error()
-	} else {
+	case len(args) > 0:
+		note = fmt.Sprintf(format, args...)
+	default:
 		note = format
 	}
 
@@ -53,6 +61,7 @@ func Wrap(err error, format string, args ...any) error {
 	return &WrappedError{
 		cause: err,
 		note:  note,
+		quiet: quiet,
 	}
 }
 
@@ -60,9 +69,17 @@ func Wrap(err error, format string, args ...any) error {
 type WrappedError struct {
 	cause error
 	note  string
+	quiet bool
 }
 
 func (w *WrappedError) Error() string {
+	switch {
+	case w == nil:
+		return ""
+	case w.cause == nil, w.quiet:
+		return w.note
+	}
+
 	s := w.cause.Error()
 	if len(s) == 0 {
 		return w.note
@@ -72,6 +89,9 @@ func (w *WrappedError) Error() string {
 }
 
 func (w *WrappedError) Unwrap() error {
+	if w == nil {
+		return nil
+	}
 	return w.cause
 }
 
