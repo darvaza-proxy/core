@@ -61,6 +61,13 @@ type WrappedError struct {
 }
 
 func (w *WrappedError) Error() string {
+	switch {
+	case w == nil:
+		return ""
+	case w.cause == nil:
+		return w.note
+	}
+
 	s := w.cause.Error()
 	if len(s) == 0 {
 		return w.note
@@ -70,6 +77,9 @@ func (w *WrappedError) Error() string {
 }
 
 func (w *WrappedError) Unwrap() error {
+	if w == nil {
+		return nil
+	}
 	return w.cause
 }
 
