@@ -35,6 +35,7 @@ should be on a subdirectory, it shouldn't be here.
 * SliceUniquify/SliceUniquifyFn
 * SliceReplaceFn/SliceCopyFn
 * SliceRandom
+* SliceSort/SliceSortFn
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement

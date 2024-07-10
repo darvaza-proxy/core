@@ -3,6 +3,7 @@ package core
 import (
 	"crypto/rand"
 	"math/big"
+	"sort"
 )
 
 // SliceMinus returns a new slice containing only the
@@ -200,4 +201,47 @@ func SliceRandom[T any](a []T) (T, bool) {
 		result = a[id.Uint64()]
 	}
 	return result, true
+}
+
+// SliceSort sorts the slice x in ascending order as determined by the cmp
+// function. This sort is not guaranteed to be stable.
+// cmp(a, b) should return a negative number when a < b, a positive number when
+// a > b and zero when a == b.
+func SliceSort[T any](x []T, cmp func(a, b T) int) {
+	if cmp == nil || len(x) == 0 {
+		// NO-OP
+		return
+	}
+
+	s := sortable[T]{
+		x:   x,
+		cmp: cmp,
+	}
+
+	sort.Sort(s)
+}
+
+var _ sort.Interface = sortable[any]{}
+
+type sortable[T any] struct {
+	x   []T
+	cmp func(a, b T) int
+}
+
+func (s sortable[T]) Len() int {
+	return len(s.x)
+}
+
+func (s sortable[T]) Less(i, j int) bool {
+	// this is only accessible from sort.Sort() so
+	// we can trust the indexes
+	a, b := s.x[i], s.x[j]
+
+	return s.cmp(a, b) < 0
+}
+
+func (s sortable[T]) Swap(i, j int) {
+	// this is only accessible from sort.Sort() so
+	// we can trust the indexes
+	s.x[j], s.x[i] = s.x[i], s.x[j]
 }
