@@ -1,6 +1,35 @@
 package core
 
-import "container/list"
+import (
+	"container/list"
+
+	"golang.org/x/exp/constraints"
+)
+
+// Keys returns the list of keys of a map
+func Keys[K comparable, T any](m map[K]T) []K {
+	out := make([]K, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+// SortedKeys returns a sorted list of the keys of a map
+func SortedKeys[K constraints.Ordered, T any](m map[K]T) []K {
+	keys := Keys(m)
+	SliceSort(keys, func(a, b K) int {
+		switch {
+		case a == b:
+			return 0
+		case a < b:
+			return -1
+		default:
+			return 1
+		}
+	})
+	return keys
+}
 
 // MapContains tells if a given map contains a key.
 // this helper is intended for switch/case conditions

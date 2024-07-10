@@ -47,6 +47,7 @@ should be on a subdirectory, it shouldn't be here.
 * MapListAppendUnique/MapListAppendUniqueFn
 * MapAllListContains/MapAllListContainsFn
 * MapAllListForEach/MapAllListForEachElement
+* Keys()/SortedKeys()
 * NewContextKey
 
 ## Errors
