@@ -46,6 +46,32 @@ func SliceContainsFn[T any](a []T, v T, eq func(T, T) bool) bool {
 	return false
 }
 
+// SliceEqual tells if two slices are equal.
+func SliceEqual[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	return SliceEqualFn(a, b, func(va, vb T) bool {
+		return va == vb
+	})
+}
+
+// SliceEqualFn tells if two slices are equal using a comparing helper.
+func SliceEqualFn[T any](a, b []T, eq func(va, vb T) bool) bool {
+	if len(a) != len(b) || eq == nil {
+		return false
+	}
+
+	for i := range a {
+		if !eq(a[i], b[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // SliceUnique returns a new slice containing only
 // unique elements
 func SliceUnique[T comparable](a []T) []T {
