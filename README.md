@@ -29,11 +29,13 @@ should be on a subdirectory, it shouldn't be here.
 * Zero/IsZero
 * Coalesce/IIf
 * SliceContains/SliceContainsFn
+* SliceEqual/SliceEqualFn
 * SliceMinus/SliceMinusFn
 * SliceUnique/SliceUniqueFn
 * SliceUniquify/SliceUniquifyFn
 * SliceReplaceFn/SliceCopyFn
 * SliceRandom
+* SliceSort/SliceSortFn
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
@@ -45,6 +47,7 @@ should be on a subdirectory, it shouldn't be here.
 * MapListAppendUnique/MapListAppendUniqueFn
 * MapAllListContains/MapAllListContainsFn
 * MapAllListForEach/MapAllListForEachElement
+* Keys()/SortedKeys()
 * NewContextKey
 
 ## Errors
