@@ -2,8 +2,6 @@ package core
 
 import (
 	"container/list"
-
-	"golang.org/x/exp/constraints"
 )
 
 // Keys returns the list of keys of a map
@@ -16,7 +14,7 @@ func Keys[K comparable, T any](m map[K]T) []K {
 }
 
 // SortedKeys returns a sorted list of the keys of a map
-func SortedKeys[K constraints.Ordered, T any](m map[K]T) []K {
+func SortedKeys[K Ordered, T any](m map[K]T) []K {
 	keys := Keys(m)
 	SliceSort(keys, func(a, b K) int {
 		switch {
