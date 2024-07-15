@@ -182,10 +182,7 @@ func SliceCopyFn[T any](s []T,
 ) []T {
 	//
 	if fn == nil {
-		// unconditional
-		result := make([]T, len(s))
-		copy(result, s)
-		return result
+		return SliceCopy(s)
 	}
 
 	result := make([]T, 0, len(s))
@@ -196,6 +193,16 @@ func SliceCopyFn[T any](s []T,
 	}
 
 	return result
+}
+
+// SliceCopy makes a shallow copy of a given slice
+func SliceCopy[T any](s []T) []T {
+	l := len(s)
+	out := make([]T, l)
+	if l > 0 {
+		copy(out, s)
+	}
+	return out
 }
 
 // SliceRandom returns a random element from a slice
