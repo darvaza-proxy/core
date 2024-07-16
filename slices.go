@@ -198,11 +198,25 @@ func SliceCopyFn[T any](s []T,
 // SliceCopy makes a shallow copy of a given slice
 func SliceCopy[T any](s []T) []T {
 	l := len(s)
-	out := make([]T, l)
+	result := make([]T, l)
 	if l > 0 {
-		copy(out, s)
+		copy(result, s)
 	}
-	return out
+	return result
+}
+
+// SliceMap takes a []T1 and uses a function to produce a []T2
+// by processing each item on the source slice.
+func SliceMap[T1 any, T2 any](a []T1,
+	fn func(partial []T2, v T1) (newEntries []T2)) []T2 {
+	//
+	var result []T2
+	if fn != nil {
+		for _, v := range a {
+			result = append(result, fn(result, v)...)
+		}
+	}
+	return result
 }
 
 // SliceRandom returns a random element from a slice
