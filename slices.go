@@ -159,6 +159,11 @@ func SliceReplaceFn[T any](s []T,
 	fn func(partial []T, before T) (after T, replace bool),
 ) []T {
 	//
+	if fn == nil {
+		// NO-OP
+		return s
+	}
+
 	j := 0
 	for _, v := range s {
 		if w, ok := fn(s[:j], v); ok {
@@ -169,12 +174,17 @@ func SliceReplaceFn[T any](s []T,
 	return s[:j]
 }
 
-// SliceCopyFn conditionally copies a slice allowing
-// modifications of the items
+// SliceCopyFn makes a copy of a slice, optionally modifying in-flight
+// the items using a function. If no function is provided,
+// the destination will be a shallow copy of the source slice.
 func SliceCopyFn[T any](s []T,
 	fn func(partial []T, before T) (after T, replace bool),
 ) []T {
 	//
+	if fn == nil {
+		return SliceCopy(s)
+	}
+
 	result := make([]T, 0, len(s))
 	for _, v := range s {
 		if w, ok := fn(result, v); ok {
@@ -183,6 +193,16 @@ func SliceCopyFn[T any](s []T,
 	}
 
 	return result
+}
+
+// SliceCopy makes a shallow copy of a given slice
+func SliceCopy[T any](s []T) []T {
+	l := len(s)
+	out := make([]T, l)
+	if l > 0 {
+		copy(out, s)
+	}
+	return out
 }
 
 // SliceRandom returns a random element from a slice

@@ -3,9 +3,6 @@ package core
 import (
 	"math"
 	"testing"
-
-	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
 )
 
 // revive:disable
@@ -23,42 +20,53 @@ var (
 	expectStrs = []string{"", "Hello", "foo", "bar", "f00", "%*&^*&^&"}
 )
 
-func testSliceUnique[T constraints.Ordered](t *testing.T, before, after []T) {
-	slices.Sort(after)
+func eq[T Ordered](a, b T) bool {
+	return a == b
+}
 
-	eq := func(a, b T) bool {
-		return a == b
+func cmp[T Ordered](a, b T) int {
+	switch {
+	case a == b:
+		return 0
+	case a < b:
+		return -1
+	default:
+		return 1
 	}
+}
+
+func testSliceUnique[T Ordered](t *testing.T, before, after []T) {
+	SliceSort(after, cmp[T])
 
 	s := SliceUnique(before)
-	slices.Sort(s)
-	if !slices.Equal(s, after) {
+	SliceSort(s, cmp[T])
+	if !SliceEqual(s, after) {
 		t.Errorf("%v != %v", s, after)
 	}
 
-	s = SliceUniqueFn(before, eq)
-	slices.Sort(s)
-	if !slices.Equal(s, after) {
+	s = SliceUniqueFn(before, eq[T])
+	SliceSort(s, cmp[T])
+	if !SliceEqual(s, after) {
 		t.Errorf("%v != %v", s, after)
 	}
 
-	s = slices.Clone(before)
+	s = SliceCopyFn(before, nil)
 	s2 := SliceUniquify(&s)
-	slices.Sort(s)
-	if !slices.Equal(s, after) {
+	SliceSort(s, cmp[T])
+	if !SliceEqual(s, after) {
 		t.Errorf("%v != %v", s, after)
 	}
-	if !slices.Equal(s2, s) {
+	if !SliceEqual(s2, s) {
 		t.Errorf("%v != %v", s2, s)
 	}
 
-	s = slices.Clone(before)
-	s2 = SliceUniquifyFn(&s, eq)
-	slices.Sort(s)
-	if !slices.Equal(s, after) {
+	s = SliceCopy(before)
+	s2 = SliceUniquifyFn(&s, eq[T])
+	SliceSort(s, cmp[T])
+	if !SliceEqual(s, after) {
 		t.Errorf("%v != %v", s, after)
 	}
-	if !slices.Equal(s2, s) {
+	if !SliceEqual(s2, s) {
 		t.Errorf("%v != %v", s2, s)
 	}
 }
