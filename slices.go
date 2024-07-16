@@ -159,6 +159,11 @@ func SliceReplaceFn[T any](s []T,
 	fn func(partial []T, before T) (after T, replace bool),
 ) []T {
 	//
+	if fn == nil {
+		// NO-OP
+		return s
+	}
+
 	j := 0
 	for _, v := range s {
 		if w, ok := fn(s[:j], v); ok {
