@@ -237,19 +237,40 @@ func SliceRandom[T any](a []T) (T, bool) {
 	return result, true
 }
 
+// SliceSortFn sorts the slice x in ascending order as a less function.
+// This sort is not guaranteed to be stable.
+// less(a, b) should true when a < b
+func SliceSortFn[T any](x []T, less func(a, b T) bool) {
+	if less != nil && len(x) > 0 {
+		doSliceSort(x, less)
+	}
+}
+
 // SliceSort sorts the slice x in ascending order as determined by the cmp
 // function. This sort is not guaranteed to be stable.
 // cmp(a, b) should return a negative number when a < b, a positive number when
 // a > b and zero when a == b.
 func SliceSort[T any](x []T, cmp func(a, b T) int) {
-	if cmp == nil || len(x) == 0 {
-		// NO-OP
-		return
+	if cmp != nil && len(x) > 0 {
+		doSliceSort(x, func(a, b T) bool {
+			return cmp(a, b) < 0
+		})
 	}
+}
 
+// SliceSortOrdered sorts the slice x of an [Ordered] type in ascending order.
+func SliceSortOrdered[T Ordered](x []T) {
+	if len(x) > 0 {
+		doSliceSort(x, func(a, b T) bool {
+			return a < b
+		})
+	}
+}
+
+func doSliceSort[T any](x []T, less func(a, b T) bool) {
 	s := sortable[T]{
-		x:   x,
-		cmp: cmp,
+		x:    x,
+		less: less,
 	}
 
 	sort.Sort(s)
@@ -258,8 +279,8 @@ func SliceSort[T any](x []T, cmp func(a, b T) int) {
 var _ sort.Interface = sortable[any]{}
 
 type sortable[T any] struct {
-	x   []T
-	cmp func(a, b T) int
+	x    []T
+	less func(a, b T) bool
 }
 
 func (s sortable[T]) Len() int {
@@ -269,9 +290,7 @@ func (s sortable[T]) Len() int {
 func (s sortable[T]) Less(i, j int) bool {
 	// this is only accessible from sort.Sort() so
 	// we can trust the indexes
-	a, b := s.x[i], s.x[j]
-
-	return s.cmp(a, b) < 0
+	return s.less(s.x[i], s.x[j])
 }
 
 func (s sortable[T]) Swap(i, j int) {
