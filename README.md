@@ -33,7 +33,7 @@ should be on a subdirectory, it shouldn't be here.
 * SliceMinus/SliceMinusFn
 * SliceUnique/SliceUniqueFn
 * SliceUniquify/SliceUniquifyFn
-* SliceReplaceFn/SliceCopy/SliceCopyFn
+* SliceReplaceFn/SliceCopy/SliceCopyFn/SliceMap
 * SliceRandom
 * SliceSort/SliceSortFn
 * ListContains/ListContainsFn
