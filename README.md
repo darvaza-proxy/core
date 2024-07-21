@@ -20,7 +20,7 @@ should be on a subdirectory, it shouldn't be here.
 * GetInterfacesNames
 * ParseAddr/ParseNetIP
 * SplitHostPort/SplitAddrPort
-* JoinHostPort
+* JoinHostPort/MakeHostPort
 * AddrPort
 * AddrFromNetIP
 * GetIPAddresses/GetNetIPAddresses/GetStringIPAddresses
