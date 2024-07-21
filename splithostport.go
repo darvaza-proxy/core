@@ -10,6 +10,53 @@ import (
 	"golang.org/x/net/idna"
 )
 
+// JoinHostPort is like the standard net.JoinHostPort, but
+// it validates the host name and port, and returns it portless
+// if the port argument is empty.
+func JoinHostPort(host, port string) (string, error) {
+	ip, _ := ParseAddr(host)
+	switch {
+	case ip.IsValid():
+		switch {
+		case port == "":
+			// portless IP ready
+			return ip.String(), nil
+		case ip.Is6():
+			// IPv6
+			host = "[" + ip.String() + "]"
+		default:
+			// IPv4
+			host = ip.String()
+		}
+	default:
+		// not IP address
+		s, ok := validName(host)
+		switch {
+		case !ok:
+			// bad host name
+			return "", addrErr(host, "invalid host")
+		case port == "":
+			// portless host
+			return s, nil
+		default:
+			// good name
+			host = s
+		}
+	}
+
+	return doJoinHostPort(host, port)
+}
+
+func doJoinHostPort(host, port string) (string, error) {
+	hostPort := host + ":" + port
+	if !validPort(port) {
+		// bad port
+		return "", addrErr(hostPort, "invalid port")
+	}
+
+	return hostPort, nil
+}
+
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
 // port isn't part of the string and it validates it if present.
 // SplitHostPort will also validate the host is a valid IP or name
