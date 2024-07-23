@@ -10,6 +10,99 @@ import (
 	"golang.org/x/net/idna"
 )
 
+// MakeHostPort produces a validated host:port from an input string
+// optionally using the given default port when the string doesn't
+// specify one.
+// port 0 on the string input isn't considered valid.
+func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
+	host, port, err := SplitHostPort(hostPort)
+	if err != nil {
+		// bad input
+		return "", err
+	}
+
+	// port is either valid or empty
+	// host is either a valid hostname or a valid IP address
+
+	if ip, _ := ParseAddr(host); ip.IsValid() {
+		// IP address
+
+		if port == "" && defaultPort == 0 {
+			// portless IP
+			return ip.String(), nil
+		}
+
+		host = ipForHostPort(ip)
+	}
+
+	return doMakeHostPort(host, port, defaultPort)
+}
+
+func doMakeHostPort(host, port string, defaultPort uint16) (string, error) {
+	var ok bool
+
+	switch {
+	case port == "":
+		if defaultPort == 0 {
+			// portless hostname
+			return host, nil
+		}
+		port = strconv.FormatUint(uint64(defaultPort), 10)
+		ok = true
+	case port != "0":
+		ok = true
+	}
+
+	hostPort := host + ":" + port
+	if !ok {
+		return "", addrErr(hostPort, "invalid port")
+	}
+
+	return hostPort, nil
+}
+
+// JoinHostPort is like the standard net.JoinHostPort, but
+// it validates the host name and port, and returns it portless
+// if the port argument is empty.
+func JoinHostPort(host, port string) (string, error) {
+	ip, _ := ParseAddr(host)
+	switch {
+	case ip.IsValid():
+		if port == "" {
+			// portless IP ready
+			return ip.String(), nil
+		}
+
+		host = ipForHostPort(ip)
+	default:
+		// not IP address
+		s, ok := validName(host)
+		switch {
+		case !ok:
+			// bad host name
+			return "", addrErr(host, "invalid host")
+		case port == "":
+			// portless host
+			return s, nil
+		default:
+			// good name
+			host = s
+		}
+	}
+
+	return doJoinHostPort(host, port)
+}
+
+func doJoinHostPort(host, port string) (string, error) {
+	hostPort := host + ":" + port
+	if !validPort(port) {
+		// bad port
+		return "", addrErr(hostPort, "invalid port")
+	}
+
+	return hostPort, nil
+}
+
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
 // port isn't part of the string and it validates it if present.
 // SplitHostPort will also validate the host is a valid IP or name
@@ -171,6 +264,14 @@ func validName(s string) (string, bool) {
 	}
 
 	return "", false
+}
+
+func ipForHostPort(ip netip.Addr) string {
+	if ip.Is6() {
+		return "[" + ip.String() + "]"
+	}
+
+	return ip.String()
 }
 
 func addrErr(addr, why string) error {
