@@ -72,9 +72,11 @@ should be on a subdirectory, it shouldn't be here.
 
 ## See also
 
+* [darvaza.org/cache](https://pkg.go.dev/darvaza.org/cache)
+* [darvaza.org/resolve](https://pkg.go.dev/darvaza.org/resolve)
 * [darvaza.org/slog](https://pkg.go.dev/darvaza.org/slog)
-* [darvaza.org/gossipcache](https://pkg.go.dev/darvaza.org/gossipcache)
-* [darvaza.org/darvaza/acme](https://pkg.go.dev/darvaza.org/darvaza/acme)
-* [darvaza.org/darvaza/agent](https://pkg.go.dev/darvaza.org/darvaza/agent)
-* [darvaza.org/darvaza/server](https://pkg.go.dev/darvaza.org/darvaza/server)
-* [darvaza.org/darvaza/shared](https://pkg.go.dev/darvaza.org/darvaza/shared)
+* [darvaza.org/x/config](https://pkg.go.dev/darvaza.org/x/config)
+* [darvaza.org/x/fs](https://pkg.go.dev/darvaza.org/x/fs)
+* [darvaza.org/x/net](https://pkg.go.dev/darvaza.org/x/net)
+* [darvaza.org/x/tls](https://pkg.go.dev/darvaza.org/x/tls)
+* [darvaza.org/x/web](https://pkg.go.dev/darvaza.org/x/web)
