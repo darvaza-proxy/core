@@ -59,22 +59,30 @@ func (w *CompoundError) AsError() error {
 // AppendError adds an error to the collection,
 // unwrapping other implementers of the [Errors]
 // interface when possible
-func (w *CompoundError) AppendError(err error) {
-	switch v := err.(type) {
-	case *CompoundError:
-		// one of us
-		w.Errs = append(w.Errs, v.Errs...)
-	case Errors:
-		// cousin, I can't trust you don't have nil entries
-		// there
-		for _, e := range v.Errors() {
-			w.AppendError(e)
+func (w *CompoundError) AppendError(errs ...error) {
+	for _, err := range errs {
+		if err != nil {
+			w.doAppendUnwrapped(err)
 		}
-	case nil:
-		// skip
+	}
+}
+
+func (w *CompoundError) doAppendUnwrapped(err error) {
+	switch v := err.(type) {
+	case Errors:
+		w.doAppend(v.Errors()...)
+	case interface{ Unwrap() []error }:
+		w.doAppend(v.Unwrap()...)
 	default:
-		// just a normal error
-		w.Errs = append(w.Errs, err)
+		w.doAppend(v)
+	}
+}
+
+func (w *CompoundError) doAppend(errs ...error) {
+	for _, err := range errs {
+		if err != nil {
+			w.Errs = append(w.Errs, err)
+		}
 	}
 }
 
