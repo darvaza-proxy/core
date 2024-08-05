@@ -1,6 +1,10 @@
 package core
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 // Errors in an error that contains a slice of errors
 type Errors interface {
@@ -72,4 +76,26 @@ func (w *CompoundError) AppendError(err error) {
 		// just a normal error
 		w.Errs = append(w.Errs, err)
 	}
+}
+
+// Append adds an error to the collection optionally annotated by a formatted string.
+// if err is nil a new error is created unless the note is empty.
+func (w *CompoundError) Append(err error, note string, args ...any) {
+	if len(args) > 0 {
+		note = fmt.Sprintf(note, args...)
+	}
+
+	switch {
+	case err == nil && note == "":
+		// nothing
+		return
+	case err == nil:
+		// note-only
+		err = errors.New(note)
+	case note != "":
+		// wrap
+		err = Wrap(err, note)
+	}
+
+	w.Errs = append(w.Errs, err)
 }
