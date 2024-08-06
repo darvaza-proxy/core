@@ -1,6 +1,10 @@
 package core
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 // Errors in an error that contains a slice of errors
 type Errors interface {
@@ -55,21 +59,51 @@ func (w *CompoundError) AsError() error {
 // AppendError adds an error to the collection,
 // unwrapping other implementers of the [Errors]
 // interface when possible
-func (w *CompoundError) AppendError(err error) {
-	switch v := err.(type) {
-	case *CompoundError:
-		// one of us
-		w.Errs = append(w.Errs, v.Errs...)
-	case Errors:
-		// cousin, I can't trust you don't have nil entries
-		// there
-		for _, e := range v.Errors() {
-			w.AppendError(e)
+func (w *CompoundError) AppendError(errs ...error) {
+	for _, err := range errs {
+		if err != nil {
+			w.doAppendUnwrapped(err)
 		}
-	case nil:
-		// skip
-	default:
-		// just a normal error
-		w.Errs = append(w.Errs, err)
 	}
+}
+
+func (w *CompoundError) doAppendUnwrapped(err error) {
+	switch v := err.(type) {
+	case Errors:
+		w.doAppend(v.Errors()...)
+	case interface{ Unwrap() []error }:
+		w.doAppend(v.Unwrap()...)
+	default:
+		w.doAppend(v)
+	}
+}
+
+func (w *CompoundError) doAppend(errs ...error) {
+	for _, err := range errs {
+		if err != nil {
+			w.Errs = append(w.Errs, err)
+		}
+	}
+}
+
+// Append adds an error to the collection optionally annotated by a formatted string.
+// if err is nil a new error is created unless the note is empty.
+func (w *CompoundError) Append(err error, note string, args ...any) {
+	if len(args) > 0 {
+		note = fmt.Sprintf(note, args...)
+	}
+
+	switch {
+	case err == nil && note == "":
+		// nothing
+		return
+	case err == nil:
+		// note-only
+		err = errors.New(note)
+	case note != "":
+		// wrap
+		err = Wrap(err, note)
+	}
+
+	w.Errs = append(w.Errs, err)
 }
