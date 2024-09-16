@@ -178,7 +178,7 @@ func SliceReplaceFn[T any](s []T,
 // the items using a function. If no function is provided,
 // the destination will be a shallow copy of the source slice.
 func SliceCopyFn[T any](s []T,
-	fn func(partial []T, before T) (after T, replace bool),
+	fn func(partial []T, before T) (after T, include bool),
 ) []T {
 	//
 	if fn == nil {
