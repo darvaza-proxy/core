@@ -5,6 +5,28 @@ import (
 	"testing"
 )
 
+func S[T comparable](v ...T) []T { return v }
+
+func TestSliceReverse(t *testing.T) {
+	for _, tc := range []struct{ a, b []int }{
+		{S[int](), S[int]()},
+		{S(1), S(1)},
+		{S(1, 2), S(2, 1)},
+		{S(1, 2, 3), S(3, 2, 1)},
+		{S(1, 2, 3, 4), S(4, 3, 2, 1)},
+		{S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)},
+		{S(1, 2, 3, 4, 5, 6), S(6, 5, 4, 3, 2, 1)},
+	} {
+		c := SliceCopy(tc.a)
+		SliceReverse(c)
+		if SliceEqual(c, tc.b) {
+			t.Logf("%s(%q) → %q", "SliceReverse", tc.a, c)
+		} else {
+			t.Fatalf("ERROR: %s(%q) → %q (expected %q)", "SliceReverse", tc.a, c, tc.b)
+		}
+	}
+}
+
 // revive:disable
 var (
 	ints       = []int{74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586}

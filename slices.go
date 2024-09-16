@@ -298,3 +298,29 @@ func (s sortable[T]) Swap(i, j int) {
 	// we can trust the indexes
 	s.x[j], s.x[i] = s.x[i], s.x[j]
 }
+
+// SliceReverse modifies a slice reversing the order of its
+// elements.
+func SliceReverse[T any](x []T) {
+	l := len(x)
+	if l > 1 {
+		for i, j := 0, l-1; i < j; i, j = i+1, j-1 {
+			x[i], x[j] = x[j], x[i]
+		}
+	}
+}
+
+// SliceReversed returns a copy of the slice, in reverse order.
+func SliceReversed[T any](a []T) []T {
+	b := SliceCopy(a)
+	SliceReverse(b)
+	return b
+}
+
+// SliceReversedFn returns a modified copy of the slice, in reverse order.
+func SliceReversedFn[T any](a []T,
+	fn func(partial []T, before T) (after T, include bool)) []T {
+	b := SliceCopyFn(a, fn)
+	SliceReverse(b)
+	return b
+}
