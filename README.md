@@ -34,6 +34,7 @@ should be on a subdirectory, it shouldn't be here.
 * SliceReplaceFn/SliceCopy/SliceCopyFn/SliceMap
 * SliceRandom
 * SliceSort/SliceSortFn/SliceSortOrdered
+* SliceReverse/SliceReversed/SliceReversedFn
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
