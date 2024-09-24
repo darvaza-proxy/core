@@ -26,6 +26,8 @@ should be on a subdirectory, it shouldn't be here.
 
 * Zero/IsZero
 * Coalesce/IIf
+* As/AsFn
+* SliceAs/SliceAsFn
 * SliceContains/SliceContainsFn
 * SliceEqual/SliceEqualFn
 * SliceMinus/SliceMinusFn
