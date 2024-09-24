@@ -40,3 +40,43 @@ func SliceAsFn[T, V any](fn func(T) (V, bool), vv []T) []V {
 	}
 	return out
 }
+
+// AsError attempts to convert a value to an error,
+// checking different interfaces.
+//
+// * AsError() error
+// * Error() string
+// * OK() bool
+// * IsZero() bool
+func AsError[T any](v T) error {
+	switch x := any(v).(type) {
+	case interface {
+		AsError() error
+	}:
+		return x.AsError()
+	case interface {
+		Error() string
+		OK() bool
+	}:
+		if !x.OK() {
+			return x
+		}
+		return nil
+	case error:
+		if IsZero(x) {
+			return nil
+		}
+		return x
+	default:
+		return nil
+	}
+}
+
+// AsErrors uses AsError to return the subset of
+// the elements that are errors.
+func AsErrors[T any](vv []T) []error {
+	return SliceAsFn(func(v T) (error, bool) {
+		err := AsError[T](v)
+		return err, err != nil
+	}, vv)
+}
