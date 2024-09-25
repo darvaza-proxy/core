@@ -145,6 +145,23 @@ func MapListAppendUniqueFn[K comparable, T any](m map[K]*list.List, key K, v T,
 	}
 }
 
+// MapListCopy duplicates a map containing a list.List
+func MapListCopy[T comparable](src map[T]*list.List) map[T]*list.List {
+	fn := func(v any) (any, bool) { return v, true }
+	return MapListCopyFn(src, fn)
+}
+
+// MapListCopyFn duplicates a map containing a list.List but
+// allows the element's values to be cloned by a helper function
+func MapListCopyFn[K comparable, V any](src map[K]*list.List,
+	fn func(v V) (V, bool)) map[K]*list.List {
+	out := make(map[K]*list.List, len(src))
+	for k, l := range src {
+		out[k] = ListCopyFn(l, fn)
+	}
+	return out
+}
+
 // MapAllListContains check if a value exists on any entry of the map
 func MapAllListContains[K comparable, T comparable](m map[K]*list.List, v T) bool {
 	if m != nil {
