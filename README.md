@@ -50,6 +50,7 @@ should be on a subdirectory, it shouldn't be here.
 * MapListCopy/MapListCopyFn
 * MapAllListContains/MapAllListContainsFn
 * MapAllListForEach/MapAllListForEachElement
+* MapValue
 * Keys()/SortedKeys()
 * NewContextKey
 

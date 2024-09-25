@@ -29,6 +29,15 @@ func SortedKeys[K Ordered, T any](m map[K]T) []K {
 	return keys
 }
 
+// MapValue returns a value of an entry or a default if
+// not found
+func MapValue[K comparable, V any](m map[K]V, key K, def V) (V, bool) {
+	if val, ok := m[key]; ok {
+		return val, true
+	}
+	return def, false
+}
+
 // MapContains tells if a given map contains a key.
 // this helper is intended for switch/case conditions
 func MapContains[K comparable](m map[K]any, key K) bool {
