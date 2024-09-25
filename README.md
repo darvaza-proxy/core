@@ -40,6 +40,7 @@ should be on a subdirectory, it shouldn't be here.
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
+* ListCopy/ListCopyFn
 * MapContains
 * MapListContains/MapListContainsFn
 * MapListForEach/MapListForEachElement

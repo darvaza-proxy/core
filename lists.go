@@ -96,3 +96,26 @@ func listIterBackwardStep(ref *list.Element) (e *list.Element, prev *list.Elemen
 	}
 	return ref, prev
 }
+
+// ListCopy makes a shallow copy of a list
+func ListCopy[T any](src *list.List) *list.List {
+	return ListCopyFn[T](src, nil)
+}
+
+// ListCopyFn makes a copy of a list using the given helper
+func ListCopyFn[T any](src *list.List, fn func(v T) (T, bool)) *list.List {
+	if fn == nil {
+		fn = func(v T) (T, bool) {
+			return v, true
+		}
+	}
+
+	out := list.New()
+	ListForEach(src, func(v0 T) bool {
+		if v1, ok := fn(v0); ok {
+			out.PushBack(v1)
+		}
+		return false
+	})
+	return out
+}
