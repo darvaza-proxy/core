@@ -104,6 +104,10 @@ func ListCopy[T any](src *list.List) *list.List {
 
 // ListCopyFn makes a copy of a list using the given helper
 func ListCopyFn[T any](src *list.List, fn func(v T) (T, bool)) *list.List {
+	if src == nil || src.Len() == 0 {
+		return list.New()
+	}
+
 	if fn == nil {
 		fn = func(v T) (T, bool) {
 			return v, true
