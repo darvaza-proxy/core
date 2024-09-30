@@ -61,11 +61,14 @@ should be on a subdirectory, it shouldn't be here.
 The `Unwrappable` type represents the classic `Unwrap() error` interface implemented
 by `WrappedError`, while the `Errors` interface represents `Errors() []error`.
 
-There are two factories for `Unwrappable`, the standard `"note: error description"` and a
-quiet one, not including the text of the original error unless unwrapped first.
+There are three factories for `Unwrappable`, the standard `"note: error description"`,
+one for formatted notes, and a quiet one, not including the text of the original error
+unless unwrapped first.
 
-* `Wrap(err, note)` with a simple string, or with a formatted note `Wrap(err, format, args...)`.
-* And the same for `QuietWrap(err, note)` or `QuietWrap(err, format, args...)`.
+* `Wrap(err, note)` with a simple string,
+* `Wrapf(err, format, args...)` when using a formatted note,
+* and `QuietWrapf(err, format, args...)` for formatted errors not including
+  the wrapped message in the text.
 
 The `Unwrap(err error) []error` helper returns a slice of non-nil sub-errors built
 from the following interfaces:

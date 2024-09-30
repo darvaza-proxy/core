@@ -72,7 +72,7 @@ func NewPanicErrorf(skip int, format string, args ...any) *PanicError {
 // annotated, optionally formatted. %w is expanded.
 func NewPanicWrap(skip int, err error, format string, args ...any) *PanicError {
 	return &PanicError{
-		payload: Wrap(err, format, args...),
+		payload: Wrapf(err, format, args...),
 		stack:   StackTrace(skip + 1),
 	}
 }
