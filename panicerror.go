@@ -69,8 +69,17 @@ func NewPanicErrorf(skip int, format string, args ...any) *PanicError {
 }
 
 // NewPanicWrap creates a new PanicError wrapping a given error
-// annotated, optionally formatted. %w is expanded.
-func NewPanicWrap(skip int, err error, format string, args ...any) *PanicError {
+// annotated with a single string.
+func NewPanicWrap(skip int, err error, note string) *PanicError {
+	return &PanicError{
+		payload: Wrap(err, note),
+		stack:   StackTrace(skip + 1),
+	}
+}
+
+// NewPanicWrapf creates a new PanicError wrapping a given error
+// annotated with a formatted string.
+func NewPanicWrapf(skip int, err error, format string, args ...any) *PanicError {
 	return &PanicError{
 		payload: Wrapf(err, format, args...),
 		stack:   StackTrace(skip + 1),
@@ -87,8 +96,13 @@ func Panicf(format string, args ...any) {
 	panic(NewPanicErrorf(1, format, args...))
 }
 
-// PanicWrap emits a PanicError wrapping an annotated error, optionally
-// formatted. %w is expanded.
-func PanicWrap(err error, format string, args ...any) {
-	panic(NewPanicWrap(1, err, format, args...))
+// PanicWrap emits a PanicError wrapping an annotated error.
+func PanicWrap(err error, note string) {
+	panic(NewPanicWrap(1, err, note))
+}
+
+// PanicWrapf emits a PanicError wrapping an annotated error using
+// a formatting string.
+func PanicWrapf(err error, format string, args ...any) {
+	panic(NewPanicWrapf(1, err, format, args...))
 }
