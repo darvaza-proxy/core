@@ -40,14 +40,17 @@ should be on a subdirectory, it shouldn't be here.
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
+* ListCopy/ListCopyFn
 * MapContains
 * MapListContains/MapListContainsFn
 * MapListForEach/MapListForEachElement
 * MapListInsert/MapListAppend
 * MapListInsertUnique/MapListInsertUniqueFn
 * MapListAppendUnique/MapListAppendUniqueFn
+* MapListCopy/MapListCopyFn
 * MapAllListContains/MapAllListContainsFn
 * MapAllListForEach/MapAllListForEachElement
+* MapValue
 * Keys()/SortedKeys()
 * NewContextKey
 

@@ -29,6 +29,15 @@ func SortedKeys[K Ordered, T any](m map[K]T) []K {
 	return keys
 }
 
+// MapValue returns a value of an entry or a default if
+// not found
+func MapValue[K comparable, V any](m map[K]V, key K, def V) (V, bool) {
+	if val, ok := m[key]; ok {
+		return val, true
+	}
+	return def, false
+}
+
 // MapContains tells if a given map contains a key.
 // this helper is intended for switch/case conditions
 func MapContains[K comparable](m map[K]any, key K) bool {
@@ -143,6 +152,23 @@ func MapListAppendUniqueFn[K comparable, T any](m map[K]*list.List, key K, v T,
 			l.PushBack(v)
 		}
 	}
+}
+
+// MapListCopy duplicates a map containing a list.List
+func MapListCopy[T comparable](src map[T]*list.List) map[T]*list.List {
+	fn := func(v any) (any, bool) { return v, true }
+	return MapListCopyFn(src, fn)
+}
+
+// MapListCopyFn duplicates a map containing a list.List but
+// allows the element's values to be cloned by a helper function
+func MapListCopyFn[K comparable, V any](src map[K]*list.List,
+	fn func(v V) (V, bool)) map[K]*list.List {
+	out := make(map[K]*list.List, len(src))
+	for k, l := range src {
+		out[k] = ListCopyFn(l, fn)
+	}
+	return out
 }
 
 // MapAllListContains check if a value exists on any entry of the map
