@@ -56,17 +56,59 @@ should be on a subdirectory, it shouldn't be here.
 
 ## Errors
 
-* Wrap/QuietWrap/Unwrappable/Unwrap
-* Errors/CompoundError
+### Wrappers
+
+The `Unwrappable` type represents the classic `Unwrap() error` interface implemented
+by `WrappedError`, while the `Errors` interface represents `Errors() []error`.
+
+There are two factories for `Unwrappable`, the standard `"note: error description"` and a
+quiet one, not including the text of the original error unless unwrapped first.
+
+* `Wrap(err, note)` with a simple string, or with a formatted note `Wrap(err, format, args...)`.
+* And the same for `QuietWrap(err, note)` or `QuietWrap(err, format, args...)`.
+
+The `Unwrap(err error) []error` helper returns a slice of non-nil sub-errors built
+from the following interfaces:
+* `Unwrap() []error`
+* `Errors() []error`
+* `Unwrap() error`
+
+For agreggating multiple errors and the `Unwrap() []error` or `Errors() []error` interfaces
+we have the `CompoundError`.
+
+### Panic and Recover
+
+A `PanicError` is a special wrapper that includes a StackTrace and can wrap anything
+and it's especially useful when used combined the standard `recover()` as shown below:
+
+```go
+defer func() {
+  if err := core.AsRecovered(recover()); err != nil {
+    // ...
+  }
+}()
+```
+
+This construct will return `nil` if there was a panic, pass-through the error if it implements
+the `Recovered` interface, or wrap anything else in a `PanicError`.
+
+`Catcher` is a companion of `PanicError` which will allows you to call a function and
+either receive its organic `error` or a `PanicError` if it panicked.
+
+To `panic()` automatically wrapping the reason in `PanicError{}` the following helpers
+can be used:
+
+* `Panic()`,
+* `Panicf()`,
+* and `PanicWrap`.
+
+### Miscellaneous error related
+
 * CoalesceError
 * AsError/AsErrors
 * IsError/IsErrorFn/IsErrorFn2
 * IsTemporary/CheckIsTemporary
 * IsTimeout/CheckIsTimeout
-* AsRecovered/Recovered
-* Catcher
-* PanicError
-* Panic/Panicf/PanicWrap
 * TemporaryError/NewTemporaryError/NewTimeoutError
 * WaitGroup/ErrGroup
 * Frame/Stack
