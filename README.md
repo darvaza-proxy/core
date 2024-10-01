@@ -92,8 +92,9 @@ defer func() {
 This construct will return `nil` if there was a panic, pass-through the error if it implements
 the `Recovered` interface, or wrap anything else in a `PanicError`.
 
-`Catcher` is a companion of `PanicError` which will allows you to call a function and
-either receive its organic `error` or a `PanicError` if it panicked.
+`Catch()` is a companion of `PanicError` which will allows you to call a function and
+either receive its organic `error` or a `PanicError` if it panicked, using a `Catcher`
+instance internally.
 
 To `panic()` automatically wrapping the reason in `PanicError{}` the following helpers
 can be used:
