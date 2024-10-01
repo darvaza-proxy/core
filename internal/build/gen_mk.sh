@@ -187,7 +187,7 @@ gen_make_targets() {
 		files=GO_FILES_$(gen_var_name "$name")
 		cat <<EOT
 
-$cmd-$name:${deps:+ $(prefixed $cmd $deps)}${depsx:+ | $depsx} ; \$(info \$(M) $cmd: $name)
+$cmd-$name:${deps:+ $(prefixed "$cmd" $deps)}${depsx:+ | $depsx} ; \$(info \$(M) $cmd: $name)
 EOT
 	if [ -n "$callu" ]; then
 		# unconditionally
@@ -204,7 +204,7 @@ EOT
 gen_files_lists
 
 for cmd in $COMMANDS; do
-	all="$(prefixed $cmd $PROJECTS)"
+	all="$(prefixed "$cmd" $PROJECTS)"
 	depsx=
 
 	cat <<EOT
@@ -223,6 +223,6 @@ done
 for x in $PROJECTS; do
 	cat <<EOT
 
-$x: $(suffixed $x get build tidy)
+$x: $(suffixed "$x" get build tidy)
 EOT
 done
