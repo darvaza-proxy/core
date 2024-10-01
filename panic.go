@@ -72,3 +72,10 @@ func (p *Catcher) Recovered() Recovered {
 	}
 	return nil
 }
+
+// Catch uses a [Catcher] to safely call a function and
+// return the organic error or the [Recovered] [PanicError].
+func Catch(fn func() error) error {
+	var p Catcher
+	return p.Do(fn)
+}
