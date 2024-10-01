@@ -281,7 +281,7 @@ func (eg *ErrGroup) GoCatch(run func(context.Context) error,
 	var c2 func(error) error
 
 	if run == nil {
-		PanicWrap(ErrInvalid, "run function not specified")
+		PanicWrap(ErrInvalid, "%s", "run function not specified")
 	}
 
 	eg.init()

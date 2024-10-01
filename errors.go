@@ -10,7 +10,7 @@ var (
 	ErrNotImplemented = errors.New("not implemented")
 	// ErrTODO is like ErrNotImplemented but used especially to
 	// indicate something needs to be implemented
-	ErrTODO = Wrap(ErrNotImplemented, "TODO")
+	ErrTODO = Wrap(ErrNotImplemented, "%s", "TODO")
 	// ErrExists indicates something already exists
 	ErrExists = errors.New("already exists")
 	// ErrNotExists indicates something doesn't exist
