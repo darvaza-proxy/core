@@ -78,7 +78,6 @@ gen_files_lists() {
 	cat <<EOT
 GO_FILES = \$(shell find * \\
 	-type d -name node_modules -prune -o \\
-	-path internal/build -prune -o \\
 	-type f -name '*.go' -print )
 
 EOT
@@ -108,7 +107,7 @@ EOT
 gen_make_targets() {
 	local cmd="$1" name="$2" dir="$3" mod="$4" deps="$5"
 	local call= callu= callx=
-	local depsx= cmdx=
+	local depsx=
 	local sequential=
 
 	# default calls
@@ -155,35 +154,7 @@ gen_make_targets() {
 			cd="cd '$dir'; "
 		fi
 
-		if [ "$name" = root ]; then
-			# special case
-			case "$cmd" in
-			get)
-				cmdx="get -tags tools -v ./..."
-				;;
-			up)
-				cmdx="get -tags tools -u \$(GOUP_FLAGS) \$(GOUP_PACKAGES)"
-				;;
-			*)
-				cmdx=
-				;;
-			esac
-
-			case "$cmd" in
-			up)
-				callx="$cmdx
-\$(GO) mod tidy"
-				;;
-			get)
-				callx="$cmdx"
-				;;
-			*)
-				callx="$call"
-				;;
-			esac
-		else
-			callx="$call"
-		fi
+		callx="$call"
 
 		if [ "build" = "$cmd" ]; then
 			# special build flags for cmd/*
