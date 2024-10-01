@@ -10,8 +10,10 @@ TOOLSDIR := $(CURDIR)/internal/build
 TMPDIR ?= $(CURDIR)/.tmp
 OUTDIR ?= $(TMPDIR)
 
-GOLANGCI_LINT_VERSION ?= v1.55
-REVIVE_VERSION ?= v1.3.7
+# Dynamic version selection based on Go version
+# Format: $(TOOLSDIR)/get_version.sh <go_version> <tool_version1> <tool_version2> ..
+GOLANGCI_LINT_VERSION ?= $(shell $(TOOLSDIR)/get_version.sh 1.20 v1.55 v1.59)
+REVIVE_VERSION ?= $(shell $(TOOLSDIR)/get_version.sh 1.20 v1.3 v1.4)
 
 GOLANGCI_LINT_URL ?= github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 GOLANGCI_LINT ?= $(GO) run $(GOLANGCI_LINT_URL)
