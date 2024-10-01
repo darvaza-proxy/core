@@ -5,6 +5,8 @@ GO ?= go
 GOFMT ?= gofmt
 GOFMT_FLAGS = -w -l -s
 GOGENERATE_FLAGS = -v
+GOUP_FLAGS ?= -v
+GOUP_PACKAGES ?= ./...
 
 TOOLSDIR := $(CURDIR)/internal/build
 TMPDIR ?= $(CURDIR)/.tmp
