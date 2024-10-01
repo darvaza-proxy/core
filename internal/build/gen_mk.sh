@@ -146,46 +146,49 @@ gen_make_targets() {
 		sequential=false ;;
 	esac
 
-		# cd $dir
-		if [ "." = "$dir" ]; then
-			# root
-			cd=
-		else
-			cd="cd '$dir'; "
-		fi
+	# cd $dir
+	if [ "." = "$dir" ]; then
+		# root
+		cd=
+	else
+		cd="cd '$dir'; "
+	fi
 
+	case "$cmd" in
+	build)
+		# special build flags for cmd/*
+		#
+		callx="$(cat <<-EOL | packed_oneline
+		set -e
+		MOD="\$\$(\$(GO) list -f '{{.ImportPath}}' ./...)"
+		if echo "\$\$MOD" | grep -q -e '.*/cmd/[^/]\+\$\$'; then
+			\$(GO_BUILD_CMD) ./...
+		elif [ -n "\$\$MOD" ]; then
+			\$(GO_BUILD) ./...
+		fi
+		EOL
+		)"
+		;;
+	tidy)
+		# exclude submodules when running revive
+		#
+		exclude=$(gen_revive_exclude "$dir")
+		if [ -n "$exclude" ]; then
+			callx=$(echo "$call" | sed -e "s;\(REVIVE)\);\1 $exclude;")
+		fi
+		;;
+	*)
 		callx="$call"
+		;;
+	esac
 
-		if [ "build" = "$cmd" ]; then
-			# special build flags for cmd/*
-			#
-			callx="$(cat <<-EOL | packed_oneline
-			set -e
-			MOD="\$\$(\$(GO) list -f '{{.ImportPath}}' ./...)"
-			if echo "\$\$MOD" | grep -q -e '.*/cmd/[^/]\+\$\$'; then
-				\$(GO_BUILD_CMD) ./...
-			elif [ -n "\$\$MOD" ]; then
-				\$(GO_BUILD) ./...
-			fi
-			EOL
-			)"
-		fi
 
-		if [ "tidy" = "$cmd" ]; then
-			# exclude submodules when running revive
-			#
-			exclude=$(gen_revive_exclude "$dir")
-			if [ -n "$exclude" ]; then
-				callx=$(echo "$callx" | sed -e "s;\(REVIVE)\);\1 $exclude;")
-			fi
-		fi
+	if ! $sequential; then
+		deps=
+	fi
 
-		if ! $sequential; then
-			deps=
-		fi
-
-		files=GO_FILES_$(gen_var_name "$name")
-		cat <<EOT
+	files=GO_FILES_$(gen_var_name "$name")
+	cat <<EOT
 
 $cmd-$name:${deps:+ $(prefixed "$cmd" $deps)}${depsx:+ | $depsx} ; \$(info \$(M) $cmd: $name)
 EOT
