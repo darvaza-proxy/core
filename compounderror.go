@@ -102,7 +102,7 @@ func (w *CompoundError) Append(err error, note string, args ...any) {
 		err = errors.New(note)
 	case note != "":
 		// wrap
-		err = Wrap(err, note)
+		err = Wrap(err, "%s", note)
 	}
 
 	w.Errs = append(w.Errs, err)
