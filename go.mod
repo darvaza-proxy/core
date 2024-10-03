@@ -1,6 +1,6 @@
 module darvaza.org/core
 
-go 1.20
+go 1.21
 
 require golang.org/x/net v0.29.0
 
