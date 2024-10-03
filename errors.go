@@ -10,7 +10,7 @@ var (
 	ErrNotImplemented = errors.New("not implemented")
 	// ErrTODO is like ErrNotImplemented but used especially to
 	// indicate something needs to be implemented
-	ErrTODO = Wrap(ErrNotImplemented, "%s", "TODO")
+	ErrTODO = Wrap(ErrNotImplemented, "TODO")
 	// ErrExists indicates something already exists
 	ErrExists = errors.New("already exists")
 	// ErrNotExists indicates something doesn't exist
@@ -31,13 +31,17 @@ type Unwrappable interface {
 	Unwrap() error
 }
 
-// Wrap annotates an error, optionally with a formatted string.
-func Wrap(err error, format string, args ...any) error {
+// Wrap annotates an error with a single string.
+func Wrap(err error, msg string) error {
+	return doWrap(err, false, "%s", msg)
+}
+
+// Wrapf annotates an error with a formatted string.
+func Wrapf(err error, format string, args ...any) error {
 	return doWrap(err, false, format, args...)
 }
 
 // QuietWrap replaces the text of the error it's wrapping.
-// if %w is used the argument will be unwrapped.
 func QuietWrap(err error, format string, args ...any) error {
 	return doWrap(err, true, format, args...)
 }
