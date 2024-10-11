@@ -122,6 +122,7 @@ can be used:
 * ErrNotImplemented/ErrTODO
 * ErrExists/ErrNotExists
 * ErrInvalid/ErrUnknown
+* ErrNilReceiver
 
 ## See also
 
