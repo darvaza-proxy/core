@@ -19,6 +19,8 @@ var (
 	ErrInvalid = errors.New("invalid argument")
 	// ErrUnknown indicates something isn't recognized
 	ErrUnknown = errors.New("unknown")
+	// ErrNilReceiver indicates a method was called over a nil instance
+	ErrNilReceiver = errors.New("nil receiver")
 )
 
 var (
