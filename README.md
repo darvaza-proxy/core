@@ -37,6 +37,7 @@ should be on a subdirectory, it shouldn't be here.
 * SliceRandom
 * SliceSort/SliceSortFn/SliceSortOrdered
 * SliceReverse/SliceReversed/SliceReversedFn
+* List[T]
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
