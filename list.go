@@ -6,7 +6,7 @@ import "container/list"
 type List[T any] list.List
 
 // Sys returns the native [list.List]
-func (l *List[_]) Sys() *list.List {
+func (l *List[T]) Sys() *list.List {
 	if l == nil {
 		return nil
 	}
@@ -14,7 +14,7 @@ func (l *List[_]) Sys() *list.List {
 }
 
 // Len returns the number of elements in the list
-func (l *List[_]) Len() int {
+func (l *List[T]) Len() int {
 	if l == nil {
 		return 0
 	}
@@ -70,7 +70,7 @@ func (l *List[T]) Back() T {
 
 // Values returns all values in the list.
 func (l *List[T]) Values() []T {
-	var out []T
+	out := make([]T, 0, l.Len())
 	l.ForEach(func(v T) bool {
 		out = append(out, v)
 		return true
