@@ -2,9 +2,39 @@ package core
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
+
+// SpinLock is a simple CompareAndSwap locking mechanism.
+type SpinLock uint32
+
+func (sl *SpinLock) ptr() *uint32 {
+	if sl == nil {
+		return nil
+	}
+	return (*uint32)(sl)
+}
+
+// TryLock attempts to acquire the lock
+func (sl *SpinLock) TryLock() bool {
+	return atomic.CompareAndSwapUint32(sl.ptr(), 0, 1)
+}
+
+// Lock blocks until it can acquire the lock
+func (sl *SpinLock) Lock() {
+	for !sl.TryLock() {
+		runtime.Gosched() // yield
+	}
+}
+
+// Unlock releases the lock
+func (sl *SpinLock) Unlock() {
+	if !atomic.CompareAndSwapUint32(sl.ptr(), 1, 0) {
+		panic("invalid SpinLock.Unlock")
+	}
+}
 
 // WaitGroup is a safer way to run workers
 type WaitGroup struct {
