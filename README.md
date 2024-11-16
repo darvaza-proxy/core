@@ -37,6 +37,7 @@ should be on a subdirectory, it shouldn't be here.
 * SliceRandom
 * SliceSort/SliceSortFn/SliceSortOrdered
 * SliceReverse/SliceReversed/SliceReversedFn
+* List[T]
 * ListContains/ListContainsFn
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
@@ -53,6 +54,7 @@ should be on a subdirectory, it shouldn't be here.
 * MapValue
 * Keys()/SortedKeys()
 * NewContextKey
+* Set
 
 ## Errors
 
