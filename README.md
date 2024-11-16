@@ -54,6 +54,7 @@ should be on a subdirectory, it shouldn't be here.
 * MapValue
 * Keys()/SortedKeys()
 * NewContextKey
+* Set
 
 ## Errors
 
