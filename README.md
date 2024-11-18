@@ -124,6 +124,10 @@ can be used:
 * ErrInvalid/ErrUnknown
 * ErrNilReceiver
 
+### Synchronization
+
+* SpinLock
+
 ## See also
 
 * [darvaza.org/cache](https://pkg.go.dev/darvaza.org/cache)
