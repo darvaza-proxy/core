@@ -12,6 +12,12 @@ should be on a subdirectory, it shouldn't be here.
 [goreport]: https://goreportcard.com/report/darvaza.org/core
 [goreport-badge]: https://goreportcard.com/badge/darvaza.org/core
 
+### Context
+
+* `NewContextKey` creates a ContextKey adding type-safety and ease of use to the standard `context.WithValue()`.
+* `WithTimeout()` and `WithTimeoutCause()` are equivalent to `context.WithDeadline()` and `context.WithDeadlineCause()`
+  but receiving a duration instead of an absolute time.
+
 ## Network
 
 * GetInterfacesNames
@@ -52,7 +58,6 @@ should be on a subdirectory, it shouldn't be here.
 * MapAllListForEach/MapAllListForEachElement
 * MapValue
 * Keys()/SortedKeys()
-* NewContextKey
 
 ## Errors
 

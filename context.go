@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 var (
@@ -53,4 +54,30 @@ func (ck *ContextKey[T]) GoString() string {
 // specified type and friendly name
 func NewContextKey[T any](name string) *ContextKey[T] {
 	return &ContextKey[T]{name: name}
+}
+
+// WithTimeout is equivalent to [context.WithDeadline] but taking a duration
+// instead of an absolute time.
+//
+// If the duration is zero or negative the context won't expire.
+func WithTimeout(parent context.Context, tio time.Duration) (context.Context, context.CancelFunc) {
+	if tio > 0 {
+		deadline := time.Now().Add(tio)
+		return context.WithDeadline(parent, deadline)
+	}
+
+	return parent, func() {}
+}
+
+// WithTimeoutCause is equivalent to [context.WithDeadlineCause] but taking a duration
+// instead of an absolute time.
+//
+// If the duration is zero or negative the context won't expire.
+func WithTimeoutCause(parent context.Context, tio time.Duration, cause error) (context.Context, context.CancelFunc) {
+	if tio > 0 {
+		deadline := time.Now().Add(tio)
+		return context.WithDeadlineCause(parent, deadline, cause)
+	}
+
+	return parent, func() {}
 }
