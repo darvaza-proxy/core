@@ -8,5 +8,8 @@
       "matchDatasources": ["golang-version"],
       "allowedVersions": "1.21"
     }
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
   ]
 }
