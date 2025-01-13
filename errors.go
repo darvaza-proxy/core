@@ -21,6 +21,8 @@ var (
 	ErrUnknown = errors.New("unknown")
 	// ErrNilReceiver indicates a method was called over a nil instance
 	ErrNilReceiver = errors.New("nil receiver")
+	// ErrUnreachable indicates something impossible happened
+	ErrUnreachable = errors.New("unreachable")
 )
 
 var (

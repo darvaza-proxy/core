@@ -106,3 +106,28 @@ func PanicWrap(err error, note string) {
 func PanicWrapf(err error, format string, args ...any) {
 	panic(NewPanicWrapf(1, err, format, args...))
 }
+
+// NewUnreachableErrorf creates a new annotated ErrUnreachable with callstack.
+func NewUnreachableErrorf(skip int, err error, format string, args ...any) error {
+	return NewUnreachableError(skip+1, err, fmt.Sprintf(format, args...))
+}
+
+// NewUnreachableError creates a new annotated ErrUnreachable with callstack.
+func NewUnreachableError(skip int, err error, note string) error {
+	if err == ErrUnreachable {
+		err = nil
+	}
+
+	switch {
+	case err == nil && note == "":
+		return NewPanicError(skip+1, ErrUnreachable)
+	case err == nil:
+		return NewPanicWrap(skip+1, ErrUnreachable, note)
+	case note != "":
+		err = Wrap(err, note)
+	}
+
+	return NewPanicError(skip+1, &CompoundError{
+		Errs: []error{ErrUnreachable, err},
+	})
+}

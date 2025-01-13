@@ -111,6 +111,15 @@ can be used:
 * `Panicf()`,
 * and `PanicWrap`.
 
+### Unreachable conditions
+
+An `ErrUnreachable` is an _error_ that indicates something impossible happened, and
+it's wrapped as a `PanicError` including callstack when using the helpers that allow
+to wrap an extra error and cause note, optionally formatted.
+
+* `NewUnreachableError()`
+* `NewUnreachableErrorf()`
+
 ### Miscellaneous error related
 
 * CoalesceError
