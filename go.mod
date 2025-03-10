@@ -1,7 +1,9 @@
 module darvaza.org/core
 
-go 1.22
+go 1.23.0
 
-require golang.org/x/net v0.35.0
+toolchain go1.24.1
 
-require golang.org/x/text v0.22.0 // indirect
+require golang.org/x/net v0.37.0
+
+require golang.org/x/text v0.23.0 // indirect
