@@ -29,6 +29,48 @@ func SortedKeys[K Ordered, T any](m map[K]T) []K {
 	return keys
 }
 
+// SortedValues returns a slice of values from the map, sorted by their keys
+func SortedValues[K Ordered, T any](m map[K]T) []T {
+	var out []T
+	if l := len(m); l > 0 {
+		out = make([]T, 0, l)
+		out = doSortedValues(out, m, nil)
+	}
+	return out
+}
+
+// SortedValuesCond returns a slice of values from the map, sorted by their keys,
+// filtered by the optional predicate function fn, preallocated to the size of the map.
+func SortedValuesCond[K Ordered, T any](m map[K]T, fn func(T) bool) []T {
+	var out []T
+	if l := len(m); l > 0 {
+		out = make([]T, 0, l)
+		out = doSortedValues(out, m, fn)
+	}
+	return out
+}
+
+// SortedValuesUnlikelyCond returns a slice of values from the map, sorted by their keys,
+// filtered by the optional predicate function fn, without preallocation.
+func SortedValuesUnlikelyCond[K Ordered, T any](m map[K]T, fn func(T) bool) []T {
+	var out []T
+	if len(m) > 0 {
+		out = doSortedValues(nil, m, fn)
+	}
+	return out
+}
+
+func doSortedValues[K Ordered, T any](out []T, m map[K]T, fn func(T) bool) []T {
+	for _, k := range SortedKeys(m) {
+		if v, ok := m[k]; ok {
+			if fn == nil || fn(v) {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
 // MapValue returns a value of an entry or a default if
 // not found
 func MapValue[K comparable, V any](m map[K]V, key K, def V) (V, bool) {
