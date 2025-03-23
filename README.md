@@ -47,7 +47,6 @@ should be on a subdirectory, it shouldn't be here.
 * ListForEach/ListForEachElement
 * ListForEachBackward/ListForEachBackwardElement
 * ListCopy/ListCopyFn
-* MapContains
 * MapListContains/MapListContainsFn
 * MapListForEach/MapListForEachElement
 * MapListInsert/MapListAppend
@@ -56,8 +55,16 @@ should be on a subdirectory, it shouldn't be here.
 * MapListCopy/MapListCopyFn
 * MapAllListContains/MapAllListContainsFn
 * MapAllListForEach/MapAllListForEachElement
-* MapValue
-* Keys()/SortedKeys()
+
+### Maps
+
+* `MapContains()` checks if a map contains a key. Useful for switch/case tests.
+* `MapValue()` returns the value for a key, or a given fallback value if the key is not present.
+* `Keys()` returns a slice of the keys in the map.
+* `SortedKeys()` returns a sorted slice of the keys in the map.
+* `SortedValues()` returns a slice of the values in the map, sorted by key.
+* `SortedValuesCond()` returns a slice of the values in the map, sorted by key, and optionally filtered by a condition function.
+* `SortedValuesUnlikelyCond()` is like `SortedValuesCond()` but it doesn't reallocate the slice.
 
 ## Errors
 
