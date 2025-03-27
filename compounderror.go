@@ -56,15 +56,15 @@ func (w *CompoundError) AsError() error {
 	return nil
 }
 
-// AppendError adds an error to the collection,
-// unwrapping other implementers of the [Errors]
-// interface when possible
-func (w *CompoundError) AppendError(errs ...error) {
+// AppendError adds an error to the collection, unwrapping other implementers of the [Errors]
+// interface when possible. It returns the updated CompoundError for method chaining.
+func (w *CompoundError) AppendError(errs ...error) *CompoundError {
 	for _, err := range errs {
 		if err != nil {
 			w.doAppendUnwrapped(err)
 		}
 	}
+	return w
 }
 
 func (w *CompoundError) doAppendUnwrapped(err error) {
