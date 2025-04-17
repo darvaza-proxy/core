@@ -147,7 +147,9 @@ to wrap an extra error and cause note, optionally formatted.
 
 ### Synchronization
 
-* SpinLock
+Use [darvaza.org/x/sync](https://pkg.go.dev/darvaza.org/x/sync) instead.
+
+* ~~SpinLock~~ Deprecated in favour of [darvaza.org/x/sync/spinlock](https://pkg.go.dev/darvaza.org/x/sync)
 
 ## See also
 
