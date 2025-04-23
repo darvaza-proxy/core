@@ -8,6 +8,8 @@ import (
 )
 
 // SpinLock is a simple CompareAndSwap locking mechanism.
+//
+// Deprecated: Use darvaza.org/x/sync/spinlock instead.
 type SpinLock uint32
 
 func (sl *SpinLock) ptr() *uint32 {
