@@ -56,15 +56,15 @@ func (w *CompoundError) AsError() error {
 	return nil
 }
 
-// AppendError adds an error to the collection,
-// unwrapping other implementers of the [Errors]
-// interface when possible
-func (w *CompoundError) AppendError(errs ...error) {
+// AppendError adds an error to the collection, unwrapping other implementers of the [Errors]
+// interface when possible. It returns the updated CompoundError for method chaining.
+func (w *CompoundError) AppendError(errs ...error) *CompoundError {
 	for _, err := range errs {
 		if err != nil {
 			w.doAppendUnwrapped(err)
 		}
 	}
+	return w
 }
 
 func (w *CompoundError) doAppendUnwrapped(err error) {
@@ -86,9 +86,11 @@ func (w *CompoundError) doAppend(errs ...error) {
 	}
 }
 
-// Append adds an error to the collection optionally annotated by a formatted string.
-// if err is nil a new error is created unless the note is empty.
-func (w *CompoundError) Append(err error, note string, args ...any) {
+// Append adds an error to the collection, optionally annotating it with a formatted note.
+// If err is nil and a note is provided, a new error is created from the note.
+// If both err and note are non-empty, the error is wrapped with the note.
+// Returns the updated CompoundError for method chaining.
+func (w *CompoundError) Append(err error, note string, args ...any) *CompoundError {
 	if len(args) > 0 {
 		note = fmt.Sprintf(note, args...)
 	}
@@ -96,7 +98,7 @@ func (w *CompoundError) Append(err error, note string, args ...any) {
 	switch {
 	case err == nil && note == "":
 		// nothing
-		return
+		return w
 	case err == nil:
 		// note-only
 		err = errors.New(note)
@@ -106,4 +108,5 @@ func (w *CompoundError) Append(err error, note string, args ...any) {
 	}
 
 	w.Errs = append(w.Errs, err)
+	return w
 }
