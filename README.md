@@ -1,166 +1,297 @@
-# Core of helpers for darvaza.org projects
+# Core helpers for darvaza.org projects
 
 [![Go Reference][godoc-badge]][godoc]
 [![Go Report Card][goreport-badge]][goreport]
 
-This package contains simple mechanisms used by other darvaza-proxy projects.
-It's not allowed to have dependencies outside of Go' Standard Library, and if something
-should be on a subdirectory, it shouldn't be here.
+This package contains simple mechanisms used by other darvaza-proxy
+projects. It's not allowed to have dependencies outside of Go's Standard
+Library, and if something should be on a subdirectory, it shouldn't be here.
 
 [godoc]: https://pkg.go.dev/darvaza.org/core
 [godoc-badge]: https://pkg.go.dev/badge/darvaza.org/core.svg
 [goreport]: https://goreportcard.com/report/darvaza.org/core
 [goreport-badge]: https://goreportcard.com/badge/darvaza.org/core
 
-### Context
+## Type Constraints
 
-* `NewContextKey` creates a ContextKey adding type-safety and ease of use to the standard `context.WithValue()`.
-* `WithTimeout()` and `WithTimeoutCause()` are equivalent to `context.WithDeadline()` and `context.WithDeadlineCause()`
-  but receiving a duration instead of an absolute time.
+Generic type constraints for use with Go generics:
 
-## Network
+* `Signed` - signed integer types
+* `Unsigned` - unsigned integer types
+* `Integer` - all integer types (signed and unsigned)
+* `Float` - floating-point types
+* `Complex` - complex number types
+* `Bool` - boolean type
+* `String` - string type
+* `Ordered` - types that support ordering operations
 
-* GetInterfacesNames
-* ParseAddr/ParseNetIP
-* SplitHostPort/SplitAddrPort
-* JoinHostPort/MakeHostPort
-* AddrPort
-* AddrFromNetIP
-* GetIPAddresses/GetNetIPAddresses/GetStringIPAddresses
+## Context
 
-## Generics
+* `ContextKey[T]` - type-safe context key type
+* `NewContextKey[T]()` creates a ContextKey adding type-safety and ease of use
+  to the standard `context.WithValue()`
+* `WithTimeout()` and `WithTimeoutCause()` are equivalent to
+  `context.WithDeadline()` and `context.WithDeadlineCause()` but receiving
+  a duration instead of an absolute time
 
-* Zero/IsZero
-* Coalesce/IIf
-* As/AsFn
-* SliceAs/SliceAsFn
-* SliceContains/SliceContainsFn
-* SliceEqual/SliceEqualFn
-* SliceMinus/SliceMinusFn
-* SliceUnique/SliceUniqueFn
-* SliceUniquify/SliceUniquifyFn
-* SliceReplaceFn/SliceCopy/SliceCopyFn/SliceMap
-* SliceRandom
-* SliceSort/SliceSortFn/SliceSortOrdered
-* SliceReverse/SliceReversed/SliceReversedFn
-* ListContains/ListContainsFn
-* ListForEach/ListForEachElement
-* ListForEachBackward/ListForEachBackwardElement
-* ListCopy/ListCopyFn
-* MapListContains/MapListContainsFn
-* MapListForEach/MapListForEachElement
-* MapListInsert/MapListAppend
-* MapListInsertUnique/MapListInsertUniqueFn
-* MapListAppendUnique/MapListAppendUniqueFn
-* MapListCopy/MapListCopyFn
-* MapAllListContains/MapAllListContainsFn
-* MapAllListForEach/MapAllListForEachElement
+## Network Utilities
 
-### Maps
+### IP Address Functions
 
-* `MapContains()` checks if a map contains a key. Useful for switch/case tests.
-* `MapValue()` returns the value for a key, or a given fallback value if the key is not present.
-* `Keys()` returns a slice of the keys in the map.
-* `SortedKeys()` returns a sorted slice of the keys in the map.
-* `SortedValues()` returns a slice of the values in the map, sorted by key.
-* `SortedValuesCond()` returns a slice of the values in the map, sorted by key, and optionally filtered by a condition function.
-* `SortedValuesUnlikelyCond()` is like `SortedValuesCond()` but it doesn't reallocate the slice.
+* `GetIPAddresses()` - get IP addresses as `netip.Addr`
+* `GetNetIPAddresses()` - get IP addresses as `net.IP`
+* `GetStringIPAddresses()` - get IP addresses as strings
+* `AddrFromNetIP(ip)` - convert `net.IP` to `netip.Addr`
+* `ParseAddr(s)` - parse string to `netip.Addr`
+* `ParseNetIP(s)` - parse string to `net.IP`
 
-## Errors
+### Host/Port Functions
 
-### Wrappers
+* `SplitHostPort(hostport)` - split host:port string
+* `SplitAddrPort(addrport)` - split address:port string
+* `JoinHostPort(host, port)` - join host and port
+* `MakeHostPort(host, port)` - create host:port string
+* `AddrPort(addr, port)` - create `netip.AddrPort`
 
-The `Unwrappable` type represents the classic `Unwrap() error` interface implemented
-by `WrappedError`, while the `Errors` interface represents `Errors() []error`.
+### Interface Functions
 
-There are three factories for `Unwrappable`, the standard `"note: error description"`,
-one for formatted notes, and a quiet one, not including the text of the original error
-unless unwrapped first.
+* `GetInterfacesNames()` - get network interface names
 
-* `Wrap(err, note)` with a simple string,
-* `Wrapf(err, format, args...)` when using a formatted note,
-* and `QuietWrapf(err, format, args...)` for formatted errors not including
-  the wrapped message in the text.
+## Generic Utilities
 
-The `Unwrap(err error) []error` helper returns a slice of non-nil sub-errors built
-from the following interfaces:
-* `Unwrap() []error`
-* `Errors() []error`
-* `Unwrap() error`
+### Basic Utilities
 
-For agreggating multiple errors and the `Unwrap() []error` or `Errors() []error` interfaces
-we have the `CompoundError`.
+* `Zero[T]()` returns the zero value for type T
+* `IsZero[T](v)` checks if a value is the zero value for its type
+* `Coalesce[T](values...)` returns the first non-zero value
+* `IIf[T](condition, ifTrue, ifFalse)` conditional expression
 
-### Panic and Recover
+### Type Conversion
 
-A `PanicError` is a special wrapper that includes a StackTrace and can wrap anything
-and it's especially useful when used combined the standard `recover()` as shown below:
+* `As[T,V](v)` attempts to convert value to target type
+* `AsFn[T,V](v, fn)` converts value using a provided function
+* `AsError[T](v)` attempts to convert value to error
+* `AsErrors[T](v)` attempts to convert value to error slice
+
+### Slice Operations
+
+#### Search and Comparison
+
+* `SliceContains[T]` / `SliceContainsFn[T]`
+* `SliceEqual[T]` / `SliceEqualFn[T]`
+
+#### Transformation
+
+* `SliceAs[T,V]` / `SliceAsFn[T,V]`
+* `SliceMap[T1,T2]` - maps slice elements to new type
+* `SliceReplaceFn[T]` - replaces elements matching condition
+* `SliceCopy[T]` / `SliceCopyFn[T]`
+
+#### Set Operations
+
+* `SliceMinus[T]` / `SliceMinusFn[T]` - set difference
+* `SliceUnique[T]` / `SliceUniqueFn[T]` - unique elements
+* `SliceUniquify[T]` / `SliceUniquifyFn[T]` - remove duplicates in-place
+
+#### Sorting and Ordering
+
+* `SliceSort[T]` / `SliceSortFn[T]` / `SliceSortOrdered[T]`
+* `SliceReverse[T]` / `SliceReversed[T]` / `SliceReversedFn[T]`
+
+#### Utilities
+
+* `SliceRandom[T]` - random element selection
+
+### List Operations (container/list)
+
+* `ListContains[T]` / `ListContainsFn[T]`
+* `ListForEach[T]` / `ListForEachElement`
+* `ListForEachBackward[T]` / `ListForEachBackwardElement`
+* `ListCopy[T]` / `ListCopyFn[T]`
+
+### Map Operations
+
+#### Basic Map Functions
+
+* `MapContains[K]()` checks if a map contains a key
+* `MapValue[K,V]()` returns the value for a key, or a fallback value
+* `Keys[K,T]()` returns a slice of the keys in the map
+* `SortedKeys[K,T]()` returns a sorted slice of the keys
+* `SortedValues[K,T]()` returns values sorted by key
+* `SortedValuesCond[K,T]()` returns filtered values sorted by key
+* `SortedValuesUnlikelyCond[K,T]()` like `SortedValuesCond` but more efficient
+
+#### Map List Operations
+
+* `MapListContains[K,T]` / `MapListContainsFn[K,T]`
+* `MapListForEach[K,T]` / `MapListForEachElement[K]`
+* `MapListInsert[K,T]` / `MapListAppend[K,T]`
+* `MapListInsertUnique[K,T]` / `MapListInsertUniqueFn[K,T]`
+* `MapListAppendUnique[K,T]` / `MapListAppendUniqueFn[K,T]`
+* `MapListCopy[T]` / `MapListCopyFn[K,V]`
+
+#### Map All List Operations
+
+* `MapAllListContains[K,T]` / `MapAllListContainsFn[K,T]`
+* `MapAllListForEach[K,T]` / `MapAllListForEachElement[K]`
+
+## Error Handling
+
+### Standard Error Variables
+
+Predefined error values for common conditions:
+
+* `ErrNotImplemented` - functionality not yet implemented
+* `ErrTODO` - placeholder for future implementation
+* `ErrExists` - resource already exists
+* `ErrNotExists` - resource does not exist
+* `ErrInvalid` - invalid input or state
+* `ErrUnknown` - unknown or unspecified error
+* `ErrNilReceiver` - method called on nil receiver
+* `ErrUnreachable` - indicates impossible condition
+
+### Error Wrapping
+
+The `Unwrappable` interface represents the classic `Unwrap() error` pattern,
+implemented by `WrappedError`. The `Errors` interface represents multi-error
+containers with `Errors() []error`.
+
+Error wrapping functions:
+
+* `Wrap(err, note)` - wrap with simple string note
+* `Wrapf(err, format, args...)` - wrap with formatted note
+* `QuietWrap(err, note)` - wrap without including original error text
+* `Unwrap(err) []error` - extract all sub-errors from wrapped errors
+
+### Compound Errors
+
+The `CompoundError` type aggregates multiple errors:
+
+* Implements both `Unwrap() []error` and `Errors() []error` interfaces
+* `.AppendError(err)` / `.Append(errs...)` - add errors
+* `.AsError()` - convert to single error or nil
+* `.Ok()` - check if no errors
+
+### Panic Handling
+
+The `PanicError` type wraps panic values with stack traces:
+
+* `NewPanicError()` / `NewPanicErrorf()` - create panic errors
+* `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics
+* `Panic()` / `Panicf()` / `PanicWrap()` / `PanicWrapf()` - panic with `PanicError`
+
+Panic recovery utilities:
+
+* `Recovered` interface - marks errors from recovered panics
+* `AsRecovered(v)` - convert `recover()` result to error
+* `Catcher` type - safely call functions that might panic
+* `Catch(fn)` - execute function, returning error if panic occurs
 
 ```go
 defer func() {
   if err := core.AsRecovered(recover()); err != nil {
-    // ...
+    // handle panic as error
   }
 }()
 ```
 
-This construct will return `nil` if there was a panic, pass-through the error if it implements
-the `Recovered` interface, or wrap anything else in a `PanicError`.
+### Unreachable Conditions
 
-`Catch()` is a companion of `PanicError` which will allows you to call a function and
-either receive its organic `error` or a `PanicError` if it panicked, using a `Catcher`
-instance internally.
+For indicating impossible code paths:
 
-To `panic()` automatically wrapping the reason in `PanicError{}` the following helpers
-can be used:
+* `NewUnreachableError()` - create unreachable error
+* `NewUnreachableErrorf(format, args...)` - create formatted unreachable error
 
-* `Panic()`,
-* `Panicf()`,
-* and `PanicWrap`.
+These create `PanicError` instances with stack traces.
 
-### Unreachable conditions
+### Temporary and Timeout Errors
 
-An `ErrUnreachable` is an _error_ that indicates something impossible happened, and
-it's wrapped as a `PanicError` including callstack when using the helpers that allow
-to wrap an extra error and cause note, optionally formatted.
+Special error types for network-style temporary and timeout conditions:
 
-* `NewUnreachableError()`
-* `NewUnreachableErrorf()`
+* `TemporaryError` type - implements `Temporary() bool`
+* `NewTemporaryError(err)` - wrap error as temporary
+* `NewTimeoutError(err)` - wrap error as timeout
+* `IsTemporary(err)` / `CheckIsTemporary(err)` - test if error is temporary
+* `IsTimeout(err)` / `CheckIsTimeout(err)` - test if error is timeout
 
-### Miscellaneous error related
+### Error Testing and Utilities
 
-* CoalesceError
-* AsError/AsErrors
-* IsError/IsErrorFn/IsErrorFn2
-* IsTemporary/CheckIsTemporary
-* IsTimeout/CheckIsTimeout
-* TemporaryError/NewTemporaryError/NewTimeoutError
-* WaitGroup/ErrGroup
-* Frame/Stack
-* Here/StackFrame/StackTrace
-* CallStacker
+* `IsError[T](err)` / `IsErrorFn[T](err, fn)` / `IsErrorFn2[T](err, fn)` - type-safe error testing
+* `CoalesceError(errs...)` - return first non-nil error
 
-* ErrNotImplemented/ErrTODO
-* ErrExists/ErrNotExists
-* ErrInvalid/ErrUnknown
-* ErrNilReceiver
+## Stack Tracing
 
-### Synchronization
+Utilities for capturing and working with call stacks:
 
-Use [darvaza.org/x/sync](https://pkg.go.dev/darvaza.org/x/sync) instead.
+* `Frame` - represents a single stack frame
+* `Stack` - represents a call stack
+* `MaxDepth` - maximum stack depth constant
+* `CallStacker` interface - types that provide call stacks
 
-* ~~SpinLock~~ Deprecated in favour of [darvaza.org/x/sync/spinlock](https://pkg.go.dev/darvaza.org/x/sync)
+### Stack Capture Functions
+
+* `Here()` - capture current stack frame
+* `StackFrame(skip)` - capture-specific stack frame
+* `StackTrace(skip, depth)` - capture call stack
+
+### Frame Methods
+
+* `.Name()` / `.FuncName()` / `.PkgName()` - function/package names
+* `.SplitName()` - split full name into package and function
+* `.File()` / `.Line()` / `.FileLine()` - source location
+* `.Format()` - formatted representation
+
+## Synchronization
+
+### WaitGroup
+
+Enhanced wait group with error handling:
+
+* `WaitGroup` - wait group that collects errors
+* `.OnError(fn)` - set error handler
+* `.Go(fn)` / `.GoCatch(fn)` - run functions in goroutines
+* `.Wait()` - wait for completion
+* `.Err()` - get first error
+
+### ErrGroup
+
+Context-aware error group with cancellation:
+
+* `ErrGroup` - context-based error group
+* `.SetDefaults()` - configure with defaults
+* `.OnError(fn)` - set error handler
+* `.Cancel()` / `.Context()` - cancellation control
+* `.Go(fn)` / `.GoCatch(fn)` - run functions with context
+* `.Wait()` - wait and return first error
+* `.IsCancelled()` / `.Cancelled()` - check cancellation state
+
+### Deprecated
+
+* ~~SpinLock~~ Deprecated in favour of [darvaza.org/x/sync/spinlock][x-sync-spinlock]
 
 ## See also
 
-* [darvaza.org/cache](https://pkg.go.dev/darvaza.org/cache)
-* [darvaza.org/resolve](https://pkg.go.dev/darvaza.org/resolve)
-* [darvaza.org/slog](https://pkg.go.dev/darvaza.org/slog)
-* [darvaza.org/x/cmp](https://pkg.go.dev/darvaza.org/x/cmp)
-* [darvaza.org/x/config](https://pkg.go.dev/darvaza.org/x/config)
-* [darvaza.org/x/container](https://pkg.go.dev/darvaza.org/x/container)
-* [darvaza.org/x/fs](https://pkg.go.dev/darvaza.org/x/fs)
-* [darvaza.org/x/net](https://pkg.go.dev/darvaza.org/x/net)
-* [darvaza.org/x/sync](https://pkg.go.dev/darvaza.org/x/sync)
-* [darvaza.org/x/tls](https://pkg.go.dev/darvaza.org/x/tls)
-* [darvaza.org/x/web](https://pkg.go.dev/darvaza.org/x/web)
+* [darvaza.org/cache][cache]
+* [darvaza.org/resolver][resolver]
+* [darvaza.org/slog][slog]
+* [darvaza.org/x/cmp][x-cmp]
+* [darvaza.org/x/config][x-config]
+* [darvaza.org/x/container][x-container]
+* [darvaza.org/x/fs][x-fs]
+* [darvaza.org/x/net][x-net]
+* [darvaza.org/x/sync][x-sync]
+* [darvaza.org/x/tls][x-tls]
+* [darvaza.org/x/web][x-web]
+
+[cache]: https://pkg.go.dev/darvaza.org/cache
+[resolver]: https://pkg.go.dev/darvaza.org/resolver
+[slog]: https://pkg.go.dev/darvaza.org/slog
+[x-cmp]: https://pkg.go.dev/darvaza.org/x/cmp
+[x-config]: https://pkg.go.dev/darvaza.org/x/config
+[x-container]: https://pkg.go.dev/darvaza.org/x/container
+[x-fs]: https://pkg.go.dev/darvaza.org/x/fs
+[x-net]: https://pkg.go.dev/darvaza.org/x/net
+[x-sync]: https://pkg.go.dev/darvaza.org/x/sync
+[x-sync-spinlock]: https://pkg.go.dev/darvaza.org/x/sync/spinlock
+[x-tls]: https://pkg.go.dev/darvaza.org/x/tls
+[x-web]: https://pkg.go.dev/darvaza.org/x/web
