@@ -47,7 +47,7 @@ make generate
 
 - **Zero dependencies**: Only the Go standard library and minimal golang.org/x
   packages.
-- **Generic programming**: Extensive use of Go 1.22+ generics for type-safe
+- **Generic programming**: Extensive use of Go 1.23+ generics for type-safe
   utilities.
 - **Single package**: Everything is in the `core` package, no subpackages.
 
@@ -84,7 +84,7 @@ Always run `make tidy` before committing to ensure proper formatting.
 
 ## Important Notes
 
-- Go 1.22 is the minimum required version.
+- Go 1.23 is the minimum required version.
 - The Makefile dynamically generates rules for subprojects.
 - Tool versions (golangci-lint, revive) are selected based on Go version.
 - This is a utility library - no business logic, only reusable helpers.
