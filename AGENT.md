@@ -171,7 +171,7 @@ make test GOTEST_FLAGS="-race"
 # Run specific tests by pattern
 make test GOTEST_FLAGS="-run TestSpecific"
 
-# Generate coverage profile
+# Generate coverage profile (alternative to 'make coverage')
 make test GOTEST_FLAGS="-coverprofile=coverage.out"
 
 # Run tests with timeout
@@ -179,6 +179,29 @@ make test GOTEST_FLAGS="-timeout 30s"
 
 # Combine multiple flags
 make test GOTEST_FLAGS="-v -race -coverprofile=coverage.out"
+
+# Run benchmarks
+make test GOTEST_FLAGS="-bench=. -benchmem"
+
+# Skip long-running tests
+make test GOTEST_FLAGS="-short"
+
+# Test with specific CPU count
+make test GOTEST_FLAGS="-cpu=1,2,4"
+```
+
+### Integration with Coverage
+
+While `make coverage` provides automated coverage collection across all
+modules, you can use `GOTEST_FLAGS` for more targeted coverage analysis:
+
+```bash
+# Coverage for specific package with detailed output
+make test GOTEST_FLAGS="-v -coverprofile=coverage.out -covermode=atomic"
+
+# Coverage with HTML output
+make test GOTEST_FLAGS="-coverprofile=coverage.out"
+go tool cover -html=coverage.out
 ```
 
 ### How It Works
