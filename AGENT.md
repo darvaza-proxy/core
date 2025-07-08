@@ -50,6 +50,17 @@ make up
 make generate
 ```
 
+## Build System Features
+
+### Whitespace and EOF Handling
+
+The `internal/build/fix_whitespace.sh` script automatically:
+- Removes trailing whitespace from all text files
+- Ensures files end with a newline
+- Excludes binary files and version control directories
+- Integrates with `make fmt` for non-Go files
+- Supports both directory scanning and explicit file arguments
+
 ## Code Architecture
 
 ### Key Design Principles
@@ -188,7 +199,7 @@ When creating or editing documentation files:
 
 ### Pre-commit Checklist
 
-1. Run `make tidy` for Go code formatting.
+1. Run `make tidy` for Go code formatting and whitespace clean-up.
 2. Check Markdown files with LanguageTool and markdownlint.
 3. Verify all tests pass with `make test`.
 4. Ensure no linting violations remain.
