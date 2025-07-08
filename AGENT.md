@@ -94,7 +94,7 @@ Always run `make tidy` before committing to ensure proper formatting.
 
 ### Documentation Standards
 
-When editing markdown files, ensure compliance with:
+When editing Markdown files, ensure compliance with:
 
 - **LanguageTool**: Check for missing articles ("a", "an", "the"), punctuation,
   and proper hyphenation of compound modifiers.
@@ -143,7 +143,7 @@ When creating or editing documentation files:
 ### Pre-commit Checklist
 
 1. Run `make tidy` for Go code formatting.
-2. Check markdown files with LanguageTool and markdownlint.
+2. Check Markdown files with LanguageTool and markdownlint.
 3. Verify all tests pass with `make test`.
 4. Ensure no linting violations remain.
 5. Update `AGENT.md` to reflect any changes in development workflow or
