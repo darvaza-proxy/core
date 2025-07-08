@@ -1,4 +1,4 @@
-.PHONY: all clean generate fmt tidy
+.PHONY: all clean generate fmt tidy check-spelling
 .PHONY: FORCE
 
 GO ?= go
@@ -36,6 +36,15 @@ MARKDOWNLINT = true
 endif
 endif
 MARKDOWNLINT_FLAGS ?= --fix --config $(TOOLSDIR)/markdownlint.json
+
+ifndef CSPELL
+ifeq ($(shell $(PNPX) cspell --version 2>&1 | grep -q '^[0-9]' && echo yes),yes)
+CSPELL = $(PNPX) cspell
+else
+CSPELL = true
+endif
+endif
+CSPELL_FLAGS ?= --no-progress --dot --config $(TOOLSDIR)/cspell.json
 
 FIX_WHITESPACE ?= $(TOOLSDIR)/fix_whitespace.sh
 # Exclude Go files (handled separately by gofmt)
@@ -91,7 +100,16 @@ ifneq ($(MARKDOWNLINT),true)
 	$Q find . $(FIND_FILES_MARKDOWN_ARGS) -print0 | xargs -0 -r $(MARKDOWNLINT) $(MARKDOWNLINT_FLAGS)
 endif
 
-tidy: fmt
+ifneq ($(CSPELL),true)
+TIDY_SPELLING = check-spelling
+check-spelling: FORCE ; $(info $(M) checking spelling…)
+	$Q $(CSPELL) $(CSPELL_FLAGS) "**/*.{go,md}"
+else
+TIDY_SPELLING =
+check-spelling: FORCE ; $(info $(M) spell checking disabled)
+endif
+
+tidy: fmt $(TIDY_SPELLING)
 
 generate: ; $(info $(M) running go:generate…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)

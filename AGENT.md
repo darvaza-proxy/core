@@ -72,6 +72,17 @@ The build system includes automatic Markdown linting:
 - Selective HTML allowlist (comments, br, kbd, etc.)
 - Runs automatically with `make fmt` when available
 
+### CSpell Integration
+
+Spell checking for both Markdown and Go source files:
+
+- Detects cspell via pnpx
+- British English configuration in `internal/build/cspell.json`
+- New `check-spelling` target
+- Integrated into `make tidy`
+- Custom word list for project-specific terminology
+- Checks both documentation and code comments
+
 ## Code Architecture
 
 ### Key Design Principles
@@ -166,6 +177,7 @@ When editing Markdown files, ensure compliance with:
 
 - **LanguageTool**: Check for missing articles ("a", "an", "the"), punctuation,
   and proper hyphenation of compound modifiers.
+- **CSpell**: Check spelling in both documentation and code comments.
 - **Markdownlint**: Follow standard Markdown formatting rules.
 
 ### Common Documentation Issues to Check
@@ -211,7 +223,7 @@ When creating or editing documentation files:
 ### Pre-commit Checklist
 
 1. Run `make tidy` for Go code formatting and whitespace clean-up.
-2. Check Markdown files with LanguageTool and markdownlint.
+2. Check Markdown files with CSpell, LanguageTool and markdownlint.
 3. Verify all tests pass with `make test`.
 4. Ensure no linting violations remain.
 5. Update `AGENT.md` to reflect any changes in development workflow or
