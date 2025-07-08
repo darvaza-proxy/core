@@ -28,6 +28,15 @@ make all
 # Run tests
 make test
 
+# Run tests with coverage
+make test GOTEST_FLAGS="-cover"
+
+# Run tests with verbose output and coverage
+make test GOTEST_FLAGS="-v -cover"
+
+# Build test binaries without running (useful for debugging)
+make test GOTEST_FLAGS="-c"
+
 # Format code and tidy dependencies (run before committing)
 make tidy
 
@@ -89,6 +98,43 @@ Always run `make tidy` before committing to ensure proper formatting.
 - Tool versions (golangci-lint, revive) are selected based on Go version.
 - This is a utility library - no business logic, only reusable helpers.
 - Always use `pnpm` instead of `npm` for any JavaScript/TypeScript tooling.
+
+## Testing with GOTEST_FLAGS
+
+The `GOTEST_FLAGS` environment variable allows flexible test execution by
+passing additional flags to `go test`. This variable is defined in the
+Makefile (line 10) with an empty default value and is used when running tests
+through the generated rules in `.tmp/gen.mk:39`.
+
+### Common Usage Examples
+
+```bash
+# Run tests with race detection
+make test GOTEST_FLAGS="-race"
+
+# Run specific tests by pattern
+make test GOTEST_FLAGS="-run TestSpecific"
+
+# Generate coverage profile
+make test GOTEST_FLAGS="-coverprofile=coverage.out"
+
+# Run tests with timeout
+make test GOTEST_FLAGS="-timeout 30s"
+
+# Combine multiple flags
+make test GOTEST_FLAGS="-v -race -coverprofile=coverage.out"
+```
+
+### How It Works
+
+1. The Makefile defines `GOTEST_FLAGS ?=` (empty by default).
+2. The generated rules in `.tmp/gen.mk` use it in the test target:
+   `$(GO) test $(GOTEST_FLAGS) ./...`.
+3. Any flags passed via `GOTEST_FLAGS` are forwarded directly to `go test`.
+
+This provides a clean interface for passing arbitrary test flags without
+modifying the Makefile, making it easy to run tests with different
+configurations for debugging, coverage analysis, or CI/CD pipelines.
 
 ## Linting and Code Quality
 
