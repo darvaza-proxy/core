@@ -192,6 +192,38 @@ This provides a clean interface for passing arbitrary test flags without
 modifying the Makefile, making it easy to run tests with different
 configurations for debugging, coverage analysis, or CI/CD pipelines.
 
+## CI/CD and Code Analysis
+
+### DeepSource Configuration
+
+The project uses DeepSource for static code analysis. Configuration is in the
+`.deepsource.toml` file:
+
+- Shell analyser is configured for POSIX sh dialect.
+- To ignore specific issues for certain files, use `[[issues]]` blocks with
+  `paths` (not `exclude_patterns`).
+- Common shell issues:
+  - SH-1091: "local is undefined in POSIX sh" - excluded for all .sh files.
+  - SH-2013: "Use while read for reading lines" - disable with
+    ShellCheck directive comment.
+
+### GitHub Actions
+
+- **Codecov workflow**: Automatically runs on push/PR to generate coverage
+  reports.
+- **Make workflow**: Tests across Go versions 1.23 and 1.24.
+- All CI checks must pass before merging PRs.
+
+### Working with Build Tools
+
+When LanguageTool reports issues:
+
+- Custom dictionary is auto-generated from CSpell words in
+  `.tmp/languagetool-dict.txt`.
+- Technical terms should be added to `internal/build/cspell.json`.
+- False positives for code-related punctuation are disabled in
+  `languagetool.cfg`.
+
 ## Linting and Code Quality
 
 ### Documentation Standards
@@ -245,10 +277,37 @@ When creating or editing documentation files:
 
 ### Pre-commit Checklist
 
-1. Run `make tidy` for Go code formatting and whitespace clean-up.
-2. Check Markdown files with CSpell, LanguageTool and markdownlint.
-3. Verify all tests pass with `make test`.
-4. Ensure no linting violations remain.
-5. Update `AGENT.md` to reflect any changes in development workflow or
+1. **ALWAYS run `make tidy` first** - Fix ALL issues before committing:
+   - Go code formatting and whitespace clean-up
+   - Markdown files checked with CSpell, LanguageTool and markdownlint
+   - If `make tidy` fails, fix the issues and run it again until it passes
+2. Verify all tests pass with `make test`.
+3. Ensure no linting violations remain.
+4. Update `AGENT.md` to reflect any changes in development workflow or
    standards.
-6. Update `README.md` to reflect significant changes in functionality or API.
+5. Update `README.md` to reflect significant changes in functionality or API.
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+1. **LanguageTool false positives**:
+   - Add technical terms to `internal/build/cspell.json`.
+   - Dictionary will auto-regenerate on next `make check-grammar`.
+   - For persistent issues, consider adding rules to `languagetool.cfg`.
+
+2. **DeepSource shell issues**:
+   - Use ShellCheck disable comments for specific lines.
+   - Update `.deepsource.toml` with issue-specific `paths` configurations.
+   - Remember: DeepSource uses `paths`, not `exclude_patterns` in
+     `[[issues]]` blocks.
+
+3. **Coverage collection failures**:
+   - Ensure `.tmp/index` exists by running `make .tmp/index`.
+   - Check that all modules have test files.
+   - Use `GOTEST_FLAGS` to pass additional flags to tests.
+
+4. **Linting tool detection**:
+   - Tools are auto-detected via `pnpx`.
+   - If tools aren't found, they're replaced with `true` (no-op).
+   - Install tools globally with `pnpm install -g <tool>` if needed.
