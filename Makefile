@@ -26,6 +26,17 @@ REVIVE_RUN_ARGS ?= -config $(REVIVE_CONF) -formatter friendly
 REVIVE_URL ?= github.com/mgechev/revive@$(REVIVE_VERSION)
 REVIVE ?= $(GO) run $(REVIVE_URL)
 
+PNPX ?= pnpx
+
+ifndef MARKDOWNLINT
+ifeq ($(shell $(PNPX) markdownlint-cli --version 2>&1 | grep -q '^[0-9]' && echo yes),yes)
+MARKDOWNLINT = $(PNPX) markdownlint-cli
+else
+MARKDOWNLINT = true
+endif
+endif
+MARKDOWNLINT_FLAGS ?= --fix --config $(TOOLSDIR)/markdownlint.json
+
 FIX_WHITESPACE ?= $(TOOLSDIR)/fix_whitespace.sh
 # Exclude Go files (handled separately by gofmt)
 FIX_WHITESPACE_EXCLUDE_GO ?= -name '*.go'
@@ -43,6 +54,11 @@ FIX_WHITESPACE_EXCLUDE_EXTS ?= \
 FIX_WHITESPACE_EXCLUDE_PATTERNS ?= $(patsubst %,-o -name '*.%',$(FIX_WHITESPACE_EXCLUDE_EXTS))
 FIX_WHITESPACE_EXCLUDE ?= $(FIX_WHITESPACE_EXCLUDE_GO) $(FIX_WHITESPACE_EXCLUDE_PATTERNS)
 FIX_WHITESPACE_ARGS ?= . \! \( $(FIX_WHITESPACE_EXCLUDE) \)
+
+FIND_FILES_PRUNE_RULES ?= -name vendor -o -name .git -o -name node_modules
+FIND_FILES_PRUNE_ARGS ?= \( $(FIND_FILES_PRUNE_RULES) \) -prune
+FIND_FILES_GO_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.go'
+FIND_FILES_MARKDOWN_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.md'
 
 V = 0
 Q = $(if $(filter 1,$V),,@)
@@ -69,8 +85,11 @@ $(TMPDIR)/gen.mk: $(TOOLSDIR)/gen_mk.sh $(TMPDIR)/index Makefile ; $(info $(M) g
 include $(TMPDIR)/gen.mk
 
 fmt: ; $(info $(M) reformatting sources…)
-	$Q find . -name '*.go' | xargs -r $(GOFMT) $(GOFMT_FLAGS)
+	$Q find . $(FIND_FILES_GO_ARGS) -print0 | xargs -0 -r $(GOFMT) $(GOFMT_FLAGS)
 	$Q $(FIX_WHITESPACE) $(FIX_WHITESPACE_ARGS)
+ifneq ($(MARKDOWNLINT),true)
+	$Q find . $(FIND_FILES_MARKDOWN_ARGS) -print0 | xargs -0 -r $(MARKDOWNLINT) $(MARKDOWNLINT_FLAGS)
+endif
 
 tidy: fmt
 
