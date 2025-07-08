@@ -1,4 +1,4 @@
-.PHONY: all clean generate fmt tidy check-grammar check-spelling
+.PHONY: all clean generate fmt tidy check-grammar check-spelling coverage
 .PHONY: FORCE
 
 GO ?= go
@@ -136,3 +136,6 @@ tidy: fmt $(TIDY_GRAMMAR) $(TIDY_SPELLING)
 
 generate: ; $(info $(M) running go:generate…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)
+
+coverage: $(TMPDIR)/index ; $(info $(M) running coverage tests…)
+	$Q $(TOOLSDIR)/make_coverage.sh $(TMPDIR)/index $(TMPDIR)/coverage

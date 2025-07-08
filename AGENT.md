@@ -37,6 +37,9 @@ make test GOTEST_FLAGS="-v -cover"
 # Build test binaries without running (useful for debugging)
 make test GOTEST_FLAGS="-c"
 
+# Generate coverage reports
+make coverage
+
 # Format code and tidy dependencies (run before committing)
 make tidy
 
@@ -92,6 +95,16 @@ Spell checking for both Markdown and Go source files:
 - Integrated into `make tidy`
 - Custom word list for project-specific terminology
 - Checks both documentation and code comments
+
+### Coverage Collection
+
+The build system includes automated coverage report generation:
+
+- `make coverage` target runs tests with coverage flags
+- `internal/build/make_coverage.sh` handles test execution
+- Generates coverage reports in multiple formats (text, HTML)
+- Coverage artifacts stored in `.tmp/coverage/` directory
+- Integrated with CI/CD workflows for automated reporting
 
 ## Code Architecture
 
