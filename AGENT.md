@@ -119,9 +119,11 @@ When editing markdown files, ensure compliance with:
 When creating or editing documentation files:
 
 1. **File Structure**:
-   - Always include a link to related documentation (e.g., AGENT.md should link to README.md).
+   - Always include a link to related documentation (e.g., AGENT.md should
+     link to README.md).
    - Add prerequisites or setup instructions before diving into commands.
-   - Include paths to configuration files when mentioning tools (e.g., revive.toml).
+   - Include paths to configuration files when mentioning tools (e.g.,
+     revive.toml).
 
 2. **Formatting Consistency**:
    - End all bullet points with periods for consistency.
@@ -144,5 +146,6 @@ When creating or editing documentation files:
 2. Check markdown files with LanguageTool and markdownlint.
 3. Verify all tests pass with `make test`.
 4. Ensure no linting violations remain.
-5. Update `AGENT.md` to reflect any changes in development workflow or standards.
+5. Update `AGENT.md` to reflect any changes in development workflow or
+   standards.
 6. Update `README.md` to reflect significant changes in functionality or API.
