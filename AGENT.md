@@ -72,6 +72,16 @@ The build system includes automatic Markdown linting:
 - Selective HTML allowlist (comments, br, kbd, etc.)
 - Runs automatically with `make fmt` when available
 
+### LanguageTool Integration
+
+Grammar and style checking for Markdown files:
+
+- Detects LanguageTool via pnpx
+- British English configuration in `internal/build/languagetool.cfg`
+- New `check-grammar` target
+- Integrated into `make tidy`
+- Checks for missing articles, punctuation, and proper hyphenation
+
 ### CSpell Integration
 
 Spell checking for both Markdown and Go source files:
