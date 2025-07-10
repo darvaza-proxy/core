@@ -1,4 +1,4 @@
-.PHONY: all clean generate fmt tidy
+.PHONY: all clean generate fmt tidy check-grammar check-spelling coverage
 .PHONY: FORCE
 
 GO ?= go
@@ -7,6 +7,8 @@ GOFMT_FLAGS = -w -l -s
 GOGENERATE_FLAGS = -v
 GOUP_FLAGS ?= -v
 GOUP_PACKAGES ?= ./...
+GOTEST_FLAGS ?=
+JQ ?= jq
 
 TOOLSDIR := $(CURDIR)/internal/build
 TMPDIR ?= $(CURDIR)/.tmp
@@ -24,6 +26,58 @@ REVIVE_CONF ?= $(TOOLSDIR)/revive.toml
 REVIVE_RUN_ARGS ?= -config $(REVIVE_CONF) -formatter friendly
 REVIVE_URL ?= github.com/mgechev/revive@$(REVIVE_VERSION)
 REVIVE ?= $(GO) run $(REVIVE_URL)
+
+PNPX ?= pnpx
+
+ifndef MARKDOWNLINT
+ifeq ($(shell $(PNPX) markdownlint-cli --version 2>&1 | grep -q '^[0-9]' && echo yes),yes)
+MARKDOWNLINT = $(PNPX) markdownlint-cli
+else
+MARKDOWNLINT = true
+endif
+endif
+MARKDOWNLINT_FLAGS ?= --fix --config $(TOOLSDIR)/markdownlint.json
+
+ifndef LANGUAGETOOL
+ifeq ($(shell $(PNPX) @twilio-labs/languagetool-cli --version 2>&1 | grep -qE '^(unknown|[0-9])' && echo yes),yes)
+LANGUAGETOOL = $(PNPX) @twilio-labs/languagetool-cli
+else
+LANGUAGETOOL = true
+endif
+endif
+LANGUAGETOOL_FLAGS ?= --config $(TOOLSDIR)/languagetool.cfg --custom-dict-file $(TMPDIR)/languagetool-dict.txt
+
+ifndef CSPELL
+ifeq ($(shell $(PNPX) cspell --version 2>&1 | grep -q '^[0-9]' && echo yes),yes)
+CSPELL = $(PNPX) cspell
+else
+CSPELL = true
+endif
+endif
+CSPELL_FLAGS ?= --no-progress --dot --config $(TOOLSDIR)/cspell.json
+
+FIX_WHITESPACE ?= $(TOOLSDIR)/fix_whitespace.sh
+# Exclude Go files (handled separately by gofmt)
+FIX_WHITESPACE_EXCLUDE_GO ?= -name '*.go'
+# Exclude binary and image files
+FIX_WHITESPACE_EXCLUDE_BINARY_EXTS ?= exe dll so dylib a o test
+FIX_WHITESPACE_EXCLUDE_IMAGE_EXTS ?= png jpg jpeg gif ico pdf
+FIX_WHITESPACE_EXCLUDE_ARCHIVE_EXTS ?= zip tar gz bz2 xz 7z
+FIX_WHITESPACE_EXCLUDE_OTHER_EXTS ?= bin dat
+# Combine all exclusions
+FIX_WHITESPACE_EXCLUDE_EXTS ?= \
+	$(FIX_WHITESPACE_EXCLUDE_ARCHIVE_EXTS) \
+	$(FIX_WHITESPACE_EXCLUDE_BINARY_EXTS) \
+	$(FIX_WHITESPACE_EXCLUDE_IMAGE_EXTS) \
+	$(FIX_WHITESPACE_EXCLUDE_OTHER_EXTS)
+FIX_WHITESPACE_EXCLUDE_PATTERNS ?= $(patsubst %,-o -name '*.%',$(FIX_WHITESPACE_EXCLUDE_EXTS))
+FIX_WHITESPACE_EXCLUDE ?= $(FIX_WHITESPACE_EXCLUDE_GO) $(FIX_WHITESPACE_EXCLUDE_PATTERNS)
+FIX_WHITESPACE_ARGS ?= . \! \( $(FIX_WHITESPACE_EXCLUDE) \)
+
+FIND_FILES_PRUNE_RULES ?= -name vendor -o -name .git -o -name node_modules
+FIND_FILES_PRUNE_ARGS ?= \( $(FIND_FILES_PRUNE_RULES) \) -prune
+FIND_FILES_GO_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.go'
+FIND_FILES_MARKDOWN_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.md'
 
 V = 0
 Q = $(if $(filter 1,$V),,@)
@@ -47,12 +101,41 @@ $(TMPDIR)/gen.mk: $(TOOLSDIR)/gen_mk.sh $(TMPDIR)/index Makefile ; $(info $(M) g
 	$Q $< $(TMPDIR)/index > $@~
 	$Q if cmp $@ $@~ 2> /dev/null >&2; then rm $@~; else mv $@~ $@; fi
 
+$(TMPDIR)/languagetool-dict.txt: $(TOOLSDIR)/cspell.json ; $(info $(M) generating languagetool dictionary…)
+	$Q mkdir -p $(@D)
+	$Q $(JQ) -r '.words[]' $< | sort > $@
+
 include $(TMPDIR)/gen.mk
 
 fmt: ; $(info $(M) reformatting sources…)
-	$Q find . -name '*.go' | xargs -r $(GOFMT) $(GOFMT_FLAGS)
+	$Q find . $(FIND_FILES_GO_ARGS) -print0 | xargs -0 -r $(GOFMT) $(GOFMT_FLAGS)
+	$Q $(FIX_WHITESPACE) $(FIX_WHITESPACE_ARGS)
+ifneq ($(MARKDOWNLINT),true)
+	$Q find . $(FIND_FILES_MARKDOWN_ARGS) -print0 | xargs -0 -r $(MARKDOWNLINT) $(MARKDOWNLINT_FLAGS)
+endif
 
-tidy: fmt
+ifneq ($(LANGUAGETOOL),true)
+TIDY_GRAMMAR = check-grammar
+check-grammar: $(TMPDIR)/languagetool-dict.txt FORCE ; $(info $(M) checking grammar…)
+	$Q find . $(FIND_FILES_MARKDOWN_ARGS) -print0 | xargs -0 -r $(LANGUAGETOOL) $(LANGUAGETOOL_FLAGS)
+else
+TIDY_GRAMMAR =
+check-grammar: FORCE ; $(info $(M) grammar checks disabled)
+endif
+
+ifneq ($(CSPELL),true)
+TIDY_SPELLING = check-spelling
+check-spelling: FORCE ; $(info $(M) checking spelling…)
+	$Q $(CSPELL) $(CSPELL_FLAGS) "**/*.{go,md}"
+else
+TIDY_SPELLING =
+check-spelling: FORCE ; $(info $(M) spell checking disabled)
+endif
+
+tidy: fmt $(TIDY_GRAMMAR) $(TIDY_SPELLING)
 
 generate: ; $(info $(M) running go:generate…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)
+
+coverage: $(TMPDIR)/index ; $(info $(M) running coverage tests…)
+	$Q $(TOOLSDIR)/make_coverage.sh $(TMPDIR)/index $(TMPDIR)/coverage

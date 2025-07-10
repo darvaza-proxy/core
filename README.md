@@ -178,7 +178,8 @@ The `PanicError` type wraps panic values with stack traces:
 
 * `NewPanicError()` / `NewPanicErrorf()` - create panic errors
 * `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics
-* `Panic()` / `Panicf()` / `PanicWrap()` / `PanicWrapf()` - panic with `PanicError`
+* `Panic()` / `Panicf()` / `PanicWrap()` / `PanicWrapf()` - panic with
+  `PanicError`
 
 Panic recovery utilities:
 
@@ -216,7 +217,8 @@ Special error types for network-style temporary and timeout conditions:
 
 ### Error Testing and Utilities
 
-* `IsError[T](err)` / `IsErrorFn[T](err, fn)` / `IsErrorFn2[T](err, fn)` - type-safe error testing
+* `IsError[T](err)` / `IsErrorFn[T](err, fn)` / `IsErrorFn2[T](err, fn)` -
+  type-safe error testing
 * `CoalesceError(errs...)` - return first non-nil error
 
 ## Stack Tracing
@@ -267,7 +269,8 @@ Context-aware error group with cancellation:
 
 ### Deprecated
 
-* ~~SpinLock~~ Deprecated in favour of [darvaza.org/x/sync/spinlock][x-sync-spinlock]
+* ~~SpinLock~~ Deprecated in favour of
+  [darvaza.org/x/sync/spinlock][x-sync-spinlock]
 
 ## See also
 
