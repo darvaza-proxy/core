@@ -47,27 +47,27 @@ fi
 
 if command -v gocovmerge >/dev/null 2>&1; then
 	echo "Using gocovmerge..."
-	gocovmerge "$@" > coverage.out
+	gocovmerge "$@" > "$COVERAGE_DIR/coverage.out"
 else
 	echo "Manual merge (no gocovmerge found)..."
 	# Manual merge
-	head -1 "$1" > coverage.out
+	head -1 "$1" > "$COVERAGE_DIR/coverage.out"
 	for f; do
-		tail -n +2 "$f" >> coverage.out
+		tail -n +2 "$f" >> "$COVERAGE_DIR/coverage.out"
 	done
 fi
 
 # Show summary
 echo
 echo "Coverage summary:"
-${GO:-go} tool cover -func=coverage.out | tail -1
+${GO:-go} tool cover -func="$COVERAGE_DIR/coverage.out" | tail -1
 
 # Optional: generate HTML report
 if [ "${COVERAGE_HTML:-}" = "true" ]; then
 	echo
 	echo "Generating HTML coverage report..."
-	${GO:-go} tool cover -html=coverage.out -o coverage.html
-	echo "HTML report saved to coverage.html"
+	${GO:-go} tool cover -html="$COVERAGE_DIR/coverage.out" -o "$COVERAGE_DIR/coverage.html"
+	echo "HTML report saved to $COVERAGE_DIR/coverage.html"
 fi
 
 # Exit with failure if any tests failed
