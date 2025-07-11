@@ -262,7 +262,7 @@ func IsErrorFn(check func(error) bool, errs ...error) bool {
 // of a false result.
 //
 // revive:disable:cognitive-complexity
-func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is bool, known bool) {
+func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) {
 	// revive:enable:cognitive-complexity
 	if check == nil || len(errs) == 0 {
 		return false, true
