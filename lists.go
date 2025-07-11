@@ -54,7 +54,7 @@ func ListForEachElement(l *list.List, fn func(*list.Element) bool) {
 	}
 }
 
-func listIterStep(ref *list.Element) (e *list.Element, next *list.Element) {
+func listIterStep(ref *list.Element) (e, next *list.Element) {
 	if ref != nil {
 		next = ref.Next()
 	}
@@ -90,7 +90,7 @@ func ListForEachBackwardElement(l *list.List, fn func(*list.Element) bool) {
 	}
 }
 
-func listIterBackwardStep(ref *list.Element) (e *list.Element, prev *list.Element) {
+func listIterBackwardStep(ref *list.Element) (e, prev *list.Element) {
 	if ref != nil {
 		prev = ref.Prev()
 	}
