@@ -1,4 +1,4 @@
-.PHONY: all clean generate fmt tidy check-grammar check-spelling coverage
+.PHONY: all clean generate fmt tidy check-grammar check-spelling check-shell coverage
 .PHONY: FORCE
 
 GO ?= go
@@ -55,6 +55,15 @@ CSPELL = true
 endif
 endif
 CSPELL_FLAGS ?= --no-progress --dot --config $(TOOLSDIR)/cspell.json
+
+ifndef SHELLCHECK
+ifeq ($(shell $(PNPX) shellcheck --version 2>&1 | grep -q '^ShellCheck' && echo yes),yes)
+SHELLCHECK = $(PNPX) shellcheck
+else
+SHELLCHECK = true
+endif
+endif
+SHELLCHECK_FLAGS ?=
 
 FIX_WHITESPACE ?= $(TOOLSDIR)/fix_whitespace.sh
 # Exclude Go files (handled separately by gofmt)
@@ -132,7 +141,16 @@ TIDY_SPELLING =
 check-spelling: FORCE ; $(info $(M) spell checking disabled)
 endif
 
-tidy: fmt $(TIDY_GRAMMAR) $(TIDY_SPELLING)
+ifneq ($(SHELLCHECK),true)
+TIDY_SHELL = check-shell
+check-shell: FORCE ; $(info $(M) checking shell scripts…)
+	$Q find . $(FIND_FILES_PRUNE_ARGS) -o -name '*.sh' -print0 | xargs -0 -r $(SHELLCHECK) $(SHELLCHECK_FLAGS)
+else
+TIDY_SHELL =
+check-shell: FORCE ; $(info $(M) shell checks disabled)
+endif
+
+tidy: fmt $(TIDY_GRAMMAR) $(TIDY_SPELLING) $(TIDY_SHELL)
 
 generate: ; $(info $(M) running go:generate…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)
