@@ -110,7 +110,7 @@ $(TMPDIR)/gen.mk: $(TOOLSDIR)/gen_mk.sh $(TMPDIR)/index Makefile ; $(info $(M) g
 	$Q $< $(TMPDIR)/index > $@~
 	$Q if cmp $@ $@~ 2> /dev/null >&2; then rm $@~; else mv $@~ $@; fi
 
-$(TMPDIR)/languagetool-dict.txt: $(TOOLSDIR)/cspell.json ; $(info $(M) generating languagetool dictionary…)
+$(TMPDIR)/languagetool-dict.txt: $(TOOLSDIR)/cspell.json | check-jq ; $(info $(M) generating languagetool dictionary…)
 	$Q mkdir -p $(@D)
 	$Q $(JQ) -r '.words[]' $< | sort > $@
 
@@ -157,3 +157,10 @@ generate: ; $(info $(M) running go:generate…)
 
 coverage: $(TMPDIR)/index ; $(info $(M) running coverage tests…)
 	$Q $(TOOLSDIR)/make_coverage.sh $(TMPDIR)/index $(TMPDIR)/coverage
+
+check-jq: FORCE
+	$Q $(JQ) --version >/dev/null 2>&1 || { \
+		echo "Warning: jq is required to import cspell's custom dictionary but was not found" >&2; \
+		echo "  Install jq or set JQ variable to override" >&2; \
+		false; \
+	}
