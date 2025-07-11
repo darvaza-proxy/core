@@ -125,3 +125,29 @@ func checkDeepStackTrace(stack Stack, depth int) bool {
 	}
 	return true
 }
+
+func TestFrameSplitName(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		frame            *Frame
+		expectedPkgName  string
+		expectedFuncName string
+	}{
+		{"current function", Here(), "darvaza.org/core", "TestFrameSplitName"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pkgName, funcName := tc.frame.SplitName()
+			assertFrameNames(t, tc.expectedPkgName, tc.expectedFuncName, pkgName, funcName)
+		})
+	}
+}
+
+func assertFrameNames(t *testing.T, expectedPkg, expectedFunc, actualPkg, actualFunc string) {
+	t.Helper()
+	if actualPkg != expectedPkg {
+		t.Errorf("Expected package name '%s', got '%s'", expectedPkg, actualPkg)
+	}
+	if actualFunc != expectedFunc {
+		t.Errorf("Expected function name '%s', got '%s'", expectedFunc, actualFunc)
+	}
+}
