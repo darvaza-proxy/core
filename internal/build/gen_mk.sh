@@ -83,7 +83,7 @@ GO_FILES = \$(shell find * \\
 
 EOT
 
-	while IFS=: read name dir mod deps; do
+	while IFS=: read -r name dir mod deps; do
 		files=GO_FILES_$(gen_var_name "$name")
 		filter="-e '/^\.$/d;'"
 		[ "x$dir" = "x." ] || filter="$filter -e '/^$(escape_dir "$dir")$/d;'"
@@ -214,7 +214,7 @@ for cmd in $COMMANDS; do
 $cmd: $all
 EOT
 
-	while IFS=: read name dir mod deps; do
+	while IFS=: read -r name dir mod deps; do
 		deps=$(echo "$deps" | tr ',' ' ')
 
 		gen_make_targets "$cmd" "$name" "$dir" "$mod" "$deps"
