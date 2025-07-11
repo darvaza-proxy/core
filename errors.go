@@ -62,7 +62,7 @@ func doWrap(err error, quiet bool, format string, args ...any) error {
 		note = format
 	}
 
-	if len(note) == 0 {
+	if note == "" {
 		return err
 	}
 
@@ -89,7 +89,7 @@ func (w *WrappedError) Error() string {
 	}
 
 	s := w.cause.Error()
-	if len(s) == 0 {
+	if s == "" {
 		return w.note
 	}
 
