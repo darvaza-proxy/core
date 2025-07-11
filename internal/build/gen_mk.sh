@@ -86,10 +86,10 @@ EOT
 	while IFS=: read -r name dir mod deps; do
 		files=GO_FILES_$(gen_var_name "$name")
 		filter="-e '/^\.$/d;'"
-		[ "x$dir" = "x." ] || filter="$filter -e '/^$(escape_dir "$dir")$/d;'"
+		[ "$dir" = "." ] || filter="$filter -e '/^$(escape_dir "$dir")$/d;'"
 		out_pat="$(cut -d: -f2 "$INDEX" | eval "sed $filter -e 's|$|/%|'" | tr '\n' ' ' | sed -e 's| \+$||')"
 
-		if [ "x$dir" = "x." ]; then
+		if [ "$dir" = "." ]; then
 			# root
 			files_cmd="\$(GO_FILES)"
 			files_cmd="\$(filter-out $out_pat, $files_cmd)"
