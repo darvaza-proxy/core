@@ -48,32 +48,35 @@ fix_file() {
 
 # Helper function to run find with auto-pruning
 run_find() {
-	local paths=
+	local paths= quoted=
 
-	# Collect paths until we hit a find option (starts with -)
-	while [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; do
-		paths="$paths $1"
-		shift
+	# Collect paths until we hit a find option (starts with '-')
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-*)
+			# Found a find option, stop collecting paths
+			break
+			;;
+		*)
+			# Add path with proper escaping for spaces and special chars
+			quoted=$(printf '%s' "$1" | sed -e "s/'/'\\\\''/g" -e "s/^/'/" -e "s/$/'/")
+			paths="${paths:+$paths }$quoted"
+			shift
+			;;
+		esac
 	done
-
-	# Default to current directory if no paths specified
-	if [ -z "$paths" ]; then
-		paths="."
-	fi
 
 	# Wrap user conditions in parentheses if they exist
 	[ $# -eq 0 ] || set -- \( "$@" \)
+	# combine auto-pruning and user conditions
+	set -- \( -name .git -o -name node_modules \) -prune -o "$@" -type f
+	# combine escaped paths with find options
+	eval "set -- ${paths:-.} \"\$@\""
 
-	# Execute find with auto-pruning and user conditions
-	# shellcheck disable=SC2086 # intentional word splitting for paths
-	find $paths \( -name .git -o -name node_modules \) -prune -o "$@" -type f -print0 | xargs -0 -r "$0" --
+	find "$@" -print0 | xargs -0 -r "$0" --
 }
 
-# Handle different argument patterns
-if [ $# -eq 0 ]; then
-	# No arguments - search current directory
-	run_find .
-elif [ "${1:-}" = "--" ]; then
+if [ "${1:-}" = "--" ]; then
 	# Explicit file mode
 	shift
 	for file; do
