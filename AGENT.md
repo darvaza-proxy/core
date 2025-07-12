@@ -79,11 +79,11 @@ The build system includes automatic Markdown linting:
 
 Grammar and style checking for Markdown files:
 
-- Detects LanguageTool via pnpx
-- British English configuration in `internal/build/languagetool.cfg`
-- New `check-grammar` target
-- Integrated into `make tidy`
-- Checks for missing articles, punctuation, and proper hyphenation
+- Detects LanguageTool via pnpx.
+- British English configuration in `internal/build/languagetool.cfg`.
+- Available via `make check-grammar` target.
+- Not integrated into `make tidy` due to false positives.
+- Checks for missing articles, punctuation, and proper hyphenation.
 
 ### CSpell Integration
 
@@ -253,8 +253,9 @@ When LanguageTool reports issues:
 
 When editing Markdown files, ensure compliance with:
 
-- **LanguageTool**: Check for missing articles ("a", "an", "the"), punctuation,
-  and proper hyphenation of compound modifiers.
+- **LanguageTool**: Optionally check for missing articles ("a", "an", "the"),
+  punctuation, and proper hyphenation of compound modifiers via
+  `make check-grammar`.
 - **CSpell**: Check spelling in both documentation and code comments.
 - **Markdownlint**: Follow standard Markdown formatting rules.
 
@@ -302,7 +303,8 @@ When creating or editing documentation files:
 
 1. **ALWAYS run `make tidy` first** - Fix ALL issues before committing:
    - Go code formatting and whitespace clean-up
-   - Markdown files checked with CSpell, LanguageTool and markdownlint
+   - Markdown files checked with CSpell and markdownlint
+   - Shell scripts checked with shellcheck
    - If `make tidy` fails, fix the issues and run it again until it passes
 2. Verify all tests pass with `make test`.
 3. Ensure no linting violations remain.

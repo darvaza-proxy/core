@@ -124,11 +124,9 @@ ifneq ($(MARKDOWNLINT),true)
 endif
 
 ifneq ($(LANGUAGETOOL),true)
-TIDY_GRAMMAR = check-grammar
 check-grammar: $(TMPDIR)/languagetool-dict.txt FORCE ; $(info $(M) checking grammar…)
 	$Q find . $(FIND_FILES_MARKDOWN_ARGS) -print0 | xargs -0 -r $(LANGUAGETOOL) $(LANGUAGETOOL_FLAGS)
 else
-TIDY_GRAMMAR =
 check-grammar: FORCE ; $(info $(M) grammar checks disabled)
 endif
 
@@ -150,7 +148,7 @@ TIDY_SHELL =
 check-shell: FORCE ; $(info $(M) shell checks disabled)
 endif
 
-tidy: fmt $(TIDY_GRAMMAR) $(TIDY_SPELLING) $(TIDY_SHELL)
+tidy: fmt $(TIDY_SPELLING) $(TIDY_SHELL)
 
 generate: ; $(info $(M) running go:generate…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)
