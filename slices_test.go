@@ -105,6 +105,56 @@ func TestSliceUniqueString(t *testing.T) {
 	testSliceUnique(t, strs, expectStrs)
 }
 
+func TestSliceMinus(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		a        []int
+		b        []int
+		expected []int
+	}{
+		{"empty slices", S[int](), S[int](), S[int]()},
+		{"empty a", S[int](), S(1, 2), S[int]()},
+		{"empty b", S(1, 2), S[int](), S(1, 2)},
+		{"no overlap", S(1, 2), S(3, 4), S(1, 2)},
+		{"partial overlap", S(1, 2, 3, 4, 5), S(3, 4, 6, 7), S(1, 2, 5)},
+		{"complete overlap", S(1, 2, 3), S(1, 2, 3), S[int]()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := SliceMinus(tc.a, tc.b)
+			if !SliceEqual(result, tc.expected) {
+				t.Errorf("SliceMinus(%v, %v) = %v, want %v", tc.a, tc.b, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestSliceMinusFn(t *testing.T) {
+	equal := func(va, vb string) bool {
+		return va == vb
+	}
+
+	for _, tc := range []struct {
+		name     string
+		a        []string
+		b        []string
+		expected []string
+	}{
+		{"empty slices", S[string](), S[string](), S[string]()},
+		{"empty a", S[string](), S("x", "y"), S[string]()},
+		{"empty b", S("x", "y"), S[string](), S("x", "y")},
+		{"no overlap", S("apple", "cherry"), S("banana", "date"), S("apple", "cherry")},
+		{"partial overlap", S("apple", "banana", "cherry"), S("banana", "date"), S("apple", "cherry")},
+		{"complete overlap", S("apple", "banana"), S("apple", "banana"), S[string]()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := SliceMinusFn(tc.a, tc.b, equal)
+			if !SliceEqual(result, tc.expected) {
+				t.Errorf("SliceMinusFn(%v, %v) = %v, want %v", tc.a, tc.b, result, tc.expected)
+			}
+		})
+	}
+}
+
 func TestSliceRandom(t *testing.T) {
 	tests := []struct {
 		name   string

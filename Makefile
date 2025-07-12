@@ -1,4 +1,4 @@
-.PHONY: all clean generate fmt tidy check-grammar check-spelling coverage
+.PHONY: all clean generate fmt tidy check-grammar check-spelling check-shell coverage
 .PHONY: FORCE
 
 GO ?= go
@@ -56,6 +56,15 @@ endif
 endif
 CSPELL_FLAGS ?= --no-progress --dot --config $(TOOLSDIR)/cspell.json
 
+ifndef SHELLCHECK
+ifeq ($(shell $(PNPX) shellcheck --version 2>&1 | grep -q '^ShellCheck' && echo yes),yes)
+SHELLCHECK = $(PNPX) shellcheck
+else
+SHELLCHECK = true
+endif
+endif
+SHELLCHECK_FLAGS ?=
+
 FIX_WHITESPACE ?= $(TOOLSDIR)/fix_whitespace.sh
 # Exclude Go files (handled separately by gofmt)
 FIX_WHITESPACE_EXCLUDE_GO ?= -name '*.go'
@@ -101,7 +110,7 @@ $(TMPDIR)/gen.mk: $(TOOLSDIR)/gen_mk.sh $(TMPDIR)/index Makefile ; $(info $(M) g
 	$Q $< $(TMPDIR)/index > $@~
 	$Q if cmp $@ $@~ 2> /dev/null >&2; then rm $@~; else mv $@~ $@; fi
 
-$(TMPDIR)/languagetool-dict.txt: $(TOOLSDIR)/cspell.json ; $(info $(M) generating languagetool dictionary…)
+$(TMPDIR)/languagetool-dict.txt: $(TOOLSDIR)/cspell.json | check-jq ; $(info $(M) generating languagetool dictionary…)
 	$Q mkdir -p $(@D)
 	$Q $(JQ) -r '.words[]' $< | sort > $@
 
@@ -132,10 +141,26 @@ TIDY_SPELLING =
 check-spelling: FORCE ; $(info $(M) spell checking disabled)
 endif
 
-tidy: fmt $(TIDY_GRAMMAR) $(TIDY_SPELLING)
+ifneq ($(SHELLCHECK),true)
+TIDY_SHELL = check-shell
+check-shell: FORCE ; $(info $(M) checking shell scripts…)
+	$Q find . $(FIND_FILES_PRUNE_ARGS) -o -name '*.sh' -print0 | xargs -0 -r $(SHELLCHECK) $(SHELLCHECK_FLAGS)
+else
+TIDY_SHELL =
+check-shell: FORCE ; $(info $(M) shell checks disabled)
+endif
+
+tidy: fmt $(TIDY_GRAMMAR) $(TIDY_SPELLING) $(TIDY_SHELL)
 
 generate: ; $(info $(M) running go:generate…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)
 
 coverage: $(TMPDIR)/index ; $(info $(M) running coverage tests…)
 	$Q $(TOOLSDIR)/make_coverage.sh $(TMPDIR)/index $(TMPDIR)/coverage
+
+check-jq: FORCE
+	$Q $(JQ) --version >/dev/null 2>&1 || { \
+		echo "Warning: jq is required to import cspell's custom dictionary but was not found" >&2; \
+		echo "  Install jq or set JQ variable to override" >&2; \
+		false; \
+	}

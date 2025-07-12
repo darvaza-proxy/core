@@ -8,7 +8,7 @@ import (
 
 // SliceMinus returns a new slice containing only the
 // elements of one slice not present on the second
-func SliceMinus[T comparable](a []T, b []T) []T {
+func SliceMinus[T comparable](a, b []T) []T {
 	return SliceMinusFn(a, b, func(va, vb T) bool {
 		return va == vb
 	})

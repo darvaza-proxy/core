@@ -24,7 +24,7 @@ jobs:
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./coverage.out
+        files: ./.tmp/coverage/coverage.out
         flags: unittests
         name: codecov-core
         fail_ci_if_error: true

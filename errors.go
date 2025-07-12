@@ -62,7 +62,7 @@ func doWrap(err error, quiet bool, format string, args ...any) error {
 		note = format
 	}
 
-	if len(note) == 0 {
+	if note == "" {
 		return err
 	}
 
@@ -89,7 +89,7 @@ func (w *WrappedError) Error() string {
 	}
 
 	s := w.cause.Error()
-	if len(s) == 0 {
+	if s == "" {
 		return w.note
 	}
 
@@ -262,7 +262,7 @@ func IsErrorFn(check func(error) bool, errs ...error) bool {
 // of a false result.
 //
 // revive:disable:cognitive-complexity
-func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is bool, known bool) {
+func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) {
 	// revive:enable:cognitive-complexity
 	if check == nil || len(errs) == 0 {
 		return false, true

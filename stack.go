@@ -76,7 +76,7 @@ func (f Frame) PkgName() string {
 }
 
 // SplitName returns package name and function name
-func (f Frame) SplitName() (pkgName string, funcName string) {
+func (f Frame) SplitName() (pkgName, funcName string) {
 	// ignore trailing[...] from generic functions
 	name, _ := strings.CutSuffix(f.name, "[...]")
 	i := strings.LastIndexAny(name, "./")
