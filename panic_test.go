@@ -179,10 +179,8 @@ func (tc catcherDoTestCase) test(t *testing.T) {
 				t.Fatalf("expected Recovered error, got %T", err)
 			}
 		}
-	} else {
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
+	} else if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 }
 
