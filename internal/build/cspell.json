@@ -42,6 +42,7 @@
     "pnpx",
     "portless",
     "rhqv",
+    "shellcheck",
     "splithostport",
     "Strs",
     "strs",
