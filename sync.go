@@ -43,47 +43,13 @@ type WaitGroup struct {
 	mu      sync.Mutex
 	wg      sync.WaitGroup
 	err     atomic.Value
-	errCh   chan error
 	onError func(error) error
-}
-
-func (wg *WaitGroup) init() {
-	wg.mu.Lock()
-	if wg.errCh == nil {
-		wg.errCh = make(chan error)
-		go wg.watchErrCh()
-	}
-	wg.mu.Unlock()
 }
 
 // OnError sets a helper that will be called when
 // a worker returns an error or panics
 func (wg *WaitGroup) OnError(fn func(error) error) {
 	wg.onError = fn
-}
-
-func (wg *WaitGroup) watchErrCh() {
-	defer close(wg.errCh)
-
-	for {
-		err, ok := <-wg.errCh
-		switch {
-		case !ok:
-			// wtf
-			return
-		case wg.onError != nil:
-			// process
-			err = wg.onError(err)
-		}
-
-		switch {
-		case err == nil:
-			// error dismissed
-		case wg.err.CompareAndSwap(nil, err):
-			// first, we are done.
-			return
-		}
-	}
 }
 
 // Go spawns a supervised goroutine
@@ -94,14 +60,11 @@ func (wg *WaitGroup) Go(fn func() error) {
 // GoCatch spawns a supervised goroutine, and uses a given function
 // to intercept the returned error
 func (wg *WaitGroup) GoCatch(fn func() error, catch func(error) error) {
-	wg.init()
-
 	if fn != nil {
 		wg.wg.Add(1)
 
 		go func() {
 			defer wg.wg.Done()
-
 			wg.run(fn, catch)
 		}()
 	}
@@ -118,22 +81,20 @@ func (wg *WaitGroup) run(fn func() error, catch func(error) error) {
 	}
 
 	if err != nil {
-		wg.tryReportError(err)
+		wg.reportError(err)
 	}
 }
 
-func (wg *WaitGroup) tryReportError(err error) {
-	wg.wg.Add(1)
+func (wg *WaitGroup) reportError(err error) {
+	// Process error through onError if set
+	if wg.onError != nil {
+		err = wg.onError(err)
+	}
 
-	go func() {
-		defer wg.wg.Done()
-		defer func() {
-			// ignore if errCh is closed
-			_ = recover()
-		}()
-
-		wg.errCh <- err
-	}()
+	// Store the first non-nil error
+	if err != nil {
+		wg.err.CompareAndSwap(nil, err)
+	}
 }
 
 // Wait waits until all workers have finished, and returns
@@ -283,7 +244,18 @@ func (eg *ErrGroup) Wait() error {
 
 // Err returns the error that initiated the group's shutdown.
 func (eg *ErrGroup) Err() error {
-	return eg.wg.Err()
+	// First check if there's an error from workers
+	wgErr := eg.wg.Err()
+	if wgErr != nil {
+		return wgErr
+	}
+
+	// If cancelled but no worker error, get the cause from context
+	if eg.IsCancelled() && eg.ctx != nil {
+		return context.Cause(eg.ctx)
+	}
+
+	return nil
 }
 
 // Go spawns a worker and an optional shutdown routine to be invoked
