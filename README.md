@@ -2,6 +2,7 @@
 
 [![Go Reference][godoc-badge]][godoc]
 [![Go Report Card][goreport-badge]][goreport]
+[![codecov][codecov-badge]][codecov]
 
 This package contains simple mechanisms used by other darvaza-proxy
 projects. It's not allowed to have dependencies outside of Go's Standard
@@ -11,6 +12,8 @@ Library, and if something should be on a subdirectory, it shouldn't be here.
 [godoc-badge]: https://pkg.go.dev/badge/darvaza.org/core.svg
 [goreport]: https://goreportcard.com/report/darvaza.org/core
 [goreport-badge]: https://goreportcard.com/badge/darvaza.org/core
+[codecov]: https://codecov.io/gh/darvaza-proxy/core
+[codecov-badge]: https://codecov.io/gh/darvaza-proxy/core/graph/badge.svg
 
 ## Type Constraints
 
