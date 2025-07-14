@@ -40,6 +40,9 @@ make test GOTEST_FLAGS="-c"
 # Generate coverage reports
 make coverage
 
+# Generate Codecov configuration and upload scripts
+make codecov
+
 # Format code and tidy dependencies (run before committing)
 make tidy
 
@@ -105,6 +108,21 @@ The build system includes automated coverage report generation:
 - Generates coverage reports in multiple formats (text, HTML)
 - Coverage artifacts stored in `.tmp/coverage/` directory
 - Integrated with CI/CD workflows for automated reporting
+
+### Codecov Integration
+
+Enhanced coverage reporting with monorepo support:
+
+- `make codecov` target generates Codecov configuration
+- `internal/build/make_codecov.sh` creates:
+  - `codecov.yml`: Dynamic configuration with per-module flags
+  - `codecov.sh`: Upload script for bulk submission
+- Module-specific coverage targets (80% default)
+- Path mappings for accurate coverage attribution
+- GitHub Actions workflow automatically uploads coverage data
+- PR comments show coverage changes per module
+- See [internal/build/README-coverage.md](internal/build/README-coverage.md)
+  for details
 
 ## Code Architecture
 
