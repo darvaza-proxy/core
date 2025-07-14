@@ -251,7 +251,7 @@ Enhanced wait group with error handling:
 
 * `WaitGroup` - wait group that collects errors
 * `.OnError(fn)` - set error handler
-* `.Go(fn)` / `.GoCatch(fn)` - run functions in goroutines
+* `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`
 * `.Wait()` - wait for completion
 * `.Err()` - get first error
 
