@@ -107,7 +107,11 @@ func AddrFromNetIP(addr net.Addr) (netip.Addr, bool) {
 		s = v.IP
 	}
 
-	return netip.AddrFromSlice(s)
+	ipAddr, ok := netip.AddrFromSlice(s)
+	if ok {
+		ipAddr = ipAddr.Unmap()
+	}
+	return ipAddr, ok
 }
 
 // GetInterfacesNames returns the list of interfaces,
