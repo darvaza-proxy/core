@@ -79,10 +79,13 @@ func (tc panicErrorMethodsTestCase) test(t *testing.T) {
 }
 
 type panicErrorUnwrapTestCase struct {
+	// Large fields (16 bytes) - string headers and interface
 	name          string
 	payload       any
-	expectUnwrap  bool
 	expectedError string
+
+	// Small fields (1 byte) - boolean flags
+	expectUnwrap bool
 }
 
 var panicErrorUnwrapTestCases = []panicErrorUnwrapTestCase{
@@ -128,10 +131,10 @@ func (tc panicErrorUnwrapTestCase) test(t *testing.T) {
 }
 
 type newPanicErrorfTestCase struct {
-	name     string
-	format   string
-	args     []any
 	expected string
+	format   string
+	name     string
+	args     []any
 }
 
 var newPanicErrorfTestCases = []newPanicErrorfTestCase{
@@ -218,9 +221,9 @@ func runNewPanicWrapfTest(t *testing.T) {
 }
 
 type panicFunctionsTestCase struct {
-	name     string
-	fn       func()
 	expected any
+	fn       func()
+	name     string
 }
 
 var panicFunctionsTestCases = []panicFunctionsTestCase{
@@ -290,8 +293,8 @@ func (tc panicFunctionsTestCase) test(t *testing.T) {
 }
 
 type panicWrapFunctionsTestCase struct {
-	name string
 	fn   func()
+	name string
 }
 
 //revive:disable-next-line:cognitive-complexity

@@ -6,10 +6,13 @@ import (
 )
 
 type asRecoveredTestCase struct {
-	name     string
-	input    any
+	// Large fields (16 bytes) - interface types and strings
 	expected any
-	isNil    bool
+	input    any
+	name     string
+
+	// Small fields (1 byte) - booleans
+	isNil bool
 }
 
 var asRecoveredTestCases = []asRecoveredTestCase{
@@ -104,8 +107,8 @@ func TestAsRecovered(t *testing.T) {
 }
 
 type catcherDoTestCase struct {
-	name        string
 	fn          func() error
+	name        string
 	expectError bool
 	expectPanic bool
 }
@@ -191,8 +194,8 @@ func TestCatcherDo(t *testing.T) {
 }
 
 type catcherTryTestCase struct {
-	name        string
 	fn          func() error
+	name        string
 	expectError bool
 	expectPanic bool
 }
@@ -336,8 +339,8 @@ func TestCatcherConcurrent(t *testing.T) {
 }
 
 type catchTestCase struct {
-	name        string
 	fn          func() error
+	name        string
 	expectError bool
 }
 
@@ -387,16 +390,16 @@ func TestCatch(t *testing.T) {
 }
 
 type catchWithPanicRecoveryTestCase struct {
-	name  string
 	value any
+	name  string
 }
 
 var catchWithPanicRecoveryTestCases = []catchWithPanicRecoveryTestCase{
-	{"string panic", "string panic"},
-	{"int panic", 42},
-	{"float panic", 3.14},
-	{"error panic", errors.New("error panic")},
-	{"formatted error", errors.New("formatted error")},
+	{name: "string panic", value: "string panic"},
+	{name: "int panic", value: 42},
+	{name: "float panic", value: 3.14},
+	{name: "error panic", value: errors.New("error panic")},
+	{name: "formatted error", value: errors.New("formatted error")},
 	// Skip slice and map as they are not comparable
 }
 

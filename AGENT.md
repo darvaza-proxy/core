@@ -267,6 +267,38 @@ When LanguageTool reports issues:
 
 ## Linting and Code Quality
 
+### Field Alignment
+
+The project enforces struct field alignment optimization for memory efficiency
+using the `fieldalignment` tool. This helps reduce memory usage by ordering
+struct fields to minimize padding.
+
+#### Running Field Alignment Fixes
+
+To automatically fix field alignment issues across the codebase:
+
+```bash
+# Run the fieldalignment tool with automatic fixes
+GOXTOOLS="golang.org/x/tools/go/analysis/passes"
+FA="$GOXTOOLS/fieldalignment/cmd/fieldalignment"
+go run "$FA@latest" -fix ./...
+```
+
+This tool will:
+
+- Analyze all struct definitions in the project
+- Reorder fields to minimize memory padding
+- Automatically update source files with optimized field ordering
+
+#### Field Alignment Notes
+
+- Always run `make tidy` after field alignment fixes to ensure all linting
+  passes
+- Field alignment changes may require updating struct literal initializations
+- The tool is safe to run repeatedly - it only makes changes when beneficial
+- Memory savings can be significant for frequently allocated structs
+- Run field alignment manually as needed for struct optimization
+
 ### Documentation Standards
 
 When editing Markdown files, ensure compliance with:

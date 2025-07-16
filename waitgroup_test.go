@@ -9,10 +9,10 @@ import (
 )
 
 type waitGroupGoTestCase struct {
-	name        string
 	fn          func() error
-	expectError bool
 	errorMsg    string
+	name        string
+	expectError bool
 }
 
 var waitGroupGoTestCases = []waitGroupGoTestCase{
@@ -81,11 +81,11 @@ func TestWaitGroupGo(t *testing.T) {
 }
 
 type waitGroupGoCatchTestCase struct {
-	name        string
 	fn          func() error
 	catch       func(error) error
-	expectError bool
+	name        string
 	errorMsg    string
+	expectError bool
 }
 
 var waitGroupGoCatchTestCases = []waitGroupGoCatchTestCase{
@@ -179,11 +179,11 @@ func TestWaitGroupGoCatch(t *testing.T) {
 }
 
 type waitGroupOnErrorTestCase struct {
+	onErrorHandler func(error) error
+	errorMsg       string
 	name           string
 	workers        []func() error
-	onErrorHandler func(error) error
 	expectError    bool
-	errorMsg       string
 }
 
 var waitGroupOnErrorTestCases = []waitGroupOnErrorTestCase{

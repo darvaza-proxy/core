@@ -40,10 +40,10 @@ func (sl *SpinLock) Unlock() {
 
 // WaitGroup is a safer way to run workers
 type WaitGroup struct {
-	mu      sync.Mutex
-	wg      sync.WaitGroup
 	err     atomic.Value
 	onError func(error) error
+	wg      sync.WaitGroup
+	mu      sync.Mutex
 }
 
 // OnError sets a helper that will be called when
@@ -126,13 +126,12 @@ func (wg *WaitGroup) Err() error {
 // ErrGroup handles a group of workers where all are canceled once one fails.
 // As it's based on [WaitGroup] it also catches panics.
 type ErrGroup struct {
-	wg        WaitGroup
 	ctx       context.Context
+	Parent    context.Context
 	cancel    context.CancelCauseFunc
-	cancelled atomic.Bool
 	onError   func(error)
-
-	Parent context.Context
+	wg        WaitGroup
+	cancelled atomic.Bool
 }
 
 // SetDefaults fills gaps in the config and initializes

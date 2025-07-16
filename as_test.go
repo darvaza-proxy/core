@@ -8,9 +8,14 @@ import (
 
 // asTestCase tests As function
 type asTestCase struct {
-	name   string
-	input  any
-	want   any
+	// Interface fields (16 bytes each) - input/output test data
+	input any
+	want  any
+
+	// String fields (16 bytes) - test identification
+	name string
+
+	// Boolean fields (1 byte) - expected result flags
 	wantOk bool
 }
 
@@ -146,10 +151,15 @@ func (e errorWithOK) OK() bool {
 
 // asErrorTestCase tests AsError function
 type asErrorTestCase struct {
+	// Interface fields (16 bytes) - input test data
+	input any
+
+	// String fields (16 bytes) - test identification and expected message
 	name    string
-	input   any
-	wantErr bool
 	wantMsg string
+
+	// Boolean fields (1 byte) - expected result flags
+	wantErr bool
 }
 
 func (tc asErrorTestCase) test(t *testing.T) {
@@ -169,8 +179,8 @@ func (tc asErrorTestCase) test(t *testing.T) {
 type asErrorsTestCase struct {
 	name     string
 	input    []any
-	wantLen  int
 	wantMsgs []string
+	wantLen  int
 }
 
 func (tc asErrorsTestCase) test(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 )
 
 type compoundErrorErrorTestCase struct {
+	expected string
 	name     string
 	errs     []error
-	expected string
 }
 
 var compoundErrorErrorTestCases = []compoundErrorErrorTestCase{
