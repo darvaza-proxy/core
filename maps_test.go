@@ -9,9 +9,9 @@ import (
 
 // keysTestCase tests Keys function
 type keysTestCase struct {
-	name     string
 	input    map[string]int
-	expected int // expected length
+	name     string
+	expected int
 }
 
 var keysTestCases = []keysTestCase{
@@ -459,28 +459,28 @@ func TestMapListContains(t *testing.T) {
 
 func TestMapListContainsFn(t *testing.T) {
 	type customType struct {
-		id   int
 		name string
+		id   int
 	}
 
 	m := make(map[string]*list.List)
-	MapListAppend(m, "key1", customType{1, "one"})
-	MapListAppend(m, "key1", customType{2, "two"})
+	MapListAppend(m, "key1", customType{id: 1, name: "one"})
+	MapListAppend(m, "key1", customType{id: 2, name: "two"})
 
 	eq := func(a, b customType) bool { return a.id == b.id }
 
 	// Test existing value
-	if !MapListContainsFn(m, "key1", customType{1, "different"}, eq) {
+	if !MapListContainsFn(m, "key1", customType{id: 1, name: "different"}, eq) {
 		t.Errorf("MapListContainsFn should find value by id")
 	}
 
 	// Test missing value
-	if MapListContainsFn(m, "key1", customType{3, "three"}, eq) {
+	if MapListContainsFn(m, "key1", customType{id: 3, name: "three"}, eq) {
 		t.Errorf("MapListContainsFn should not find missing value")
 	}
 
 	// Test nil eq function
-	if MapListContainsFn(m, "key1", customType{1, "one"}, nil) {
+	if MapListContainsFn(m, "key1", customType{id: 1, name: "one"}, nil) {
 		t.Errorf("MapListContainsFn with nil eq should return false")
 	}
 }
