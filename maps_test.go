@@ -78,27 +78,27 @@ var sortedKeysTestCases = []sortedKeysTestCase{
 	{
 		name:     "empty map",
 		input:    map[string]int{},
-		expected: []string{},
+		expected: S[string](),
 	},
 	{
 		name:     "single entry",
 		input:    map[string]int{"a": 1},
-		expected: []string{"a"},
+		expected: S("a"),
 	},
 	{
 		name:     "multiple entries",
 		input:    map[string]int{"c": 3, "a": 1, "b": 2},
-		expected: []string{"a", "b", "c"},
+		expected: S("a", "b", "c"),
 	},
 	{
 		name:     "numeric string keys",
 		input:    map[string]int{"10": 10, "2": 2, "1": 1, "20": 20},
-		expected: []string{"1", "10", "2", "20"}, // lexicographic order
+		expected: S("1", "10", "2", "20"), // lexicographic order
 	},
 	{
 		name:     "nil map",
 		input:    nil,
-		expected: []string{},
+		expected: S[string](),
 	},
 }
 
@@ -120,7 +120,7 @@ func TestSortedKeys(t *testing.T) {
 // Test SortedKeys with int keys
 func TestSortedKeysInt(t *testing.T) {
 	input := map[int]string{10: "ten", 2: "two", 1: "one", 20: "twenty"}
-	expected := []int{1, 2, 10, 20}
+	expected := S(1, 2, 10, 20)
 
 	got := SortedKeys(input)
 	if !reflect.DeepEqual(got, expected) {
@@ -144,12 +144,12 @@ var sortedValuesTestCases = []sortedValuesTestCase{
 	{
 		name:     "single entry",
 		input:    map[string]int{"a": 1},
-		expected: []int{1},
+		expected: S(1),
 	},
 	{
 		name:     "multiple entries",
 		input:    map[string]int{"c": 3, "a": 1, "b": 2},
-		expected: []int{1, 2, 3}, // sorted by keys: a=1, b=2, c=3
+		expected: S(1, 2, 3), // sorted by keys: a=1, b=2, c=3
 	},
 	{
 		name:     "nil map",
@@ -192,25 +192,25 @@ var sortedValuesCondTestCases = []sortedValuesCondTestCase{
 		name:      "filter even values",
 		input:     map[string]int{"a": 1, "b": 2, "c": 3, "d": 4},
 		predicate: func(v int) bool { return v%2 == 0 },
-		expected:  []int{2, 4}, // b=2, d=4
+		expected:  S(2, 4), // b=2, d=4
 	},
 	{
 		name:      "filter greater than 2",
 		input:     map[string]int{"a": 1, "b": 2, "c": 3, "d": 4},
 		predicate: func(v int) bool { return v > 2 },
-		expected:  []int{3, 4}, // c=3, d=4
+		expected:  S(3, 4), // c=3, d=4
 	},
 	{
 		name:      "filter none",
 		input:     map[string]int{"a": 1, "b": 2, "c": 3},
 		predicate: func(v int) bool { return v > 10 },
-		expected:  []int{},
+		expected:  S[int](),
 	},
 	{
 		name:      "nil predicate",
 		input:     map[string]int{"a": 1, "b": 2, "c": 3},
 		predicate: nil,
-		expected:  []int{1, 2, 3},
+		expected:  S(1, 2, 3),
 	},
 	{
 		name:      "nil map",
@@ -239,7 +239,7 @@ func TestSortedValuesCond(t *testing.T) {
 func TestSortedValuesUnlikelyCond(t *testing.T) {
 	input := map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}
 	predicate := func(v int) bool { return v == 3 }
-	expected := []int{3}
+	expected := S(3)
 
 	got := SortedValuesUnlikelyCond(input, predicate)
 	if !reflect.DeepEqual(got, expected) {
@@ -261,7 +261,7 @@ func TestSortedValuesUnlikelyCond(t *testing.T) {
 
 	// Test nil predicate
 	got4 := SortedValuesUnlikelyCond(input, nil)
-	expected4 := []int{1, 2, 3, 4}
+	expected4 := S(1, 2, 3, 4)
 	if !reflect.DeepEqual(got4, expected4) {
 		t.Errorf("SortedValuesUnlikelyCond with nil predicate returned %v, want %v", got4, expected4)
 	}
@@ -543,7 +543,7 @@ func TestMapListForEach(t *testing.T) {
 		return false // continue
 	})
 
-	expected := []string{"a", "b", "c"}
+	expected := S("a", "b", "c")
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("MapListForEach collected %v, want %v", result, expected)
 	}
@@ -600,7 +600,7 @@ func createMapListForEachElementTestCases() []mapListForEachElementTestCase {
 			fn: func(_ *list.Element) bool {
 				return false // continue
 			},
-			expected: []string{"a", "b"},
+			expected: S("a", "b"),
 		},
 		{
 			name: "early termination",
@@ -609,28 +609,28 @@ func createMapListForEachElementTestCases() []mapListForEachElementTestCase {
 			fn: func(_ *list.Element) bool {
 				return true // stop after first
 			},
-			expected: []string{"a"},
+			expected: S("a"),
 		},
 		{
 			name:     "missing key",
 			m:        m,
 			key:      "missing",
 			fn:       func(_ *list.Element) bool { return false },
-			expected: []string{},
+			expected: S[string](),
 		},
 		{
 			name:     "nil map",
 			m:        nil,
 			key:      "key",
 			fn:       func(_ *list.Element) bool { return false },
-			expected: []string{},
+			expected: S[string](),
 		},
 		{
 			name:     "nil function",
 			m:        m,
 			key:      "key1",
 			fn:       nil,
-			expected: []string{},
+			expected: S[string](),
 		},
 	}
 }

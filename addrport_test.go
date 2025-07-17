@@ -225,13 +225,13 @@ var typeSpecificAddrPortTestCases = []typeSpecificAddrPortTestCase{
 	},
 	{
 		name:   "TCPAddr with invalid IP",
-		input:  &net.TCPAddr{IP: []byte{1, 2, 3}, Port: 80}, // Invalid IP length
+		input:  &net.TCPAddr{IP: S[byte](1, 2, 3), Port: 80}, // Invalid IP length
 		want:   netip.AddrPort{},
 		wantOk: false,
 	},
 	{
 		name:   "UDPAddr with invalid IP",
-		input:  &net.UDPAddr{IP: []byte{}, Port: 80}, // Empty IP
+		input:  &net.UDPAddr{IP: S[byte](), Port: 80}, // Empty IP
 		want:   netip.AddrPort{},
 		wantOk: false,
 	},

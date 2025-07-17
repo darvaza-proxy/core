@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-func S[T comparable](v ...T) []T { return v }
-
 func TestSliceReverse(t *testing.T) {
 	for _, tc := range []struct{ a, b []int }{
 		{S[int](), S[int]()},
@@ -29,17 +27,17 @@ func TestSliceReverse(t *testing.T) {
 
 // revive:disable
 var (
-	ints       = []int{74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586}
-	expectInts = []int{74, 59, 238, -784, 9845, 959, 905, 0, 42, 7586, -5467984}
+	ints       = S(74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586)
+	expectInts = S(74, 59, 238, -784, 9845, 959, 905, 0, 42, 7586, -5467984)
 
-	float64s = []float64{
+	float64s = S(
 		74.3, 59.0, math.Inf(1), 238.2, -784.0, 2.3, 7.8, 7.8, 74.3,
 		59.0, math.Inf(1), 238.2, -784.0, 2.3,
-	}
-	expectFloat64s = []float64{74.3, 59.0, math.Inf(1), 238.2, -784, 2.3, 7.8}
+	)
+	expectFloat64s = S(74.3, 59.0, math.Inf(1), 238.2, -784, 2.3, 7.8)
 
-	strs       = []string{"", "Hello", "foo", "bar", "foo", "f00", "%*&^*&^&"}
-	expectStrs = []string{"", "Hello", "foo", "bar", "f00", "%*&^*&^&"}
+	strs       = S("", "Hello", "foo", "bar", "foo", "f00", "%*&^*&^&")
+	expectStrs = S("", "Hello", "foo", "bar", "f00", "%*&^*&^&")
 )
 
 func eq[T Ordered](a, b T) bool {
@@ -162,9 +160,9 @@ func TestSliceRandom(t *testing.T) {
 		input  []string
 		wantok bool
 	}{
-		{name: "empty", input: []string{}, want: string(""), wantok: false},
-		{name: "one", input: []string{"one"}, want: string("one"), wantok: true},
-		{name: "random", input: []string{"one", "two", "three", "four", "five", "six"}, want: string(""), wantok: true},
+		{name: "empty", input: S[string](), want: string(""), wantok: false},
+		{name: "one", input: S("one"), want: string("one"), wantok: true},
+		{name: "random", input: S("one", "two", "three", "four", "five", "six"), want: string(""), wantok: true},
 	}
 	for _, tc := range tests {
 		if tc.name != "random" {

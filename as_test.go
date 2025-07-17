@@ -292,12 +292,12 @@ func TestSliceAs(t *testing.T) {
 		{
 			name:  "mixed types to string",
 			input: S[any]("hello", 42, "world", 3.14, "!"),
-			want:  []string{"hello", "world", "!"},
+			want:  S("hello", "world", "!"),
 		},
 		{
 			name:  "all strings",
 			input: S[any]("a", "b", "c"),
-			want:  []string{"a", "b", "c"},
+			want:  S("a", "b", "c"),
 		},
 		{
 			name:  "no strings",
@@ -317,7 +317,7 @@ func TestSliceAs(t *testing.T) {
 		{
 			name:  "with nil values",
 			input: S[any]("hello", nil, "world"),
-			want:  []string{"hello", "world"},
+			want:  S("hello", "world"),
 		},
 	}
 
@@ -340,7 +340,7 @@ func TestSliceAsFn(t *testing.T) {
 			name:  "with custom conversion",
 			fn:    prefixString,
 			input: S[any]("a", 1, "b", 2, "c"),
-			want:  []string{"prefix:a", "prefix:b", "prefix:c"},
+			want:  S("prefix:a", "prefix:b", "prefix:c"),
 		},
 		{
 			name:  "with nil function",
@@ -443,7 +443,7 @@ func TestAsErrors(t *testing.T) {
 				nil,
 			),
 			wantLen:  3,
-			wantMsgs: []string{"error1", "error2", "error3"},
+			wantMsgs: S("error1", "error2", "error3"),
 		},
 		{
 			name: "all errors",
@@ -453,25 +453,25 @@ func TestAsErrors(t *testing.T) {
 				errors.New("c"),
 			),
 			wantLen:  3,
-			wantMsgs: []string{"a", "b", "c"},
+			wantMsgs: S("a", "b", "c"),
 		},
 		{
 			name:     "no errors",
 			input:    S[any]("a", 1, true, nil),
 			wantLen:  0,
-			wantMsgs: nil,
+			wantMsgs: S[string](),
 		},
 		{
 			name:     "empty slice",
 			input:    S[any](),
 			wantLen:  0,
-			wantMsgs: nil,
+			wantMsgs: S[string](),
 		},
 		{
 			name:     "nil slice",
 			input:    nil,
 			wantLen:  0,
-			wantMsgs: nil,
+			wantMsgs: S[string](),
 		},
 		{
 			name: "with OK interface",
@@ -481,7 +481,7 @@ func TestAsErrors(t *testing.T) {
 				errorWithOK{msg: "fail2", ok: false},
 			),
 			wantLen:  2,
-			wantMsgs: []string{"fail", "fail2"},
+			wantMsgs: S("fail", "fail2"),
 		},
 	}
 

@@ -21,12 +21,12 @@ func TestIsErrorFn(t *testing.T) {
 		errs     []error
 		expected bool
 	}{
-		{"matching error", isTestErr, []error{testErr}, true},
-		{"non-matching error", isTestErr, []error{differentErr}, false},
-		{"nil check function", nil, []error{testErr}, false},
-		{"no errors", isTestErr, []error{}, false},
-		{"wrapped error", isTestErr, []error{wrappedErr}, true},
-		{"nil error in slice", isTestErr, []error{nil, testErr}, true},
+		{"matching error", isTestErr, S(testErr), true},
+		{"non-matching error", isTestErr, S(differentErr), false},
+		{"nil check function", nil, S(testErr), false},
+		{"no errors", isTestErr, S[error](), false},
+		{"wrapped error", isTestErr, S(wrappedErr), true},
+		{"nil error in slice", isTestErr, S[error](nil, testErr), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := IsErrorFn(tc.checkFn, tc.errs...)
@@ -58,12 +58,12 @@ func TestIsErrorFn2(t *testing.T) {
 		expectedIs    bool
 		expectedKnown bool
 	}{
-		{"matching error", isTestErr, []error{testErr}, true, true},
-		{"non-matching error", isTestErr, []error{differentErr}, false, true},
-		{"nil check function", nil, []error{testErr}, false, true},
-		{"no errors", isTestErr, []error{}, false, true},
-		{"wrapped error", isTestErr, []error{wrappedErr}, true, true},
-		{"unknown error type", func(_ error) (bool, bool) { return false, false }, []error{testErr}, false, false},
+		{"matching error", isTestErr, S(testErr), true, true},
+		{"non-matching error", isTestErr, S(differentErr), false, true},
+		{"nil check function", nil, S(testErr), false, true},
+		{"no errors", isTestErr, S[error](), false, true},
+		{"wrapped error", isTestErr, S(wrappedErr), true, true},
+		{"unknown error type", func(_ error) (bool, bool) { return false, false }, S(testErr), false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			is, known := IsErrorFn2(tc.checkFn, tc.errs...)

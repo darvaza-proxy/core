@@ -47,27 +47,27 @@ func testListElementIteration(
 }
 
 func TestListForEach(t *testing.T) {
-	testListIteration(t, "empty list", ListForEach[int], []int{}, []int{})
-	testListIteration(t, "single element", ListForEach[int], []int{1}, []int{1})
-	testListIteration(t, "multiple elements", ListForEach[int], []int{1, 2, 3}, []int{1, 2, 3})
+	testListIteration(t, "empty list", ListForEach[int], S[int](), S[int]())
+	testListIteration(t, "single element", ListForEach[int], S(1), S(1))
+	testListIteration(t, "multiple elements", ListForEach[int], S(1, 2, 3), S(1, 2, 3))
 }
 
 func TestListForEachElement(t *testing.T) {
-	testListElementIteration(t, "empty list", ListForEachElement, []int{}, []int{})
-	testListElementIteration(t, "single element", ListForEachElement, []int{1}, []int{1})
-	testListElementIteration(t, "multiple elements", ListForEachElement, []int{1, 2, 3}, []int{1, 2, 3})
+	testListElementIteration(t, "empty list", ListForEachElement, S[int](), S[int]())
+	testListElementIteration(t, "single element", ListForEachElement, S(1), S(1))
+	testListElementIteration(t, "multiple elements", ListForEachElement, S(1, 2, 3), S(1, 2, 3))
 }
 
 func TestListForEachBackward(t *testing.T) {
-	testListIteration(t, "empty list", ListForEachBackward[int], []int{}, []int{})
-	testListIteration(t, "single element", ListForEachBackward[int], []int{1}, []int{1})
-	testListIteration(t, "multiple elements", ListForEachBackward[int], []int{1, 2, 3}, []int{3, 2, 1})
+	testListIteration(t, "empty list", ListForEachBackward[int], S[int](), S[int]())
+	testListIteration(t, "single element", ListForEachBackward[int], S(1), S(1))
+	testListIteration(t, "multiple elements", ListForEachBackward[int], S(1, 2, 3), S(3, 2, 1))
 }
 
 func TestListForEachBackwardElement(t *testing.T) {
-	testListElementIteration(t, "empty list", ListForEachBackwardElement, []int{}, []int{})
-	testListElementIteration(t, "single element", ListForEachBackwardElement, []int{1}, []int{1})
-	testListElementIteration(t, "multiple elements", ListForEachBackwardElement, []int{1, 2, 3}, []int{3, 2, 1})
+	testListElementIteration(t, "empty list", ListForEachBackwardElement, S[int](), S[int]())
+	testListElementIteration(t, "single element", ListForEachBackwardElement, S(1), S(1))
+	testListElementIteration(t, "multiple elements", ListForEachBackwardElement, S(1, 2, 3), S(3, 2, 1))
 }
 
 func assertIntSlicesEqual(t *testing.T, expected, actual []int) {
