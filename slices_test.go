@@ -5,22 +5,34 @@ import (
 	"testing"
 )
 
+type sliceReverseTestCase struct {
+	name string
+	a, b []int
+}
+
+func (tc sliceReverseTestCase) test(t *testing.T) {
+	t.Helper()
+	c := SliceCopy(tc.a)
+	SliceReverse(c)
+	AssertSliceEqual(t, tc.b, c, "SliceReverse(%q) failed", tc.a)
+	if SliceEqual(c, tc.b) {
+		t.Logf("%s(%q) → %q", "SliceReverse", tc.a, c)
+	}
+}
+
+var sliceReverseTestCases = []sliceReverseTestCase{
+	{"empty", S[int](), S[int]()},
+	{"single", S(1), S(1)},
+	{"two elements", S(1, 2), S(2, 1)},
+	{"three elements", S(1, 2, 3), S(3, 2, 1)},
+	{"four elements", S(1, 2, 3, 4), S(4, 3, 2, 1)},
+	{"five elements", S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)},
+	{"six elements", S(1, 2, 3, 4, 5, 6), S(6, 5, 4, 3, 2, 1)},
+}
+
 func TestSliceReverse(t *testing.T) {
-	for _, tc := range []struct{ a, b []int }{
-		{S[int](), S[int]()},
-		{S(1), S(1)},
-		{S(1, 2), S(2, 1)},
-		{S(1, 2, 3), S(3, 2, 1)},
-		{S(1, 2, 3, 4), S(4, 3, 2, 1)},
-		{S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)},
-		{S(1, 2, 3, 4, 5, 6), S(6, 5, 4, 3, 2, 1)},
-	} {
-		c := SliceCopy(tc.a)
-		SliceReverse(c)
-		AssertSliceEqual(t, tc.b, c, "SliceReverse(%q) failed", tc.a)
-		if SliceEqual(c, tc.b) {
-			t.Logf("%s(%q) → %q", "SliceReverse", tc.a, c)
-		}
+	for _, tc := range sliceReverseTestCases {
+		t.Run(tc.name, tc.test)
 	}
 }
 
