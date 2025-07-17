@@ -6,7 +6,7 @@ import (
 )
 
 type asRecoveredTestCase struct {
-	// Large fields (16 bytes) - interface types and strings
+	// Large fields - interface types and strings
 	expected any
 	input    any
 	name     string

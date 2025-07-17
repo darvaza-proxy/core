@@ -9,10 +9,10 @@ import (
 
 // Test cases for ParseAddr
 type parseAddrTestCase struct {
-	// netip.Addr struct (24 bytes) - result value
+	// netip.Addr struct - result value
 	want netip.Addr
 
-	// String fields (16 bytes each) - alphabetically ordered
+	// String fields - alphabetically ordered
 	input string
 	name  string
 
@@ -180,13 +180,13 @@ func TestParseNetIP(t *testing.T) {
 
 // Test cases for AddrFromNetIP
 type addrFromNetIPTestCase struct {
-	// netip.Addr struct (24 bytes) - result value
+	// netip.Addr struct - result value
 	want netip.Addr
 
-	// Interface field (16 bytes) - input value
+	// Interface field - input value
 	input net.Addr
 
-	// String field (16 bytes) - test name
+	// String field - test name
 	name string
 
 	// Boolean field (1 byte) - success flag

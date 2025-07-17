@@ -79,7 +79,7 @@ func (tc panicErrorMethodsTestCase) test(t *testing.T) {
 }
 
 type panicErrorUnwrapTestCase struct {
-	// Large fields (16 bytes) - string headers and interface
+	// Large fields - string headers and interface
 	name          string
 	payload       any
 	expectedError string

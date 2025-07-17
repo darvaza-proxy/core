@@ -8,11 +8,11 @@ import (
 
 // asTestCase tests As function
 type asTestCase struct {
-	// Interface fields (16 bytes each) - input/output test data
+	// Interface fields - input/output test data
 	input any
 	want  any
 
-	// String fields (16 bytes) - test identification
+	// String fields - test identification
 	name string
 
 	// Boolean fields (1 byte) - expected result flags
@@ -151,10 +151,10 @@ func (e errorWithOK) OK() bool {
 
 // asErrorTestCase tests AsError function
 type asErrorTestCase struct {
-	// Interface fields (16 bytes) - input test data
+	// Interface fields - input test data
 	input any
 
-	// String fields (16 bytes) - test identification and expected message
+	// String fields - test identification and expected message
 	name    string
 	wantMsg string
 
