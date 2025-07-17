@@ -286,18 +286,18 @@ go run "$FA@latest" -fix ./...
 
 This tool will:
 
-- Analyze all struct definitions in the project
-- Reorder fields to minimize memory padding
-- Automatically update source files with optimized field ordering
+- Analyze all struct definitions in the project.
+- Reorder fields to minimize memory padding.
+- Automatically update source files with optimized field ordering.
 
 #### Field Alignment Notes
 
 - Always run `make tidy` after field alignment fixes to ensure all linting
-  passes
-- Field alignment changes may require updating struct literal initializations
-- The tool is safe to run repeatedly - it only makes changes when beneficial
-- Memory savings can be significant for frequently allocated structs
-- Run field alignment manually as needed for struct optimization
+  passes.
+- Field alignment changes may require updating struct literal initializations.
+- The tool is safe to run repeatedly - it only makes changes when beneficial.
+- Memory savings can be significant for frequently allocated structs.
+- Run field alignment manually as needed for struct optimization.
 
 ### golangci-lint Configuration
 
@@ -343,17 +343,18 @@ linters-settings:
 
 Common IDE diagnostics and their meanings:
 
-1. **Missing property "version"**: IDE schema expects `version: "2"`
-2. **Property linters-settings is not allowed**: IDE expects v2 structure
+1. **Missing property "version"**: IDE schema expects `version: "2"`.
+2. **Property linters-settings is not allowed**: IDE expects v2 structure.
 3. **cSpell warnings**: Linter names are technical terms not in spell-check
-   dictionary
+   dictionary.
 
 #### Resolution Status
 
-- **Current priority**: Low - configuration works functionally
-- **IDE warnings**: Cannot be resolved without upgrading golangci-lint to v2
-- **System constraint**: Project uses v1.64.8 to avoid v2 configuration issues
-- **Workaround**: IDE warnings can be ignored as they don't affect functionality
+- **Current priority**: Low - configuration works functionally.
+- **IDE warnings**: Cannot be resolved without upgrading golangci-lint to v2.
+- **System constraint**: Project uses v1.64.8 to avoid v2 configuration issues.
+- **Workaround**: IDE warnings can be ignored as they don't affect
+  functionality.
 
 #### Field Alignment Integration
 
