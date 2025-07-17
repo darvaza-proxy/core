@@ -165,6 +165,67 @@ Always run `make tidy` before committing to ensure proper formatting.
 - Helper functions like `S[T]()` create test slices.
 - Comprehensive coverage for generic functions is expected.
 
+#### Test Helper Functions
+
+The project uses a comprehensive set of test helper functions defined in
+`testutils_test.go` to reduce boilerplate and improve test consistency:
+
+**Slice Creation:**
+
+- `S[T](values...)` - Creates test slices concisely: `S(1, 2, 3)` instead of
+  `[]int{1, 2, 3}`
+- `S[T]()` - Creates empty slices: `S[string]()` instead of `[]string{}`
+
+**Assertion Helpers:**
+
+- `AssertEqual[T](t, expected, actual, msg...)` - Generic value comparison with
+  better error messages
+- `AssertSliceEqual[T](t, expected, actual, msg...)` - Slice comparison using
+  `reflect.DeepEqual`
+- `AssertError(t, err, expectError, msg...)` - Standardized error expectation
+  checking
+- `AssertBool(t, actual, expected, msg...)` - Boolean assertions with context
+- `AssertPanic(t, fn, expectedPanic, msg...)` - Simplified panic testing
+- `AssertNoPanic(t, fn, msg...)` - Ensure functions don't panic
+
+**Advanced Helpers:**
+
+- `RunConcurrentTest(t, numWorkers, workerFn)` - Concurrent testing with
+  goroutines
+- `RunBenchmark(b, setupFn, execFn)` - Benchmark testing with setup/execution
+  phases
+- `RunTestCases(t, []TestCase)` - Table-driven test runner (requires
+  `TestCase` interface)
+
+**Usage Examples:**
+
+```go
+// Before: Manual assertions
+if !reflect.DeepEqual(got, expected) {
+    t.Errorf("Expected %v, got %v", expected, got)
+}
+
+// After: Helper function
+AssertSliceEqual(t, expected, got, "operation failed")
+
+// Before: Manual error checking
+if expectError && err == nil {
+    t.Error("Expected error but got nil")
+} else if !expectError && err != nil {
+    t.Errorf("Expected no error but got: %v", err)
+}
+
+// After: Helper function
+AssertError(t, err, expectError, "operation error expectation")
+```
+
+These helpers provide:
+
+- Consistent error messages across all tests
+- Reduced boilerplate code
+- Better test maintainability
+- Clearer test intent
+
 ## Important Notes
 
 - Go 1.23 is the minimum required version.

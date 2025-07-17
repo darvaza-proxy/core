@@ -76,6 +76,7 @@
     "subpackages",
     "subprojects",
     "TCPAddr",
+    "testutils",
     "toml",
     "TOOLSDIR",
     "tput",

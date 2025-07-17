@@ -30,9 +30,7 @@ func TestIsErrorFn(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := IsErrorFn(tc.checkFn, tc.errs...)
-			if result != tc.expected {
-				t.Errorf("IsErrorFn() = %v, want %v", result, tc.expected)
-			}
+			AssertBool(t, result, tc.expected, "IsErrorFn() result")
 		})
 	}
 }
@@ -67,9 +65,8 @@ func TestIsErrorFn2(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			is, known := IsErrorFn2(tc.checkFn, tc.errs...)
-			if is != tc.expectedIs || known != tc.expectedKnown {
-				t.Errorf("IsErrorFn2() = (%v, %v), want (%v, %v)", is, known, tc.expectedIs, tc.expectedKnown)
-			}
+			AssertBool(t, is, tc.expectedIs, "IsErrorFn2() first return value")
+			AssertBool(t, known, tc.expectedKnown, "IsErrorFn2() second return value")
 		})
 	}
 }
