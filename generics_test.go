@@ -7,9 +7,9 @@ import (
 
 // coalesceTestCase tests Coalesce function with generic type support
 type coalesceTestCase[T comparable] struct {
+	expected T
 	name     string
 	inputs   []T
-	expected T
 }
 
 func (tc coalesceTestCase[T]) test(t *testing.T) {
@@ -146,9 +146,9 @@ func TestCoalesceString(t *testing.T) {
 
 // coalescePointerTestCase tests Coalesce with pointers (requires special comparison logic)
 type coalescePointerTestCase[T comparable] struct {
+	expected *T
 	name     string
 	inputs   []*T
-	expected *T
 }
 
 func (tc coalescePointerTestCase[T]) test(t *testing.T) {
@@ -416,10 +416,10 @@ func TestIIfInt(t *testing.T) {
 // iifStringTestCase tests IIf with strings
 type iifStringTestCase struct {
 	name     string
-	cond     bool
 	yes      string
 	no       string
 	expected string
+	cond     bool
 }
 
 var iifStringTestCases = []iifStringTestCase{
@@ -477,11 +477,11 @@ func TestIIfString(t *testing.T) {
 
 // iifPointerTestCase tests IIf with pointers
 type iifPointerTestCase struct {
-	name     string
-	cond     bool
 	yes      *int
 	no       *int
 	expected *int
+	name     string
+	cond     bool
 }
 
 var iifPointerTestCases = []iifPointerTestCase{
@@ -556,10 +556,10 @@ func TestIIfPointer(t *testing.T) {
 // iifStructTestCase tests IIf with structs
 type iifStructTestCase struct {
 	name     string
-	cond     bool
 	yes      testStruct
 	no       testStruct
 	expected testStruct
+	cond     bool
 }
 
 var iifStructTestCases = []iifStructTestCase{
