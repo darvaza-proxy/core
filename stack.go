@@ -148,6 +148,8 @@ func (f Frame) formatFile(s fmt.State) {
 		writeFormat(s, f.name)
 		writeFormat(s, "\n\t")
 		writeFormat(s, f.file)
+	case f.file == "":
+		writeFormat(s, "")
 	default:
 		writeFormat(s, path.Base(f.file))
 	}
