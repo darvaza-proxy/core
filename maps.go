@@ -98,7 +98,7 @@ func MapListContains[K comparable, T comparable](m map[K]*list.List, key K, v T)
 func MapListContainsFn[K comparable, T any](m map[K]*list.List, key K, v T,
 	eq func(T, T) bool) bool {
 	//
-	if m != nil && eq == nil {
+	if m != nil && eq != nil {
 		if l, ok := m[key]; ok {
 			return ListContainsFn(l, v, eq)
 		}
