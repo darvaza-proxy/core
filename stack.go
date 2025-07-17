@@ -134,6 +134,13 @@ func (f Frame) FileLine() string {
 	return f.file
 }
 
+// String returns a string representation of the frame equivalent to %v format.
+// This implements the fmt.Stringer interface and returns "file:line" format
+// using the same logic as FileLine but with basename only for the file.
+func (f Frame) String() string {
+	return fmt.Sprintf("%v", f)
+}
+
 /* Format formats the frame according to the fmt.Formatter interface.
  *
  *	%s    source file
@@ -238,6 +245,13 @@ func (st Stack) Format(s fmt.State, verb rune) {
 			f.Format(s, verb)
 		}
 	}
+}
+
+// String returns a string representation of the stack equivalent to %v format.
+// This implements the fmt.Stringer interface and returns a multi-line representation
+// with each frame formatted as "file:line" on separate lines.
+func (st Stack) String() string {
+	return fmt.Sprintf("%v", st)
 }
 
 // Here captures and returns the current stack frame where it was called.

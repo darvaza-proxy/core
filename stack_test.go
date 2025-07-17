@@ -272,6 +272,28 @@ func TestFrameFileLine(t *testing.T) {
 	}
 }
 
+// Test Frame.String method (implements fmt.Stringer)
+func TestFrameString(t *testing.T) {
+	frame := &Frame{
+		name: "darvaza.org/core.TestFunction",
+		file: "/path/to/test.go",
+		line: 42,
+	}
+
+	// String() should be equivalent to %v format
+	expected := fmt.Sprintf("%v", frame)
+	actual := frame.String()
+
+	AssertEqual(t, expected, actual, "String() should be equivalent to %v format")
+
+	// Test with empty frame
+	emptyFrame := &Frame{}
+	expectedEmpty := fmt.Sprintf("%v", emptyFrame)
+	actualEmpty := emptyFrame.String()
+
+	AssertEqual(t, expectedEmpty, actualEmpty, "String() should work for empty frame")
+}
+
 // Test case for Frame.Format method
 type frameFormatTestCase struct {
 	name     string
@@ -387,6 +409,27 @@ func TestStackFormat(t *testing.T) {
 	for _, tc := range stackFormatTestCases() {
 		t.Run(tc.name, tc.test)
 	}
+}
+
+// Test Stack.String method (implements fmt.Stringer)
+func TestStackString(t *testing.T) {
+	stack := Stack{
+		{name: "darvaza.org/core.func1", file: "/path/to/file1.go", line: 10},
+		{name: "darvaza.org/core.func2", file: "/path/to/file2.go", line: 20},
+	}
+
+	// String() should be equivalent to %v format
+	expected := fmt.Sprintf("%v", stack)
+	actual := stack.String()
+
+	AssertEqual(t, expected, actual, "String() should be equivalent to %v format")
+
+	// Test with empty stack
+	emptyStack := Stack{}
+	expectedEmpty := fmt.Sprintf("%v", emptyStack)
+	actualEmpty := emptyStack.String()
+
+	AssertEqual(t, expectedEmpty, actualEmpty, "String() should work for empty stack")
 }
 
 // Test case for formatLine function
