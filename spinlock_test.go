@@ -8,8 +8,8 @@ import (
 )
 
 type spinLockTryLockTestCase struct {
-	name     string
 	setup    func() *SpinLock
+	name     string
 	expected bool
 }
 
@@ -50,8 +50,8 @@ func TestSpinLockTryLock(t *testing.T) {
 }
 
 type spinLockLockTestCase struct {
-	name  string
 	setup func() *SpinLock
+	name  string
 }
 
 var spinLockLockTestCases = []spinLockLockTestCase{
@@ -126,8 +126,8 @@ func TestSpinLockLock(t *testing.T) {
 }
 
 type spinLockUnlockTestCase struct {
-	name        string
 	setup       func() *SpinLock
+	name        string
 	shouldPanic bool
 }
 

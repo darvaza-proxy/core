@@ -267,6 +267,101 @@ When LanguageTool reports issues:
 
 ## Linting and Code Quality
 
+### Field Alignment
+
+The project enforces struct field alignment optimization for memory efficiency
+using the `fieldalignment` tool. This helps reduce memory usage by ordering
+struct fields to minimize padding.
+
+#### Running Field Alignment Fixes
+
+To automatically fix field alignment issues across the codebase:
+
+```bash
+# Run the fieldalignment tool with automatic fixes
+GOXTOOLS="golang.org/x/tools/go/analysis/passes"
+FA="$GOXTOOLS/fieldalignment/cmd/fieldalignment"
+go run "$FA@latest" -fix ./...
+```
+
+This tool will:
+
+- Analyze all struct definitions in the project
+- Reorder fields to minimize memory padding
+- Automatically update source files with optimized field ordering
+
+#### Field Alignment Notes
+
+- Always run `make tidy` after field alignment fixes to ensure all linting
+  passes
+- Field alignment changes may require updating struct literal initializations
+- The tool is safe to run repeatedly - it only makes changes when beneficial
+- Memory savings can be significant for frequently allocated structs
+- Run field alignment manually as needed for struct optimization
+
+### golangci-lint Configuration
+
+The project uses golangci-lint for comprehensive Go code linting.
+Configuration is stored in `.golangci.yml` in the project root.
+
+#### Current Configuration Status
+
+The project uses golangci-lint v1.64.8 (pinned to avoid v2 configuration
+issues). The current `.golangci.yml` uses the v1 format that functions
+properly but triggers IDE schema validation warnings:
+
+- ✅ **Functionally works**: All linters and settings are properly applied
+- ✅ **Field alignment enabled**: `govet: enable: [fieldalignment]` works
+- ⚠️ **Schema validation**: IDE expects v2 format, but system uses v1.64
+
+#### Schema Version Compatibility
+
+**Current v1.64 format (working)**:
+
+```yaml
+linters-settings:
+  govet:
+    enable: [fieldalignment]
+linters:
+  enable:
+    - govet
+```
+
+**v2 format (IDE expects, but system doesn't support)**:
+
+```yaml
+version: "2"
+linters:
+  enable:
+    - govet
+linters-settings:
+  govet:
+    enable: [fieldalignment]
+```
+
+#### Schema Validation Issues
+
+Common IDE diagnostics and their meanings:
+
+1. **Missing property "version"**: IDE schema expects `version: "2"`
+2. **Property linters-settings is not allowed**: IDE expects v2 structure
+3. **cSpell warnings**: Linter names are technical terms not in spell-check
+   dictionary
+
+#### Resolution Status
+
+- **Current priority**: Low - configuration works functionally
+- **IDE warnings**: Cannot be resolved without upgrading golangci-lint to v2
+- **System constraint**: Project uses v1.64.8 to avoid v2 configuration issues
+- **Workaround**: IDE warnings can be ignored as they don't affect functionality
+
+#### Field Alignment Integration
+
+- Always run `make tidy-root` which includes golangci-lint checks
+- Field alignment linter is properly configured and working
+- Schema format doesn't affect linting functionality, only IDE validation
+- Technical linter names are added to `internal/build/cspell.json`
+
 ### Documentation Standards
 
 When editing Markdown files, ensure compliance with:
@@ -354,3 +449,10 @@ When creating or editing documentation files:
    - Tools are auto-detected via `pnpx`.
    - If tools aren't found, they're replaced with `true` (no-op).
    - Install tools globally with `pnpm install -g <tool>` if needed.
+
+5. **golangci-lint schema validation**:
+   - IDE warnings about missing `version` field or `linters-settings` placement.
+   - Configuration functions properly despite schema warnings.
+   - Project uses v1.64.8 to avoid v2 configuration format issues.
+   - System uses pinned version via Makefile `GOLANGCI_LINT_VERSION`.
+   - cSpell warnings for linter names are added to `internal/build/cspell.json`.

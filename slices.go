@@ -279,8 +279,11 @@ func doSliceSort[T any](x []T, less func(a, b T) bool) {
 var _ sort.Interface = sortable[any]{}
 
 type sortable[T any] struct {
-	x    []T
+	// Function pointer (8 bytes) - ordered alphabetically
 	less func(a, b T) bool
+
+	// Slice (24 bytes) - ordered alphabetically
+	x []T
 }
 
 func (s sortable[T]) Len() int {

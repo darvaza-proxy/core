@@ -158,8 +158,8 @@ func TestSliceMinusFn(t *testing.T) {
 func TestSliceRandom(t *testing.T) {
 	tests := []struct {
 		name   string
-		input  []string
 		want   string
+		input  []string
 		wantok bool
 	}{
 		{name: "empty", input: []string{}, want: string(""), wantok: false},

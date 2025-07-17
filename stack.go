@@ -25,11 +25,16 @@ const (
 // github.com/pkg/errors.Frame but all parts are resolved
 // immediately for later consumption.
 type Frame struct {
-	pc    uintptr
+	// string fields (16 bytes each) - alphabetically ordered
+	file string
+	name string
+
+	// uintptr fields (8 bytes each) - alphabetically ordered
 	entry uintptr
-	name  string
-	file  string
-	line  int
+	pc    uintptr
+
+	// int fields (8 bytes) - single field
+	line int
 }
 
 func frameForPC(pc uintptr) Frame {

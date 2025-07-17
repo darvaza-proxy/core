@@ -8,9 +8,9 @@ import (
 )
 
 type errGroupSetDefaultsTestCase struct {
-	name           string
-	setup          func() *ErrGroup
 	expectedParent context.Context
+	setup          func() *ErrGroup
+	name           string
 }
 
 var errGroupSetDefaultsTestCases = []errGroupSetDefaultsTestCase{
@@ -63,9 +63,9 @@ func TestErrGroupSetDefaults(t *testing.T) {
 }
 
 type errGroupGoTestCase struct {
-	name         string
 	runFunc      func(context.Context) error
 	shutdownFunc func() error
+	name         string
 	expectError  bool
 	expectCancel bool
 }
@@ -173,9 +173,9 @@ func TestErrGroupGo(t *testing.T) {
 }
 
 type errGroupGoCatchTestCase struct {
-	name        string
 	runFunc     func(context.Context) error
 	catchFunc   func(context.Context, error) error
+	name        string
 	expectError bool
 }
 
