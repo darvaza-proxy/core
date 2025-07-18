@@ -79,7 +79,7 @@ func (tc panicErrorMethodsTestCase) test(t *testing.T) {
 }
 
 type panicErrorUnwrapTestCase struct {
-	// Large fields (16 bytes) - string headers and interface
+	// Large fields - string headers and interface
 	name          string
 	payload       any
 	expectedError string
@@ -147,13 +147,13 @@ var newPanicErrorfTestCases = []newPanicErrorfTestCase{
 	{
 		name:     "with args",
 		format:   "error %d: %s",
-		args:     []any{42, "test"},
+		args:     S[any](42, "test"),
 		expected: "error 42: test",
 	},
 	{
 		name:     "with wrapped error",
 		format:   "wrapped: %w",
-		args:     []any{errors.New("original")},
+		args:     S[any](errors.New("original")),
 		expected: "wrapped: original",
 	},
 }
@@ -200,7 +200,7 @@ func runNewPanicWrapTest(t *testing.T) {
 func runNewPanicWrapfTest(t *testing.T) {
 	originalErr := errors.New("original error")
 	format := "wrapped %s: %d"
-	args := []any{"note", 42}
+	args := S[any]("note", 42)
 
 	pe := NewPanicWrapf(0, originalErr, format, args...)
 
@@ -401,7 +401,7 @@ func (tc newUnreachableErrorTestCase) test(t *testing.T) {
 func runNewUnreachableErrorfTest(t *testing.T) {
 	err := errors.New("test error")
 	format := "formatted %s: %d"
-	args := []any{"note", 42}
+	args := S[any]("note", 42)
 
 	result := NewUnreachableErrorf(0, err, format, args...)
 

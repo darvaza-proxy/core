@@ -5,41 +5,50 @@ import (
 	"testing"
 )
 
-func S[T comparable](v ...T) []T { return v }
+type sliceReverseTestCase struct {
+	name string
+	a, b []int
+}
+
+func (tc sliceReverseTestCase) test(t *testing.T) {
+	t.Helper()
+	c := SliceCopy(tc.a)
+	SliceReverse(c)
+	AssertSliceEqual(t, tc.b, c, "SliceReverse(%q) failed", tc.a)
+	if SliceEqual(c, tc.b) {
+		t.Logf("%s(%q) → %q", "SliceReverse", tc.a, c)
+	}
+}
+
+var sliceReverseTestCases = []sliceReverseTestCase{
+	{"empty", S[int](), S[int]()},
+	{"single", S(1), S(1)},
+	{"two elements", S(1, 2), S(2, 1)},
+	{"three elements", S(1, 2, 3), S(3, 2, 1)},
+	{"four elements", S(1, 2, 3, 4), S(4, 3, 2, 1)},
+	{"five elements", S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)},
+	{"six elements", S(1, 2, 3, 4, 5, 6), S(6, 5, 4, 3, 2, 1)},
+}
 
 func TestSliceReverse(t *testing.T) {
-	for _, tc := range []struct{ a, b []int }{
-		{S[int](), S[int]()},
-		{S(1), S(1)},
-		{S(1, 2), S(2, 1)},
-		{S(1, 2, 3), S(3, 2, 1)},
-		{S(1, 2, 3, 4), S(4, 3, 2, 1)},
-		{S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)},
-		{S(1, 2, 3, 4, 5, 6), S(6, 5, 4, 3, 2, 1)},
-	} {
-		c := SliceCopy(tc.a)
-		SliceReverse(c)
-		if SliceEqual(c, tc.b) {
-			t.Logf("%s(%q) → %q", "SliceReverse", tc.a, c)
-		} else {
-			t.Fatalf("ERROR: %s(%q) → %q (expected %q)", "SliceReverse", tc.a, c, tc.b)
-		}
+	for _, tc := range sliceReverseTestCases {
+		t.Run(tc.name, tc.test)
 	}
 }
 
 // revive:disable
 var (
-	ints       = []int{74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586}
-	expectInts = []int{74, 59, 238, -784, 9845, 959, 905, 0, 42, 7586, -5467984}
+	ints       = S(74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586)
+	expectInts = S(74, 59, 238, -784, 9845, 959, 905, 0, 42, 7586, -5467984)
 
-	float64s = []float64{
+	float64s = S(
 		74.3, 59.0, math.Inf(1), 238.2, -784.0, 2.3, 7.8, 7.8, 74.3,
 		59.0, math.Inf(1), 238.2, -784.0, 2.3,
-	}
-	expectFloat64s = []float64{74.3, 59.0, math.Inf(1), 238.2, -784, 2.3, 7.8}
+	)
+	expectFloat64s = S(74.3, 59.0, math.Inf(1), 238.2, -784, 2.3, 7.8)
 
-	strs       = []string{"", "Hello", "foo", "bar", "foo", "f00", "%*&^*&^&"}
-	expectStrs = []string{"", "Hello", "foo", "bar", "f00", "%*&^*&^&"}
+	strs       = S("", "Hello", "foo", "bar", "foo", "f00", "%*&^*&^&")
+	expectStrs = S("", "Hello", "foo", "bar", "f00", "%*&^*&^&")
 )
 
 func eq[T Ordered](a, b T) bool {
@@ -62,35 +71,23 @@ func testSliceUnique[T Ordered](t *testing.T, before, after []T) {
 
 	s := SliceUnique(before)
 	SliceSort(s, cmp[T])
-	if !SliceEqual(s, after) {
-		t.Errorf("%v != %v", s, after)
-	}
+	AssertSliceEqual(t, after, s, "SliceUnique failed")
 
 	s = SliceUniqueFn(before, eq[T])
 	SliceSort(s, cmp[T])
-	if !SliceEqual(s, after) {
-		t.Errorf("%v != %v", s, after)
-	}
+	AssertSliceEqual(t, after, s, "SliceUniqueFn failed")
 
 	s = SliceCopyFn(before, nil)
 	s2 := SliceUniquify(&s)
 	SliceSort(s, cmp[T])
-	if !SliceEqual(s, after) {
-		t.Errorf("%v != %v", s, after)
-	}
-	if !SliceEqual(s2, s) {
-		t.Errorf("%v != %v", s2, s)
-	}
+	AssertSliceEqual(t, after, s, "SliceUniquify failed")
+	AssertSliceEqual(t, s, s2, "SliceUniquify return value mismatch")
 
 	s = SliceCopy(before)
 	s2 = SliceUniquifyFn(&s, eq[T])
 	SliceSort(s, cmp[T])
-	if !SliceEqual(s, after) {
-		t.Errorf("%v != %v", s, after)
-	}
-	if !SliceEqual(s2, s) {
-		t.Errorf("%v != %v", s2, s)
-	}
+	AssertSliceEqual(t, after, s, "SliceUniquifyFn failed")
+	AssertSliceEqual(t, s, s2, "SliceUniquifyFn return value mismatch")
 }
 
 func TestSliceUniqueInt(t *testing.T) {
@@ -121,9 +118,7 @@ func TestSliceMinus(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := SliceMinus(tc.a, tc.b)
-			if !SliceEqual(result, tc.expected) {
-				t.Errorf("SliceMinus(%v, %v) = %v, want %v", tc.a, tc.b, result, tc.expected)
-			}
+			AssertSliceEqual(t, tc.expected, result, "SliceMinus(%v, %v) failed", tc.a, tc.b)
 		})
 	}
 }
@@ -148,9 +143,7 @@ func TestSliceMinusFn(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := SliceMinusFn(tc.a, tc.b, equal)
-			if !SliceEqual(result, tc.expected) {
-				t.Errorf("SliceMinusFn(%v, %v) = %v, want %v", tc.a, tc.b, result, tc.expected)
-			}
+			AssertSliceEqual(t, tc.expected, result, "SliceMinusFn(%v, %v) failed", tc.a, tc.b)
 		})
 	}
 }
@@ -162,24 +155,18 @@ func TestSliceRandom(t *testing.T) {
 		input  []string
 		wantok bool
 	}{
-		{name: "empty", input: []string{}, want: string(""), wantok: false},
-		{name: "one", input: []string{"one"}, want: string("one"), wantok: true},
-		{name: "random", input: []string{"one", "two", "three", "four", "five", "six"}, want: string(""), wantok: true},
+		{name: "empty", input: S[string](), want: string(""), wantok: false},
+		{name: "one", input: S("one"), want: string("one"), wantok: true},
+		{name: "random", input: S("one", "two", "three", "four", "five", "six"), want: string(""), wantok: true},
 	}
 	for _, tc := range tests {
 		if tc.name != "random" {
 			got, ok := SliceRandom(tc.input)
-			if ok != tc.wantok {
-				t.Fatalf("an error occurred in %s", tc.name)
-			}
-			if tc.want != got {
-				t.Fatalf("%s: expected: %v, got: %v", tc.name, tc.want, got)
-			}
+			AssertBool(t, ok, tc.wantok, "SliceRandom ok status mismatch for %s", tc.name)
+			AssertEqual(t, tc.want, got, "SliceRandom result mismatch for %s", tc.name)
 		} else {
 			u, ok := SliceRandom(tc.input)
-			if ok != tc.wantok {
-				t.Fatalf("error occurred in %s", tc.name)
-			}
+			AssertBool(t, ok, tc.wantok, "SliceRandom ok status mismatch for %s", tc.name)
 			t.Logf("random from one,two,three,four,five,six: %s", u)
 		}
 	}

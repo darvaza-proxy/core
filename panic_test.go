@@ -6,7 +6,7 @@ import (
 )
 
 type asRecoveredTestCase struct {
-	// Large fields (16 bytes) - interface types and strings
+	// Large fields - interface types and strings
 	expected any
 	input    any
 	name     string
@@ -73,24 +73,18 @@ func (tc asRecoveredTestCase) test(t *testing.T) {
 	case string:
 		// For string inputs, they get converted to errors
 		if err, ok := recovered.(error); ok {
-			if err.Error() != exp {
-				t.Fatalf("expected recovered error '%s', got '%s'", exp, err.Error())
-			}
+			AssertEqual(t, exp, err.Error(), "recovered error message mismatch")
 		} else if recovered != exp {
 			t.Fatalf("expected recovered value %v, got %v", exp, recovered)
 		}
 	case error:
 		if err, ok := recovered.(error); ok {
-			if err.Error() != exp.Error() {
-				t.Fatalf("expected recovered error '%s', got '%s'", exp.Error(), err.Error())
-			}
+			AssertEqual(t, exp.Error(), err.Error(), "recovered error message mismatch")
 		} else {
 			t.Fatalf("expected error type, got %T", recovered)
 		}
 	default:
-		if recovered != tc.expected {
-			t.Fatalf("expected recovered value %v, got %v", tc.expected, recovered)
-		}
+		AssertEqual(t, tc.expected, recovered, "recovered value mismatch")
 	}
 
 	// Test Error method
@@ -168,22 +162,16 @@ func (tc catcherDoTestCase) test(t *testing.T) {
 	var catcher Catcher
 	err := catcher.Do(tc.fn)
 
-	if tc.expectError {
-		if err == nil {
-			t.Fatalf("expected error, got nil")
-		}
+	AssertError(t, err, tc.expectError, "Catcher.Do error expectation mismatch")
 
-		if tc.expectPanic {
-			if recovered, ok := err.(Recovered); ok {
-				if recovered.Recovered() == nil {
-					t.Fatalf("expected recovered panic value, got nil")
-				}
-			} else {
-				t.Fatalf("expected Recovered error, got %T", err)
+	if tc.expectError && tc.expectPanic {
+		if recovered, ok := err.(Recovered); ok {
+			if recovered.Recovered() == nil {
+				t.Fatalf("expected recovered panic value, got nil")
 			}
+		} else {
+			t.Fatalf("expected Recovered error, got %T", err)
 		}
-	} else if err != nil {
-		t.Fatalf("expected no error, got %v", err)
 	}
 }
 
@@ -239,15 +227,7 @@ func (tc catcherTryTestCase) test(t *testing.T) {
 	var catcher Catcher
 	err := catcher.Try(tc.fn)
 
-	if tc.expectError {
-		if err == nil {
-			t.Fatalf("expected error, got nil")
-		}
-	} else {
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-	}
+	AssertError(t, err, tc.expectError, "Catcher.Try error expectation mismatch")
 
 	// Check recovered panic
 	recovered := catcher.Recovered()
@@ -255,10 +235,8 @@ func (tc catcherTryTestCase) test(t *testing.T) {
 		if recovered == nil {
 			t.Fatalf("expected recovered panic, got nil")
 		}
-	} else {
-		if recovered != nil {
-			t.Fatalf("expected no recovered panic, got %v", recovered)
-		}
+	} else if recovered != nil {
+		t.Fatalf("expected no recovered panic, got %v", recovered)
 	}
 }
 
@@ -288,9 +266,7 @@ func TestCatcherRecovered(t *testing.T) {
 
 	// String panics get converted to errors by NewPanicError
 	if err, ok := recovered.Recovered().(error); ok {
-		if err.Error() != "test panic" {
-			t.Fatalf("expected 'test panic', got %v", err.Error())
-		}
+		AssertEqual(t, "test panic", err.Error(), "panic error message mismatch")
 	} else {
 		t.Fatalf("expected error type for string panic, got %T", recovered.Recovered())
 	}
@@ -372,15 +348,7 @@ func (tc catchTestCase) test(t *testing.T) {
 	t.Helper()
 	err := Catch(tc.fn)
 
-	if tc.expectError {
-		if err == nil {
-			t.Fatalf("expected error, got nil")
-		}
-	} else {
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-	}
+	AssertError(t, err, tc.expectError, "Catch error expectation mismatch")
 }
 
 func TestCatch(t *testing.T) {
@@ -410,9 +378,7 @@ func (tc catchWithPanicRecoveryTestCase) test(t *testing.T) {
 		panic(tc.value)
 	})
 
-	if err == nil {
-		t.Fatalf("expected error from panic, got nil")
-	}
+	AssertError(t, err, true, "expected error from panic")
 
 	if recovered, ok := err.(Recovered); ok {
 		panicValue := recovered.Recovered()
@@ -420,16 +386,12 @@ func (tc catchWithPanicRecoveryTestCase) test(t *testing.T) {
 		// Handle string conversion to error by NewPanicError
 		if s, ok := tc.value.(string); ok {
 			if err, ok := panicValue.(error); ok {
-				if err.Error() != s {
-					t.Fatalf("expected panic error '%s', got '%s'", s, err.Error())
-				}
+				AssertEqual(t, s, err.Error(), "panic error message mismatch")
 			} else {
 				t.Fatalf("expected error type for string panic, got %T", panicValue)
 			}
 		} else {
-			if panicValue != tc.value {
-				t.Fatalf("expected panic value %v, got %v", tc.value, panicValue)
-			}
+			AssertEqual(t, tc.value, panicValue, "panic value mismatch")
 		}
 	} else {
 		t.Fatalf("expected Recovered error, got %T", err)

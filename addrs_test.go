@@ -9,10 +9,10 @@ import (
 
 // Test cases for ParseAddr
 type parseAddrTestCase struct {
-	// netip.Addr struct (24 bytes) - result value
+	// netip.Addr struct - result value
 	want netip.Addr
 
-	// String fields (16 bytes each) - alphabetically ordered
+	// String fields - alphabetically ordered
 	input string
 	name  string
 
@@ -180,13 +180,13 @@ func TestParseNetIP(t *testing.T) {
 
 // Test cases for AddrFromNetIP
 type addrFromNetIPTestCase struct {
-	// netip.Addr struct (24 bytes) - result value
+	// netip.Addr struct - result value
 	want netip.Addr
 
-	// Interface field (16 bytes) - input value
+	// Interface field - input value
 	input net.Addr
 
-	// String field (16 bytes) - test name
+	// String field - test name
 	name string
 
 	// Boolean field (1 byte) - success flag
@@ -324,7 +324,7 @@ func TestGetStringIPAddresses(t *testing.T) {
 
 func testLoopbackInterface(t *testing.T) {
 	// Most systems have a loopback interface
-	loopbackNames := []string{"lo", "lo0", "Loopback Pseudo-Interface 1"}
+	loopbackNames := S("lo", "lo0", "Loopback Pseudo-Interface 1")
 
 	var found bool
 	for _, name := range loopbackNames {
@@ -430,15 +430,15 @@ var getInterfacesNamesTestCases = []getInterfacesNamesTestCase{
 	},
 	{
 		name:   "empty exclusions",
-		except: []string{},
+		except: S[string](),
 	},
 	{
 		name:   "exclude invalid",
-		except: []string{"invalid-interface"},
+		except: S("invalid-interface"),
 	},
 	{
 		name:   "exclude multiple",
-		except: []string{"eth0", "eth1", "lo"},
+		except: S("eth0", "eth1", "lo"),
 	},
 }
 
@@ -513,15 +513,15 @@ func TestGetInterfacesNames(t *testing.T) {
 
 // Test internal helper functions
 func TestAsStringIPAddresses(t *testing.T) {
-	addrs := []netip.Addr{
+	addrs := S[netip.Addr](
 		netip.MustParseAddr("192.168.1.1"),
 		netip.MustParseAddr("2001:db8::1"),
-		{}, // Invalid address
+		netip.Addr{}, // Invalid address
 		netip.MustParseAddr("10.0.0.1"),
-	}
+	)
 
 	result := asStringIPAddresses(addrs...)
-	expected := []string{"192.168.1.1", "2001:db8::1", "10.0.0.1"}
+	expected := S("192.168.1.1", "2001:db8::1", "10.0.0.1")
 
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Expected %v, got %v", expected, result)
@@ -529,12 +529,12 @@ func TestAsStringIPAddresses(t *testing.T) {
 }
 
 func TestAsNetIPAddresses(t *testing.T) {
-	addrs := []netip.Addr{
+	addrs := S[netip.Addr](
 		netip.MustParseAddr("192.168.1.1"),
 		netip.MustParseAddr("2001:db8::1"),
-		{}, // Invalid address
+		netip.Addr{},                              // Invalid address
 		netip.MustParseAddr("::ffff:192.168.1.2"), // IPv4-mapped IPv6
-	}
+	)
 
 	result := asNetIPAddresses(addrs...)
 
@@ -582,12 +582,12 @@ func TestAsNetIP(t *testing.T) {
 func TestAppendNetIPAsIP(t *testing.T) {
 	var out []netip.Addr
 
-	addrs := []net.Addr{
+	addrs := S[net.Addr](
 		&net.IPAddr{IP: net.ParseIP("192.168.1.1")},
 		&net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
 		&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, // Should be skipped
 		&net.IPAddr{IP: nil}, // Should be skipped
-	}
+	)
 
 	result := appendNetIPAsIP(out, addrs...)
 

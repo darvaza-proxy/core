@@ -15,27 +15,27 @@ type compoundErrorErrorTestCase struct {
 var compoundErrorErrorTestCases = []compoundErrorErrorTestCase{
 	{
 		name:     "empty errors",
-		errs:     []error{},
+		errs:     S[error](),
 		expected: "",
 	},
 	{
 		name:     "single error",
-		errs:     []error{errors.New("first error")},
+		errs:     S(errors.New("first error")),
 		expected: "first error",
 	},
 	{
 		name:     "multiple errors",
-		errs:     []error{errors.New("first error"), errors.New("second error")},
+		errs:     S(errors.New("first error"), errors.New("second error")),
 		expected: "first error\nsecond error",
 	},
 	{
 		name:     "with nil errors",
-		errs:     []error{errors.New("first error"), nil, errors.New("third error")},
+		errs:     S(errors.New("first error"), nil, errors.New("third error")),
 		expected: "first error\nthird error",
 	},
 	{
 		name:     "all nil errors",
-		errs:     []error{nil, nil, nil},
+		errs:     S[error](nil, nil, nil),
 		expected: "",
 	},
 }
@@ -57,10 +57,10 @@ func TestCompoundErrorError(t *testing.T) {
 }
 
 func TestCompoundErrorErrors(t *testing.T) {
-	errs := []error{
+	errs := S(
 		errors.New("first error"),
 		errors.New("second error"),
-	}
+	)
 
 	ce := &CompoundError{Errs: errs}
 	result := ce.Errors()
@@ -77,10 +77,10 @@ func TestCompoundErrorErrors(t *testing.T) {
 }
 
 func TestCompoundErrorUnwrap(t *testing.T) {
-	errs := []error{
+	errs := S(
 		errors.New("first error"),
 		errors.New("second error"),
-	}
+	)
 
 	ce := &CompoundError{Errs: errs}
 	result := ce.Unwrap()
@@ -105,7 +105,7 @@ type compoundErrorOkTestCase struct {
 var compoundErrorOkTestCases = []compoundErrorOkTestCase{
 	{
 		name:     "empty errors",
-		errs:     []error{},
+		errs:     S[error](),
 		expected: true,
 	},
 	{
@@ -115,12 +115,12 @@ var compoundErrorOkTestCases = []compoundErrorOkTestCase{
 	},
 	{
 		name:     "single error",
-		errs:     []error{errors.New("error")},
+		errs:     S(errors.New("error")),
 		expected: false,
 	},
 	{
 		name:     "multiple errors",
-		errs:     []error{errors.New("first"), errors.New("second")},
+		errs:     S(errors.New("first"), errors.New("second")),
 		expected: false,
 	},
 }
@@ -150,7 +150,7 @@ type compoundErrorAsErrorTestCase struct {
 var compoundErrorAsErrorTestCases = []compoundErrorAsErrorTestCase{
 	{
 		name:      "empty errors",
-		errs:      []error{},
+		errs:      S[error](),
 		expectNil: true,
 	},
 	{
@@ -160,12 +160,12 @@ var compoundErrorAsErrorTestCases = []compoundErrorAsErrorTestCase{
 	},
 	{
 		name:      "single error",
-		errs:      []error{errors.New("error")},
+		errs:      S(errors.New("error")),
 		expectNil: false,
 	},
 	{
 		name:      "multiple errors",
-		errs:      []error{errors.New("first"), errors.New("second")},
+		errs:      S(errors.New("first"), errors.New("second")),
 		expectNil: false,
 	},
 }
@@ -205,26 +205,26 @@ type compoundErrorAppendErrorTestCase struct {
 var compoundErrorAppendErrorTestCases = []compoundErrorAppendErrorTestCase{
 	{
 		name:        "append to empty",
-		initial:     []error{},
-		toAppend:    []error{errors.New("first")},
+		initial:     S[error](),
+		toAppend:    S(errors.New("first")),
 		expectedLen: 1,
 	},
 	{
 		name:        "append multiple",
-		initial:     []error{errors.New("existing")},
-		toAppend:    []error{errors.New("first"), errors.New("second")},
+		initial:     S(errors.New("existing")),
+		toAppend:    S(errors.New("first"), errors.New("second")),
 		expectedLen: 3,
 	},
 	{
 		name:        "append with nils",
-		initial:     []error{errors.New("existing")},
-		toAppend:    []error{nil, errors.New("valid"), nil},
+		initial:     S(errors.New("existing")),
+		toAppend:    S[error](nil, errors.New("valid"), nil),
 		expectedLen: 2,
 	},
 	{
 		name:        "append all nils",
-		initial:     []error{errors.New("existing")},
-		toAppend:    []error{nil, nil},
+		initial:     S(errors.New("existing")),
+		toAppend:    S[error](nil, nil),
 		expectedLen: 1,
 	},
 }
@@ -259,8 +259,8 @@ func TestCompoundErrorAppendError(t *testing.T) {
 }
 
 func TestCompoundErrorAppendErrorWithCompoundError(t *testing.T) {
-	ce1 := &CompoundError{Errs: []error{errors.New("first")}}
-	ce2 := &CompoundError{Errs: []error{errors.New("second"), errors.New("third")}}
+	ce1 := &CompoundError{Errs: S(errors.New("first"))}
+	ce2 := &CompoundError{Errs: S(errors.New("second"), errors.New("third"))}
 
 	result := ce1.AppendError(ce2)
 
@@ -301,9 +301,9 @@ func (m *mockUnwrappable) Unwrap() []error {
 }
 
 func TestCompoundErrorAppendErrorWithUnwrappable(t *testing.T) {
-	ce := &CompoundError{Errs: []error{errors.New("initial")}}
+	ce := &CompoundError{Errs: S(errors.New("initial"))}
 	mock := &mockUnwrappable{
-		errs: []error{errors.New("unwrapped1"), errors.New("unwrapped2")},
+		errs: S(errors.New("unwrapped1"), errors.New("unwrapped2")),
 	}
 
 	result := ce.AppendError(mock)
@@ -333,7 +333,7 @@ type compoundErrorAppendTestCase struct {
 var compoundErrorAppendTestCases = []compoundErrorAppendTestCase{
 	{
 		name:        "nil error, empty note",
-		initial:     []error{},
+		initial:     S[error](),
 		err:         nil,
 		note:        "",
 		args:        nil,
@@ -342,7 +342,7 @@ var compoundErrorAppendTestCases = []compoundErrorAppendTestCase{
 	},
 	{
 		name:        "nil error, with note",
-		initial:     []error{},
+		initial:     S[error](),
 		err:         nil,
 		note:        "note only",
 		args:        nil,
@@ -351,7 +351,7 @@ var compoundErrorAppendTestCases = []compoundErrorAppendTestCase{
 	},
 	{
 		name:        "error without note",
-		initial:     []error{},
+		initial:     S[error](),
 		err:         errors.New("test error"),
 		note:        "",
 		args:        nil,
@@ -360,7 +360,7 @@ var compoundErrorAppendTestCases = []compoundErrorAppendTestCase{
 	},
 	{
 		name:        "error with note",
-		initial:     []error{},
+		initial:     S[error](),
 		err:         errors.New("test error"),
 		note:        "wrapped note",
 		args:        nil,
@@ -369,10 +369,10 @@ var compoundErrorAppendTestCases = []compoundErrorAppendTestCase{
 	},
 	{
 		name:        "formatted note",
-		initial:     []error{},
+		initial:     S[error](),
 		err:         errors.New("test error"),
 		note:        "wrapped %s: %d",
-		args:        []any{"note", 42},
+		args:        S[any]("note", 42),
 		expectedLen: 1,
 		expectNote:  true,
 	},
@@ -465,7 +465,7 @@ func TestCompoundErrorNilHandling(t *testing.T) {
 }
 
 func TestCompoundErrorIsInterface(t *testing.T) {
-	ce := &CompoundError{Errs: []error{errors.New("test")}}
+	ce := &CompoundError{Errs: S(errors.New("test"))}
 
 	// Test Errors interface
 	var _ Errors = ce

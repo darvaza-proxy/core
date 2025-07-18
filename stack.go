@@ -25,15 +25,15 @@ const (
 // github.com/pkg/errors.Frame but all parts are resolved
 // immediately for later consumption.
 type Frame struct {
-	// string fields (16 bytes each) - alphabetically ordered
+	// string fields - alphabetically ordered
 	file string
 	name string
 
-	// uintptr fields (8 bytes each) - alphabetically ordered
+	// uintptr fields - alphabetically ordered
 	entry uintptr
 	pc    uintptr
 
-	// int fields (8 bytes) - single field
+	// int fields - single field
 	line int
 }
 
