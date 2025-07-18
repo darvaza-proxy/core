@@ -514,6 +514,206 @@ func TestIsZeroWithNestedStructs(t *testing.T) {
 	}
 }
 
+type isNilTestCase struct {
+	value    any
+	name     string
+	expected bool
+}
+
+func (tc isNilTestCase) test(t *testing.T) {
+	result := IsNil(tc.value)
+	AssertBool(t, result, tc.expected, "IsNil() result")
+}
+
+func newIsNilTestCase(name string, value any, expected bool) isNilTestCase {
+	return isNilTestCase{
+		name:     name,
+		value:    value,
+		expected: expected,
+	}
+}
+
+func isNilTestCases() []isNilTestCase {
+	return S(
+		// Untyped nil
+		newIsNilTestCase("untyped nil", nil, true),
+
+		// Typed nil values
+		newIsNilTestCase("nil pointer", (*int)(nil), true),
+		newIsNilTestCase("nil slice", []int(nil), true),
+		newIsNilTestCase("nil map", map[string]int(nil), true),
+		newIsNilTestCase("nil channel", (chan int)(nil), true),
+		newIsNilTestCase("nil function", (func())(nil), true),
+		newIsNilTestCase("nil interface", (any)(nil), true),
+
+		// Non-nil values
+		newIsNilTestCase("non-nil pointer", new(int), false),
+		newIsNilTestCase("empty slice", []int{}, false),
+		newIsNilTestCase("non-empty slice", []int{1, 2, 3}, false),
+		newIsNilTestCase("empty map", map[string]int{}, false),
+		newIsNilTestCase("non-empty map", map[string]int{"a": 1}, false),
+		newIsNilTestCase("non-nil channel", make(chan int), false),
+		newIsNilTestCase("non-nil function", func() {}, false),
+		newIsNilTestCase("non-nil interface", any(42), false),
+
+		// Basic types (cannot be nil)
+		newIsNilTestCase("zero int", 0, false),
+		newIsNilTestCase("non-zero int", 42, false),
+		newIsNilTestCase("zero string", "", false),
+		newIsNilTestCase("non-zero string", "hello", false),
+		newIsNilTestCase("zero bool", false, false),
+		newIsNilTestCase("non-zero bool", true, false),
+		newIsNilTestCase("zero struct", struct{}{}, false),
+		newIsNilTestCase("non-zero struct", struct{ Name string }{Name: "test"}, false),
+
+		// Arrays (cannot be nil)
+		newIsNilTestCase("zero array", [3]int{}, false),
+		newIsNilTestCase("non-zero array", [3]int{1, 2, 3}, false),
+
+		// Edge cases
+		newIsNilTestCase("zero time", time.Time{}, false),
+		newIsNilTestCase("non-zero time", time.Now(), false),
+	)
+}
+
+func TestIsNil(t *testing.T) {
+	for _, tc := range isNilTestCases() {
+		t.Run(tc.name, tc.test)
+	}
+}
+
+type isNilVsIsZeroTestCase struct {
+	value        any
+	name         string
+	description  string
+	expectedNil  bool
+	expectedZero bool
+}
+
+func (tc isNilVsIsZeroTestCase) test(t *testing.T) {
+	nilResult := IsNil(tc.value)
+	zeroResult := IsZero(tc.value)
+
+	AssertBool(t, nilResult, tc.expectedNil, tc.description+" - IsNil")
+	AssertBool(t, zeroResult, tc.expectedZero, tc.description+" - IsZero")
+}
+
+func newIsNilVsIsZeroTestCase(name string, value any, expectedNil, expectedZero bool,
+	description string) isNilVsIsZeroTestCase {
+	return isNilVsIsZeroTestCase{
+		name:         name,
+		value:        value,
+		expectedNil:  expectedNil,
+		expectedZero: expectedZero,
+		description:  description,
+	}
+}
+
+func isNilVsIsZeroTestCases() []isNilVsIsZeroTestCase {
+	return S(
+		// Basic types: not nil but can be zero
+		newIsNilVsIsZeroTestCase("zero int", 0, false, true, "zero int is not nil but is zero"),
+		newIsNilVsIsZeroTestCase("non-zero int", 42, false, false, "non-zero int is neither nil nor zero"),
+		newIsNilVsIsZeroTestCase("zero string", "", false, true, "zero string is not nil but is zero"),
+		newIsNilVsIsZeroTestCase("non-zero string", "hello", false, false, "non-zero string is neither nil nor zero"),
+
+		// Pointer types: can be both nil and zero
+		newIsNilVsIsZeroTestCase("nil pointer", (*int)(nil), true, true, "nil pointer is both nil and zero"),
+		newIsNilVsIsZeroTestCase("non-nil pointer", new(int), false, false, "non-nil pointer is neither nil nor zero"),
+
+		// Slice types: nil vs empty distinction
+		newIsNilVsIsZeroTestCase("nil slice", []int(nil), true, true, "nil slice is both nil and zero"),
+		newIsNilVsIsZeroTestCase("empty slice", []int{}, false, false,
+			"empty slice is neither nil nor zero"),
+		newIsNilVsIsZeroTestCase("non-empty slice", []int{1, 2}, false, false,
+			"non-empty slice is neither nil nor zero"),
+
+		// Map types: nil vs empty distinction
+		newIsNilVsIsZeroTestCase("nil map", map[string]int(nil), true, true, "nil map is both nil and zero"),
+		newIsNilVsIsZeroTestCase("empty map", map[string]int{}, false, false, "empty map is neither nil nor zero"),
+		newIsNilVsIsZeroTestCase("non-empty map", map[string]int{"a": 1}, false, false,
+			"non-empty map is neither nil nor zero"),
+
+		// Channel types
+		newIsNilVsIsZeroTestCase("nil channel", (chan int)(nil), true, true, "nil channel is both nil and zero"),
+		newIsNilVsIsZeroTestCase("non-nil channel", make(chan int), false, false,
+			"non-nil channel is neither nil nor zero"),
+
+		// Function types
+		newIsNilVsIsZeroTestCase("nil function", (func())(nil), true, true, "nil function is both nil and zero"),
+		newIsNilVsIsZeroTestCase("non-nil function", func() {}, false, false,
+			"non-nil function is neither nil nor zero"),
+
+		// Interface types
+		newIsNilVsIsZeroTestCase("nil interface", (any)(nil), true, true, "nil interface is both nil and zero"),
+		newIsNilVsIsZeroTestCase("non-nil interface", any(42), false, false,
+			"non-nil interface is neither nil nor zero"),
+
+		// Struct types: cannot be nil
+		newIsNilVsIsZeroTestCase("zero struct", struct{}{}, false, true, "zero struct is not nil but is zero"),
+		newIsNilVsIsZeroTestCase("non-zero struct", struct{ Name string }{Name: "test"}, false, false,
+			"non-zero struct is neither nil nor zero"),
+	)
+}
+
+func TestIsNilVsIsZero(t *testing.T) {
+	for _, tc := range isNilVsIsZeroTestCases() {
+		t.Run(tc.name, tc.test)
+	}
+}
+
+func TestIsNilWithReflectValue(t *testing.T) {
+	// Test that an invalid reflect.Value is considered nil
+	var invalidValue reflect.Value
+	result := IsNil(invalidValue)
+	AssertBool(t, result, true, "IsNil() with invalid reflect.Value should return true")
+
+	// Test that a valid reflect.Value with nil content is considered nil
+	var nilPtr *int
+	nilPtrValue := reflect.ValueOf(nilPtr)
+	result2 := IsNil(nilPtrValue)
+	AssertBool(t, result2, true, "IsNil() with reflect.Value containing nil should return true")
+
+	// Test that a valid reflect.Value with non-nil content is not considered nil
+	nonNilPtr := new(int)
+	nonNilPtrValue := reflect.ValueOf(nonNilPtr)
+	result3 := IsNil(nonNilPtrValue)
+	AssertBool(t, result3, false, "IsNil() with reflect.Value containing non-nil should return false")
+
+	// Test that a valid reflect.Value with basic type is not considered nil
+	intValue := reflect.ValueOf(42)
+	result4 := IsNil(intValue)
+	AssertBool(t, result4, false, "IsNil() with reflect.Value containing basic type should return false")
+}
+
+func TestIsNilTypedNilEdgeCases(t *testing.T) {
+	// Test various typed nil scenarios
+
+	// Interface containing typed nil
+	var nilPtr *int
+	var vi any = nilPtr
+	AssertBool(t, IsNil(vi), true, "interface containing typed nil should be nil")
+
+	// Slice of pointers with nil elements
+	var ptrSlice []*int
+	ptrSlice = append(ptrSlice, nil)
+	AssertBool(t, IsNil(ptrSlice), false, "slice containing nil elements is not nil itself")
+	AssertBool(t, IsNil(ptrSlice[0]), true, "nil element in slice should be nil")
+
+	// Map with nil values
+	nilMap := map[string]*int{"key": nil}
+	AssertBool(t, IsNil(nilMap), false, "map with nil values is not nil itself")
+	AssertBool(t, IsNil(nilMap["key"]), true, "nil value in map should be nil")
+
+	// Channel operations
+	var ch chan int
+	AssertBool(t, IsNil(ch), true, "nil channel should be nil")
+
+	ch = make(chan int)
+	close(ch)
+	AssertBool(t, IsNil(ch), false, "closed channel should not be nil")
+}
+
 func BenchmarkZero(b *testing.B) {
 	var p *int
 	b.ResetTimer()
@@ -552,6 +752,17 @@ func BenchmarkIsZero(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				_ = IsZero(tc.value)
+			}
+		})
+	}
+}
+
+func BenchmarkIsNil(b *testing.B) {
+	for _, tc := range benchmarkTestCases() {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = IsNil(tc.value)
 			}
 		})
 	}
@@ -651,4 +862,85 @@ func ExampleIsZero_initialization() {
 	// Initialized map: map[]
 	// Initialized pointer: 42
 	// Slice already initialized: [existing]
+}
+
+func ExampleIsNil() {
+	// Basic nil detection
+	_, _ = fmt.Printf("IsNil(nil): %t\n", IsNil(nil))
+
+	// Typed nil values
+	var ptr *int
+	_, _ = fmt.Printf("IsNil((*int)(nil)): %t\n", IsNil(ptr))
+
+	var slice []int
+	_, _ = fmt.Printf("IsNil([]int(nil)): %t\n", IsNil(slice))
+
+	var m map[string]int
+	_, _ = fmt.Printf("IsNil(map[string]int(nil)): %t\n", IsNil(m))
+
+	// Non-nil values
+	ptr = new(int)
+	_, _ = fmt.Printf("IsNil(new(int)): %t\n", IsNil(ptr))
+
+	slice = []int{}
+	_, _ = fmt.Printf("IsNil([]int{}): %t\n", IsNil(slice))
+
+	m = map[string]int{}
+	_, _ = fmt.Printf("IsNil(map[string]int{}): %t\n", IsNil(m))
+
+	// Basic types (cannot be nil)
+	_, _ = fmt.Printf("IsNil(0): %t\n", IsNil(0))
+	_, _ = fmt.Printf("IsNil(\"\"): %t\n", IsNil(""))
+	_, _ = fmt.Printf("IsNil(false): %t\n", IsNil(false))
+	_, _ = fmt.Printf("IsNil(struct{}{}): %t\n", IsNil(struct{}{}))
+
+	// Output:
+	// IsNil(nil): true
+	// IsNil((*int)(nil)): true
+	// IsNil([]int(nil)): true
+	// IsNil(map[string]int(nil)): true
+	// IsNil(new(int)): false
+	// IsNil([]int{}): false
+	// IsNil(map[string]int{}): false
+	// IsNil(0): false
+	// IsNil(""): false
+	// IsNil(false): false
+	// IsNil(struct{}{}): false
+}
+
+func ExampleIsNil_comparison() {
+	// Comparing IsNil vs IsZero behaviour
+
+	// Basic types: not nil but can be zero
+	_, _ = fmt.Printf("Zero int - IsNil: %t, IsZero: %t\n", IsNil(0), IsZero(0))
+	_, _ = fmt.Printf("Zero string - IsNil: %t, IsZero: %t\n", IsNil(""), IsZero(""))
+
+	// Nil pointer: both nil and zero
+	var ptr *int
+	_, _ = fmt.Printf("Nil pointer - IsNil: %t, IsZero: %t\n", IsNil(ptr), IsZero(ptr))
+
+	// Non-nil pointer: neither nil nor zero
+	ptr = new(int)
+	_, _ = fmt.Printf("Non-nil pointer - IsNil: %t, IsZero: %t\n", IsNil(ptr), IsZero(ptr))
+
+	// Nil slice: both nil and zero
+	var slice []int
+	_, _ = fmt.Printf("Nil slice - IsNil: %t, IsZero: %t\n", IsNil(slice), IsZero(slice))
+
+	// Empty slice: neither nil nor zero (key distinction)
+	slice = []int{}
+	_, _ = fmt.Printf("Empty slice - IsNil: %t, IsZero: %t\n", IsNil(slice), IsZero(slice))
+
+	// Zero struct: not nil but is zero
+	var s struct{ Name string }
+	_, _ = fmt.Printf("Zero struct - IsNil: %t, IsZero: %t\n", IsNil(s), IsZero(s))
+
+	// Output:
+	// Zero int - IsNil: false, IsZero: true
+	// Zero string - IsNil: false, IsZero: true
+	// Nil pointer - IsNil: true, IsZero: true
+	// Non-nil pointer - IsNil: false, IsZero: false
+	// Nil slice - IsNil: true, IsZero: true
+	// Empty slice - IsNil: false, IsZero: false
+	// Zero struct - IsNil: false, IsZero: true
 }

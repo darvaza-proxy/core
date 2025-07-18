@@ -85,6 +85,21 @@ Key semantic distinctions:
 * **Interface Support**: Types implementing `IsZero() bool` are handled
   via their method, enabling custom zero semantics.
 
+#### Nil Value Detection
+
+* `IsNil(v)` - reports whether a value is nil (typed or untyped). Answers
+  the question: "Is this value nil?"
+
+Key distinctions from `IsZero`:
+
+* **Scope**: Only checks for nil state, not zero state.
+* **Basic Types**: `IsNil(0)` returns `false` (integers cannot be nil),
+  `IsZero(0)` returns `true` (zero integer is uninitialized).
+* **Collections**: `IsNil([]int{})` returns `false` (empty slice is not nil),
+  `IsZero([]int{})` returns `false` (empty slice is initialized).
+* **Structs**: `IsNil(struct{}{})` returns `false` (structs cannot be nil),
+  `IsZero(struct{}{})` returns `true` (zero struct is uninitialized).
+
 #### Other Utilities
 
 * `Coalesce[T](values...)` returns the first non-zero value.
