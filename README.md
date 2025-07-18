@@ -107,10 +107,29 @@ Generic type constraints for use with Go generics:
 
 ### List Operations (container/list)
 
-* `ListContains[T]` / `ListContainsFn[T]`
-* `ListForEach[T]` / `ListForEachElement`
-* `ListForEachBackward[T]` / `ListForEachBackwardElement`
-* `ListCopy[T]` / `ListCopyFn[T]`
+#### Search and Membership
+
+* `ListContains[T](list, value)` - check if list contains element with default
+  equality.
+* `ListContainsFn[T](list, value, eq)` - check if list contains element with
+  custom equality function.
+
+#### Iteration
+
+* `ListForEach[T](list, fn)` - iterate forward over list values until fn
+  returns true.
+* `ListForEachElement(list, fn)` - iterate forward over list elements until fn
+  returns true.
+* `ListForEachBackward[T](list, fn)` - iterate backward over list values until
+  fn returns true.
+* `ListForEachBackwardElement(list, fn)` - iterate backward over list elements
+  until fn returns true.
+
+#### Copying and Transformation
+
+* `ListCopy[T](list)` - create shallow copy of list.
+* `ListCopyFn[T](list, fn)` - create filtered/transformed copy with helper
+  function.
 
 ### Map Operations
 
