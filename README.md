@@ -50,11 +50,24 @@ Generic type constraints for use with Go generics:
 
 ### Host/Port Functions
 
-* `SplitHostPort(hostport)` - split host:port string
-* `SplitAddrPort(addrport)` - split address:port string
-* `JoinHostPort(host, port)` - join host and port
-* `MakeHostPort(host, port)` - create host:port string
-* `AddrPort(addr, port)` - create `netip.AddrPort`
+#### Parsing and Splitting
+
+* `SplitHostPort(hostport)` - enhanced version of `net.SplitHostPort` that
+  accepts portless strings and validates both host and port. Supports IPv6
+  addresses, international domain names, and descriptive error messages.
+* `SplitAddrPort(addrport)` - splits IP address and optional port into
+  `netip.Addr` and `uint16`. Validates address format and port range
+  (1-65535), returns zero values for portless addresses.
+
+#### Joining and Construction
+
+* `JoinHostPort(host, port)` - enhanced version of `net.JoinHostPort` that
+  validates inputs and returns portless host when port is empty. Properly
+  handles IPv6 bracketing and international domain names.
+* `MakeHostPort(hostport, defaultPort)` - constructs validated host:port
+  string from input with optional default port. Rejects port 0 in input,
+  supports portless output when default is 0.
+* `AddrPort(addr, port)` - creates `netip.AddrPort` from components.
 
 ### Interface Functions
 
