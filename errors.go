@@ -290,8 +290,21 @@ func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) 
 	return false, false
 }
 
-// CheckIsTemporary tests an error for Temporary(), IsTemporary(),
-// Timeout() and IsTimeout() without unwrapping.
+// CheckIsTemporary tests an error for temporary conditions without unwrapping.
+// It checks if the error implements Temporary() bool or IsTemporary() bool
+// interfaces directly, without traversing wrapped error chains.
+//
+// The function examines the error in the following priority order:
+//   - Temporary() bool interface (legacy net.Error style)
+//   - IsTemporary() bool interface (modern style)
+//   - Falls back to CheckIsTimeout for timeout-based temporary errors
+//
+// Returns:
+//   - is: true if the error indicates a temporary condition
+//   - known: true if the error type implements a recognized interface
+//
+// For nil errors, returns (false, true) indicating definitively not temporary.
+// For errors with no recognized interface, returns result from CheckIsTimeout.
 func CheckIsTemporary(err error) (is, known bool) {
 	switch e := err.(type) {
 	case nil:
@@ -309,15 +322,44 @@ func CheckIsTemporary(err error) (is, known bool) {
 	}
 }
 
-// IsTemporary tests an error for Temporary(), IsTemporary(),
-// Timeout() and IsTimeout() recursively.
+// IsTemporary tests an error chain for temporary conditions recursively.
+// It traverses wrapped error chains using IsErrorFn2 to find any error
+// that implements temporary condition interfaces.
+//
+// This function provides comprehensive temporary error detection by:
+//   - Checking each error in the unwrapping chain via CheckIsTemporary
+//   - Following both Unwrap() error and Unwrap() []error patterns
+//   - Detecting legacy net.Error.Temporary() implementations
+//   - Detecting modern IsTemporary() bool implementations
+//   - Detecting timeout errors (which are also considered temporary)
+//
+// Returns true if any error in the chain indicates a temporary condition.
+// Returns false for nil errors or chains with no temporary indicators.
+//
+// Use this function when you need to determine if an operation should be
+// retried based on the error's temporary nature.
 func IsTemporary(err error) bool {
 	is, _ := IsErrorFn2(CheckIsTemporary, err)
 	return is
 }
 
-// CheckIsTimeout tests an error for Timeout() and IsTimeout()
-// without unwrapping.
+// CheckIsTimeout tests an error for timeout conditions without unwrapping.
+// It checks if the error implements Timeout() bool or IsTimeout() bool
+// interfaces directly, without traversing wrapped error chains.
+//
+// The function examines the error in the following priority order:
+//   - Timeout() bool interface (legacy net.Error style)
+//   - IsTimeout() bool interface (modern style)
+//
+// Returns:
+//   - is: true if the error indicates a timeout condition
+//   - known: true if the error type implements a recognized timeout interface
+//
+// For nil errors, returns (false, true) indicating definitively not a timeout.
+// For errors with no recognized timeout interface, returns (false, false).
+//
+// Note that timeout errors are typically also considered temporary conditions,
+// but this function specifically tests for timeout semantics only.
 func CheckIsTimeout(err error) (is, known bool) {
 	switch e := err.(type) {
 	case nil:
@@ -335,8 +377,22 @@ func CheckIsTimeout(err error) (is, known bool) {
 	}
 }
 
-// IsTimeout tests an error for Timeout() and IsTimeout()
-// recursively.
+// IsTimeout tests an error chain for timeout conditions recursively.
+// It traverses wrapped error chains using IsErrorFn2 to find any error
+// that implements timeout condition interfaces.
+//
+// This function provides comprehensive timeout error detection by:
+//   - Checking each error in the unwrapping chain via CheckIsTimeout
+//   - Following both Unwrap() error and Unwrap() []error patterns
+//   - Detecting legacy net.Error.Timeout() implementations
+//   - Detecting modern IsTimeout() bool implementations
+//
+// Returns true if any error in the chain indicates a timeout condition.
+// Returns false for nil errors or chains with no timeout indicators.
+//
+// Use this function when you need to distinguish timeout errors from
+// other types of temporary errors for specialized retry logic or
+// timeout-specific error handling.
 func IsTimeout(err error) bool {
 	is, _ := IsErrorFn2(CheckIsTimeout, err)
 	return is
