@@ -62,12 +62,33 @@ Generic type constraints for use with Go generics:
 
 ## Generic Utilities
 
-### Basic Utilities
+### Zero Value Utilities
 
-* `Zero[T]()` returns the zero value for type T
-* `IsZero[T](v)` checks if a value is the zero value for its type
-* `Coalesce[T](values...)` returns the first non-zero value
-* `IIf[T](condition, ifTrue, ifFalse)` conditional expression
+#### Zero Value Creation
+
+* `Zero[T]()` - returns the zero value for type T using reflection when
+  needed. Supports all Go types including complex generics, interfaces, and
+  custom types.
+
+#### Zero Value Detection
+
+* `IsZero(v)` - reports whether a value is in an uninitialized state and ready
+  to be set. Answers the question: "Is this value uninitialized and ready to
+  be set?"
+
+Key semantic distinctions:
+
+* **Nil vs Empty**: `[]int(nil)` returns `true` (needs initialization),
+  `[]int{}` returns `false` (already initialized).
+* **Pointer States**: `(*int)(nil)` returns `true` (can be assigned),
+  `new(int)` returns `false` (already points to memory).
+* **Interface Support**: Types implementing `IsZero() bool` are handled
+  via their method, enabling custom zero semantics.
+
+#### Other Utilities
+
+* `Coalesce[T](values...)` returns the first non-zero value.
+* `IIf[T](condition, ifTrue, ifFalse)` conditional expression.
 
 ### Type Conversion
 
