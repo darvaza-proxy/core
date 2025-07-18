@@ -14,6 +14,14 @@ import (
 // optionally using the given default port when the string doesn't
 // specify one.
 // port 0 on the string input isn't considered valid.
+//
+// Examples:
+//   - MakeHostPort("localhost", 8080) → "localhost:8080"
+//   - MakeHostPort("localhost:9000", 8080) → "localhost:9000"
+//   - MakeHostPort("192.168.1.1", 80) → "192.168.1.1:80"
+//   - MakeHostPort("::1", 443) → "[::1]:443"
+//   - MakeHostPort("example.com", 0) → "example.com"
+//   - MakeHostPort("example.com:0", 80) → error (port 0 invalid)
 func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	host, port, err := SplitHostPort(hostPort)
 	if err != nil {
@@ -64,6 +72,23 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, error) {
 // JoinHostPort is like the standard net.JoinHostPort, but
 // it validates the host name and port, and returns it portless
 // if the port argument is empty.
+//
+// Unlike net.JoinHostPort, this function:
+//   - Validates hostname and port before joining
+//   - Returns host without port if port is empty
+//   - Properly handles IPv6 addresses with bracketing
+//   - Supports international domain names
+//   - Returns descriptive errors for invalid inputs
+//
+// Examples:
+//   - JoinHostPort("localhost", "8080") → "localhost:8080"
+//   - JoinHostPort("localhost", "") → "localhost"
+//   - JoinHostPort("192.168.1.1", "80") → "192.168.1.1:80"
+//   - JoinHostPort("::1", "443") → "[::1]:443"
+//   - JoinHostPort("::1", "") → "::1"
+//   - JoinHostPort("example.com", "0") → "example.com:0" (port 0 allowed)
+//   - JoinHostPort("invalid host", "80") → error
+//   - JoinHostPort("example.com", "99999") → error (port out of range)
 func JoinHostPort(host, port string) (string, error) {
 	ip, _ := ParseAddr(host)
 	switch {
@@ -106,6 +131,25 @@ func doJoinHostPort(host, port string) (string, error) {
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
 // port isn't part of the string and it validates it if present.
 // SplitHostPort will also validate the host is a valid IP or name
+//
+// Unlike net.SplitHostPort, this function:
+//   - Accepts hostport strings without port (returns empty port)
+//   - Validates the host is a valid IP address or hostname
+//   - Validates the port is a valid port number (1-65535)
+//   - Properly handles IPv6 addresses with and without brackets
+//   - Supports international domain names with punycode conversion
+//   - Returns descriptive errors for invalid inputs
+//
+// Examples:
+//   - SplitHostPort("localhost:8080") → ("localhost", "8080", nil)
+//   - SplitHostPort("localhost") → ("localhost", "", nil)
+//   - SplitHostPort("192.168.1.1:80") → ("192.168.1.1", "80", nil)
+//   - SplitHostPort("[::1]:443") → ("::1", "443", nil)
+//   - SplitHostPort("::1") → ("::1", "", nil)
+//   - SplitHostPort("example.com") → ("example.com", "", nil)
+//   - SplitHostPort("Hello.世界") → ("hello.世界", "", nil)
+//   - SplitHostPort("invalid host") → error
+//   - SplitHostPort("example.com:99999") → error (port out of range)
 func SplitHostPort(hostPort string) (host, port string, err error) {
 	host, port, err = splitHostPortUnsafe(hostPort)
 
@@ -134,7 +178,23 @@ func SplitHostPort(hostPort string) (host, port string, err error) {
 }
 
 // SplitAddrPort splits a string containing an IP address and an optional port,
-// and validates it.
+// and validates it. Returns the address as netip.Addr and port as uint16.
+//
+// This function:
+//   - Accepts IP addresses with optional port numbers
+//   - Validates the address is a valid IPv4 or IPv6 address
+//   - Validates the port is in range 1-65535 (0 if no port specified)
+//   - Properly handles IPv6 addresses with brackets
+//   - Returns zero values and error for invalid inputs
+//
+// Examples:
+//   - SplitAddrPort("192.168.1.1:8080") → (192.168.1.1, 8080, nil)
+//   - SplitAddrPort("192.168.1.1") → (192.168.1.1, 0, nil)
+//   - SplitAddrPort("[::1]:443") → (::1, 443, nil)
+//   - SplitAddrPort("::1") → (::1, 0, nil)
+//   - SplitAddrPort("127.0.0.1:80") → (127.0.0.1, 80, nil)
+//   - SplitAddrPort("invalid") → error
+//   - SplitAddrPort("192.168.1.1:99999") → error (port out of range)
 func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	// split
 	host, sPort, err := splitHostPortUnsafe(addrPort)
