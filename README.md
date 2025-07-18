@@ -62,12 +62,48 @@ Generic type constraints for use with Go generics:
 
 ## Generic Utilities
 
-### Basic Utilities
+### Zero Value Utilities
 
-* `Zero[T]()` returns the zero value for type T
-* `IsZero[T](v)` checks if a value is the zero value for its type
-* `Coalesce[T](values...)` returns the first non-zero value
-* `IIf[T](condition, ifTrue, ifFalse)` conditional expression
+#### Zero Value Creation
+
+* `Zero[T]()` - returns the zero value for type T using reflection when
+  needed. Supports all Go types including complex generics, interfaces, and
+  custom types.
+
+#### Zero Value Detection
+
+* `IsZero(v)` - reports whether a value is in an uninitialized state and ready
+  to be set. Answers the question: "Is this value uninitialized and ready to
+  be set?"
+
+Key semantic distinctions:
+
+* **Nil vs Empty**: `[]int(nil)` returns `true` (needs initialization),
+  `[]int{}` returns `false` (already initialized).
+* **Pointer States**: `(*int)(nil)` returns `true` (can be assigned),
+  `new(int)` returns `false` (already points to memory).
+* **Interface Support**: Types implementing `IsZero() bool` are handled
+  via their method, enabling custom zero semantics.
+
+#### Nil Value Detection
+
+* `IsNil(v)` - reports whether a value is nil (typed or untyped). Answers
+  the question: "Is this value nil?"
+
+Key distinctions from `IsZero`:
+
+* **Scope**: Only checks for nil state, not zero state.
+* **Basic Types**: `IsNil(0)` returns `false` (integers cannot be nil),
+  `IsZero(0)` returns `true` (zero integer is uninitialized).
+* **Collections**: `IsNil([]int{})` returns `false` (empty slice is not nil),
+  `IsZero([]int{})` returns `false` (empty slice is initialized).
+* **Structs**: `IsNil(struct{}{})` returns `false` (structs cannot be nil),
+  `IsZero(struct{}{})` returns `true` (zero struct is uninitialized).
+
+#### Other Utilities
+
+* `Coalesce[T](values...)` returns the first non-zero value.
+* `IIf[T](condition, ifTrue, ifFalse)` conditional expression.
 
 ### Type Conversion
 
