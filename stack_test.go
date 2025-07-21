@@ -399,16 +399,20 @@ func frameFormatTestCases() []frameFormatTestCase {
 		newFrameFormatTestCase("file format %s", frame, "%s", "test.go"),
 		newFrameFormatTestCase("file format with + flag %+s", frame, "%+s",
 			"darvaza.org/core.TestFunction\n\t/path/to/test.go"),
+		newFrameFormatTestCase("file format with # flag %#s", frame, "%#s", "darvaza.org/core/test.go"),
 		newFrameFormatTestCase("line format %d", frame, "%d", "42"),
 		newFrameFormatTestCase("name format %n", frame, "%n", "TestFunction"),
 		newFrameFormatTestCase("name format with + flag %+n", frame, "%+n", "darvaza.org/core.TestFunction"),
 		newFrameFormatTestCase("file:line format %v", frame, "%v", "test.go:42"),
 		newFrameFormatTestCase("file:line format with + flag %+v", frame, "%+v",
 			"darvaza.org/core.TestFunction\n\t/path/to/test.go:42"),
+		newFrameFormatTestCase("file:line format with # flag %#v", frame, "%#v", "darvaza.org/core/test.go:42"),
 		newFrameFormatTestCase("empty file %s", emptyFrame, "%s", ""),
+		newFrameFormatTestCase("empty file with # flag %#s", emptyFrame, "%#s", ""),
 		newFrameFormatTestCase("empty line %d", emptyFrame, "%d", "0"),
 		newFrameFormatTestCase("empty name %n", emptyFrame, "%n", ""),
 		newFrameFormatTestCase("empty file:line %v", emptyFrame, "%v", ":0"),
+		newFrameFormatTestCase("empty file:line with # flag %#v", emptyFrame, "%#v", ":0"),
 	)
 }
 

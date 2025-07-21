@@ -178,6 +178,8 @@ func (f Frame) String() string {
 //	      GOPATH separated by \n\t (<funcName>\n\t<path>)
 //	%+n   full package name followed by function name
 //	%+v   equivalent to %+s:%d
+//	%#s   package/file format using PkgFile()
+//	%#v   equivalent to %#s:%d
 func (f Frame) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 's':
@@ -199,6 +201,8 @@ func (f Frame) formatFile(s fmt.State) {
 		writeFormat(s, f.name)
 		writeFormat(s, "\n\t")
 		writeFormat(s, f.file)
+	case s.Flag('#'):
+		writeFormat(s, f.PkgFile())
 	case f.file == "":
 		writeFormat(s, "")
 	default:
