@@ -119,6 +119,25 @@ func (f Frame) File() string {
 	return f.file
 }
 
+// PkgFile returns the package name (if present) followed by '/' and the
+// file name. For example: "darvaza.org/core/stack.go".
+// If no package name exists, returns just the file name.
+// Returns empty string for zero-valued frames or when file information
+// is unavailable.
+func (f Frame) PkgFile() string {
+	if f.file == "" {
+		return ""
+	}
+
+	pkgName := f.PkgName()
+	fileName := path.Base(f.file)
+	if pkgName == "" {
+		return fileName
+	}
+
+	return pkgName + "/" + fileName
+}
+
 // Line returns the line number within the source file for this frame.
 // Returns 0 for zero-valued frames or when line information is unavailable.
 func (f Frame) Line() int {

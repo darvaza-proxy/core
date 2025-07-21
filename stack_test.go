@@ -217,6 +217,76 @@ func TestFrameFile(t *testing.T) {
 	AssertEqual(t, "/path/to/file.go", testFrame.File(), "frame should return file path")
 }
 
+// Test case for Frame.PkgFile method
+type framePkgFileTestCase struct {
+	name     string
+	expected string
+	frame    Frame
+}
+
+func (tc framePkgFileTestCase) test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.expected, tc.frame.PkgFile(), "PkgFile output mismatch")
+}
+
+func newFramePkgFileTestCase(name string, frame Frame, expected string) framePkgFileTestCase {
+	return framePkgFileTestCase{
+		name:     name,
+		frame:    frame,
+		expected: expected,
+	}
+}
+
+// Test Frame.PkgFile method
+func TestFramePkgFile(t *testing.T) {
+	tests := []framePkgFileTestCase{
+		newFramePkgFileTestCase(
+			"empty frame",
+			Frame{},
+			"",
+		),
+		newFramePkgFileTestCase(
+			"frame with file but no name",
+			Frame{file: "/path/to/file.go"},
+			"file.go",
+		),
+		newFramePkgFileTestCase(
+			"frame with absolute path and no package",
+			Frame{file: "/absolute/path/to/source.go", name: "main"},
+			"source.go",
+		),
+		newFramePkgFileTestCase(
+			"frame with package and file",
+			Frame{file: "/go/src/github.com/user/repo/file.go", name: "github.com/user/repo.FuncName"},
+			"github.com/user/repo/file.go",
+		),
+		newFramePkgFileTestCase(
+			"frame with nested package",
+			Frame{file: "/workspace/project/internal/utils/helper.go", name: "internal/utils.Helper"},
+			"internal/utils/helper.go",
+		),
+		newFramePkgFileTestCase(
+			"frame with standard library package",
+			Frame{file: "/usr/local/go/src/fmt/print.go", name: "fmt.Printf"},
+			"fmt/print.go",
+		),
+		newFramePkgFileTestCase(
+			"frame with generic function",
+			Frame{file: "/src/generics.go", name: "example.com/pkg.GenericFunc[...]"},
+			"example.com/pkg/generics.go",
+		),
+		newFramePkgFileTestCase(
+			"current test frame",
+			*Here(),
+			"darvaza.org/core/stack_test.go",
+		),
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, tc.test)
+	}
+}
+
 // Test Frame.Line method (0% coverage)
 func TestFrameLine(t *testing.T) {
 	frame := Here()
