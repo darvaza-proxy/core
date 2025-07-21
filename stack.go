@@ -92,14 +92,17 @@ func (f Frame) PkgName() string {
 	return s
 }
 
-// SplitName splits the full function name into package and function components.
-// Handles generic function names by ignoring trailing "[...]" suffixes.
-// Searches for the last "." or "/" separator to determine the split point.
+// SplitName splits the full function name into package and function
+// components. Handles generic function names by ignoring trailing "[...]"
+// suffixes. Searches for the last "." or "/" separator to determine the
+// split point.
 //
 // Returns:
 //   - pkgName: package path ("darvaza.org/core")
 //   - funcName: function name ("TestFunction")
-//   - For unseparated names, returns ("", fullName)
+//
+// If no separator is found, returns an empty package name and the full
+// name as the function name.
 func (f Frame) SplitName() (pkgName, funcName string) {
 	// ignore trailing[...] from generic functions
 	name, _ := strings.CutSuffix(f.name, "[...]")
@@ -114,6 +117,25 @@ func (f Frame) SplitName() (pkgName, funcName string) {
 // Returns empty string for zero-valued frames or when file information is unavailable.
 func (f Frame) File() string {
 	return f.file
+}
+
+// PkgFile returns the package name (if present) followed by '/' and the
+// file name. For example: "darvaza.org/core/stack.go".
+// If no package name exists, returns just the file name.
+// Returns empty string for zero-valued frames or when file information
+// is unavailable.
+func (f Frame) PkgFile() string {
+	if f.file == "" {
+		return ""
+	}
+
+	pkgName := f.PkgName()
+	fileName := path.Base(f.file)
+	if pkgName == "" {
+		return fileName
+	}
+
+	return pkgName + "/" + fileName
 }
 
 // Line returns the line number within the source file for this frame.
@@ -141,20 +163,23 @@ func (f Frame) String() string {
 	return fmt.Sprintf("%v", f)
 }
 
-/* Format formats the frame according to the fmt.Formatter interface.
- *
- *	%s    source file
- *	%d    source line
- *	%n    function name
- *	%v    equivalent to %s:%d
- *
- * Format accepts flags that alter the printing of some verbs, as follows:
- *
- *	%+s   function name and path of source file relative to the compile time
- *	      GOPATH separated by \n\t (<funcname>\n\t<path>)
- *	%+n   full package name followed by function name
- *  %+v   equivalent to %+s:%d
- */
+// Format formats the frame according to the fmt.Formatter interface.
+//
+// The following verbs are supported:
+//
+//	%s    source file
+//	%d    source line
+//	%n    function name
+//	%v    equivalent to %s:%d
+//
+// Format accepts flags that alter the printing of some verbs:
+//
+//	%+s   function name and path of source file relative to the compile time
+//	      GOPATH separated by \n\t (<funcName>\n\t<path>)
+//	%+n   full package name followed by function name
+//	%+v   equivalent to %+s:%d
+//	%#s   package/file format using PkgFile()
+//	%#v   equivalent to %#s:%d
 func (f Frame) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 's':
@@ -176,6 +201,8 @@ func (f Frame) formatFile(s fmt.State) {
 		writeFormat(s, f.name)
 		writeFormat(s, "\n\t")
 		writeFormat(s, f.file)
+	case s.Flag('#'):
+		writeFormat(s, f.PkgFile())
 	case f.file == "":
 		writeFormat(s, "")
 	default:
