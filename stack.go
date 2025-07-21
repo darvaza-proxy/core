@@ -141,20 +141,21 @@ func (f Frame) String() string {
 	return fmt.Sprintf("%v", f)
 }
 
-/* Format formats the frame according to the fmt.Formatter interface.
- *
- *	%s    source file
- *	%d    source line
- *	%n    function name
- *	%v    equivalent to %s:%d
- *
- * Format accepts flags that alter the printing of some verbs, as follows:
- *
- *	%+s   function name and path of source file relative to the compile time
- *	      GOPATH separated by \n\t (<funcname>\n\t<path>)
- *	%+n   full package name followed by function name
- *  %+v   equivalent to %+s:%d
- */
+// Format formats the frame according to the fmt.Formatter interface.
+//
+// The following verbs are supported:
+//
+//	%s    source file
+//	%d    source line
+//	%n    function name
+//	%v    equivalent to %s:%d
+//
+// Format accepts flags that alter the printing of some verbs:
+//
+//	%+s   function name and path of source file relative to the compile time
+//	      GOPATH separated by \n\t (<funcName>\n\t<path>)
+//	%+n   full package name followed by function name
+//	%+v   equivalent to %+s:%d
 func (f Frame) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 's':
