@@ -92,14 +92,17 @@ func (f Frame) PkgName() string {
 	return s
 }
 
-// SplitName splits the full function name into package and function components.
-// Handles generic function names by ignoring trailing "[...]" suffixes.
-// Searches for the last "." or "/" separator to determine the split point.
+// SplitName splits the full function name into package and function
+// components. Handles generic function names by ignoring trailing "[...]"
+// suffixes. Searches for the last "." or "/" separator to determine the
+// split point.
 //
 // Returns:
 //   - pkgName: package path ("darvaza.org/core")
 //   - funcName: function name ("TestFunction")
-//   - For unseparated names, returns ("", fullName)
+//
+// If no separator is found, returns an empty package name and the full
+// name as the function name.
 func (f Frame) SplitName() (pkgName, funcName string) {
 	// ignore trailing[...] from generic functions
 	name, _ := strings.CutSuffix(f.name, "[...]")
