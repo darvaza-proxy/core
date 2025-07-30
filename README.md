@@ -303,17 +303,25 @@ These create `PanicError` instances with stack traces.
 
 Special error types for network-style temporary and timeout conditions:
 
-* `TemporaryError` type - implements `Temporary() bool`
-* `NewTemporaryError(err)` - wrap error as temporary
-* `NewTimeoutError(err)` - wrap error as timeout
-* `IsTemporary(err)` / `CheckIsTemporary(err)` - test if error is temporary
-* `IsTimeout(err)` / `CheckIsTimeout(err)` - test if error is timeout
+* `TemporaryError` type - implements `Temporary() bool` and `IsTemporary() bool`
+  interfaces for marking recoverable errors.
+* `NewTemporaryError(err)` - wrap error as temporary condition.
+* `NewTimeoutError(err)` - wrap error as timeout condition with both temporary
+  and timeout properties.
+* `IsTemporary(err)` - recursively test if error chain contains temporary
+  condition via `Temporary()` or `IsTemporary()` methods.
+* `CheckIsTemporary(err)` - test single error for temporary condition without
+  unwrapping chain, returns (is, known) tuple.
+* `IsTimeout(err)` - recursively test if error chain contains timeout
+  condition via `Timeout()` or `IsTimeout()` methods.
+* `CheckIsTimeout(err)` - test single error for timeout condition without
+  unwrapping chain, returns (is, known) tuple.
 
 ### Error Testing and Utilities
 
 * `IsError[T](err)` / `IsErrorFn[T](err, fn)` / `IsErrorFn2[T](err, fn)` -
-  type-safe error testing
-* `CoalesceError(errs...)` - return first non-nil error
+  type-safe error testing with generic constraints and custom checker functions.
+* `CoalesceError(errs...)` - return first non-nil error from argument list.
 
 ## Stack Tracing
 
