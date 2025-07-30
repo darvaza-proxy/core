@@ -140,30 +140,42 @@ Key distinctions from `IsZero`:
 
 #### Search and Comparison
 
-* `SliceContains[T]` / `SliceContainsFn[T]`
-* `SliceEqual[T]` / `SliceEqualFn[T]`
+* `SliceContains[T](slice, value)` - check if slice contains value.
+* `SliceContainsFn[T](slice, value, eq)` - check containment with custom
+  equality.
+* `SliceEqual[T](a, b)` - compare two slices for equality.
+* `SliceEqualFn[T](a, b, eq)` - compare slices with custom equality function.
 
 #### Transformation
 
-* `SliceAs[T,V]` / `SliceAsFn[T,V]`
-* `SliceMap[T1,T2]` - maps slice elements to new type
-* `SliceReplaceFn[T]` - replaces elements matching condition
-* `SliceCopy[T]` / `SliceCopyFn[T]`
+* `SliceAs[T,V]` / `SliceAsFn[T,V]` - convert slice elements to different type.
+* `SliceMap[T1,T2](slice, fn)` - transform each element with cumulative
+  function.
+* `SliceReplaceFn[T](slice, fn)` - replace/filter elements in-place.
+* `SliceCopy[T](slice)` - create shallow copy of slice.
+* `SliceCopyFn[T](slice, fn)` - create filtered/transformed copy.
 
 #### Set Operations
 
-* `SliceMinus[T]` / `SliceMinusFn[T]` - set difference
-* `SliceUnique[T]` / `SliceUniqueFn[T]` - unique elements
-* `SliceUniquify[T]` / `SliceUniquifyFn[T]` - remove duplicates in-place
+* `SliceMinus[T](a, b)` - elements in `a` but not in `b`.
+* `SliceMinusFn[T](a, b, eq)` - set difference with custom equality.
+* `SliceUnique[T](slice)` - return slice with unique elements only.
+* `SliceUniqueFn[T](slice, eq)` - unique elements with custom equality.
+* `SliceUniquify[T](ptr)` - remove duplicates in-place, modify original.
+* `SliceUniquifyFn[T](ptr, eq)` - remove duplicates with custom equality.
 
 #### Sorting and Ordering
 
-* `SliceSort[T]` / `SliceSortFn[T]` / `SliceSortOrdered[T]`
-* `SliceReverse[T]` / `SliceReversed[T]` / `SliceReversedFn[T]`
+* `SliceSort[T](slice, cmp)` - sort using comparison function (returns int).
+* `SliceSortFn[T](slice, less)` - sort using less function (returns bool).
+* `SliceSortOrdered[T](slice)` - sort ordered types (int, string, float64).
+* `SliceReverse[T](slice)` - reverse slice in-place.
+* `SliceReversed[T](slice)` - return reversed copy.
+* `SliceReversedFn[T](slice, fn)` - return transformed and reversed copy.
 
 #### Utilities
 
-* `SliceRandom[T]` - random element selection
+* `SliceRandom[T](slice)` - select random element, returns (value, found).
 
 ### List Operations (container/list)
 
