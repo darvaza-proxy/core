@@ -262,25 +262,80 @@ Special error types for network-style temporary and timeout conditions:
 
 ## Stack Tracing
 
-Utilities for capturing and working with call stacks:
+Stack tracing utilities for debugging, error reporting, and call context:
 
-* `Frame` - represents a single stack frame
-* `Stack` - represents a call stack
-* `MaxDepth` - maximum stack depth constant
-* `CallStacker` interface - types that provide call stacks
+### Core Types
+
+* `Frame` - represents a single function call frame with source location.
+* `Stack` - slice of frames representing a complete call stack.
+* `MaxDepth` - maximum stack capture depth (32 frames).
+* `CallStacker` interface - types that can provide their call stack.
 
 ### Stack Capture Functions
 
-* `Here()` - capture current stack frame
-* `StackFrame(skip)` - capture-specific stack frame
-* `StackTrace(skip, depth)` - capture call stack
+#### Frame Capture
 
-### Frame Methods
+* `Here()` - capture the current stack frame where called. Returns nil if
+  capture fails. Useful for immediate calling context.
+* `StackFrame(skip)` - capture a specific frame in the call stack, skipping
+  the specified number of levels. Returns nil if insufficient frames.
 
-* `.Name()` / `.FuncName()` / `.PkgName()` - function/package names
-* `.SplitName()` - split full name into package and function
-* `.File()` / `.Line()` / `.FileLine()` - source location
-* `.Format()` - formatted representation
+#### Complete Stack Capture
+
+* `StackTrace(skip)` - capture complete call stack starting from skip level.
+  Returns empty Stack on failure. Maximum depth limited by MaxDepth.
+
+### Frame Information Methods
+
+#### Function Names
+
+* `Frame.Name()` - full qualified function name including package path
+  (e.g., "darvaza.org/core.TestFunction").
+* `Frame.FuncName()` - function name only without package qualification
+  (e.g., "TestFunction").
+* `Frame.PkgName()` - package path portion only (e.g., "darvaza.org/core").
+* `Frame.SplitName()` - split full name into (package, function) components.
+  Handles generic functions by ignoring "[...]" suffixes.
+
+#### Source Location
+
+* `Frame.File()` - full path to source file containing the function.
+* `Frame.Line()` - line number within source file (0 if unavailable).
+* `Frame.FileLine()` - formatted "file:line" string for display.
+
+#### Formatting
+
+* `Frame.Format(fmt.State, rune)` - implements fmt.Formatter interface with
+  support for multiple format verbs:
+  * `%s` - source file basename.
+  * `%d` - line number.
+  * `%n` - function name (short form).
+  * `%v` - equivalent to `%s:%d`.
+  * `%+s` - function name + full file path (newline separated).
+  * `%+n` - full qualified function name.
+  * `%+v` - equivalent to `%+s:%d`.
+
+* `Stack.Format(fmt.State, rune)` - format entire stack with same verbs as
+  Frame plus '#' flag support:
+  * `%#s`, `%#n`, `%#v` - each frame on new line.
+  * `%#+s`, `%#+n`, `%#+v` - numbered frames with [index/total] prefix.
+
+### Usage Examples
+
+```go
+// Capture current location
+frame := Here()
+if frame != nil {
+    fmt.Printf("Called from %s at %s", frame.FuncName(), frame.FileLine())
+}
+
+// Capture complete stack for error reporting
+stack := StackTrace(1) // skip current function
+fmt.Printf("Stack trace:%+v", stack)
+
+// Numbered stack output
+fmt.Printf("Debug stack:%#+v", stack)
+```
 
 ## Synchronization
 
