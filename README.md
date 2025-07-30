@@ -30,12 +30,23 @@ Generic type constraints for use with Go generics:
 
 ## Context
 
-* `ContextKey[T]` - type-safe context key type
-* `NewContextKey[T]()` creates a ContextKey adding type-safety and ease of use
-  to the standard `context.WithValue()`
-* `WithTimeout()` and `WithTimeoutCause()` are equivalent to
-  `context.WithDeadline()` and `context.WithDeadlineCause()` but receiving
-  a duration instead of an absolute time
+### Context Keys
+
+* `NewContextKey[T](name)` - creates a new type-safe key bound to specified
+  type and friendly name.
+* `ContextKey[T].WithValue(ctx, value)` - safely attach value to context,
+  comparable to standard `context.WithValue()`.
+* `ContextKey[T].Get(ctx)` - extract value bound to this key in context,
+  returns (value, found) with nil receiver safety.
+
+### Timeout Utilities
+
+* `WithTimeout(parent, duration)` - equivalent to `context.WithDeadline()`
+  but takes duration instead of absolute time. Returns parent context and
+  no-op cancel for zero/negative durations.
+* `WithTimeoutCause(parent, duration, cause)` - equivalent to
+  `context.WithDeadlineCause()` but takes duration instead of absolute time.
+  Attaches custom cause error to timeout context.
 
 ## Network Utilities
 

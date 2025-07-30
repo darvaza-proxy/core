@@ -29,8 +29,8 @@ func (ck *ContextKey[T]) WithValue(ctx context.Context, v T) context.Context {
 // Get attempts to extract a value bound to this key in a [context.Context]
 // For convenience this method will safely operate over a nil receiver.
 func (ck *ContextKey[T]) Get(ctx context.Context) (T, bool) {
-	if ck == nil {
-		var zero T
+	var zero T
+	if ck == nil || ctx == nil {
 		return zero, false
 	}
 
@@ -61,6 +61,10 @@ func NewContextKey[T any](name string) *ContextKey[T] {
 //
 // If the duration is zero or negative the context won't expire.
 func WithTimeout(parent context.Context, tio time.Duration) (context.Context, context.CancelFunc) {
+	if parent == nil {
+		parent = context.Background()
+	}
+
 	if tio > 0 {
 		deadline := time.Now().Add(tio)
 		return context.WithDeadline(parent, deadline)
@@ -74,6 +78,10 @@ func WithTimeout(parent context.Context, tio time.Duration) (context.Context, co
 //
 // If the duration is zero or negative the context won't expire.
 func WithTimeoutCause(parent context.Context, tio time.Duration, cause error) (context.Context, context.CancelFunc) {
+	if parent == nil {
+		parent = context.Background()
+	}
+
 	if tio > 0 {
 		deadline := time.Now().Add(tio)
 		return context.WithDeadlineCause(parent, deadline, cause)
