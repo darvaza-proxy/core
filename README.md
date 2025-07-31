@@ -19,14 +19,14 @@ Library, and if something should be on a subdirectory, it shouldn't be here.
 
 Generic type constraints for use with Go generics:
 
-* `Signed` - signed integer types
-* `Unsigned` - unsigned integer types
-* `Integer` - all integer types (signed and unsigned)
-* `Float` - floating-point types
-* `Complex` - complex number types
-* `Bool` - boolean type
-* `String` - string type
-* `Ordered` - types that support ordering operations
+* `Signed` - signed integer types.
+* `Unsigned` - unsigned integer types.
+* `Integer` - all integer types (signed and unsigned).
+* `Float` - floating-point types.
+* `Complex` - complex number types.
+* `Bool` - boolean type.
+* `String` - string type.
+* `Ordered` - types that support ordering operations.
 
 ## Context
 
@@ -52,12 +52,12 @@ Generic type constraints for use with Go generics:
 
 ### IP Address Functions
 
-* `GetIPAddresses()` - get IP addresses as `netip.Addr`
-* `GetNetIPAddresses()` - get IP addresses as `net.IP`
-* `GetStringIPAddresses()` - get IP addresses as strings
-* `AddrFromNetIP(ip)` - convert `net.IP` to `netip.Addr`
-* `ParseAddr(s)` - parse string to `netip.Addr`
-* `ParseNetIP(s)` - parse string to `net.IP`
+* `GetIPAddresses()` - get IP addresses as `netip.Addr`.
+* `GetNetIPAddresses()` - get IP addresses as `net.IP`.
+* `GetStringIPAddresses()` - get IP addresses as strings.
+* `AddrFromNetIP(ip)` - convert `net.IP` to `netip.Addr`.
+* `ParseAddr(s)` - parse string to `netip.Addr`.
+* `ParseNetIP(s)` - parse string to `net.IP`.
 
 ### Host/Port Functions
 
@@ -82,7 +82,7 @@ Generic type constraints for use with Go generics:
 
 ### Interface Functions
 
-* `GetInterfacesNames()` - get network interface names
+* `GetInterfacesNames()` - get network interface names.
 
 ## Generic Utilities
 
@@ -207,13 +207,13 @@ Key distinctions from `IsZero`:
 
 #### Basic Map Functions
 
-* `MapContains[K]()` checks if a map contains a key
-* `MapValue[K,V]()` returns the value for a key, or a fallback value
-* `Keys[K,T]()` returns a slice of the keys in the map
-* `SortedKeys[K,T]()` returns a sorted slice of the keys
-* `SortedValues[K,T]()` returns values sorted by key
-* `SortedValuesCond[K,T]()` returns filtered values sorted by key
-* `SortedValuesUnlikelyCond[K,T]()` like `SortedValuesCond` but more efficient
+* `MapContains[K]()` checks if a map contains a key.
+* `MapValue[K,V]()` returns the value for a key, or a fallback value.
+* `Keys[K,T]()` returns a slice of the keys in the map.
+* `SortedKeys[K,T]()` returns a sorted slice of the keys.
+* `SortedValues[K,T]()` returns values sorted by key.
+* `SortedValuesCond[K,T]()` returns filtered values sorted by key.
+* `SortedValuesUnlikelyCond[K,T]()` like `SortedValuesCond` but more efficient.
 
 #### Map List Operations
 
@@ -235,14 +235,14 @@ Key distinctions from `IsZero`:
 
 Predefined error values for common conditions:
 
-* `ErrNotImplemented` - functionality not yet implemented
-* `ErrTODO` - placeholder for future implementation
-* `ErrExists` - resource already exists
-* `ErrNotExists` - resource does not exist
-* `ErrInvalid` - invalid input or state
-* `ErrUnknown` - unknown or unspecified error
-* `ErrNilReceiver` - method called on nil receiver
-* `ErrUnreachable` - indicates impossible condition
+* `ErrNotImplemented` - functionality not yet implemented.
+* `ErrTODO` - placeholder for future implementation.
+* `ErrExists` - resource already exists.
+* `ErrNotExists` - resource does not exist.
+* `ErrInvalid` - invalid input or state.
+* `ErrUnknown` - unknown or unspecified error.
+* `ErrNilReceiver` - method called on nil receiver.
+* `ErrUnreachable` - indicates impossible condition.
 
 ### Error Wrapping
 
@@ -252,35 +252,35 @@ containers with `Errors() []error`.
 
 Error wrapping functions:
 
-* `Wrap(err, note)` - wrap with simple string note
-* `Wrapf(err, format, args...)` - wrap with formatted note
-* `QuietWrap(err, note)` - wrap without including original error text
-* `Unwrap(err) []error` - extract all sub-errors from wrapped errors
+* `Wrap(err, note)` - wrap with simple string note.
+* `Wrapf(err, format, args...)` - wrap with formatted note.
+* `QuietWrap(err, note)` - wrap without including original error text.
+* `Unwrap(err) []error` - extract all sub-errors from wrapped errors.
 
 ### Compound Errors
 
 The `CompoundError` type aggregates multiple errors:
 
-* Implements both `Unwrap() []error` and `Errors() []error` interfaces
-* `.AppendError(err)` / `.Append(errs...)` - add errors
-* `.AsError()` - convert to single error or nil
-* `.Ok()` - check if no errors
+* Implements both `Unwrap() []error` and `Errors() []error` interfaces.
+* `.AppendError(err)` / `.Append(errs...)` - add errors.
+* `.AsError()` - convert to single error or nil.
+* `.Ok()` - check if no errors.
 
 ### Panic Handling
 
 The `PanicError` type wraps panic values with stack traces:
 
-* `NewPanicError()` / `NewPanicErrorf()` - create panic errors
-* `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics
+* `NewPanicError()` / `NewPanicErrorf()` - create panic errors.
+* `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics.
 * `Panic()` / `Panicf()` / `PanicWrap()` / `PanicWrapf()` - panic with
-  `PanicError`
+  `PanicError`.
 
 Panic recovery utilities:
 
-* `Recovered` interface - marks errors from recovered panics
-* `AsRecovered(v)` - convert `recover()` result to error
-* `Catcher` type - safely call functions that might panic
-* `Catch(fn)` - execute function, returning error if panic occurs
+* `Recovered` interface - marks errors from recovered panics.
+* `AsRecovered(v)` - convert `recover()` result to error.
+* `Catcher` type - safely call functions that might panic.
+* `Catch(fn)` - execute function, returning error if panic occurs.
 
 ```go
 defer func() {
@@ -294,8 +294,8 @@ defer func() {
 
 For indicating impossible code paths:
 
-* `NewUnreachableError()` - create unreachable error
-* `NewUnreachableErrorf(format, args...)` - create formatted unreachable error
+* `NewUnreachableError()` - create unreachable error.
+* `NewUnreachableErrorf(format, args...)` - create formatted unreachable error.
 
 These create `PanicError` instances with stack traces.
 
@@ -406,23 +406,23 @@ fmt.Printf("Debug stack:%#+v", stack)
 
 Enhanced wait group with error handling:
 
-* `WaitGroup` - wait group that collects errors
-* `.OnError(fn)` - set error handler
-* `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`
-* `.Wait()` - wait for completion
-* `.Err()` - get first error
+* `WaitGroup` - wait group that collects errors.
+* `.OnError(fn)` - set error handler.
+* `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`.
+* `.Wait()` - wait for completion.
+* `.Err()` - get first error.
 
 ### ErrGroup
 
 Context-aware error group with cancellation:
 
-* `ErrGroup` - context-based error group
-* `.SetDefaults()` - configure with defaults
-* `.OnError(fn)` - set error handler
-* `.Cancel()` / `.Context()` - cancellation control
-* `.Go(fn)` / `.GoCatch(fn)` - run functions with context
-* `.Wait()` - wait and return first error
-* `.IsCancelled()` / `.Cancelled()` - check cancellation state
+* `ErrGroup` - context-based error group.
+* `.SetDefaults()` - configure with defaults.
+* `.OnError(fn)` - set error handler.
+* `.Cancel()` / `.Context()` - cancellation control.
+* `.Go(fn)` / `.GoCatch(fn)` - run functions with context.
+* `.Wait()` - wait and return first error.
+* `.IsCancelled()` / `.Cancelled()` - check cancellation state.
 
 ### Deprecated
 
