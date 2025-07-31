@@ -290,6 +290,27 @@ defer func() {
 }()
 ```
 
+### Must/Maybe Utilities
+
+Convenience functions for common error-handling patterns:
+
+* `Must[T](value T, err error) T` - returns value or panics with `PanicError` if
+  err is not nil. Follows the common Go pattern of Must* functions for cases
+  where errors should never occur.
+* `Maybe[T](value T, err error) T` - always returns the value, ignoring any
+  error. Useful when you want to proceed with a default or zero value regardless
+  of error status.
+
+```go
+// Must - panic on error (use in tests, config loading, etc.)
+config := Must(loadConfig("config.json"))  // panics if loadConfig fails
+conn := Must(net.Dial("tcp", "localhost:8080"))  // panics if dial fails
+
+// Maybe - ignore errors, proceed with values
+content := Maybe(os.ReadFile("optional.txt"))  // empty string if file missing
+count := Maybe(strconv.Atoi(userInput))  // zero if parsing fails
+```
+
 ### Unreachable Conditions
 
 For indicating impossible code paths:

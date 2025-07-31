@@ -79,3 +79,39 @@ func Catch(fn func() error) error {
 	var p Catcher
 	return p.Do(fn)
 }
+
+// Must panics if err is not nil, otherwise returns value.
+// This is useful for situations where errors should never occur, such as
+// test setup or configuration loading. It follows the common Go pattern
+// of Must* functions that panic on error. The panic includes proper stack
+// traces pointing to the caller.
+//
+// Example usage:
+//
+//	config := Must(loadConfig("config.json"))  // panics if loadConfig returns error
+//	conn := Must(net.Dial("tcp", "localhost:8080"))  // panics if dial fails
+//	data := Must(json.Marshal(obj))  // panics if marshal fails
+func Must[V any](value V, err error) V {
+	if err != nil {
+		panic(NewPanicWrap(1, err, "core.Must"))
+	}
+	return value
+}
+
+// Maybe returns the value, ignoring any error.
+// This is useful when you want to proceed with a default or zero value
+// regardless of whether an error occurred. Unlike Must, it never panics.
+//
+// Example usage:
+//
+//	// Use empty string if ReadFile fails
+//	content := Maybe(os.ReadFile("optional.txt"))
+//
+//	// Use zero value if parsing fails
+//	count := Maybe(strconv.Atoi(userInput))
+//
+//	// Chain operations where errors are non-critical
+//	data := Maybe(json.Marshal(obj))
+func Maybe[V any](value V, _ error) V {
+	return value
+}
