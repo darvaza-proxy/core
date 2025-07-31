@@ -4,6 +4,10 @@ This file provides guidance to AI agents when working with code in this
 repository. For developers and general project information, please refer to
 [README.md](README.md) first.
 
+## Related Documentation
+
+- [README.md](README.md) - Package overview and API reference
+
 ## Repository Overview
 
 `darvaza.org/core` is a foundational Go utility library that provides
@@ -162,13 +166,14 @@ Always run `make tidy` before committing to ensure proper formatting.
 ### Testing Patterns
 
 - Table-driven tests are preferred.
-- Helper functions like `S[T]()` create test slices.
+- All testing utilities are public in `testing.go` for external use.
 - Comprehensive coverage for generic functions is expected.
+- Testing utilities log successful assertions for better debugging.
 
 #### Test Helper Functions
 
-The project uses a comprehensive set of test helper functions defined in
-`testutils_test.go` to reduce boilerplate and improve test consistency:
+The project uses a comprehensive set of public test helper functions defined in
+`testing.go` to reduce boilerplate and improve test consistency:
 
 **Slice Creation:**
 
@@ -182,11 +187,17 @@ The project uses a comprehensive set of test helper functions defined in
   better error messages
 - `AssertSliceEqual[T](t, expected, actual, msg...)` - Slice comparison using
   `reflect.DeepEqual`
-- `AssertError(t, err, expectError, msg...)` - Standardized error expectation
+- `AssertError(t, err, msg...)` - Assert error is not nil
+- `AssertNoError(t, err, msg...)` - Assert error is nil
+- `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
+  Boolean assertions
+- `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - Nil
   checking
-- `AssertBool(t, actual, expected, msg...)` - Boolean assertions with context
 - `AssertPanic(t, fn, expectedPanic, msg...)` - Simplified panic testing
 - `AssertNoPanic(t, fn, msg...)` - Ensure functions don't panic
+- `AssertContains(t, text, substring, msg...)` - String containment
+- `AssertTypeIs[T](t, value, msg...)` - Type assertion with casting
+- `AssertErrorIs(t, err, target, msg...)` - Error chain checking
 
 **Advanced Helpers:**
 
@@ -196,6 +207,7 @@ The project uses a comprehensive set of test helper functions defined in
   phases
 - `RunTestCases(t, []TestCase)` - Table-driven test runner (requires
   `TestCase` interface)
+- `MockT` - Mock testing.T for testing assertion functions themselves
 
 **Usage Examples:**
 
@@ -206,25 +218,51 @@ if !reflect.DeepEqual(got, expected) {
 }
 
 // After: Helper function
-AssertSliceEqual(t, expected, got, "operation failed")
+core.AssertSliceEqual(t, expected, got, "operation result")
 
 // Before: Manual error checking
-if expectError && err == nil {
+if err == nil {
     t.Error("Expected error but got nil")
-} else if !expectError && err != nil {
-    t.Errorf("Expected no error but got: %v", err)
 }
 
 // After: Helper function
-AssertError(t, err, expectError, "operation error expectation")
+core.AssertError(t, err, "operation should fail")
 ```
 
 These helpers provide:
 
 - Consistent error messages across all tests
+- Success logging for better debugging
 - Reduced boilerplate code
 - Better test maintainability
-- Clearer test intent
+- Clear test intent
+
+**Quick Development Reference:**
+
+```go
+// Use public testing utilities
+import "darvaza.org/core"
+
+// Table-driven test structure
+type myTestCase struct {
+    input    string
+    expected result
+    wantErr  bool
+}
+
+func (tc myTestCase) test(t *testing.T) {
+    t.Helper()
+    result, err := processInput(tc.input)
+
+    if tc.wantErr {
+        AssertError(t, err, "process error")
+        return
+    }
+
+    AssertNoError(t, err, "process")
+    AssertEqual(t, tc.expected, result, "result")
+}
+```
 
 ## Important Notes
 

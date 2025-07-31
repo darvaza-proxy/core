@@ -50,6 +50,7 @@
     "languagetool",
     "LANGUAGETOOL",
     "linters",
+    "Logf",
     "markdownlint",
     "markdownlint-cli",
     "MDSPELL",
@@ -86,9 +87,7 @@
     "unmapping",
     "Uniquify",
     "Unwrappable",
-    "waitgroup",
     "WaitGroup",
-    "wantok",
     "WrappedError",
     "Wrapf"
   ],

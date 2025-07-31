@@ -38,7 +38,7 @@ func (tc spinLockTryLockTestCase) test(t *testing.T) {
 	sl := tc.setup()
 	result := sl.TryLock()
 
-	AssertEqual(t, tc.expected, result, "TryLock() result mismatch")
+	AssertEqual(t, tc.expected, result, "TryLock")
 }
 
 func TestSpinLockTryLock(t *testing.T) {
@@ -93,7 +93,7 @@ func (tc spinLockLockTestCase) test(t *testing.T) {
 			return nil
 		})
 
-		AssertError(t, err, false, "concurrent lock test should not fail")
+		AssertNoError(t, err, "concurrent test")
 		close(acquired)
 
 		// Both should have acquired the lock
@@ -101,7 +101,7 @@ func (tc spinLockLockTestCase) test(t *testing.T) {
 		for range acquired {
 			count++
 		}
-		AssertEqual(t, 2, count, "Expected 2 lock acquisitions")
+		AssertEqual(t, 2, count, "lock count")
 	} else {
 		// Simple case
 		sl.Lock()
@@ -148,9 +148,9 @@ func (tc spinLockUnlockTestCase) test(t *testing.T) {
 	sl := tc.setup()
 
 	if tc.shouldPanic {
-		AssertPanic(t, func() { sl.Unlock() }, "invalid SpinLock.Unlock", "Unlock should panic on unlocked spinlock")
+		AssertPanic(t, func() { sl.Unlock() }, "invalid SpinLock.Unlock", "Unlock unlocked")
 	} else {
-		AssertNoPanic(t, func() { sl.Unlock() }, "Unlock should not panic on locked spinlock")
+		AssertNoPanic(t, func() { sl.Unlock() }, "Unlock locked")
 	}
 }
 
@@ -164,19 +164,19 @@ func testSpinLockNilPtr(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
 	ptr := sl.ptr()
-	AssertEqual(t, (*uint32)(nil), ptr, "nil SpinLock ptr() should return nil")
+	AssertEqual(t, (*uint32)(nil), ptr, "nil ptr")
 }
 
 func testSpinLockNilTryLock(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
-	AssertPanic(t, func() { sl.TryLock() }, nil, "nil SpinLock TryLock should panic")
+	AssertPanic(t, func() { sl.TryLock() }, nil, "nil TryLock")
 }
 
 func testSpinLockNilUnlock(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
-	AssertPanic(t, func() { sl.Unlock() }, nil, "nil SpinLock Unlock should panic")
+	AssertPanic(t, func() { sl.Unlock() }, nil, "nil Unlock")
 }
 
 func TestSpinLockNilReceiver(t *testing.T) {
@@ -202,10 +202,10 @@ func TestSpinLockConcurrency(t *testing.T) {
 		return nil
 	})
 
-	AssertError(t, err, false, "concurrent test should not fail")
+	AssertNoError(t, err, "concurrent test")
 
 	expected := int64(numGoroutines * numIterations)
-	AssertEqual(t, expected, counter, "counter should match expected value")
+	AssertEqual(t, expected, counter, "counter value")
 }
 
 func BenchmarkSpinLockUncontended(b *testing.B) {

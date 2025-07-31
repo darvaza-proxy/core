@@ -130,39 +130,42 @@ var errGroupGoTestCases = []errGroupGoTestCase{
 	},
 }
 
-//revive:disable-next-line:cognitive-complexity
-//revive:disable-next-line:cyclomatic
 func (tc errGroupGoTestCase) test(t *testing.T) {
 	t.Helper()
 
 	var eg ErrGroup
-
 	eg.Go(tc.runFunc, tc.shutdownFunc)
 
-	// For shutdown tests, manually cancel after a short delay
+	tc.handleShutdownTests(&eg)
+	err := eg.Wait()
+	tc.checkError(t, err)
+	tc.checkCancellation(t, &eg)
+}
+
+func (tc errGroupGoTestCase) handleShutdownTests(eg *ErrGroup) {
 	if tc.name == "successful worker with shutdown" || tc.name == "worker with shutdown error" {
 		go func() {
 			time.Sleep(10 * time.Millisecond)
 			eg.Cancel(errors.New("manual cancellation"))
 		}()
 	}
+}
 
-	err := eg.Wait()
-
+func (tc errGroupGoTestCase) checkError(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		}
+		AssertError(t, err, "error")
+	} else if errors.Is(err, context.Canceled) {
+		t.Log("context cancelled as expected")
 	} else {
-		if err != nil && err != context.Canceled {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "no error")
 	}
+}
 
-	if tc.expectCancel {
-		if !eg.IsCancelled() {
-			t.Error("Expected group to be cancelled")
-		}
+func (tc errGroupGoTestCase) checkCancellation(t *testing.T, eg *ErrGroup) {
+	t.Helper()
+	if tc.expectCancel && !eg.IsCancelled() {
+		t.Error("Expected group to be cancelled")
 	}
 }
 
@@ -221,37 +224,39 @@ var errGroupGoCatchTestCases = []errGroupGoCatchTestCase{
 	},
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc errGroupGoCatchTestCase) test(t *testing.T) {
 	t.Helper()
 
 	var eg ErrGroup
 
 	if tc.runFunc == nil {
-		// Test panic for nil function
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic for nil run function")
-			}
-		}()
+		tc.testNilFunction(t, &eg)
+		return
 	}
 
 	eg.GoCatch(tc.runFunc, tc.catchFunc)
-
-	if tc.runFunc == nil {
-		return // Panic expected, test ends here
-	}
-
 	err := eg.Wait()
+	tc.checkTestResult(t, err)
+}
 
+func (tc errGroupGoCatchTestCase) testNilFunction(t *testing.T, eg *ErrGroup) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for nil run function")
+		}
+	}()
+	eg.GoCatch(tc.runFunc, tc.catchFunc)
+}
+
+func (tc errGroupGoCatchTestCase) checkTestResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
 		if err == nil {
 			t.Errorf("Test case '%s': Expected error but got nil", tc.name)
 		}
-	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+	} else if err != nil {
+		t.Errorf("Expected no error but got: %v", err)
 	}
 }
 
@@ -261,61 +266,59 @@ func TestErrGroupGoCatch(t *testing.T) {
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
+func testErrGroupFirstCancellation(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	cause := errors.New("test error")
+	isFirst := eg.Cancel(cause)
+
+	AssertTrue(t, isFirst, "first cancellation")
+	AssertTrue(t, eg.IsCancelled(), "cancelled")
+	AssertEqual(t, cause, eg.Err(), "error")
+}
+
+func testErrGroupSubsequentCancellation(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	// First cancellation
+	cause1 := errors.New("first error")
+	eg.Cancel(cause1)
+
+	// Second cancellation
+	cause2 := errors.New("second error")
+	isFirst := eg.Cancel(cause2)
+
+	if isFirst {
+		t.Error("Expected subsequent cancellation to return false")
+	}
+
+	// Should keep the first error
+	if err := eg.Err(); err != cause1 {
+		t.Errorf("Expected first error %v, got %v", cause1, err)
+	}
+}
+
+func testErrGroupNilCause(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	isFirst := eg.Cancel(nil)
+
+	if !isFirst {
+		t.Error("Expected first cancellation to return true")
+	}
+
+	if err := eg.Err(); err != context.Canceled {
+		t.Errorf("Expected context.Canceled, got %v", err)
+	}
+}
+
 func TestErrGroupCancel(t *testing.T) {
-	t.Run("first cancellation", func(t *testing.T) {
-		var eg ErrGroup
-
-		cause := errors.New("test error")
-		isFirst := eg.Cancel(cause)
-
-		if !isFirst {
-			t.Error("Expected first cancellation to return true")
-		}
-
-		if !eg.IsCancelled() {
-			t.Error("Expected group to be cancelled")
-		}
-
-		if err := eg.Err(); err != cause {
-			t.Errorf("Expected error %v, got %v", cause, err)
-		}
-	})
-
-	t.Run("subsequent cancellation", func(t *testing.T) {
-		var eg ErrGroup
-
-		// First cancellation
-		cause1 := errors.New("first error")
-		eg.Cancel(cause1)
-
-		// Second cancellation
-		cause2 := errors.New("second error")
-		isFirst := eg.Cancel(cause2)
-
-		if isFirst {
-			t.Error("Expected subsequent cancellation to return false")
-		}
-
-		// Should keep the first error
-		if err := eg.Err(); err != cause1 {
-			t.Errorf("Expected first error %v, got %v", cause1, err)
-		}
-	})
-
-	t.Run("nil cause", func(t *testing.T) {
-		var eg ErrGroup
-
-		isFirst := eg.Cancel(nil)
-
-		if !isFirst {
-			t.Error("Expected first cancellation to return true")
-		}
-
-		if err := eg.Err(); err != context.Canceled {
-			t.Errorf("Expected context.Canceled, got %v", err)
-		}
-	})
+	t.Run("first cancellation", testErrGroupFirstCancellation)
+	t.Run("subsequent cancellation", testErrGroupSubsequentCancellation)
+	t.Run("nil cause", testErrGroupNilCause)
 }
 
 func TestErrGroupOnError(t *testing.T) {
@@ -420,74 +423,88 @@ func TestErrGroupDone(t *testing.T) {
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
 func TestErrGroupConcurrency(t *testing.T) {
 	const numWorkers = 10
 
 	var eg ErrGroup
-
-	for i := 0; i < numWorkers; i++ {
-		worker := i
-		eg.Go(func(ctx context.Context) error {
-			// Worker 5 fails quickly, others run longer but should be cancelled
-			if worker == 5 {
-				time.Sleep(5 * time.Millisecond)
-				return errors.New("worker 5 error")
-			}
-
-			// Other workers wait for cancellation or timeout
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(100 * time.Millisecond):
-				return nil // Should not reach here if cancellation works
-			}
-		}, nil)
-	}
+	startConcurrentWorkers(t, &eg, numWorkers)
 
 	err := eg.Wait()
-	if err == nil {
-		t.Error("Expected error from worker 5")
-	}
+	validateConcurrencyResult(t, &eg, err)
+}
 
-	if !eg.IsCancelled() {
-		t.Error("Expected group to be cancelled")
+func startConcurrentWorkers(t *testing.T, eg *ErrGroup, numWorkers int) {
+	t.Helper()
+	for i := 0; i < numWorkers; i++ {
+		worker := i
+		eg.Go(createConcurrentWorker(worker), nil)
+	}
+}
+
+func createConcurrentWorker(worker int) func(context.Context) error {
+	return func(ctx context.Context) error {
+		// Worker 5 fails quickly, others run longer but should be cancelled
+		if worker == 5 {
+			time.Sleep(5 * time.Millisecond)
+			return errors.New("worker 5 error")
+		}
+
+		// Other workers wait for cancellation or timeout
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+			return nil // Should not reach here if cancellation works
+		}
+	}
+}
+
+func validateConcurrencyResult(t *testing.T, eg *ErrGroup, err error) {
+	t.Helper()
+	AssertError(t, err, "worker 5 error")
+	AssertTrue(t, eg.IsCancelled(), "group cancelled")
+}
+
+func testErrGroupCatcherErrorWhenNotCancelled(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	testErr := errors.New("test error")
+	result := eg.defaultErrGroupCatcher(testErr)
+
+	if result != testErr {
+		t.Errorf("Expected %v, got %v", testErr, result)
+	}
+}
+
+func testErrGroupCatcherErrorWhenCancelled(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+	eg.Cancel(errors.New("cancellation error"))
+
+	testErr := errors.New("test error")
+	result := eg.defaultErrGroupCatcher(testErr)
+
+	if result != context.Canceled {
+		t.Errorf("Expected context.Canceled, got %v", result)
+	}
+}
+
+func testErrGroupCatcherNilError(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	result := eg.defaultErrGroupCatcher(nil)
+
+	if result != nil {
+		t.Errorf("Expected nil, got %v", result)
 	}
 }
 
 func TestErrGroupDefaultErrGroupCatcher(t *testing.T) {
-	t.Run("error when not cancelled", func(t *testing.T) {
-		var eg ErrGroup
-
-		testErr := errors.New("test error")
-		result := eg.defaultErrGroupCatcher(testErr)
-
-		if result != testErr {
-			t.Errorf("Expected %v, got %v", testErr, result)
-		}
-	})
-
-	t.Run("error when cancelled", func(t *testing.T) {
-		var eg ErrGroup
-		eg.Cancel(errors.New("cancellation error"))
-
-		testErr := errors.New("test error")
-		result := eg.defaultErrGroupCatcher(testErr)
-
-		if result != context.Canceled {
-			t.Errorf("Expected context.Canceled, got %v", result)
-		}
-	})
-
-	t.Run("nil error", func(t *testing.T) {
-		var eg ErrGroup
-
-		result := eg.defaultErrGroupCatcher(nil)
-
-		if result != nil {
-			t.Errorf("Expected nil, got %v", result)
-		}
-	})
+	t.Run("error when not cancelled", testErrGroupCatcherErrorWhenNotCancelled)
+	t.Run("error when cancelled", testErrGroupCatcherErrorWhenCancelled)
+	t.Run("nil error", testErrGroupCatcherNilError)
 }
 
 func TestErrGroupWithCustomParent(t *testing.T) {

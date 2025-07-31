@@ -284,32 +284,11 @@ func TestAddrFromNetIP(t *testing.T) {
 }
 
 // Test GetStringIPAddresses
-//
-//revive:disable-next-line:cognitive-complexity
 func TestGetStringIPAddresses(t *testing.T) {
 	// Since we can't easily mock net.InterfaceByName and net.InterfaceAddrs,
 	// we'll test with the real interfaces but handle the case where there are none
 
-	t.Run("all interfaces", func(t *testing.T) {
-		addrs, err := GetStringIPAddresses()
-		if err != nil {
-			// Some systems might not have any interfaces
-			t.Logf("Got error (possibly no interfaces): %v", err)
-			return
-		}
-
-		// At least check it returns a slice (could be empty)
-		if addrs == nil {
-			t.Error("Expected non-nil slice")
-		}
-
-		// Verify all returned addresses are valid strings
-		for _, addr := range addrs {
-			if _, err := netip.ParseAddr(addr); err != nil {
-				t.Errorf("Invalid address string: %s", addr)
-			}
-		}
-	})
+	t.Run("all interfaces", testAllStringInterfaces)
 
 	t.Run("specific interface", func(t *testing.T) {
 		// Try with a non-existent interface
@@ -341,6 +320,28 @@ func testLoopbackInterface(t *testing.T) {
 
 	if !found {
 		t.Skip("No loopback interface found on this system")
+	}
+}
+
+func testAllStringInterfaces(t *testing.T) {
+	t.Helper()
+	addrs, err := GetStringIPAddresses()
+	if err != nil {
+		// Some systems might not have any interfaces
+		t.Logf("Got error (possibly no interfaces): %v", err)
+		return
+	}
+
+	// At least check it returns a slice (could be empty)
+	if addrs == nil {
+		t.Error("Expected non-nil slice")
+	}
+
+	// Verify all returned addresses are valid strings
+	for _, addr := range addrs {
+		if _, err := netip.ParseAddr(addr); err != nil {
+			t.Errorf("Invalid address string: %s", addr)
+		}
 	}
 }
 

@@ -36,46 +36,55 @@ var panicErrorMethodsTestCases = []panicErrorMethodsTestCase{
 	},
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc panicErrorMethodsTestCase) test(t *testing.T) {
 	t.Helper()
 	pe := NewPanicError(0, tc.payload)
 
-	// Test Error method
+	tc.testErrorMethod(t, pe)
+	tc.testRecoveredMethod(t, pe)
+	tc.testCallStackMethod(t, pe)
+}
+
+func (tc panicErrorMethodsTestCase) testErrorMethod(t *testing.T, pe *PanicError) {
+	t.Helper()
 	errorStr := pe.Error()
 	expectedError := fmt.Sprintf("panic: %s", tc.expected)
-	if errorStr != expectedError {
-		t.Fatalf("expected error '%s', got '%s'", expectedError, errorStr)
-	}
+	AssertEqual(t, expectedError, errorStr, "error message")
+}
 
-	// Test Recovered method
+func (tc panicErrorMethodsTestCase) testRecoveredMethod(t *testing.T, pe *PanicError) {
+	t.Helper()
 	recovered := pe.Recovered()
 	if tc.payload == nil {
-		if recovered != nil {
-			t.Fatalf("expected nil recovered, got %v", recovered)
-		}
+		AssertNil(t, recovered, "nil payload recovered")
 	} else {
-		// For strings, they get converted to errors in NewPanicError
-		if s, ok := tc.payload.(string); ok {
-			if err, ok := recovered.(error); ok {
-				if err.Error() != s {
-					t.Fatalf("expected recovered error '%s', got '%s'", s, err.Error())
-				}
-			} else {
-				t.Fatalf("expected error type for string payload, got %T", recovered)
-			}
-		} else {
-			if recovered != tc.payload {
-				t.Fatalf("expected recovered %v, got %v", tc.payload, recovered)
-			}
-		}
+		tc.validateRecoveredPayload(t, recovered)
 	}
+}
 
-	// Test CallStack method
-	stack := pe.CallStack()
-	if len(stack) == 0 {
-		t.Fatalf("expected non-empty stack trace")
+func (tc panicErrorMethodsTestCase) validateRecoveredPayload(t *testing.T, recovered any) {
+	t.Helper()
+	// For strings, they get converted to errors in NewPanicError
+	if s, ok := tc.payload.(string); ok {
+		tc.validateStringPayload(t, recovered, s)
+	} else {
+		AssertEqual(t, tc.payload, recovered, "recovered payload")
 	}
+}
+
+func (panicErrorMethodsTestCase) validateStringPayload(t *testing.T, recovered any, expectedStr string) {
+	t.Helper()
+	if err, ok := recovered.(error); ok {
+		AssertEqual(t, expectedStr, err.Error(), "string payload error")
+	} else {
+		t.Fatalf("expected error type for string payload, got %T", recovered)
+	}
+}
+
+func (panicErrorMethodsTestCase) testCallStackMethod(t *testing.T, pe *PanicError) {
+	t.Helper()
+	stack := pe.CallStack()
+	AssertTrue(t, len(stack) > 0, "non-empty stack trace")
 }
 
 type panicErrorUnwrapTestCase struct {
@@ -257,39 +266,49 @@ var panicFunctionsTestCases = []panicFunctionsTestCase{
 	},
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc panicFunctionsTestCase) test(t *testing.T) {
 	t.Helper()
 	defer func() {
 		r := recover()
-		if r == nil {
-			t.Fatalf("expected panic, got nil")
-		}
-
-		pe, ok := r.(*PanicError)
-		if !ok {
-			t.Fatalf("expected PanicError, got %T", r)
-		}
-
-		// Handle payload comparison based on type
-		panicValue := pe.Recovered()
-		if s, ok := tc.expected.(string); ok {
-			if err, ok := panicValue.(error); ok {
-				if err.Error() != s {
-					t.Fatalf("expected panic payload error '%s', got '%s'", s, err.Error())
-				}
-			} else {
-				t.Fatalf("expected error payload for string, got %T", panicValue)
-			}
-		} else {
-			// For non-string expected values, compare directly
-			if panicValue != tc.expected {
-				t.Fatalf("expected panic payload %v, got %v", tc.expected, panicValue)
-			}
-		}
+		tc.validatePanicFunction(t, r)
 	}()
-
 	tc.fn()
+}
+
+func (tc panicFunctionsTestCase) validatePanicFunction(t *testing.T, r any) {
+	t.Helper()
+	AssertNotNil(t, r, "panic occurred")
+
+	pe := tc.extractPanicError(t, r)
+	tc.validatePanicPayload(t, pe)
+}
+
+func (panicFunctionsTestCase) extractPanicError(t *testing.T, r any) *PanicError {
+	t.Helper()
+	pe, ok := r.(*PanicError)
+	if !ok {
+		t.Fatalf("expected PanicError, got %T", r)
+	}
+	return pe
+}
+
+func (tc panicFunctionsTestCase) validatePanicPayload(t *testing.T, pe *PanicError) {
+	t.Helper()
+	panicValue := pe.Recovered()
+	if s, ok := tc.expected.(string); ok {
+		tc.validateStringPayload(t, panicValue, s)
+	} else {
+		AssertEqual(t, tc.expected, panicValue, "panic payload")
+	}
+}
+
+func (panicFunctionsTestCase) validateStringPayload(t *testing.T, panicValue any, expectedStr string) {
+	t.Helper()
+	if err, ok := panicValue.(error); ok {
+		AssertEqual(t, expectedStr, err.Error(), "panic error message")
+	} else {
+		t.Fatalf("expected error payload for string, got %T", panicValue)
+	}
 }
 
 type panicWrapFunctionsTestCase struct {
@@ -297,33 +316,37 @@ type panicWrapFunctionsTestCase struct {
 	name string
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc panicWrapFunctionsTestCase) test(t *testing.T, originalErr error) {
 	t.Helper()
 	defer func() {
 		r := recover()
-		if r == nil {
-			t.Fatalf("expected panic, got nil")
-		}
-
-		pe, ok := r.(*PanicError)
-		if !ok {
-			t.Fatalf("expected PanicError, got %T", r)
-		}
-
-		// Test that it unwraps to something that contains the original error
-		unwrapped := pe.Unwrap()
-		if unwrapped == nil {
-			t.Fatalf("expected unwrapped error, got nil")
-		}
-
-		// Check if we can find the original error in the chain
-		if !errors.Is(unwrapped, originalErr) {
-			t.Fatalf("expected to find original error in chain")
-		}
+		tc.validateWrapFunction(t, r, originalErr)
 	}()
-
 	tc.fn()
+}
+
+func (tc panicWrapFunctionsTestCase) validateWrapFunction(t *testing.T, r any, originalErr error) {
+	t.Helper()
+	AssertNotNil(t, r, "panic occurred")
+
+	pe := tc.extractWrapPanicError(t, r)
+	tc.validateUnwrapChain(t, pe, originalErr)
+}
+
+func (panicWrapFunctionsTestCase) extractWrapPanicError(t *testing.T, r any) *PanicError {
+	t.Helper()
+	pe, ok := r.(*PanicError)
+	if !ok {
+		t.Fatalf("expected PanicError, got %T", r)
+	}
+	return pe
+}
+
+func (panicWrapFunctionsTestCase) validateUnwrapChain(t *testing.T, pe *PanicError, originalErr error) {
+	t.Helper()
+	unwrapped := pe.Unwrap()
+	AssertNotNil(t, unwrapped, "unwrapped error")
+	AssertTrue(t, errors.Is(unwrapped, originalErr), "original error in chain")
 }
 
 type newUnreachableErrorTestCase struct {

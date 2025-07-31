@@ -117,7 +117,7 @@ func (tc listContainsTestCase) test(t *testing.T) {
 	}
 
 	result := ListContains(l, tc.target)
-	AssertBool(t, result, tc.expected, "ListContains result")
+	AssertEqual(t, tc.expected, result, "ListContains")
 }
 
 func TestListContains(t *testing.T) {
@@ -140,7 +140,7 @@ func TestListContains(t *testing.T) {
 	// Test nil list
 	t.Run("nil list", func(t *testing.T) {
 		result := ListContains((*list.List)(nil), 42)
-		AssertBool(t, result, false, "ListContains nil list")
+		AssertFalse(t, result, "nil list")
 	})
 }
 
@@ -163,13 +163,13 @@ func (tc listCopyTestCase) test(t *testing.T) {
 	copied := ListCopy[int](orig)
 
 	// Verify same length
-	AssertEqual(t, orig.Len(), copied.Len(), "ListCopy length")
+	AssertEqual(t, orig.Len(), copied.Len(), "length")
 
 	// Verify same elements
 	origElem := orig.Front()
 	copiedElem := copied.Front()
 	for origElem != nil && copiedElem != nil {
-		AssertEqual(t, origElem.Value.(int), copiedElem.Value.(int), "ListCopy element value")
+		AssertEqual(t, origElem.Value.(int), copiedElem.Value.(int), "element value")
 		origElem = origElem.Next()
 		copiedElem = copiedElem.Next()
 	}
@@ -182,7 +182,7 @@ func (tc listCopyTestCase) test(t *testing.T) {
 	// Verify independence - modifying one doesn't affect the other
 	if orig.Len() > 0 {
 		orig.PushBack(999)
-		AssertEqual(t, orig.Len()-1, copied.Len(), "ListCopy should be independent")
+		AssertEqual(t, orig.Len()-1, copied.Len(), "independence")
 	}
 }
 
@@ -224,7 +224,7 @@ func TestListContainsFn(t *testing.T) {
 		result := ListContainsFn(l, 0, func(_, val int) bool {
 			return val > 2
 		})
-		AssertBool(t, result, true, "ListContainsFn custom function")
+		AssertTrue(t, result, "ListContainsFn")
 	})
 
 	// Test with nil list
@@ -232,7 +232,7 @@ func TestListContainsFn(t *testing.T) {
 		result := ListContainsFn((*list.List)(nil), 42, func(a, b int) bool {
 			return a == b
 		})
-		AssertBool(t, result, false, "ListContainsFn nil list")
+		AssertFalse(t, result, "nil list")
 	})
 
 	// Test with nil function
@@ -241,7 +241,7 @@ func TestListContainsFn(t *testing.T) {
 		l.PushBack(42)
 
 		result := ListContainsFn(l, 42, nil)
-		AssertBool(t, result, false, "ListContainsFn nil function")
+		AssertFalse(t, result, "nil function")
 	})
 }
 
@@ -259,11 +259,11 @@ func TestListCopyFn(t *testing.T) {
 			return v * 2, true
 		})
 
-		AssertEqual(t, 3, result.Len(), "ListCopyFn transformation length")
-		expected := []int{2, 4, 6}
+		AssertEqual(t, 3, result.Len(), "length")
+		expected := S(2, 4, 6)
 		i := 0
 		for e := result.Front(); e != nil; e = e.Next() {
-			AssertEqual(t, expected[i], e.Value.(int), "ListCopyFn transformation value")
+			AssertEqual(t, expected[i], e.Value.(int), "value[%d]", i)
 			i++
 		}
 	})
@@ -281,11 +281,11 @@ func TestListCopyFn(t *testing.T) {
 			return v, v%2 == 0
 		})
 
-		AssertEqual(t, 2, result.Len(), "ListCopyFn filtering length")
-		expected := []int{2, 4}
+		AssertEqual(t, 2, result.Len(), "filtered length")
+		expected := S(2, 4)
 		i := 0
 		for e := result.Front(); e != nil; e = e.Next() {
-			AssertEqual(t, expected[i], e.Value.(int), "ListCopyFn filtering value")
+			AssertEqual(t, expected[i], e.Value.(int), "value[%d]", i)
 			i++
 		}
 	})
@@ -295,7 +295,7 @@ func TestListCopyFn(t *testing.T) {
 		result := ListCopyFn((*list.List)(nil), func(v int) (int, bool) {
 			return v, true
 		})
-		AssertEqual(t, 0, result.Len(), "ListCopyFn nil list")
+		AssertEqual(t, 0, result.Len(), "nil list")
 	})
 
 	// Test with nil function (should use default)
@@ -304,8 +304,8 @@ func TestListCopyFn(t *testing.T) {
 		l.PushBack(42)
 
 		result := ListCopyFn[int](l, nil)
-		AssertEqual(t, 1, result.Len(), "ListCopyFn nil function")
-		AssertEqual(t, 42, result.Front().Value.(int), "ListCopyFn nil function value")
+		AssertEqual(t, 1, result.Len(), "nil function")
+		AssertEqual(t, 42, result.Front().Value.(int), "value")
 	})
 }
 
@@ -320,7 +320,7 @@ func testListForEachNilAndEarlyReturn(t *testing.T, name string, iterFn func(*li
 
 		var result []int
 		iterFn(l, func(int) bool { return false })
-		AssertEqual(t, 0, len(result), name+" nil function should not call anything")
+		AssertEqual(t, 0, len(result), name+" nil function")
 	})
 
 	// Test early return
@@ -340,8 +340,8 @@ func testListForEachNilAndEarlyReturn(t *testing.T, name string, iterFn func(*li
 			AssertEqual(t, 1, result[0], "First element")
 			AssertEqual(t, 2, result[1], "Second element")
 		} else {
-			AssertEqual(t, 3, result[0], "First element (from back)")
-			AssertEqual(t, 2, result[1], "Second element (from back)")
+			AssertEqual(t, 3, result[0], "first (backward)")
+			AssertEqual(t, 2, result[1], "second (backward)")
 		}
 	})
 
@@ -367,7 +367,7 @@ func testListForEachElementNilAndEarlyReturn(t *testing.T, name string,
 
 		var called bool
 		iterFn(l, nil)
-		AssertBool(t, called, false, name+" nil function should not call anything")
+		AssertFalse(t, called, name)
 	})
 
 	// Test early return
@@ -387,8 +387,8 @@ func testListForEachElementNilAndEarlyReturn(t *testing.T, name string,
 			AssertEqual(t, 1, result[0], "First element")
 			AssertEqual(t, 2, result[1], "Second element")
 		} else {
-			AssertEqual(t, 3, result[0], "First element (from back)")
-			AssertEqual(t, 2, result[1], "Second element (from back)")
+			AssertEqual(t, 3, result[0], "first (backward)")
+			AssertEqual(t, 2, result[1], "second (backward)")
 		}
 	})
 
