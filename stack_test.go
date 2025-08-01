@@ -70,9 +70,8 @@ func deepStackFrame(depth, space int) *Frame {
 	return hereStackFrame(space)
 }
 
-// revive:disable:cognitive-complexity
+//revive:disable-next-line:cognitive-complexity
 func TestStackTrace(t *testing.T) {
-	// revive:enable:cognitive-complexity
 	stack := StackTrace(0)
 	if len(stack) < 2 || fmt.Sprintf("%n", stack[0]) != "TestStackTrace" {
 		t.Fatalf("StackTrace(%v): %s", 0, fmt.Sprintln(stack))
@@ -169,7 +168,7 @@ func TestFrameName(t *testing.T) {
 			if tc.frame == nil {
 				// Test nil Frame - create empty frame to test Name method
 				var frame Frame
-				AssertEqual(t, "", frame.Name(), "empty frame should return empty name")
+				AssertEqual(t, "", frame.Name(), "empty frame name")
 			} else {
 				AssertEqual(t, tc.expected, tc.frame.Name(), "frame name mismatch")
 			}
@@ -210,11 +209,11 @@ func TestFrameFile(t *testing.T) {
 
 	// Test empty frame
 	emptyFrame := &Frame{file: ""}
-	AssertEqual(t, "", emptyFrame.File(), "empty frame should return empty file")
+	AssertEqual(t, "", emptyFrame.File(), "empty frame file")
 
 	// Test frame with file
 	testFrame := &Frame{file: "/path/to/file.go"}
-	AssertEqual(t, "/path/to/file.go", testFrame.File(), "frame should return file path")
+	AssertEqual(t, "/path/to/file.go", testFrame.File(), "frame file path")
 }
 
 // Test case for Frame.PkgFile method
@@ -299,11 +298,11 @@ func TestFrameLine(t *testing.T) {
 
 	// Test empty frame
 	emptyFrame := &Frame{line: 0}
-	AssertEqual(t, 0, emptyFrame.Line(), "empty frame should return 0 line")
+	AssertEqual(t, 0, emptyFrame.Line(), "empty frame line")
 
 	// Test frame with line
 	testFrame := &Frame{line: 42}
-	AssertEqual(t, 42, testFrame.Line(), "frame should return line number")
+	AssertEqual(t, 42, testFrame.Line(), "frame line number")
 }
 
 // Test case for Frame.FileLine method
@@ -354,14 +353,14 @@ func TestFrameString(t *testing.T) {
 	expected := fmt.Sprintf("%v", frame)
 	actual := frame.String()
 
-	AssertEqual(t, expected, actual, "String() should be equivalent to %v format")
+	AssertEqual(t, expected, actual, "String format")
 
 	// Test with empty frame
 	emptyFrame := &Frame{}
 	expectedEmpty := fmt.Sprintf("%v", emptyFrame)
 	actualEmpty := emptyFrame.String()
 
-	AssertEqual(t, expectedEmpty, actualEmpty, "String() should work for empty frame")
+	AssertEqual(t, expectedEmpty, actualEmpty, "empty frame String")
 }
 
 // Test case for Frame.Format method
@@ -437,7 +436,7 @@ func (tc stackFormatTestCase) test(t *testing.T) {
 
 	// Special case for empty stack - check exact match
 	if len(tc.stack) == 0 && len(tc.contains) == 1 && tc.contains[0] == "" {
-		AssertEqual(t, "", result, "empty stack should produce empty output")
+		AssertEqual(t, "", result, "empty stack output")
 		return
 	}
 
@@ -496,14 +495,14 @@ func TestStackString(t *testing.T) {
 	expected := fmt.Sprintf("%v", stack)
 	actual := stack.String()
 
-	AssertEqual(t, expected, actual, "String() should be equivalent to %v format")
+	AssertEqual(t, expected, actual, "String format")
 
 	// Test with empty stack
 	emptyStack := Stack{}
 	expectedEmpty := fmt.Sprintf("%v", emptyStack)
 	actualEmpty := emptyStack.String()
 
-	AssertEqual(t, expectedEmpty, actualEmpty, "String() should work for empty stack")
+	AssertEqual(t, expectedEmpty, actualEmpty, "empty stack String")
 }
 
 // Test case for formatLine function
@@ -516,7 +515,7 @@ type formatLineTestCase struct {
 func (tc formatLineTestCase) test(t *testing.T) {
 	t.Helper()
 	result := fmt.Sprintf("%d", tc.frame)
-	AssertEqual(t, tc.expected, result, "formatLine should format line number")
+	AssertEqual(t, tc.expected, result, "formatted line")
 }
 
 func newFormatLineTestCase(name string, frame *Frame, expected string) formatLineTestCase {

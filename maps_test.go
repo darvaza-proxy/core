@@ -36,25 +36,19 @@ var keysTestCases = []keysTestCase{
 	},
 }
 
-// revive:disable-next-line:cognitive-complexity
 func (tc keysTestCase) test(t *testing.T) {
 	t.Helper()
 
 	got := Keys(tc.input)
-	AssertEqual(t, tc.expected, len(got), "Keys(%v) returned wrong number of keys", tc.input)
+	AssertEqual(t, tc.expected, len(got), "Keys", tc.input)
 
-	// Verify all keys are present
+	tc.verifyAllKeysPresent(t, got)
+}
+
+func (tc keysTestCase) verifyAllKeysPresent(t *testing.T, got []string) {
+	t.Helper()
 	for k := range tc.input {
-		found := false
-		for _, gotK := range got {
-			if gotK == k {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Key %q not found in result", k)
-		}
+		AssertTrue(t, SliceContains(got, k), "contains %v", k)
 	}
 }
 
@@ -103,7 +97,7 @@ func (tc sortedKeysTestCase) test(t *testing.T) {
 	t.Helper()
 
 	got := SortedKeys(tc.input)
-	AssertSliceEqual(t, tc.expected, got, "SortedKeys(%v) failed", tc.input)
+	AssertSliceEqual(t, tc.expected, got, "SortedKeys", tc.input)
 }
 
 func TestSortedKeys(t *testing.T) {
@@ -118,7 +112,7 @@ func TestSortedKeysInt(t *testing.T) {
 	expected := S(1, 2, 10, 20)
 
 	got := SortedKeys(input)
-	AssertSliceEqual(t, expected, got, "SortedKeys with int keys failed")
+	AssertSliceEqual(t, expected, got, "SortedKeys[int]")
 }
 
 // sortedValuesTestCase tests SortedValues functions
@@ -155,7 +149,7 @@ func (tc sortedValuesTestCase) test(t *testing.T) {
 	t.Helper()
 
 	got := SortedValues(tc.input)
-	AssertSliceEqual(t, tc.expected, got, "SortedValues(%v) failed", tc.input)
+	AssertSliceEqual(t, tc.expected, got, "SortedValues", tc.input)
 }
 
 func TestSortedValues(t *testing.T) {
@@ -215,7 +209,7 @@ func (tc sortedValuesCondTestCase) test(t *testing.T) {
 	t.Helper()
 
 	got := SortedValuesCond(tc.input, tc.predicate)
-	AssertSliceEqual(t, tc.expected, got, "SortedValuesCond(%v, predicate) failed", tc.input)
+	AssertSliceEqual(t, tc.expected, got, "SortedValuesCond", tc.input)
 }
 
 func TestSortedValuesCond(t *testing.T) {
@@ -231,21 +225,21 @@ func TestSortedValuesUnlikelyCond(t *testing.T) {
 	expected := S(3)
 
 	got := SortedValuesUnlikelyCond(input, predicate)
-	AssertSliceEqual(t, expected, got, "SortedValuesUnlikelyCond failed")
+	AssertSliceEqual(t, expected, got, "SortedValuesUnlikelyCond")
 
 	// Test empty result
 	predicate2 := func(v int) bool { return v > 10 }
 	got2 := SortedValuesUnlikelyCond(input, predicate2)
-	AssertEqual(t, 0, len(got2), "SortedValuesUnlikelyCond with no matches should return empty")
+	AssertEqual(t, 0, len(got2), "SortedValuesUnlikelyCond empty")
 
 	// Test nil map
 	got3 := SortedValuesUnlikelyCond[string, int](nil, predicate)
-	AssertEqual(t, true, got3 == nil, "SortedValuesUnlikelyCond with nil map should return nil")
+	AssertNil(t, got3, "SortedValuesUnlikelyCond(nil)")
 
 	// Test nil predicate
 	got4 := SortedValuesUnlikelyCond(input, nil)
 	expected4 := S(1, 2, 3, 4)
-	AssertSliceEqual(t, expected4, got4, "SortedValuesUnlikelyCond with nil predicate failed")
+	AssertSliceEqual(t, expected4, got4, "SortedValuesUnlikelyCond nil predicate")
 }
 
 // mapValueTestCase tests MapValue function
@@ -297,8 +291,8 @@ func (tc mapValueTestCase) test(t *testing.T) {
 	t.Helper()
 
 	got, found := MapValue(tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.expected, got, "MapValue(%v, %q, %d) returned wrong value", tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.found, found, "MapValue(%v, %q, %d) returned wrong found flag", tc.m, tc.key, tc.def)
+	AssertEqual(t, tc.expected, got, "MapValue value", tc.m, tc.key, tc.def)
+	AssertEqual(t, tc.found, found, "MapValue found", tc.m, tc.key, tc.def)
 }
 
 func TestMapValue(t *testing.T) {
@@ -346,7 +340,7 @@ func (tc mapContainsTestCase) test(t *testing.T) {
 	t.Helper()
 
 	got := MapContains(tc.m, tc.key)
-	AssertEqual(t, tc.expected, got, "MapContains(%v, %q) failed", tc.m, tc.key)
+	AssertEqual(t, tc.expected, got, "MapContains", tc.m, tc.key)
 }
 
 func TestMapContains(t *testing.T) {
@@ -361,15 +355,15 @@ func TestMapListInsert(t *testing.T) {
 	// Insert into empty map
 	MapListInsert(m, "key1", "value1")
 	l, ok := m["key1"]
-	AssertEqual(t, true, ok, "MapListInsert failed to create list")
-	AssertEqual(t, 1, l.Len(), "MapListInsert created list with wrong length")
+	AssertTrue(t, ok, "MapListInsert")
+	AssertEqual(t, 1, l.Len(), "list length")
 
 	// Insert another value
 	MapListInsert(m, "key1", "value2")
-	AssertEqual(t, 2, m["key1"].Len(), "MapListInsert failed to add second value")
+	AssertEqual(t, 2, m["key1"].Len(), "list length after insert")
 
 	// Verify order (insert at front)
-	AssertEqual(t, "value2", m["key1"].Front().Value, "MapListInsert should insert at front")
+	AssertEqual(t, "value2", m["key1"].Front().Value, "front value")
 }
 
 func TestMapListAppend(t *testing.T) {
@@ -378,15 +372,15 @@ func TestMapListAppend(t *testing.T) {
 	// Append to empty map
 	MapListAppend(m, "key1", "value1")
 	l, ok := m["key1"]
-	AssertEqual(t, true, ok, "MapListAppend failed to create list")
-	AssertEqual(t, 1, l.Len(), "MapListAppend created list with wrong length")
+	AssertTrue(t, ok, "MapListAppend")
+	AssertEqual(t, 1, l.Len(), "list length")
 
 	// Append another value
 	MapListAppend(m, "key1", "value2")
-	AssertEqual(t, 2, m["key1"].Len(), "MapListAppend failed to add second value")
+	AssertEqual(t, 2, m["key1"].Len(), "list length after append")
 
 	// Verify order (append at back)
-	AssertEqual(t, "value2", m["key1"].Back().Value, "MapListAppend should append at back")
+	AssertEqual(t, "value2", m["key1"].Back().Value, "back value")
 }
 
 type mapListContainsTestCase struct {
@@ -400,7 +394,7 @@ type mapListContainsTestCase struct {
 func (tc mapListContainsTestCase) test(t *testing.T) {
 	t.Helper()
 	got := MapListContains(tc.m, tc.key, tc.value)
-	AssertEqual(t, tc.expected, got, "MapListContains(m, %q, %q) failed", tc.key, tc.value)
+	AssertEqual(t, tc.expected, got, "MapListContains", tc.key, tc.value)
 }
 
 func TestMapListContains(t *testing.T) {
@@ -436,16 +430,13 @@ func TestMapListContainsFn(t *testing.T) {
 	eq := func(a, b customType) bool { return a.id == b.id }
 
 	// Test existing value
-	AssertEqual(t, true, MapListContainsFn(m, "key1", customType{id: 1, name: "different"}, eq),
-		"MapListContainsFn should find value by id")
+	AssertTrue(t, MapListContainsFn(m, "key1", customType{id: 1, name: "different"}, eq), "MapListContainsFn")
 
 	// Test missing value
-	AssertEqual(t, false, MapListContainsFn(m, "key1", customType{id: 3, name: "three"}, eq),
-		"MapListContainsFn should not find missing value")
+	AssertFalse(t, MapListContainsFn(m, "key1", customType{id: 3, name: "three"}, eq), "MapListContainsFn missing")
 
 	// Test nil eq function
-	AssertEqual(t, false, MapListContainsFn(m, "key1", customType{id: 1, name: "one"}, nil),
-		"MapListContainsFn with nil eq should return false")
+	AssertFalse(t, MapListContainsFn(m, "key1", customType{id: 1, name: "one"}, nil), "MapListContainsFn nil eq")
 }
 
 func TestMapListInsertUnique(t *testing.T) {
@@ -453,15 +444,15 @@ func TestMapListInsertUnique(t *testing.T) {
 
 	// Insert first value
 	MapListInsertUnique(m, "key1", "value1")
-	AssertEqual(t, 1, m["key1"].Len(), "MapListInsertUnique failed to insert first value")
+	AssertEqual(t, 1, m["key1"].Len(), "length after first insert")
 
 	// Try to insert duplicate
 	MapListInsertUnique(m, "key1", "value1")
-	AssertEqual(t, 1, m["key1"].Len(), "MapListInsertUnique should not insert duplicate")
+	AssertEqual(t, 1, m["key1"].Len(), "length after duplicate")
 
 	// Insert different value
 	MapListInsertUnique(m, "key1", "value2")
-	AssertEqual(t, 2, m["key1"].Len(), "MapListInsertUnique should insert different value")
+	AssertEqual(t, 2, m["key1"].Len(), "length after unique")
 }
 
 func TestMapListAppendUnique(t *testing.T) {
@@ -469,20 +460,18 @@ func TestMapListAppendUnique(t *testing.T) {
 
 	// Append first value
 	MapListAppendUnique(m, "key1", "value1")
-	AssertEqual(t, 1, m["key1"].Len(), "MapListAppendUnique failed to append first value")
+	AssertEqual(t, 1, m["key1"].Len(), "length after first append")
 
 	// Try to append duplicate
 	MapListAppendUnique(m, "key1", "value1")
-	AssertEqual(t, 1, m["key1"].Len(), "MapListAppendUnique should not append duplicate")
+	AssertEqual(t, 1, m["key1"].Len(), "length after duplicate")
 
 	// Append different value
 	MapListAppendUnique(m, "key1", "value2")
-	AssertEqual(t, 2, m["key1"].Len(), "MapListAppendUnique should append different value")
+	AssertEqual(t, 2, m["key1"].Len(), "length after unique")
 }
 
-// revive:disable:cognitive-complexity
 func TestMapListForEach(t *testing.T) {
-	// revive:enable:cognitive-complexity
 	m := make(map[string]*list.List)
 	MapListAppend(m, "key1", "a")
 	MapListAppend(m, "key1", "b")
@@ -495,7 +484,7 @@ func TestMapListForEach(t *testing.T) {
 	})
 
 	expected := S("a", "b", "c")
-	AssertSliceEqual(t, expected, result, "MapListForEach failed to collect all values")
+	AssertSliceEqual(t, expected, result, "MapListForEach")
 
 	// Test early termination
 	result = nil
@@ -504,8 +493,8 @@ func TestMapListForEach(t *testing.T) {
 		return v == "b" // stop at "b"
 	})
 
-	AssertEqual(t, 2, len(result), "MapListForEach early termination failed")
-	AssertEqual(t, "b", result[1], "MapListForEach early termination stopped at wrong value")
+	AssertEqual(t, 2, len(result), "early termination length")
+	AssertEqual(t, "b", result[1], "stopped value")
 
 	// Test missing key
 	result = nil
@@ -513,7 +502,7 @@ func TestMapListForEach(t *testing.T) {
 		result = append(result, v)
 		return false
 	})
-	AssertEqual(t, 0, len(result), "MapListForEach with missing key should not call function")
+	AssertEqual(t, 0, len(result), "missing key")
 
 	// Test nil map
 	MapListForEach(nil, "key", func(_ string) bool { return false })
@@ -592,7 +581,7 @@ func (tc mapListForEachElementTestCase) test(t *testing.T) {
 		return false
 	})
 
-	AssertEqual(t, len(tc.expected), len(values), "got wrong number of values")
+	AssertEqual(t, len(tc.expected), len(values), "value count")
 	for i, v := range values {
 		if i < len(tc.expected) {
 			AssertEqual(t, tc.expected[i], v, "values[%d] mismatch", i)
@@ -608,9 +597,7 @@ func TestMapListForEachElement(t *testing.T) {
 	}
 }
 
-// revive:disable:cognitive-complexity
 func TestMapListCopy(t *testing.T) {
-	// revive:enable:cognitive-complexity
 	src := make(map[string]*list.List)
 	MapListAppend(src, "key1", "a")
 	MapListAppend(src, "key1", "b")
@@ -619,7 +606,7 @@ func TestMapListCopy(t *testing.T) {
 	dst := MapListCopy(src)
 
 	// Verify structure
-	AssertEqual(t, len(src), len(dst), "MapListCopy created map with wrong number of keys")
+	AssertEqual(t, len(src), len(dst), "key count")
 
 	// Verify contents
 	for key, srcList := range src {
@@ -628,13 +615,13 @@ func TestMapListCopy(t *testing.T) {
 			t.Errorf("MapListCopy missing key %q", key)
 			continue
 		}
-		AssertEqual(t, srcList.Len(), dstList.Len(), "MapListCopy list length mismatch for key %q", key)
+		AssertEqual(t, srcList.Len(), dstList.Len(), "list length[%q]", key)
 	}
 
 	// Verify deep copy (modify dst shouldn't affect src)
 	MapListAppend(dst, "key1", "new")
-	AssertEqual(t, 2, src["key1"].Len(), "MapListCopy source list should be unchanged")
-	AssertEqual(t, 3, dst["key1"].Len(), "MapListCopy destination list should be modified")
+	AssertEqual(t, 2, src["key1"].Len(), "source length")
+	AssertEqual(t, 3, dst["key1"].Len(), "destination length")
 }
 
 func TestMapListCopyFn(t *testing.T) {
@@ -654,15 +641,15 @@ func TestMapListCopyFn(t *testing.T) {
 	// Verify transformation
 	el := dst["key1"].Front()
 	v, ok := el.Value.(data)
-	AssertEqual(t, true, ok, "MapListCopyFn transformation failed: wrong type")
-	AssertEqual(t, "a-copy", v.value, "MapListCopyFn transformation failed")
+	AssertTrue(t, ok, "MapListCopyFn type check")
+	AssertEqual(t, "a-copy", v.value, "transformed value")
 
 	// Test filtering
 	dst2 := MapListCopyFn(src, func(v data) (data, bool) {
 		return v, v.value != "b" // exclude "b"
 	})
 
-	AssertEqual(t, 1, dst2["key1"].Len(), "MapListCopyFn filtering failed")
+	AssertEqual(t, 1, dst2["key1"].Len(), "filtered length")
 }
 
 type mapAllListContainsTestCase struct {
@@ -675,7 +662,7 @@ type mapAllListContainsTestCase struct {
 func (tc mapAllListContainsTestCase) test(t *testing.T) {
 	t.Helper()
 	got := MapAllListContains(tc.m, tc.value)
-	AssertEqual(t, tc.expected, got, "MapAllListContains(m, %q) failed", tc.value)
+	AssertEqual(t, tc.expected, got, "MapAllListContains", tc.value)
 }
 
 func TestMapAllListContains(t *testing.T) {
@@ -707,17 +694,17 @@ func TestMapAllListContainsFn(t *testing.T) {
 	found := MapAllListContainsFn(m, func(v int) bool {
 		return v%2 == 0
 	})
-	AssertEqual(t, true, found, "MapAllListContainsFn should find even number")
+	AssertTrue(t, found, "MapAllListContainsFn even")
 
 	// Test not finding large number
 	found = MapAllListContainsFn(m, func(v int) bool {
 		return v > 10
 	})
-	AssertEqual(t, false, found, "MapAllListContainsFn should not find number > 10")
+	AssertFalse(t, found, "MapAllListContainsFn >10")
 
 	// Test nil function
 	found = MapAllListContainsFn[string, int](m, nil)
-	AssertEqual(t, false, found, "MapAllListContainsFn with nil function should return false")
+	AssertFalse(t, found, "MapAllListContainsFn(nil)")
 }
 
 func TestMapAllListForEach(t *testing.T) {
@@ -733,7 +720,7 @@ func TestMapAllListForEach(t *testing.T) {
 		return false // continue
 	})
 
-	AssertEqual(t, 10, sum, "MapAllListForEach sum failed")
+	AssertEqual(t, 10, sum, "sum")
 
 	// Test early termination
 	sum = 0
@@ -743,7 +730,7 @@ func TestMapAllListForEach(t *testing.T) {
 	})
 
 	// Sum should be less than 10 due to early termination
-	AssertEqual(t, true, sum < 10, "MapAllListForEach should stop early")
+	AssertTrue(t, sum < 10, "MapAllListForEach early stop")
 }
 
 func TestMapAllListForEachElement(t *testing.T) {
@@ -758,7 +745,7 @@ func TestMapAllListForEachElement(t *testing.T) {
 		return false // continue
 	})
 
-	AssertEqual(t, 3, count, "MapAllListForEachElement count failed")
+	AssertEqual(t, 3, count, "count")
 
 	// Test early termination
 	count = 0
@@ -767,7 +754,7 @@ func TestMapAllListForEachElement(t *testing.T) {
 		return count == 2 // stop after 2
 	})
 
-	AssertEqual(t, 2, count, "MapAllListForEachElement should stop at 2")
+	AssertEqual(t, 2, count, "early stop count")
 }
 
 // Test edge cases
@@ -779,7 +766,7 @@ func TestMapListEdgeCases(t *testing.T) {
 	// Test MapListInsertUniqueFn with nil eq
 	m := make(map[string]*list.List)
 	MapListInsertUniqueFn(m, "key", "value", nil)
-	AssertEqual(t, 0, len(m), "MapListInsertUniqueFn with nil eq should not insert")
+	AssertEqual(t, 0, len(m), "nil eq")
 
 	// Test MapListAppendUniqueFn with nil map
 	MapListAppendUniqueFn(nil, "key", "value", func(a, b string) bool { return a == b })
@@ -787,7 +774,7 @@ func TestMapListEdgeCases(t *testing.T) {
 
 	// Test MapListAppendUniqueFn with nil eq
 	MapListAppendUniqueFn(m, "key", "value", nil)
-	AssertEqual(t, 0, len(m), "MapListAppendUniqueFn with nil eq should not insert")
+	AssertEqual(t, 0, len(m), "nil eq")
 }
 
 // Benchmark tests

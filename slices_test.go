@@ -15,7 +15,7 @@ func (tc sliceReverseTestCase) test(t *testing.T) {
 	t.Helper()
 	c := SliceCopy(tc.a)
 	SliceReverse(c)
-	AssertSliceEqual(t, tc.b, c, "SliceReverse(%q) failed", tc.a)
+	AssertSliceEqual(t, tc.b, c, "SliceReverse", tc.a)
 	if SliceEqual(c, tc.b) {
 		t.Logf("%s(%q) → %q", "SliceReverse", tc.a, c)
 	}
@@ -72,23 +72,23 @@ func testSliceUnique[T Ordered](t *testing.T, before, after []T) {
 
 	s := SliceUnique(before)
 	SliceSort(s, cmp[T])
-	AssertSliceEqual(t, after, s, "SliceUnique failed")
+	AssertSliceEqual(t, after, s, "SliceUnique")
 
 	s = SliceUniqueFn(before, eq[T])
 	SliceSort(s, cmp[T])
-	AssertSliceEqual(t, after, s, "SliceUniqueFn failed")
+	AssertSliceEqual(t, after, s, "SliceUniqueFn")
 
 	s = SliceCopyFn(before, nil)
 	s2 := SliceUniquify(&s)
 	SliceSort(s, cmp[T])
-	AssertSliceEqual(t, after, s, "SliceUniquify failed")
-	AssertSliceEqual(t, s, s2, "SliceUniquify return value mismatch")
+	AssertSliceEqual(t, after, s, "SliceUniquify")
+	AssertSliceEqual(t, s, s2, "return value")
 
 	s = SliceCopy(before)
 	s2 = SliceUniquifyFn(&s, eq[T])
 	SliceSort(s, cmp[T])
-	AssertSliceEqual(t, after, s, "SliceUniquifyFn failed")
-	AssertSliceEqual(t, s, s2, "SliceUniquifyFn return value mismatch")
+	AssertSliceEqual(t, after, s, "SliceUniquifyFn")
+	AssertSliceEqual(t, s, s2, "return value")
 }
 
 func TestSliceUniqueInt(t *testing.T) {
@@ -119,7 +119,7 @@ func TestSliceMinus(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := SliceMinus(tc.a, tc.b)
-			AssertSliceEqual(t, tc.expected, result, "SliceMinus(%v, %v) failed", tc.a, tc.b)
+			AssertSliceEqual(t, tc.expected, result, "SliceMinus", tc.a, tc.b)
 		})
 	}
 }
@@ -144,7 +144,7 @@ func TestSliceMinusFn(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := SliceMinusFn(tc.a, tc.b, equal)
-			AssertSliceEqual(t, tc.expected, result, "SliceMinusFn(%v, %v) failed", tc.a, tc.b)
+			AssertSliceEqual(t, tc.expected, result, "SliceMinusFn", tc.a, tc.b)
 		})
 	}
 }
@@ -154,20 +154,20 @@ func TestSliceRandom(t *testing.T) {
 		name   string
 		want   string
 		input  []string
-		wantok bool
+		wantOK bool
 	}{
-		{name: "empty", input: S[string](), want: string(""), wantok: false},
-		{name: "one", input: S("one"), want: string("one"), wantok: true},
-		{name: "random", input: S("one", "two", "three", "four", "five", "six"), want: string(""), wantok: true},
+		{name: "empty", input: S[string](), want: string(""), wantOK: false},
+		{name: "one", input: S("one"), want: string("one"), wantOK: true},
+		{name: "random", input: S("one", "two", "three", "four", "five", "six"), want: string(""), wantOK: true},
 	}
 	for _, tc := range tests {
 		if tc.name != "random" {
 			got, ok := SliceRandom(tc.input)
-			AssertBool(t, ok, tc.wantok, "SliceRandom ok status mismatch for %s", tc.name)
-			AssertEqual(t, tc.want, got, "SliceRandom result mismatch for %s", tc.name)
+			AssertEqual(t, tc.wantOK, ok, "ok[%s]", tc.name)
+			AssertEqual(t, tc.want, got, "result[%s]", tc.name)
 		} else {
 			u, ok := SliceRandom(tc.input)
-			AssertBool(t, ok, tc.wantok, "SliceRandom ok status mismatch for %s", tc.name)
+			AssertEqual(t, tc.wantOK, ok, "ok[%s]", tc.name)
 			t.Logf("random from one,two,three,four,five,six: %s", u)
 		}
 	}
@@ -185,7 +185,7 @@ func (tc sliceContainsTestCase) test(t *testing.T) {
 	t.Helper()
 
 	result := SliceContains(tc.slice, tc.value)
-	AssertBool(t, result, tc.expected, "SliceContains result")
+	AssertEqual(t, tc.expected, result, "SliceContains")
 }
 
 func TestSliceContains(t *testing.T) {
@@ -218,7 +218,7 @@ func (tc sliceMapTestCase[T1, T2]) test(t *testing.T) {
 	t.Helper()
 
 	result := SliceMap(tc.input, tc.fn)
-	AssertSliceEqual(t, tc.expected, result, "SliceMap result")
+	AssertSliceEqual(t, tc.expected, result, "SliceMap")
 }
 
 func TestSliceMap(t *testing.T) {
@@ -270,11 +270,11 @@ func (tc sliceReversedTestCase) test(t *testing.T) {
 	t.Helper()
 
 	result := SliceReversed(tc.input)
-	AssertSliceEqual(t, tc.expected, result, "SliceReversed result")
+	AssertSliceEqual(t, tc.expected, result, "SliceReversed")
 
 	// Verify original slice is unchanged
 	originalCopy := SliceCopy(tc.input)
-	AssertSliceEqual(t, originalCopy, tc.input, "SliceReversed should not modify original slice")
+	AssertSliceEqual(t, originalCopy, tc.input, "original unchanged")
 }
 
 func TestSliceReversed(t *testing.T) {
@@ -304,7 +304,7 @@ func (tc sliceReversedFnTestCase[T]) test(t *testing.T) {
 	t.Helper()
 
 	result := SliceReversedFn(tc.input, tc.fn)
-	AssertSliceEqual(t, tc.expected, result, "SliceReversedFn result")
+	AssertSliceEqual(t, tc.expected, result, "SliceReversedFn")
 }
 
 func TestSliceReversedFn(t *testing.T) {
@@ -340,7 +340,7 @@ func (tc sliceSortFnTestCase[T]) test(t *testing.T) {
 	// Make a copy to avoid modifying the original
 	result := SliceCopy(tc.input)
 	SliceSortFn(result, tc.less)
-	AssertSliceEqual(t, tc.expected, result, "SliceSortFn result")
+	AssertSliceEqual(t, tc.expected, result, "SliceSortFn")
 }
 
 func TestSliceSortFn(t *testing.T) {
@@ -381,7 +381,7 @@ func TestSliceSortFn(t *testing.T) {
 		original := S(3, 1, 2)
 		result := SliceCopy(original)
 		SliceSortFn(result, nil)
-		AssertSliceEqual(t, original, result, "SliceSortFn with nil function should not modify slice")
+		AssertSliceEqual(t, original, result, "nil function")
 	})
 }
 
@@ -398,7 +398,7 @@ func (tc sliceSortOrderedTestCase[T]) test(t *testing.T) {
 	// Make a copy to avoid modifying the original
 	result := SliceCopy(tc.input)
 	SliceSortOrdered(result)
-	AssertSliceEqual(t, tc.expected, result, "SliceSortOrdered result")
+	AssertSliceEqual(t, tc.expected, result, "SliceSortOrdered")
 }
 
 func TestSliceSortOrdered(t *testing.T) {

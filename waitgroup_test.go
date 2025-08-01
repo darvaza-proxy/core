@@ -46,31 +46,35 @@ var waitGroupGoTestCases = []waitGroupGoTestCase{
 	},
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc waitGroupGoTestCase) test(t *testing.T) {
 	t.Helper()
 
 	var wg WaitGroup
-
 	wg.Go(tc.fn)
 	err := wg.Wait()
 
-	// Give a small delay for error reporting in case of async processing
-	if tc.expectError && err == nil {
-		time.Sleep(1 * time.Millisecond)
-		err = wg.Err()
-	}
+	tc.handleAsyncError(t, &wg, &err)
+	tc.validateResult(t, err)
+}
 
+func (tc waitGroupGoTestCase) handleAsyncError(t *testing.T, wg *WaitGroup, err *error) {
+	t.Helper()
+	// Give a small delay for error reporting in case of async processing
+	if tc.expectError && *err == nil {
+		time.Sleep(1 * time.Millisecond)
+		*err = wg.Err()
+	}
+}
+
+func (tc waitGroupGoTestCase) validateResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		} else if tc.errorMsg != "" && err.Error() != tc.errorMsg {
-			t.Errorf("Expected error message '%s', got '%s'", tc.errorMsg, err.Error())
+		AssertError(t, err, "wait group error")
+		if tc.errorMsg != "" {
+			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
 		}
 	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "wait group")
 	}
 }
 
@@ -150,25 +154,25 @@ var waitGroupGoCatchTestCases = []waitGroupGoCatchTestCase{
 	},
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc waitGroupGoCatchTestCase) test(t *testing.T) {
 	t.Helper()
 
 	var wg WaitGroup
-
 	wg.GoCatch(tc.fn, tc.catch)
 	err := wg.Wait()
 
+	tc.validateGoCatchResult(t, err)
+}
+
+func (tc waitGroupGoCatchTestCase) validateGoCatchResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		} else if tc.errorMsg != "" && err.Error() != tc.errorMsg {
-			t.Errorf("Expected error message '%s', got '%s'", tc.errorMsg, err.Error())
+		AssertError(t, err, "wait group catch error")
+		if tc.errorMsg != "" {
+			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
 		}
 	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "wait group catch")
 	}
 }
 
@@ -221,35 +225,43 @@ var waitGroupOnErrorTestCases = []waitGroupOnErrorTestCase{
 	},
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc waitGroupOnErrorTestCase) test(t *testing.T) {
 	t.Helper()
 
 	var wg WaitGroup
 	wg.OnError(tc.onErrorHandler)
 
+	tc.runWorkers(t, &wg)
+	err := wg.Wait()
+	tc.handleOnErrorAsync(t, &wg, &err)
+	tc.validateOnErrorResult(t, err)
+}
+
+func (tc waitGroupOnErrorTestCase) runWorkers(t *testing.T, wg *WaitGroup) {
+	t.Helper()
 	for _, worker := range tc.workers {
 		wg.Go(worker)
 	}
+}
 
-	err := wg.Wait()
-
+func (tc waitGroupOnErrorTestCase) handleOnErrorAsync(t *testing.T, wg *WaitGroup, err *error) {
+	t.Helper()
 	// Give a small delay for error processing in case of async handling
-	if tc.expectError && err == nil {
+	if tc.expectError && *err == nil {
 		time.Sleep(1 * time.Millisecond)
-		err = wg.Err()
+		*err = wg.Err()
 	}
+}
 
+func (tc waitGroupOnErrorTestCase) validateOnErrorResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		} else if tc.errorMsg != "" && err.Error() != tc.errorMsg {
-			t.Errorf("Expected error message '%s', got '%s'", tc.errorMsg, err.Error())
+		AssertError(t, err, "wait group on error")
+		if tc.errorMsg != "" {
+			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
 		}
 	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "wait group on error")
 	}
 }
 
@@ -277,7 +289,7 @@ func TestWaitGroupDone(t *testing.T) {
 	// Should not be closed yet
 	select {
 	case <-done:
-		t.Error("Done channel closed too early")
+		AssertTrue(t, false, "done channel timing")
 	case <-time.After(5 * time.Millisecond):
 		// Expected
 	}
@@ -296,34 +308,27 @@ func TestWaitGroupDone(t *testing.T) {
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
+func testWaitGroupErrNoError(t *testing.T) {
+	t.Helper()
+	var wg WaitGroup
+	wg.Go(func() error { return nil })
+	AssertNoError(t, wg.Wait(), "wait")
+	AssertNil(t, wg.Err(), "error")
+}
+
+func testWaitGroupErrWithError(t *testing.T) {
+	t.Helper()
+	var wg WaitGroup
+	expectedErr := errors.New("test error")
+	wg.Go(func() error { return expectedErr })
+	AssertError(t, wg.Wait(), "wait error")
+	AssertError(t, wg.Err(), "error")
+	AssertEqual(t, expectedErr.Error(), wg.Err().Error(), "error message")
+}
+
 func TestWaitGroupErr(t *testing.T) {
-	t.Run("no error", func(t *testing.T) {
-		var wg WaitGroup
-		wg.Go(func() error { return nil })
-		if err := wg.Wait(); err != nil {
-			t.Errorf("Expected no error from Wait(), got: %v", err)
-		}
-
-		if err := wg.Err(); err != nil {
-			t.Errorf("Expected nil error, got: %v", err)
-		}
-	})
-
-	t.Run("with error", func(t *testing.T) {
-		var wg WaitGroup
-		expectedErr := errors.New("test error")
-		wg.Go(func() error { return expectedErr })
-		if err := wg.Wait(); err == nil {
-			t.Error("Expected error from Wait() but got nil")
-		}
-
-		if err := wg.Err(); err == nil {
-			t.Error("Expected error but got nil")
-		} else if err.Error() != expectedErr.Error() {
-			t.Errorf("Expected error '%v', got '%v'", expectedErr, err)
-		}
-	})
+	t.Run("no error", testWaitGroupErrNoError)
+	t.Run("with error", testWaitGroupErrWithError)
 }
 
 func TestWaitGroupConcurrency(t *testing.T) {
@@ -346,14 +351,10 @@ func TestWaitGroupConcurrency(t *testing.T) {
 	}
 
 	err := wg.Wait()
-	if err != nil {
-		t.Errorf("Expected no error, got: %v", err)
-	}
+	AssertNoError(t, err, "concurrent workers")
 
 	expected := int64(numWorkers * numIterations)
-	if counter != expected {
-		t.Errorf("Expected counter %d, got %d", expected, counter)
-	}
+	AssertEqual(t, expected, counter, "counter value")
 }
 
 func TestWaitGroupFirstErrorWins(t *testing.T) {

@@ -19,14 +19,14 @@ Library, and if something should be on a subdirectory, it shouldn't be here.
 
 Generic type constraints for use with Go generics:
 
-* `Signed` - signed integer types
-* `Unsigned` - unsigned integer types
-* `Integer` - all integer types (signed and unsigned)
-* `Float` - floating-point types
-* `Complex` - complex number types
-* `Bool` - boolean type
-* `String` - string type
-* `Ordered` - types that support ordering operations
+* `Signed` - signed integer types.
+* `Unsigned` - unsigned integer types.
+* `Integer` - all integer types (signed and unsigned).
+* `Float` - floating-point types.
+* `Complex` - complex number types.
+* `Bool` - boolean type.
+* `String` - string type.
+* `Ordered` - types that support ordering operations.
 
 ## Context
 
@@ -52,12 +52,12 @@ Generic type constraints for use with Go generics:
 
 ### IP Address Functions
 
-* `GetIPAddresses()` - get IP addresses as `netip.Addr`
-* `GetNetIPAddresses()` - get IP addresses as `net.IP`
-* `GetStringIPAddresses()` - get IP addresses as strings
-* `AddrFromNetIP(ip)` - convert `net.IP` to `netip.Addr`
-* `ParseAddr(s)` - parse string to `netip.Addr`
-* `ParseNetIP(s)` - parse string to `net.IP`
+* `GetIPAddresses()` - get IP addresses as `netip.Addr`.
+* `GetNetIPAddresses()` - get IP addresses as `net.IP`.
+* `GetStringIPAddresses()` - get IP addresses as strings.
+* `AddrFromNetIP(ip)` - convert `net.IP` to `netip.Addr`.
+* `ParseAddr(s)` - parse string to `netip.Addr`.
+* `ParseNetIP(s)` - parse string to `net.IP`.
 
 ### Host/Port Functions
 
@@ -82,7 +82,7 @@ Generic type constraints for use with Go generics:
 
 ### Interface Functions
 
-* `GetInterfacesNames()` - get network interface names
+* `GetInterfacesNames()` - get network interface names.
 
 ## Generic Utilities
 
@@ -207,13 +207,13 @@ Key distinctions from `IsZero`:
 
 #### Basic Map Functions
 
-* `MapContains[K]()` checks if a map contains a key
-* `MapValue[K,V]()` returns the value for a key, or a fallback value
-* `Keys[K,T]()` returns a slice of the keys in the map
-* `SortedKeys[K,T]()` returns a sorted slice of the keys
-* `SortedValues[K,T]()` returns values sorted by key
-* `SortedValuesCond[K,T]()` returns filtered values sorted by key
-* `SortedValuesUnlikelyCond[K,T]()` like `SortedValuesCond` but more efficient
+* `MapContains[K]()` checks if a map contains a key.
+* `MapValue[K,V]()` returns the value for a key, or a fallback value.
+* `Keys[K,T]()` returns a slice of the keys in the map.
+* `SortedKeys[K,T]()` returns a sorted slice of the keys.
+* `SortedValues[K,T]()` returns values sorted by key.
+* `SortedValuesCond[K,T]()` returns filtered values sorted by key.
+* `SortedValuesUnlikelyCond[K,T]()` like `SortedValuesCond` but more efficient.
 
 #### Map List Operations
 
@@ -235,14 +235,14 @@ Key distinctions from `IsZero`:
 
 Predefined error values for common conditions:
 
-* `ErrNotImplemented` - functionality not yet implemented
-* `ErrTODO` - placeholder for future implementation
-* `ErrExists` - resource already exists
-* `ErrNotExists` - resource does not exist
-* `ErrInvalid` - invalid input or state
-* `ErrUnknown` - unknown or unspecified error
-* `ErrNilReceiver` - method called on nil receiver
-* `ErrUnreachable` - indicates impossible condition
+* `ErrNotImplemented` - functionality not yet implemented.
+* `ErrTODO` - placeholder for future implementation.
+* `ErrExists` - resource already exists.
+* `ErrNotExists` - resource does not exist.
+* `ErrInvalid` - invalid input or state.
+* `ErrUnknown` - unknown or unspecified error.
+* `ErrNilReceiver` - method called on nil receiver.
+* `ErrUnreachable` - indicates impossible condition.
 
 ### Error Wrapping
 
@@ -252,35 +252,35 @@ containers with `Errors() []error`.
 
 Error wrapping functions:
 
-* `Wrap(err, note)` - wrap with simple string note
-* `Wrapf(err, format, args...)` - wrap with formatted note
-* `QuietWrap(err, note)` - wrap without including original error text
-* `Unwrap(err) []error` - extract all sub-errors from wrapped errors
+* `Wrap(err, note)` - wrap with simple string note.
+* `Wrapf(err, format, args...)` - wrap with formatted note.
+* `QuietWrap(err, note)` - wrap without including original error text.
+* `Unwrap(err) []error` - extract all sub-errors from wrapped errors.
 
 ### Compound Errors
 
 The `CompoundError` type aggregates multiple errors:
 
-* Implements both `Unwrap() []error` and `Errors() []error` interfaces
-* `.AppendError(err)` / `.Append(errs...)` - add errors
-* `.AsError()` - convert to single error or nil
-* `.Ok()` - check if no errors
+* Implements both `Unwrap() []error` and `Errors() []error` interfaces.
+* `.AppendError(err)` / `.Append(errs...)` - add errors.
+* `.AsError()` - convert to single error or nil.
+* `.Ok()` - check if no errors.
 
 ### Panic Handling
 
 The `PanicError` type wraps panic values with stack traces:
 
-* `NewPanicError()` / `NewPanicErrorf()` - create panic errors
-* `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics
+* `NewPanicError()` / `NewPanicErrorf()` - create panic errors.
+* `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics.
 * `Panic()` / `Panicf()` / `PanicWrap()` / `PanicWrapf()` - panic with
-  `PanicError`
+  `PanicError`.
 
 Panic recovery utilities:
 
-* `Recovered` interface - marks errors from recovered panics
-* `AsRecovered(v)` - convert `recover()` result to error
-* `Catcher` type - safely call functions that might panic
-* `Catch(fn)` - execute function, returning error if panic occurs
+* `Recovered` interface - marks errors from recovered panics.
+* `AsRecovered(v)` - convert `recover()` result to error.
+* `Catcher` type - safely call functions that might panic.
+* `Catch(fn)` - execute function, returning error if panic occurs.
 
 ```go
 defer func() {
@@ -290,12 +290,33 @@ defer func() {
 }()
 ```
 
+### Must/Maybe Utilities
+
+Convenience functions for common error-handling patterns:
+
+* `Must[T](value T, err error) T` - returns value or panics with `PanicError` if
+  err is not nil. Follows the common Go pattern of Must* functions for cases
+  where errors should never occur.
+* `Maybe[T](value T, err error) T` - always returns the value, ignoring any
+  error. Useful when you want to proceed with a default or zero value regardless
+  of error status.
+
+```go
+// Must - panic on error (use in tests, config loading, etc.)
+config := Must(loadConfig("config.json"))  // panics if loadConfig fails
+conn := Must(net.Dial("tcp", "localhost:8080"))  // panics if dial fails
+
+// Maybe - ignore errors, proceed with values
+content := Maybe(os.ReadFile("optional.txt"))  // empty string if file missing
+count := Maybe(strconv.Atoi(userInput))  // zero if parsing fails
+```
+
 ### Unreachable Conditions
 
 For indicating impossible code paths:
 
-* `NewUnreachableError()` - create unreachable error
-* `NewUnreachableErrorf(format, args...)` - create formatted unreachable error
+* `NewUnreachableError()` - create unreachable error.
+* `NewUnreachableErrorf(format, args...)` - create formatted unreachable error.
 
 These create `PanicError` instances with stack traces.
 
@@ -400,29 +421,85 @@ fmt.Printf("Stack trace:%+v", stack)
 fmt.Printf("Debug stack:%#+v", stack)
 ```
 
+## Testing Utilities
+
+This package provides comprehensive public testing utilities for both internal
+library tests and external library users.
+
+### Quick Reference
+
+```go
+import "darvaza.org/core"
+
+// Concise slice creation
+testData := core.S(1, 2, 3)           // []int{1, 2, 3}
+emptyStrings := core.S[string]()      // []string{}
+
+// Standard assertions
+core.AssertEqual(t, expected, actual, "value")
+core.AssertNoError(t, err, "operation")
+core.AssertTrue(t, condition, "check")
+
+// Testing test code with MockT
+mock := &core.MockT{}
+core.AssertEqual(mock, 42, 42, "equality")
+```
+
+### Features
+
+* **14 assertion functions** - `AssertEqual`, `AssertError`, `AssertPanic`, etc.
+* **MockT implementation** - for testing assertion functions themselves.
+* **Advanced utilities** - `RunConcurrentTest(), RunBenchmark()`.
+* **Generic support** - type-safe operations with Go generics.
+* **Success logging** - all assertions log successful cases for debugging.
+
+### Documentation
+
+For detailed testing patterns and guidelines:
+
+* [TESTING.md](./TESTING.md) - General testing patterns for all darvaza.org
+  projects
+* [TESTING_core.md](./TESTING_core.md) - Core-specific testing patterns and
+  self-testing approaches
+
+## Development
+
+For detailed development setup, build commands, and AI agent guidance:
+
+* [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
+  patterns
+
+### Quick Start
+
+```bash
+make all    # Full build cycle (get deps, generate, tidy, build)
+make test   # Run tests
+make tidy   # Format and tidy (run before committing)
+```
+
 ## Synchronization
 
 ### WaitGroup
 
 Enhanced wait group with error handling:
 
-* `WaitGroup` - wait group that collects errors
-* `.OnError(fn)` - set error handler
-* `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`
-* `.Wait()` - wait for completion
-* `.Err()` - get first error
+* `WaitGroup` - wait group that collects errors.
+* `.OnError(fn)` - set error handler.
+* `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`.
+* `.Wait()` - wait for completion.
+* `.Err()` - get first error.
 
 ### ErrGroup
 
 Context-aware error group with cancellation:
 
-* `ErrGroup` - context-based error group
-* `.SetDefaults()` - configure with defaults
-* `.OnError(fn)` - set error handler
-* `.Cancel()` / `.Context()` - cancellation control
-* `.Go(fn)` / `.GoCatch(fn)` - run functions with context
-* `.Wait()` - wait and return first error
-* `.IsCancelled()` / `.Cancelled()` - check cancellation state
+* `ErrGroup` - context-based error group.
+* `.SetDefaults()` - configure with defaults.
+* `.OnError(fn)` - set error handler.
+* `.Cancel()` / `.Context()` - cancellation control.
+* `.Go(fn)` / `.GoCatch(fn)` - run functions with context.
+* `.Wait()` - wait and return first error.
+* `.IsCancelled()` / `.Cancelled()` - check cancellation state.
 
 ### Deprecated
 

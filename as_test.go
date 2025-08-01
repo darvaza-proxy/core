@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+const testHello = "hello"
+
 // asTestCase tests As function
 type asTestCase struct {
 	// Interface fields - input/output test data
@@ -20,43 +22,62 @@ type asTestCase struct {
 }
 
 func (tc asTestCase) test(t *testing.T) {
-	//revive:disable:cyclomatic,cognitive-complexity
 	t.Helper()
 
 	switch want := tc.want.(type) {
 	case string:
-		got, ok := As[any, string](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
-		}
-		if got != want {
-			t.Errorf("As() got = %v, want %v", got, want)
-		}
+		tc.testStringConversion(t, want)
 	case int:
-		got, ok := As[any, int](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
-		}
-		if got != want {
-			t.Errorf("As() got = %v, want %v", got, want)
-		}
+		tc.testIntConversion(t, want)
 	case error:
-		got, ok := As[any, error](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
-		}
-		if ok && got.Error() != want.Error() {
-			t.Errorf("As() got = %v, want %v", got, want)
-		}
+		tc.testErrorConversion(t, want)
 	default:
-		// Test cases where conversion should fail
-		got, ok := As[any, string](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
-		}
-		if tc.wantOk && got != "" {
-			t.Errorf("As() got = %v, want zero value", got)
-		}
+		tc.testDefaultConversion(t)
+	}
+}
+
+func (tc asTestCase) testStringConversion(t *testing.T, want string) {
+	t.Helper()
+	got, ok := As[any, string](tc.input)
+	if ok != tc.wantOk {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+	}
+	if got != want {
+		t.Errorf("As() got = %v, want %v", got, want)
+	}
+}
+
+func (tc asTestCase) testIntConversion(t *testing.T, want int) {
+	t.Helper()
+	got, ok := As[any, int](tc.input)
+	if ok != tc.wantOk {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+	}
+	if got != want {
+		t.Errorf("As() got = %v, want %v", got, want)
+	}
+}
+
+func (tc asTestCase) testErrorConversion(t *testing.T, want error) {
+	t.Helper()
+	got, ok := As[any, error](tc.input)
+	if ok != tc.wantOk {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+	}
+	if ok && got.Error() != want.Error() {
+		t.Errorf("As() got = %v, want %v", got, want)
+	}
+}
+
+func (tc asTestCase) testDefaultConversion(t *testing.T) {
+	t.Helper()
+	// Test cases where conversion should fail
+	got, ok := As[any, string](tc.input)
+	if ok != tc.wantOk {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+	}
+	if tc.wantOk && got != "" {
+		t.Errorf("As() got = %v, want zero value", got)
 	}
 }
 
@@ -201,8 +222,8 @@ func TestAs(t *testing.T) {
 	testCases := []asTestCase{
 		{
 			name:   "string to string",
-			input:  "hello",
-			want:   "hello",
+			input:  testHello,
+			want:   testHello,
 			wantOk: true,
 		},
 		{
@@ -291,8 +312,8 @@ func TestSliceAs(t *testing.T) {
 	testCases := []sliceAsTestCase{
 		{
 			name:  "mixed types to string",
-			input: S[any]("hello", 42, "world", 3.14, "!"),
-			want:  S("hello", "world", "!"),
+			input: S[any](testHello, 42, "world", 3.14, "!"),
+			want:  S(testHello, "world", "!"),
 		},
 		{
 			name:  "all strings",
@@ -316,8 +337,8 @@ func TestSliceAs(t *testing.T) {
 		},
 		{
 			name:  "with nil values",
-			input: S[any]("hello", nil, "world"),
-			want:  S("hello", "world"),
+			input: S[any](testHello, nil, "world"),
+			want:  S(testHello, "world"),
 		},
 	}
 
@@ -542,8 +563,8 @@ func TestAsWithConcreteTypes(t *testing.T) {
 	}
 
 	// Test interface{} to concrete type
-	var value any = "hello"
-	if v, ok := As[any, string](value); !ok || v != "hello" {
+	var value any = testHello
+	if v, ok := As[any, string](value); !ok || v != testHello {
 		t.Errorf("As[any, string](%v) = %v, %v; want hello, true", value, v, ok)
 	}
 }

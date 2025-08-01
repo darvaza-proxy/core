@@ -8,42 +8,31 @@ import (
 	"time"
 )
 
-// revive:disable:cognitive-complexity
 func TestNewContextKey(t *testing.T) {
-	// revive:enable:cognitive-complexity
 	k0 := NewContextKey[int]("k0")
 	// name
-	if k0.String() != "k0" {
-		t.Fail()
-	}
+	AssertEqual(t, "k0", k0.String(), "key name")
 	// name and type
 	s := fmt.Sprintf("core.NewContextKey[%s](%q)", "int", "k0")
-	if k0.GoString() != s {
-		t.Fail()
-	}
+	AssertEqual(t, s, k0.GoString(), "GoString")
 
 	// new context
 	ctx0 := k0.WithValue(context.TODO(), 123)
 	v0, ok := k0.Get(ctx0)
-	if !ok || v0 != 123 {
-		t.Fail()
-	}
+	AssertTrue(t, ok, "context value found")
+	AssertEqual(t, 123, v0, "value")
 	// wrong context
 	_, ok = k0.Get(context.TODO())
-	if ok {
-		t.Fail()
-	}
+	AssertFalse(t, ok, "wrong context")
 	// sub-context
 	ctx1 := k0.WithValue(ctx0, 456)
 	v1, ok := k0.Get(ctx1)
-	if !ok || v1 != 456 {
-		t.Fail()
-	}
+	AssertTrue(t, ok, "sub-context value found")
+	AssertEqual(t, 456, v1, "sub-context")
 	// parent-context
 	v, ok := k0.Get(ctx0)
-	if !ok || v != v0 {
-		t.Fail()
-	}
+	AssertTrue(t, ok, "parent context value found")
+	AssertEqual(t, v0, v, "parent value")
 }
 
 // Test cases for WithTimeout function
@@ -62,7 +51,7 @@ func (tc withTimeoutTestCase) test(t *testing.T) {
 
 	if tc.expectTimeout {
 		_, hasDeadline := ctx.Deadline()
-		AssertBool(t, hasDeadline, true, "WithTimeout should set deadline for positive duration")
+		AssertTrue(t, hasDeadline, "has deadline")
 		return
 	}
 
@@ -71,7 +60,7 @@ func (tc withTimeoutTestCase) test(t *testing.T) {
 		if expectedParent == nil {
 			expectedParent = context.Background()
 		}
-		AssertEqual(t, expectedParent, ctx, "WithTimeout should return parent for zero/negative duration")
+		AssertEqual(t, expectedParent, ctx, "parent")
 	}
 }
 
@@ -103,11 +92,9 @@ func testWithTimeoutExpiration(t *testing.T) {
 	select {
 	case <-ctx.Done():
 		// Should timeout
-		if ctx.Err() != context.DeadlineExceeded {
-			t.Errorf("Expected DeadlineExceeded, got %v", ctx.Err())
-		}
+		AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
 	case <-time.After(100 * time.Millisecond):
-		t.Error("Context should have timed out")
+		t.Error("context should have timed out")
 	}
 }
 
@@ -116,7 +103,7 @@ func testWithTimeoutCancellation(t *testing.T) {
 
 	select {
 	case <-ctx.Done():
-		t.Error("Context should not be done immediately")
+		t.Error("context should not be done immediately")
 	default:
 	}
 
@@ -126,7 +113,7 @@ func testWithTimeoutCancellation(t *testing.T) {
 	case <-ctx.Done():
 		// Expected
 	default:
-		t.Error("Context should be done after cancel")
+		t.Error("context should be done after cancel")
 	}
 }
 
@@ -159,7 +146,7 @@ func (tc withTimeoutCauseTestCase) test(t *testing.T) {
 
 	if tc.expectTimeout {
 		_, hasDeadline := ctx.Deadline()
-		AssertBool(t, hasDeadline, true, "WithTimeoutCause should set deadline for positive duration")
+		AssertTrue(t, hasDeadline, "has deadline")
 		return
 	}
 
@@ -168,7 +155,7 @@ func (tc withTimeoutCauseTestCase) test(t *testing.T) {
 		if expectedParent == nil {
 			expectedParent = context.Background()
 		}
-		AssertEqual(t, expectedParent, ctx, "WithTimeoutCause should return parent for zero/negative duration")
+		AssertEqual(t, expectedParent, ctx, "parent")
 	}
 }
 
@@ -204,15 +191,13 @@ func testWithTimeoutCauseExpiration(t *testing.T) {
 	select {
 	case <-ctx.Done():
 		// Should timeout
-		if ctx.Err() != context.DeadlineExceeded {
-			t.Errorf("Expected DeadlineExceeded, got %v", ctx.Err())
-		}
+		AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
 		// Check cause (if supported by Go version)
 		if cause := context.Cause(ctx); cause != testErr {
-			t.Errorf("Expected cause %v, got %v", testErr, cause)
+			AssertEqual(t, testErr, cause, "cause")
 		}
 	case <-time.After(100 * time.Millisecond):
-		t.Error("Context should have timed out")
+		t.Error("context should have timed out")
 	}
 }
 
@@ -238,8 +223,8 @@ func (tc contextKeyGetTestCase) test(t *testing.T) {
 	t.Helper()
 
 	value, ok := tc.key.Get(tc.ctx)
-	AssertEqual(t, tc.expectedValue, value, "Get returned wrong value")
-	AssertBool(t, ok, tc.expectedOk, "Get returned wrong ok value")
+	AssertEqual(t, tc.expectedValue, value, "value")
+	AssertEqual(t, tc.expectedOk, ok, "ok")
 }
 
 func contextKeyGetTest(ctx context.Context, name string, key *ContextKey[int],
