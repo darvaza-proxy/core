@@ -432,6 +432,15 @@ core.AssertEqual(mock, 42, 42, "equality")
 * **Generic support** - type-safe operations with Go generics.
 * **Success logging** - all assertions log successful cases for debugging.
 
+### Documentation
+
+For detailed testing patterns and guidelines:
+
+* [TESTING.md](./TESTING.md) - General testing patterns for all darvaza.org
+  projects
+* [TESTING_core.md](./TESTING_core.md) - Core-specific testing patterns and
+  self-testing approaches
+
 ## Development
 
 For detailed development setup, build commands, and AI agent guidance:

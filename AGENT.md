@@ -7,6 +7,9 @@ repository. For developers and general project information, please refer to
 ## Related Documentation
 
 - [README.md](README.md) - Package overview and API reference
+- [TESTING.md](TESTING.md) - Testing patterns and guidelines for all
+  darvaza.org projects
+- [TESTING_core.md](TESTING_core.md) - Core-specific testing patterns
 
 ## Repository Overview
 
@@ -170,72 +173,14 @@ Always run `make tidy` before committing to ensure proper formatting.
 - Comprehensive coverage for generic functions is expected.
 - Testing utilities log successful assertions for better debugging.
 
-#### Test Helper Functions
+**Development Testing Guidelines:**
 
-The project uses a comprehensive set of public test helper functions defined in
-`testing.go` to reduce boilerplate and improve test consistency:
+For comprehensive testing patterns and assertion function usage, see:
 
-**Slice Creation:**
-
-- `S[T](values...)` - Creates test slices concisely: `S(1, 2, 3)` instead of
-  `[]int{1, 2, 3}`
-- `S[T]()` - Creates empty slices: `S[string]()` instead of `[]string{}`
-
-**Assertion Helpers:**
-
-- `AssertEqual[T](t, expected, actual, msg...)` - Generic value comparison with
-  better error messages
-- `AssertSliceEqual[T](t, expected, actual, msg...)` - Slice comparison using
-  `reflect.DeepEqual`
-- `AssertError(t, err, msg...)` - Assert error is not nil
-- `AssertNoError(t, err, msg...)` - Assert error is nil
-- `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
-  Boolean assertions
-- `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - Nil
-  checking
-- `AssertPanic(t, fn, expectedPanic, msg...)` - Simplified panic testing
-- `AssertNoPanic(t, fn, msg...)` - Ensure functions don't panic
-- `AssertContains(t, text, substring, msg...)` - String containment
-- `AssertTypeIs[T](t, value, msg...)` - Type assertion with casting
-- `AssertErrorIs(t, err, target, msg...)` - Error chain checking
-
-**Advanced Helpers:**
-
-- `RunConcurrentTest(t, numWorkers, workerFn)` - Concurrent testing with
-  goroutines
-- `RunBenchmark(b, setupFn, execFn)` - Benchmark testing with setup/execution
-  phases
-- `RunTestCases(t, []TestCase)` - Table-driven test runner (requires
-  `TestCase` interface)
-- `MockT` - Mock testing.T for testing assertion functions themselves
-
-**Usage Examples:**
-
-```go
-// Before: Manual assertions
-if !reflect.DeepEqual(got, expected) {
-    t.Errorf("Expected %v, got %v", expected, got)
-}
-
-// After: Helper function
-core.AssertSliceEqual(t, expected, got, "operation result")
-
-// Before: Manual error checking
-if err == nil {
-    t.Error("Expected error but got nil")
-}
-
-// After: Helper function
-core.AssertError(t, err, "operation should fail")
-```
-
-These helpers provide:
-
-- Consistent error messages across all tests
-- Success logging for better debugging
-- Reduced boilerplate code
-- Better test maintainability
-- Clear test intent
+- [TESTING.md](./TESTING.md) - General testing patterns for all darvaza.org
+  projects
+- [TESTING_core.md](./TESTING_core.md) - Core-specific testing patterns and
+  self-testing approaches
 
 **Quick Development Reference:**
 
