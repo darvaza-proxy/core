@@ -37,6 +37,7 @@
     "gofmt",
     "GOFMT",
     "GOGENERATE",
+    "goimports",
     "golangci",
     "golangci-lint",
     "GOPATH",

@@ -42,7 +42,19 @@ func (w *CompoundError) Unwrap() []error {
 	return w.Errs
 }
 
+// OK tells when there are no errors stored
+func (w *CompoundError) OK() bool {
+	if w == nil {
+		return true
+	}
+	return len(w.Errs) == 0
+}
+
 // Ok tells when there are no errors stored
+//
+// Deprecated: Use OK() instead.
+//
+//revive:disable-next-line:confusing-naming
 func (w *CompoundError) Ok() bool {
 	return len(w.Errs) == 0
 }
