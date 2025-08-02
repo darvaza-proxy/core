@@ -6,6 +6,15 @@ import (
 	"testing"
 )
 
+var _ TestCase = asTestCase{}
+var _ TestCase = asFnTestCase{}
+var _ TestCase = sliceAsTestCase{}
+var _ TestCase = sliceAsFnTestCase{}
+var _ TestCase = asErrorTestCase{}
+var _ TestCase = asErrorsTestCase{}
+
+const testHello = "hello"
+
 // asTestCase tests As function
 type asTestCase struct {
 	// Interface fields - input/output test data
@@ -19,44 +28,77 @@ type asTestCase struct {
 	wantOK bool
 }
 
-func (tc asTestCase) test(t *testing.T) {
-	//revive:disable:cyclomatic,cognitive-complexity
+// newAsTestCase creates a new asTestCase
+func newAsTestCase(name string, input, want any, wantOK bool) asTestCase {
+	return asTestCase{
+		name:   name,
+		input:  input,
+		want:   want,
+		wantOK: wantOK,
+	}
+}
+
+func (tc asTestCase) Name() string {
+	return tc.name
+}
+
+func (tc asTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	switch want := tc.want.(type) {
 	case string:
-		got, ok := As[any, string](tc.input)
-		if ok != tc.wantOK {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-		}
-		if got != want {
-			t.Errorf("As() got = %v, want %v", got, want)
-		}
+		tc.testStringConversion(t, want)
 	case int:
-		got, ok := As[any, int](tc.input)
-		if ok != tc.wantOK {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-		}
-		if got != want {
-			t.Errorf("As() got = %v, want %v", got, want)
-		}
+		tc.testIntConversion(t, want)
 	case error:
-		got, ok := As[any, error](tc.input)
-		if ok != tc.wantOK {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-		}
-		if ok && got.Error() != want.Error() {
-			t.Errorf("As() got = %v, want %v", got, want)
-		}
+		tc.testErrorConversion(t, want)
 	default:
-		// Test cases where conversion should fail
-		got, ok := As[any, string](tc.input)
-		if ok != tc.wantOK {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-		}
-		if tc.wantOK && got != "" {
-			t.Errorf("As() got = %v, want zero value", got)
-		}
+		tc.testDefaultConversion(t)
+	}
+}
+
+func (tc asTestCase) testStringConversion(t *testing.T, want string) {
+	t.Helper()
+	got, ok := As[any, string](tc.input)
+	if ok != tc.wantOK {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
+	}
+	if got != want {
+		t.Errorf("As() got = %v, want %v", got, want)
+	}
+}
+
+func (tc asTestCase) testIntConversion(t *testing.T, want int) {
+	t.Helper()
+	got, ok := As[any, int](tc.input)
+	if ok != tc.wantOK {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
+	}
+	if got != want {
+		t.Errorf("As() got = %v, want %v", got, want)
+	}
+}
+
+func (tc asTestCase) testErrorConversion(t *testing.T, want error) {
+	t.Helper()
+	got, ok := As[any, error](tc.input)
+	if ok != tc.wantOK {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
+	}
+	if ok && got.Error() != want.Error() {
+		t.Errorf("As() got = %v, want %v", got, want)
+	}
+}
+
+func (tc asTestCase) testDefaultConversion(t *testing.T) {
+	t.Helper()
+	// Test cases where conversion should fail
+	got, ok := As[any, string](tc.input)
+	if ok != tc.wantOK {
+		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
+	}
+	if tc.wantOK && got != "" {
+		t.Errorf("As() got = %v, want zero value", got)
 	}
 }
 
@@ -69,7 +111,22 @@ type asFnTestCase struct {
 	wantOK bool
 }
 
-func (tc asFnTestCase) test(t *testing.T) {
+// newAsFnTestCase creates a new asFnTestCase
+func newAsFnTestCase(name string, fn func(any) (string, bool), input any, want string, wantOK bool) asFnTestCase {
+	return asFnTestCase{
+		name:   name,
+		fn:     fn,
+		input:  input,
+		want:   want,
+		wantOK: wantOK,
+	}
+}
+
+func (tc asFnTestCase) Name() string {
+	return tc.name
+}
+
+func (tc asFnTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, ok := AsFn(tc.fn, tc.input)
@@ -88,7 +145,20 @@ type sliceAsTestCase struct {
 	want  []string
 }
 
-func (tc sliceAsTestCase) test(t *testing.T) {
+// newSliceAsTestCase creates a new sliceAsTestCase
+func newSliceAsTestCase(name string, input []any, want []string) sliceAsTestCase {
+	return sliceAsTestCase{
+		name:  name,
+		input: input,
+		want:  want,
+	}
+}
+
+func (tc sliceAsTestCase) Name() string {
+	return tc.name
+}
+
+func (tc sliceAsTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := SliceAs[any, string](tc.input)
@@ -110,7 +180,21 @@ type sliceAsFnTestCase struct {
 	want  []string
 }
 
-func (tc sliceAsFnTestCase) test(t *testing.T) {
+// newSliceAsFnTestCase creates a new sliceAsFnTestCase
+func newSliceAsFnTestCase(name string, fn func(any) (string, bool), input []any, want []string) sliceAsFnTestCase {
+	return sliceAsFnTestCase{
+		name:  name,
+		fn:    fn,
+		input: input,
+		want:  want,
+	}
+}
+
+func (tc sliceAsFnTestCase) Name() string {
+	return tc.name
+}
+
+func (tc sliceAsFnTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := SliceAsFn(tc.fn, tc.input)
@@ -162,7 +246,21 @@ type asErrorTestCase struct {
 	wantErr bool
 }
 
-func (tc asErrorTestCase) test(t *testing.T) {
+// newAsErrorTestCase creates a new asErrorTestCase
+func newAsErrorTestCase(name string, input any, wantMsg string, wantErr bool) asErrorTestCase {
+	return asErrorTestCase{
+		name:    name,
+		input:   input,
+		wantMsg: wantMsg,
+		wantErr: wantErr,
+	}
+}
+
+func (tc asErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc asErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := AsError(tc.input)
@@ -183,7 +281,21 @@ type asErrorsTestCase struct {
 	wantLen  int
 }
 
-func (tc asErrorsTestCase) test(t *testing.T) {
+// newAsErrorsTestCase creates a new asErrorsTestCase
+func newAsErrorsTestCase(name string, input []any, wantMsgs []string, wantLen int) asErrorsTestCase {
+	return asErrorsTestCase{
+		name:     name,
+		input:    input,
+		wantMsgs: wantMsgs,
+		wantLen:  wantLen,
+	}
+}
+
+func (tc asErrorsTestCase) Name() string {
+	return tc.name
+}
+
+func (tc asErrorsTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := AsErrors(tc.input)
@@ -199,47 +311,15 @@ func (tc asErrorsTestCase) test(t *testing.T) {
 
 func TestAs(t *testing.T) {
 	testCases := []asTestCase{
-		{
-			name:   "string to string",
-			input:  "hello",
-			want:   "hello",
-			wantOK: true,
-		},
-		{
-			name:   "int to int",
-			input:  42,
-			want:   42,
-			wantOK: true,
-		},
-		{
-			name:   "error to error",
-			input:  errors.New("test error"),
-			want:   errors.New("test error"),
-			wantOK: true,
-		},
-		{
-			name:   "int to string fails",
-			input:  42,
-			want:   "",
-			wantOK: false,
-		},
-		{
-			name:   "nil to string",
-			input:  nil,
-			want:   "",
-			wantOK: false,
-		},
-		{
-			name:   "nil to error",
-			input:  nil,
-			want:   error(nil),
-			wantOK: false,
-		},
+		newAsTestCase("string to string", testHello, testHello, true),
+		newAsTestCase("int to int", 42, 42, true),
+		newAsTestCase("error to error", errors.New("test error"), errors.New("test error"), true),
+		newAsTestCase("int to string fails", 42, "", false),
+		newAsTestCase("nil to string", nil, "", false),
+		newAsTestCase("nil to error", nil, error(nil), false),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, testCases)
 }
 
 func TestAsFn(t *testing.T) {
@@ -252,78 +332,28 @@ func TestAsFn(t *testing.T) {
 	}
 
 	testCases := []asFnTestCase{
-		{
-			name:   "with valid conversion function",
-			fn:     intToString,
-			input:  42,
-			want:   "42",
-			wantOK: true,
-		},
-		{
-			name:   "with valid conversion function but wrong type",
-			fn:     intToString,
-			input:  "not an int",
-			want:   "",
-			wantOK: false,
-		},
-		{
-			name:   "with nil function",
-			fn:     nil,
-			input:  42,
-			want:   "",
-			wantOK: false,
-		},
-		{
-			name:   "with function returning false",
-			fn:     func(any) (string, bool) { return "ignored", false },
-			input:  42,
-			want:   "ignored",
-			wantOK: false,
-		},
+		newAsFnTestCase("with valid conversion function", intToString, 42, "42", true),
+		newAsFnTestCase("with valid conversion function but wrong type", intToString, "not an int", "", false),
+		newAsFnTestCase("with nil function", nil, 42, "", false),
+		newAsFnTestCase("with function returning false", func(any) (string, bool) { return "ignored", false },
+			42, "ignored", false),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, testCases)
 }
 
 func TestSliceAs(t *testing.T) {
 	testCases := []sliceAsTestCase{
-		{
-			name:  "mixed types to string",
-			input: S[any]("hello", 42, "world", 3.14, "!"),
-			want:  S("hello", "world", "!"),
-		},
-		{
-			name:  "all strings",
-			input: S[any]("a", "b", "c"),
-			want:  S("a", "b", "c"),
-		},
-		{
-			name:  "no strings",
-			input: S[any](1, 2, 3, 4.5, true),
-			want:  nil,
-		},
-		{
-			name:  "empty slice",
-			input: S[any](),
-			want:  nil,
-		},
-		{
-			name:  "nil slice",
-			input: nil,
-			want:  nil,
-		},
-		{
-			name:  "with nil values",
-			input: S[any]("hello", nil, "world"),
-			want:  S("hello", "world"),
-		},
+		newSliceAsTestCase("mixed types to string", S[any](testHello, 42, "world", 3.14, "!"),
+			S(testHello, "world", "!")),
+		newSliceAsTestCase("all strings", S[any]("a", "b", "c"), S("a", "b", "c")),
+		newSliceAsTestCase("no strings", S[any](1, 2, 3, 4.5, true), nil),
+		newSliceAsTestCase("empty slice", S[any](), nil),
+		newSliceAsTestCase("nil slice", nil, nil),
+		newSliceAsTestCase("with nil values", S[any](testHello, nil, "world"), S(testHello, "world")),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, testCases)
 }
 
 func TestSliceAsFn(t *testing.T) {
@@ -336,158 +366,62 @@ func TestSliceAsFn(t *testing.T) {
 	}
 
 	testCases := []sliceAsFnTestCase{
-		{
-			name:  "with custom conversion",
-			fn:    prefixString,
-			input: S[any]("a", 1, "b", 2, "c"),
-			want:  S("prefix:a", "prefix:b", "prefix:c"),
-		},
-		{
-			name:  "with nil function",
-			fn:    nil,
-			input: S[any]("a", "b", "c"),
-			want:  nil,
-		},
-		{
-			name:  "empty slice",
-			fn:    prefixString,
-			input: S[any](),
-			want:  nil,
-		},
-		{
-			name:  "nil slice",
-			fn:    prefixString,
-			input: nil,
-			want:  nil,
-		},
-		{
-			name:  "all filtered out",
-			fn:    prefixString,
-			input: S[any](1, 2, 3),
-			want:  nil,
-		},
+		newSliceAsFnTestCase("with custom conversion", prefixString, S[any]("a", 1, "b", 2, "c"),
+			S("prefix:a", "prefix:b", "prefix:c")),
+		newSliceAsFnTestCase("with nil function", nil, S[any]("a", "b", "c"), nil),
+		newSliceAsFnTestCase("empty slice", prefixString, S[any](), nil),
+		newSliceAsFnTestCase("nil slice", prefixString, nil, nil),
+		newSliceAsFnTestCase("all filtered out", prefixString, S[any](1, 2, 3), nil),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, testCases)
 }
 
 func TestAsError(t *testing.T) {
 	testCases := []asErrorTestCase{
-		{
-			name:    "standard error",
-			input:   errors.New("standard error"),
-			wantErr: true,
-			wantMsg: "standard error",
-		},
-		{
-			name:    "nil error",
-			input:   error(nil),
-			wantErr: false,
-		},
-		{
-			name:    "type with AsError returning error",
-			input:   errorWithAsError{msg: "custom error"},
-			wantErr: true,
-			wantMsg: "custom error",
-		},
-		{
-			name:    "type with AsError returning nil",
-			input:   errorWithAsError{msg: ""},
-			wantErr: false,
-		},
-		{
-			name:    "type with OK returning false",
-			input:   errorWithOK{msg: "not ok error", ok: false},
-			wantErr: true,
-			wantMsg: "not ok error",
-		},
-		{
-			name:    "type with OK returning true",
-			input:   errorWithOK{msg: "ok error", ok: true},
-			wantErr: false,
-		},
-		{
-			name:    "non-error type",
-			input:   "not an error",
-			wantErr: false,
-		},
-		{
-			name:    "nil value",
-			input:   nil,
-			wantErr: false,
-		},
-		{
-			name:    "integer",
-			input:   42,
-			wantErr: false,
-		},
+		newAsErrorTestCase("standard error", errors.New("standard error"), "standard error", true),
+		newAsErrorTestCase("nil error", error(nil), "", false),
+		newAsErrorTestCase("type with AsError returning error",
+			errorWithAsError{msg: "custom error"}, "custom error", true),
+		newAsErrorTestCase("type with AsError returning nil",
+			errorWithAsError{msg: ""}, "", false),
+		newAsErrorTestCase("type with OK returning false",
+			errorWithOK{msg: "not ok error", ok: false}, "not ok error", true),
+		newAsErrorTestCase("type with OK returning true", errorWithOK{msg: "ok error", ok: true}, "", false),
+		newAsErrorTestCase("non-error type", "not an error", "", false),
+		newAsErrorTestCase("nil value", nil, "", false),
+		newAsErrorTestCase("integer", 42, "", false),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, testCases)
 }
 
 func TestAsErrors(t *testing.T) {
 	testCases := []asErrorsTestCase{
-		{
-			name: "mixed values with errors",
-			input: S[any](
-				errors.New("error1"),
-				"not an error",
-				errors.New("error2"),
-				42,
-				errorWithAsError{msg: "error3"},
-				nil,
-			),
-			wantLen:  3,
-			wantMsgs: S("error1", "error2", "error3"),
-		},
-		{
-			name: "all errors",
-			input: S[any](
-				errors.New("a"),
-				errors.New("b"),
-				errors.New("c"),
-			),
-			wantLen:  3,
-			wantMsgs: S("a", "b", "c"),
-		},
-		{
-			name:     "no errors",
-			input:    S[any]("a", 1, true, nil),
-			wantLen:  0,
-			wantMsgs: S[string](),
-		},
-		{
-			name:     "empty slice",
-			input:    S[any](),
-			wantLen:  0,
-			wantMsgs: S[string](),
-		},
-		{
-			name:     "nil slice",
-			input:    nil,
-			wantLen:  0,
-			wantMsgs: S[string](),
-		},
-		{
-			name: "with OK interface",
-			input: S[any](
-				errorWithOK{msg: "fail", ok: false},
-				errorWithOK{msg: "pass", ok: true},
-				errorWithOK{msg: "fail2", ok: false},
-			),
-			wantLen:  2,
-			wantMsgs: S("fail", "fail2"),
-		},
+		newAsErrorsTestCase("mixed values with errors", S[any](
+			errors.New("error1"),
+			"not an error",
+			errors.New("error2"),
+			42,
+			errorWithAsError{msg: "error3"},
+			nil,
+		), S("error1", "error2", "error3"), 3),
+		newAsErrorsTestCase("all errors", S[any](
+			errors.New("a"),
+			errors.New("b"),
+			errors.New("c"),
+		), S("a", "b", "c"), 3),
+		newAsErrorsTestCase("no errors", S[any]("a", 1, true, nil), S[string](), 0),
+		newAsErrorsTestCase("empty slice", S[any](), S[string](), 0),
+		newAsErrorsTestCase("nil slice", nil, S[string](), 0),
+		newAsErrorsTestCase("with OK interface", S[any](
+			errorWithOK{msg: "fail", ok: false},
+			errorWithOK{msg: "pass", ok: true},
+			errorWithOK{msg: "fail2", ok: false},
+		), S("fail", "fail2"), 2),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, testCases)
 }
 
 // Benchmark tests
@@ -542,8 +476,8 @@ func TestAsWithConcreteTypes(t *testing.T) {
 	}
 
 	// Test interface{} to concrete type
-	var value any = "hello"
-	if v, ok := As[any, string](value); !ok || v != "hello" {
+	var value any = testHello
+	if v, ok := As[any, string](value); !ok || v != testHello {
 		t.Errorf("As[any, string](%v) = %v, %v; want hello, true", value, v, ok)
 	}
 }

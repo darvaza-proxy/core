@@ -7,32 +7,49 @@ import (
 	"time"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var (
+	_ TestCase = errGroupSetDefaultsTestCase{}
+	_ TestCase = errGroupGoTestCase{}
+	_ TestCase = errGroupGoCatchTestCase{}
+)
+
 type errGroupSetDefaultsTestCase struct {
 	expectedParent context.Context
 	setup          func() *ErrGroup
 	name           string
 }
 
-var errGroupSetDefaultsTestCases = []errGroupSetDefaultsTestCase{
-	{
-		name: "nil parent context",
-		setup: func() *ErrGroup {
+// newErrGroupSetDefaultsTestCase creates a new errGroupSetDefaultsTestCase
+func newErrGroupSetDefaultsTestCase(expectedParent context.Context, name string,
+	setup func() *ErrGroup) errGroupSetDefaultsTestCase {
+	return errGroupSetDefaultsTestCase{
+		name:           name,
+		setup:          setup,
+		expectedParent: expectedParent,
+	}
+}
+
+func errGroupSetDefaultsTestCases() []errGroupSetDefaultsTestCase {
+	var nilCtx context.Context
+
+	return []errGroupSetDefaultsTestCase{
+		newErrGroupSetDefaultsTestCase(context.Background(), "nil parent context", func() *ErrGroup {
 			return &ErrGroup{}
-		},
-		expectedParent: context.Background(),
-	},
-	{
-		name: "custom parent context",
-		setup: func() *ErrGroup {
+		}),
+		newErrGroupSetDefaultsTestCase(nilCtx, "custom parent context", func() *ErrGroup {
 			type testKey string
 			ctx := context.WithValue(context.Background(), testKey("test"), "value")
 			return &ErrGroup{Parent: ctx}
-		},
-		expectedParent: nil, // Will be set by test
-	},
+		}), // Will be set by test
+	}
 }
 
-func (tc errGroupSetDefaultsTestCase) test(t *testing.T) {
+func (tc errGroupSetDefaultsTestCase) Name() string {
+	return tc.name
+}
+
+func (tc errGroupSetDefaultsTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	eg := tc.setup()
@@ -57,9 +74,7 @@ func (tc errGroupSetDefaultsTestCase) test(t *testing.T) {
 }
 
 func TestErrGroupSetDefaults(t *testing.T) {
-	for _, tc := range errGroupSetDefaultsTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, errGroupSetDefaultsTestCases())
 }
 
 type errGroupGoTestCase struct {
@@ -70,106 +85,111 @@ type errGroupGoTestCase struct {
 	expectCancel bool
 }
 
-var errGroupGoTestCases = []errGroupGoTestCase{
-	{
-		name: "successful worker",
-		runFunc: func(_ context.Context) error {
-			return nil
-		},
-		shutdownFunc: nil,
-		expectError:  false,
-		expectCancel: false,
-	},
-	{
-		name: "worker with error",
-		runFunc: func(_ context.Context) error {
-			return errors.New("worker error")
-		},
-		shutdownFunc: nil,
-		expectError:  true,
-		expectCancel: true,
-	},
-	{
-		name: "worker with panic",
-		runFunc: func(_ context.Context) error {
-			panic("worker panic")
-		},
-		shutdownFunc: nil,
-		expectError:  true,
-		expectCancel: true,
-	},
-	{
-		name: "successful worker with shutdown",
-		runFunc: func(ctx context.Context) error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(100 * time.Millisecond):
-				return nil
-			}
-		},
-		shutdownFunc: func() error {
-			return nil
-		},
-		expectError:  false,
-		expectCancel: true, // Manual cancellation will happen
-	},
-	{
-		name: "worker with shutdown error",
-		runFunc: func(_ context.Context) error {
-			// Worker runs for a short time then completes
-			time.Sleep(5 * time.Millisecond)
-			return nil
-		},
-		shutdownFunc: func() error {
-			// Shutdown immediately returns error
-			return errors.New("shutdown error")
-		},
-		expectError:  false,
-		expectCancel: true, // Manual cancellation will happen
-	},
+// newErrGroupGoTestCase creates a new errGroupGoTestCase
+func newErrGroupGoTestCase(name string, runFunc func(context.Context) error,
+	shutdownFunc func() error, expectError, expectCancel bool) errGroupGoTestCase {
+	return errGroupGoTestCase{
+		name:         name,
+		runFunc:      runFunc,
+		shutdownFunc: shutdownFunc,
+		expectError:  expectError,
+		expectCancel: expectCancel,
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-//revive:disable-next-line:cyclomatic
-func (tc errGroupGoTestCase) test(t *testing.T) {
+// newErrGroupGoTestCaseSuccess creates a test case expecting successful completion
+func newErrGroupGoTestCaseSuccess(name string, runFunc func(context.Context) error,
+	shutdownFunc func() error) errGroupGoTestCase {
+	return newErrGroupGoTestCase(name, runFunc, shutdownFunc, false, false)
+}
+
+// newErrGroupGoTestCaseError creates a test case expecting error and cancellation
+func newErrGroupGoTestCaseError(name string, runFunc func(context.Context) error,
+	shutdownFunc func() error) errGroupGoTestCase {
+	return newErrGroupGoTestCase(name, runFunc, shutdownFunc, true, true)
+}
+
+// newErrGroupGoTestCaseCancel creates a test case expecting cancellation but no error
+func newErrGroupGoTestCaseCancel(name string, runFunc func(context.Context) error,
+	shutdownFunc func() error) errGroupGoTestCase {
+	return newErrGroupGoTestCase(name, runFunc, shutdownFunc, false, true)
+}
+
+var errGroupGoTestCases = []errGroupGoTestCase{
+	newErrGroupGoTestCaseSuccess("successful worker", func(_ context.Context) error {
+		return nil
+	}, nil),
+	newErrGroupGoTestCaseError("worker with error", func(_ context.Context) error {
+		return errors.New("worker error")
+	}, nil),
+	newErrGroupGoTestCaseError("worker with panic", func(_ context.Context) error {
+		panic("worker panic")
+	}, nil),
+	newErrGroupGoTestCaseCancel("successful worker with shutdown", func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+			return nil
+		}
+	}, func() error {
+		return nil
+	}), // Manual cancellation will happen
+	newErrGroupGoTestCaseCancel("worker with shutdown error", func(_ context.Context) error {
+		// Worker runs for a short time then completes
+		time.Sleep(5 * time.Millisecond)
+		return nil
+	}, func() error {
+		// Shutdown immediately returns error
+		return errors.New("shutdown error")
+	}), // Manual cancellation will happen
+}
+
+func (tc errGroupGoTestCase) Name() string {
+	return tc.name
+}
+
+func (tc errGroupGoTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	var eg ErrGroup
-
 	eg.Go(tc.runFunc, tc.shutdownFunc)
 
-	// For shutdown tests, manually cancel after a short delay
+	tc.handleShutdownTests(&eg)
+	err := eg.Wait()
+	tc.checkError(t, err)
+	tc.checkCancellation(t, &eg)
+}
+
+func (tc errGroupGoTestCase) handleShutdownTests(eg *ErrGroup) {
 	if tc.name == "successful worker with shutdown" || tc.name == "worker with shutdown error" {
 		go func() {
 			time.Sleep(10 * time.Millisecond)
 			eg.Cancel(errors.New("manual cancellation"))
 		}()
 	}
+}
 
-	err := eg.Wait()
-
+func (tc errGroupGoTestCase) checkError(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		}
+		AssertError(t, err, "error")
+	} else if errors.Is(err, context.Canceled) {
+		t.Log("context cancelled as expected")
 	} else {
-		if err != nil && err != context.Canceled {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "no error")
 	}
+}
 
+func (tc errGroupGoTestCase) checkCancellation(t *testing.T, eg *ErrGroup) {
+	t.Helper()
 	if tc.expectCancel {
-		if !eg.IsCancelled() {
-			t.Error("Expected group to be cancelled")
-		}
+		AssertTrue(t, eg.IsCancelled(), "group cancelled")
 	}
 }
 
 func TestErrGroupGo(t *testing.T) {
-	for _, tc := range errGroupGoTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, errGroupGoTestCases)
 }
 
 type errGroupGoCatchTestCase struct {
@@ -179,143 +199,148 @@ type errGroupGoCatchTestCase struct {
 	expectError bool
 }
 
-var errGroupGoCatchTestCases = []errGroupGoCatchTestCase{
-	{
-		name: "successful worker with catch",
-		runFunc: func(_ context.Context) error {
-			return nil
-		},
-		catchFunc: func(_ context.Context, _ error) error {
-			// This should never be called for successful workers
-			return errors.New("catch should not be called")
-		},
-		expectError: false,
-	},
-	{
-		name: "worker error handled by catch",
-		runFunc: func(_ context.Context) error {
-			return errors.New("worker error")
-		},
-		catchFunc: func(_ context.Context, _ error) error {
-			return nil // dismiss error
-		},
-		expectError: false,
-	},
-	{
-		name: "worker error transformed by catch",
-		runFunc: func(_ context.Context) error {
-			return errors.New("original error")
-		},
-		catchFunc: func(_ context.Context, _ error) error {
-			return errors.New("transformed error")
-		},
-		expectError: true, // Transformed error should propagate
-	},
-	{
-		name:    "nil run function",
-		runFunc: nil,
-		catchFunc: func(_ context.Context, err error) error {
-			return err
-		},
-		expectError: true, // Should panic and be caught
-	},
+// newErrGroupGoCatchTestCase creates a new errGroupGoCatchTestCase
+func newErrGroupGoCatchTestCase(name string, runFunc func(context.Context) error,
+	catchFunc func(context.Context, error) error, expectError bool) errGroupGoCatchTestCase {
+	return errGroupGoCatchTestCase{
+		name:        name,
+		runFunc:     runFunc,
+		catchFunc:   catchFunc,
+		expectError: expectError,
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc errGroupGoCatchTestCase) test(t *testing.T) {
+// newErrGroupGoCatchTestCaseSuccess creates a test case expecting successful completion
+func newErrGroupGoCatchTestCaseSuccess(name string, runFunc func(context.Context) error,
+	catchFunc func(context.Context, error) error) errGroupGoCatchTestCase {
+	return newErrGroupGoCatchTestCase(name, runFunc, catchFunc, false)
+}
+
+// newErrGroupGoCatchTestCaseError creates a test case expecting error
+func newErrGroupGoCatchTestCaseError(name string, runFunc func(context.Context) error,
+	catchFunc func(context.Context, error) error) errGroupGoCatchTestCase {
+	return newErrGroupGoCatchTestCase(name, runFunc, catchFunc, true)
+}
+
+var errGroupGoCatchTestCases = []errGroupGoCatchTestCase{
+	newErrGroupGoCatchTestCaseSuccess("successful worker with catch", func(_ context.Context) error {
+		return nil
+	}, func(_ context.Context, _ error) error {
+		// This should never be called for successful workers
+		return errors.New("catch should not be called")
+	}),
+	newErrGroupGoCatchTestCaseSuccess("worker error handled by catch", func(_ context.Context) error {
+		return errors.New("worker error")
+	}, func(_ context.Context, _ error) error {
+		return nil // dismiss error
+	}),
+	newErrGroupGoCatchTestCaseError("worker error transformed by catch", func(_ context.Context) error {
+		return errors.New("original error")
+	}, func(_ context.Context, _ error) error {
+		return errors.New("transformed error")
+	}), // Transformed error should propagate
+	newErrGroupGoCatchTestCaseError("nil run function", nil, func(_ context.Context, err error) error {
+		return err
+	}), // Should panic and be caught
+}
+
+func (tc errGroupGoCatchTestCase) Name() string {
+	return tc.name
+}
+
+func (tc errGroupGoCatchTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	var eg ErrGroup
 
 	if tc.runFunc == nil {
-		// Test panic for nil function
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("Expected panic for nil run function")
-			}
-		}()
+		tc.testNilFunction(t, &eg)
+		return
 	}
 
 	eg.GoCatch(tc.runFunc, tc.catchFunc)
-
-	if tc.runFunc == nil {
-		return // Panic expected, test ends here
-	}
-
 	err := eg.Wait()
+	tc.checkTestResult(t, err)
+}
 
+func (tc errGroupGoCatchTestCase) testNilFunction(t *testing.T, eg *ErrGroup) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic for nil run function")
+		}
+	}()
+	eg.GoCatch(tc.runFunc, tc.catchFunc)
+}
+
+func (tc errGroupGoCatchTestCase) checkTestResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
 		if err == nil {
 			t.Errorf("Test case '%s': Expected error but got nil", tc.name)
 		}
-	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+	} else if err != nil {
+		t.Errorf("Expected no error but got: %v", err)
 	}
 }
 
 func TestErrGroupGoCatch(t *testing.T) {
-	for _, tc := range errGroupGoCatchTestCases {
-		t.Run(tc.name, tc.test)
+	RunTestCases(t, errGroupGoCatchTestCases)
+}
+
+func testErrGroupFirstCancellation(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	cause := errors.New("test error")
+	isFirst := eg.Cancel(cause)
+
+	AssertTrue(t, isFirst, "first cancellation")
+	AssertTrue(t, eg.IsCancelled(), "cancelled")
+	AssertEqual(t, cause, eg.Err(), "error")
+}
+
+func testErrGroupSubsequentCancellation(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	// First cancellation
+	cause1 := errors.New("first error")
+	eg.Cancel(cause1)
+
+	// Second cancellation
+	cause2 := errors.New("second error")
+	isFirst := eg.Cancel(cause2)
+
+	if isFirst {
+		t.Error("Expected subsequent cancellation to return false")
+	}
+
+	// Should keep the first error
+	if err := eg.Err(); err != cause1 {
+		t.Errorf("Expected first error %v, got %v", cause1, err)
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
+func testErrGroupNilCause(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	isFirst := eg.Cancel(nil)
+
+	if !isFirst {
+		t.Error("Expected first cancellation to return true")
+	}
+
+	if err := eg.Err(); err != context.Canceled {
+		t.Errorf("Expected context.Canceled, got %v", err)
+	}
+}
+
 func TestErrGroupCancel(t *testing.T) {
-	t.Run("first cancellation", func(t *testing.T) {
-		var eg ErrGroup
-
-		cause := errors.New("test error")
-		isFirst := eg.Cancel(cause)
-
-		if !isFirst {
-			t.Error("Expected first cancellation to return true")
-		}
-
-		if !eg.IsCancelled() {
-			t.Error("Expected group to be cancelled")
-		}
-
-		if err := eg.Err(); err != cause {
-			t.Errorf("Expected error %v, got %v", cause, err)
-		}
-	})
-
-	t.Run("subsequent cancellation", func(t *testing.T) {
-		var eg ErrGroup
-
-		// First cancellation
-		cause1 := errors.New("first error")
-		eg.Cancel(cause1)
-
-		// Second cancellation
-		cause2 := errors.New("second error")
-		isFirst := eg.Cancel(cause2)
-
-		if isFirst {
-			t.Error("Expected subsequent cancellation to return false")
-		}
-
-		// Should keep the first error
-		if err := eg.Err(); err != cause1 {
-			t.Errorf("Expected first error %v, got %v", cause1, err)
-		}
-	})
-
-	t.Run("nil cause", func(t *testing.T) {
-		var eg ErrGroup
-
-		isFirst := eg.Cancel(nil)
-
-		if !isFirst {
-			t.Error("Expected first cancellation to return true")
-		}
-
-		if err := eg.Err(); err != context.Canceled {
-			t.Errorf("Expected context.Canceled, got %v", err)
-		}
-	})
+	t.Run("first cancellation", testErrGroupFirstCancellation)
+	t.Run("subsequent cancellation", testErrGroupSubsequentCancellation)
+	t.Run("nil cause", testErrGroupNilCause)
 }
 
 func TestErrGroupOnError(t *testing.T) {
@@ -420,74 +445,88 @@ func TestErrGroupDone(t *testing.T) {
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
 func TestErrGroupConcurrency(t *testing.T) {
 	const numWorkers = 10
 
 	var eg ErrGroup
-
-	for i := 0; i < numWorkers; i++ {
-		worker := i
-		eg.Go(func(ctx context.Context) error {
-			// Worker 5 fails quickly, others run longer but should be cancelled
-			if worker == 5 {
-				time.Sleep(5 * time.Millisecond)
-				return errors.New("worker 5 error")
-			}
-
-			// Other workers wait for cancellation or timeout
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(100 * time.Millisecond):
-				return nil // Should not reach here if cancellation works
-			}
-		}, nil)
-	}
+	startConcurrentWorkers(t, &eg, numWorkers)
 
 	err := eg.Wait()
-	if err == nil {
-		t.Error("Expected error from worker 5")
-	}
+	validateConcurrencyResult(t, &eg, err)
+}
 
-	if !eg.IsCancelled() {
-		t.Error("Expected group to be cancelled")
+func startConcurrentWorkers(t *testing.T, eg *ErrGroup, numWorkers int) {
+	t.Helper()
+	for i := 0; i < numWorkers; i++ {
+		worker := i
+		eg.Go(createConcurrentWorker(worker), nil)
+	}
+}
+
+func createConcurrentWorker(worker int) func(context.Context) error {
+	return func(ctx context.Context) error {
+		// Worker 5 fails quickly, others run longer but should be cancelled
+		if worker == 5 {
+			time.Sleep(5 * time.Millisecond)
+			return errors.New("worker 5 error")
+		}
+
+		// Other workers wait for cancellation or timeout
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+			return nil // Should not reach here if cancellation works
+		}
+	}
+}
+
+func validateConcurrencyResult(t *testing.T, eg *ErrGroup, err error) {
+	t.Helper()
+	AssertError(t, err, "worker 5 error")
+	AssertTrue(t, eg.IsCancelled(), "group cancelled")
+}
+
+func testErrGroupCatcherErrorWhenNotCancelled(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	testErr := errors.New("test error")
+	result := eg.defaultErrGroupCatcher(testErr)
+
+	if result != testErr {
+		t.Errorf("Expected %v, got %v", testErr, result)
+	}
+}
+
+func testErrGroupCatcherErrorWhenCancelled(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+	eg.Cancel(errors.New("cancellation error"))
+
+	testErr := errors.New("test error")
+	result := eg.defaultErrGroupCatcher(testErr)
+
+	if result != context.Canceled {
+		t.Errorf("Expected context.Canceled, got %v", result)
+	}
+}
+
+func testErrGroupCatcherNilError(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+
+	result := eg.defaultErrGroupCatcher(nil)
+
+	if result != nil {
+		t.Errorf("Expected nil, got %v", result)
 	}
 }
 
 func TestErrGroupDefaultErrGroupCatcher(t *testing.T) {
-	t.Run("error when not cancelled", func(t *testing.T) {
-		var eg ErrGroup
-
-		testErr := errors.New("test error")
-		result := eg.defaultErrGroupCatcher(testErr)
-
-		if result != testErr {
-			t.Errorf("Expected %v, got %v", testErr, result)
-		}
-	})
-
-	t.Run("error when cancelled", func(t *testing.T) {
-		var eg ErrGroup
-		eg.Cancel(errors.New("cancellation error"))
-
-		testErr := errors.New("test error")
-		result := eg.defaultErrGroupCatcher(testErr)
-
-		if result != context.Canceled {
-			t.Errorf("Expected context.Canceled, got %v", result)
-		}
-	})
-
-	t.Run("nil error", func(t *testing.T) {
-		var eg ErrGroup
-
-		result := eg.defaultErrGroupCatcher(nil)
-
-		if result != nil {
-			t.Errorf("Expected nil, got %v", result)
-		}
-	})
+	t.Run("error when not cancelled", testErrGroupCatcherErrorWhenNotCancelled)
+	t.Run("error when cancelled", testErrGroupCatcherErrorWhenCancelled)
+	t.Run("nil error", testErrGroupCatcherNilError)
 }
 
 func TestErrGroupWithCustomParent(t *testing.T) {

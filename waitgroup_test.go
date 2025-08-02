@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var (
+	_ TestCase = waitGroupGoTestCase{}
+	_ TestCase = waitGroupGoCatchTestCase{}
+	_ TestCase = waitGroupOnErrorTestCase{}
+)
+
 type waitGroupGoTestCase struct {
 	fn          func() error
 	errorMsg    string
@@ -15,69 +22,67 @@ type waitGroupGoTestCase struct {
 	expectError bool
 }
 
-var waitGroupGoTestCases = []waitGroupGoTestCase{
-	{
-		name: "successful worker",
-		fn: func() error {
-			return nil
-		},
-		expectError: false,
-	},
-	{
-		name: "worker with error",
-		fn: func() error {
-			return errors.New("worker error")
-		},
-		expectError: true,
-		errorMsg:    "worker error",
-	},
-	{
-		name: "worker with panic",
-		fn: func() error {
-			panic("worker panic")
-		},
-		expectError: true,
-		errorMsg:    "", // Panic should be caught and converted to error
-	},
-	{
-		name:        "nil function",
-		fn:          nil,
-		expectError: false,
-	},
+// Factory function for waitGroupGoTestCase
+func newWaitGroupGoTestCase(name string, fn func() error, expectError bool, errorMsg string) waitGroupGoTestCase {
+	return waitGroupGoTestCase{
+		name:        name,
+		fn:          fn,
+		errorMsg:    errorMsg,
+		expectError: expectError,
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc waitGroupGoTestCase) test(t *testing.T) {
+var waitGroupGoTestCases = []waitGroupGoTestCase{
+	newWaitGroupGoTestCase("successful worker", func() error {
+		return nil
+	}, false, ""),
+	newWaitGroupGoTestCase("worker with error", func() error {
+		return errors.New("worker error")
+	}, true, "worker error"),
+	newWaitGroupGoTestCase("worker with panic", func() error {
+		panic("worker panic")
+	}, true, ""), // Panic should be caught and converted to error
+	newWaitGroupGoTestCase("nil function", nil, false, ""),
+}
+
+func (tc waitGroupGoTestCase) Name() string {
+	return tc.name
+}
+
+func (tc waitGroupGoTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	var wg WaitGroup
-
 	wg.Go(tc.fn)
 	err := wg.Wait()
 
-	// Give a small delay for error reporting in case of async processing
-	if tc.expectError && err == nil {
-		time.Sleep(1 * time.Millisecond)
-		err = wg.Err()
-	}
+	tc.handleAsyncError(t, &wg, &err)
+	tc.validateResult(t, err)
+}
 
+func (tc waitGroupGoTestCase) handleAsyncError(t *testing.T, wg *WaitGroup, err *error) {
+	t.Helper()
+	// Give a small delay for error reporting in case of async processing
+	if tc.expectError && *err == nil {
+		time.Sleep(1 * time.Millisecond)
+		*err = wg.Err()
+	}
+}
+
+func (tc waitGroupGoTestCase) validateResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		} else if tc.errorMsg != "" && err.Error() != tc.errorMsg {
-			t.Errorf("Expected error message '%s', got '%s'", tc.errorMsg, err.Error())
+		AssertError(t, err, "wait group error")
+		if tc.errorMsg != "" {
+			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
 		}
 	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "wait group")
 	}
 }
 
 func TestWaitGroupGo(t *testing.T) {
-	for _, tc := range waitGroupGoTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, waitGroupGoTestCases)
 }
 
 type waitGroupGoCatchTestCase struct {
@@ -88,94 +93,75 @@ type waitGroupGoCatchTestCase struct {
 	expectError bool
 }
 
-var waitGroupGoCatchTestCases = []waitGroupGoCatchTestCase{
-	{
-		name: "successful worker with catch",
-		fn: func() error {
-			return nil
-		},
-		catch: func(_ error) error {
-			return nil
-		},
-		expectError: false,
-	},
-	{
-		name: "worker error handled by catch",
-		fn: func() error {
-			return errors.New("worker error")
-		},
-		catch: func(_ error) error {
-			return nil // catch dismisses the error
-		},
-		expectError: false,
-	},
-	{
-		name: "worker error transformed by catch",
-		fn: func() error {
-			return errors.New("original error")
-		},
-		catch: func(_ error) error {
-			return errors.New("transformed error")
-		},
-		expectError: true,
-		errorMsg:    "transformed error",
-	},
-	{
-		name: "catch function panics",
-		fn: func() error {
-			return errors.New("worker error")
-		},
-		catch: func(_ error) error {
-			panic("catch panic")
-		},
-		expectError: true,
-		errorMsg:    "", // Don't check exact message as panic handling may vary
-	},
-	{
-		name: "nil function with catch",
-		fn:   nil,
-		catch: func(err error) error {
-			return err
-		},
-		expectError: false,
-	},
-	{
-		name: "worker error with nil catch",
-		fn: func() error {
-			return errors.New("worker error")
-		},
-		catch:       nil,
-		expectError: true,
-		errorMsg:    "worker error",
-	},
+// Factory function for waitGroupGoCatchTestCase
+func newWaitGroupGoCatchTestCase(name string, fn func() error, catch func(error) error,
+	expectError bool, errorMsg string) waitGroupGoCatchTestCase {
+	return waitGroupGoCatchTestCase{
+		name:        name,
+		fn:          fn,
+		catch:       catch,
+		errorMsg:    errorMsg,
+		expectError: expectError,
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc waitGroupGoCatchTestCase) test(t *testing.T) {
+var waitGroupGoCatchTestCases = []waitGroupGoCatchTestCase{
+	newWaitGroupGoCatchTestCase("successful worker with catch", func() error {
+		return nil
+	}, func(_ error) error {
+		return nil
+	}, false, ""),
+	newWaitGroupGoCatchTestCase("worker error handled by catch", func() error {
+		return errors.New("worker error")
+	}, func(_ error) error {
+		return nil // catch dismisses the error
+	}, false, ""),
+	newWaitGroupGoCatchTestCase("worker error transformed by catch", func() error {
+		return errors.New("original error")
+	}, func(_ error) error {
+		return errors.New("transformed error")
+	}, true, "transformed error"),
+	newWaitGroupGoCatchTestCase("catch function panics", func() error {
+		return errors.New("worker error")
+	}, func(_ error) error {
+		panic("catch panic")
+	}, true, ""), // Don't check exact message as panic handling may vary
+	newWaitGroupGoCatchTestCase("nil function with catch", nil, func(err error) error {
+		return err
+	}, false, ""),
+	newWaitGroupGoCatchTestCase("worker error with nil catch", func() error {
+		return errors.New("worker error")
+	}, nil, true, "worker error"),
+}
+
+func (tc waitGroupGoCatchTestCase) Name() string {
+	return tc.name
+}
+
+func (tc waitGroupGoCatchTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	var wg WaitGroup
-
 	wg.GoCatch(tc.fn, tc.catch)
 	err := wg.Wait()
 
+	tc.validateGoCatchResult(t, err)
+}
+
+func (tc waitGroupGoCatchTestCase) validateGoCatchResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		} else if tc.errorMsg != "" && err.Error() != tc.errorMsg {
-			t.Errorf("Expected error message '%s', got '%s'", tc.errorMsg, err.Error())
+		AssertError(t, err, "wait group catch error")
+		if tc.errorMsg != "" {
+			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
 		}
 	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "wait group catch")
 	}
 }
 
 func TestWaitGroupGoCatch(t *testing.T) {
-	for _, tc := range waitGroupGoCatchTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, waitGroupGoCatchTestCases)
 }
 
 type waitGroupOnErrorTestCase struct {
@@ -186,77 +172,83 @@ type waitGroupOnErrorTestCase struct {
 	expectError    bool
 }
 
-var waitGroupOnErrorTestCases = []waitGroupOnErrorTestCase{
-	{
-		name: "successful workers with onError",
-		workers: []func() error{
-			func() error { return nil },
-			func() error { return nil },
-		},
-		onErrorHandler: func(err error) error {
-			return err
-		},
-		expectError: false,
-	},
-	{
-		name: "error dismissed by onError filter",
-		workers: []func() error{
-			func() error { return errors.New("worker error") },
-		},
-		onErrorHandler: func(_ error) error {
-			return nil // onError filter dismisses the error
-		},
-		expectError: false,
-	},
-	{
-		name: "error transformed by onError filter",
-		workers: []func() error{
-			func() error { return errors.New("original error") },
-		},
-		onErrorHandler: func(_ error) error {
-			return errors.New("filtered error")
-		},
-		expectError: true,
-		errorMsg:    "filtered error",
-	},
+// Factory function for waitGroupOnErrorTestCase
+func newWaitGroupOnErrorTestCase(name string, workers []func() error,
+	onErrorHandler func(error) error, expectError bool, errorMsg string) waitGroupOnErrorTestCase {
+	return waitGroupOnErrorTestCase{
+		name:           name,
+		workers:        workers,
+		onErrorHandler: onErrorHandler,
+		errorMsg:       errorMsg,
+		expectError:    expectError,
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc waitGroupOnErrorTestCase) test(t *testing.T) {
+var waitGroupOnErrorTestCases = []waitGroupOnErrorTestCase{
+	newWaitGroupOnErrorTestCase("successful workers with onError", []func() error{
+		func() error { return nil },
+		func() error { return nil },
+	}, func(err error) error {
+		return err
+	}, false, ""),
+	newWaitGroupOnErrorTestCase("error dismissed by onError filter", []func() error{
+		func() error { return errors.New("worker error") },
+	}, func(_ error) error {
+		return nil // onError filter dismisses the error
+	}, false, ""),
+	newWaitGroupOnErrorTestCase("error transformed by onError filter", []func() error{
+		func() error { return errors.New("original error") },
+	}, func(_ error) error {
+		return errors.New("filtered error")
+	}, true, "filtered error"),
+}
+
+func (tc waitGroupOnErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc waitGroupOnErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	var wg WaitGroup
 	wg.OnError(tc.onErrorHandler)
 
+	tc.runWorkers(t, &wg)
+	err := wg.Wait()
+	tc.handleOnErrorAsync(t, &wg, &err)
+	tc.validateOnErrorResult(t, err)
+}
+
+func (tc waitGroupOnErrorTestCase) runWorkers(t *testing.T, wg *WaitGroup) {
+	t.Helper()
 	for _, worker := range tc.workers {
 		wg.Go(worker)
 	}
+}
 
-	err := wg.Wait()
-
+func (tc waitGroupOnErrorTestCase) handleOnErrorAsync(t *testing.T, wg *WaitGroup, err *error) {
+	t.Helper()
 	// Give a small delay for error processing in case of async handling
-	if tc.expectError && err == nil {
+	if tc.expectError && *err == nil {
 		time.Sleep(1 * time.Millisecond)
-		err = wg.Err()
+		*err = wg.Err()
 	}
+}
 
+func (tc waitGroupOnErrorTestCase) validateOnErrorResult(t *testing.T, err error) {
+	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		} else if tc.errorMsg != "" && err.Error() != tc.errorMsg {
-			t.Errorf("Expected error message '%s', got '%s'", tc.errorMsg, err.Error())
+		AssertError(t, err, "wait group on error")
+		if tc.errorMsg != "" {
+			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
 		}
 	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
+		AssertNoError(t, err, "wait group on error")
 	}
 }
 
 func TestWaitGroupOnError(t *testing.T) {
-	for _, tc := range waitGroupOnErrorTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, waitGroupOnErrorTestCases)
 }
 
 func TestWaitGroupDone(t *testing.T) {
@@ -277,7 +269,7 @@ func TestWaitGroupDone(t *testing.T) {
 	// Should not be closed yet
 	select {
 	case <-done:
-		t.Error("Done channel closed too early")
+		AssertTrue(t, false, "done channel timing")
 	case <-time.After(5 * time.Millisecond):
 		// Expected
 	}
@@ -296,34 +288,27 @@ func TestWaitGroupDone(t *testing.T) {
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
+func testWaitGroupErrNoError(t *testing.T) {
+	t.Helper()
+	var wg WaitGroup
+	wg.Go(func() error { return nil })
+	AssertNoError(t, wg.Wait(), "wait")
+	AssertNil(t, wg.Err(), "error")
+}
+
+func testWaitGroupErrWithError(t *testing.T) {
+	t.Helper()
+	var wg WaitGroup
+	expectedErr := errors.New("test error")
+	wg.Go(func() error { return expectedErr })
+	AssertError(t, wg.Wait(), "wait error")
+	AssertError(t, wg.Err(), "error")
+	AssertEqual(t, expectedErr.Error(), wg.Err().Error(), "error message")
+}
+
 func TestWaitGroupErr(t *testing.T) {
-	t.Run("no error", func(t *testing.T) {
-		var wg WaitGroup
-		wg.Go(func() error { return nil })
-		if err := wg.Wait(); err != nil {
-			t.Errorf("Expected no error from Wait(), got: %v", err)
-		}
-
-		if err := wg.Err(); err != nil {
-			t.Errorf("Expected nil error, got: %v", err)
-		}
-	})
-
-	t.Run("with error", func(t *testing.T) {
-		var wg WaitGroup
-		expectedErr := errors.New("test error")
-		wg.Go(func() error { return expectedErr })
-		if err := wg.Wait(); err == nil {
-			t.Error("Expected error from Wait() but got nil")
-		}
-
-		if err := wg.Err(); err == nil {
-			t.Error("Expected error but got nil")
-		} else if err.Error() != expectedErr.Error() {
-			t.Errorf("Expected error '%v', got '%v'", expectedErr, err)
-		}
-	})
+	t.Run("no error", testWaitGroupErrNoError)
+	t.Run("with error", testWaitGroupErrWithError)
 }
 
 func TestWaitGroupConcurrency(t *testing.T) {
@@ -346,14 +331,10 @@ func TestWaitGroupConcurrency(t *testing.T) {
 	}
 
 	err := wg.Wait()
-	if err != nil {
-		t.Errorf("Expected no error, got: %v", err)
-	}
+	AssertNoError(t, err, "concurrent workers")
 
 	expected := int64(numWorkers * numIterations)
-	if counter != expected {
-		t.Errorf("Expected counter %d, got %d", expected, counter)
-	}
+	AssertEqual(t, expected, counter, "counter value")
 }
 
 func TestWaitGroupFirstErrorWins(t *testing.T) {

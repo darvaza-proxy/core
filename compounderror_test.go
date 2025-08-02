@@ -6,41 +6,52 @@ import (
 	"testing"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var (
+	_ TestCase = compoundErrorErrorTestCase{}
+	_ TestCase = compoundErrorOKTestCase{}
+	_ TestCase = compoundErrorAsErrorTestCase{}
+	_ TestCase = compoundErrorAppendErrorTestCase{}
+	_ TestCase = compoundErrorAppendTestCase{}
+)
+
 type compoundErrorErrorTestCase struct {
 	expected string
 	name     string
 	errs     []error
 }
 
-var compoundErrorErrorTestCases = []compoundErrorErrorTestCase{
-	{
-		name:     "empty errors",
-		errs:     S[error](),
-		expected: "",
-	},
-	{
-		name:     "single error",
-		errs:     S(errors.New("first error")),
-		expected: "first error",
-	},
-	{
-		name:     "multiple errors",
-		errs:     S(errors.New("first error"), errors.New("second error")),
-		expected: "first error\nsecond error",
-	},
-	{
-		name:     "with nil errors",
-		errs:     S(errors.New("first error"), nil, errors.New("third error")),
-		expected: "first error\nthird error",
-	},
-	{
-		name:     "all nil errors",
-		errs:     S[error](nil, nil, nil),
-		expected: "",
-	},
+// newCompoundErrorErrorTestCase creates a new compoundErrorErrorTestCase
+func newCompoundErrorErrorTestCase(name string, errs []error, expected string) compoundErrorErrorTestCase {
+	return compoundErrorErrorTestCase{
+		name:     name,
+		errs:     errs,
+		expected: expected,
+	}
 }
 
-func (tc compoundErrorErrorTestCase) test(t *testing.T) {
+// newCompoundErrorErrorTestCaseEmpty creates a test case for empty errors
+func newCompoundErrorErrorTestCaseEmpty(name string) compoundErrorErrorTestCase {
+	return newCompoundErrorErrorTestCase(name, S[error](), "")
+}
+
+var compoundErrorErrorTestCases = []compoundErrorErrorTestCase{
+	newCompoundErrorErrorTestCaseEmpty("empty errors"),
+	newCompoundErrorErrorTestCase("single error", S(errors.New("first error")), "first error"),
+	newCompoundErrorErrorTestCase("multiple errors",
+		S(errors.New("first error"), errors.New("second error")),
+		"first error\nsecond error"),
+	newCompoundErrorErrorTestCase("with nil errors",
+		S(errors.New("first error"), nil, errors.New("third error")),
+		"first error\nthird error"),
+	newCompoundErrorErrorTestCase("all nil errors", S[error](nil, nil, nil), ""),
+}
+
+func (tc compoundErrorErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc compoundErrorErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 	ce := &CompoundError{Errs: tc.errs}
 	result := ce.Error()
@@ -51,9 +62,7 @@ func (tc compoundErrorErrorTestCase) test(t *testing.T) {
 }
 
 func TestCompoundErrorError(t *testing.T) {
-	for _, tc := range compoundErrorErrorTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, compoundErrorErrorTestCases)
 }
 
 func TestCompoundErrorErrors(t *testing.T) {
@@ -102,27 +111,31 @@ type compoundErrorOKTestCase struct {
 	expected bool
 }
 
+// newCompoundErrorOKTestCase creates a new compoundErrorOKTestCase
+func newCompoundErrorOKTestCase(name string, errs []error, expected bool) compoundErrorOKTestCase {
+	return compoundErrorOKTestCase{
+		name:     name,
+		errs:     errs,
+		expected: expected,
+	}
+}
+
+// newCompoundErrorOKTestCaseEmpty creates a test case expecting OK() to return true
+func newCompoundErrorOKTestCaseEmpty(name string, errs []error) compoundErrorOKTestCase {
+	return newCompoundErrorOKTestCase(name, errs, true)
+}
+
+// newCompoundErrorOKTestCaseHasErrors creates a test case expecting OK() to return false
+func newCompoundErrorOKTestCaseHasErrors(name string, errs []error) compoundErrorOKTestCase {
+	return newCompoundErrorOKTestCase(name, errs, false)
+}
+
 var compoundErrorOKTestCases = []compoundErrorOKTestCase{
-	{
-		name:     "empty errors",
-		errs:     S[error](),
-		expected: true,
-	},
-	{
-		name:     "nil slice",
-		errs:     nil,
-		expected: true,
-	},
-	{
-		name:     "single error",
-		errs:     S(errors.New("error")),
-		expected: false,
-	},
-	{
-		name:     "multiple errors",
-		errs:     S(errors.New("first"), errors.New("second")),
-		expected: false,
-	},
+	newCompoundErrorOKTestCaseEmpty("empty errors", S[error]()),
+	newCompoundErrorOKTestCaseEmpty("nil slice", nil),
+	newCompoundErrorOKTestCaseHasErrors("single error", S(errors.New("error"))),
+	newCompoundErrorOKTestCaseHasErrors("multiple errors",
+		S(errors.New("first"), errors.New("second"))),
 }
 
 func (tc compoundErrorOKTestCase) Name() string {
@@ -143,12 +156,7 @@ func (tc compoundErrorOKTestCase) Test(t *testing.T) {
 }
 
 func TestCompoundErrorOK(t *testing.T) {
-	// Convert to []TestCase for use with RunTestCases
-	testCases := make([]TestCase, len(compoundErrorOKTestCases))
-	for i, tc := range compoundErrorOKTestCases {
-		testCases[i] = tc
-	}
-	RunTestCases(t, testCases)
+	RunTestCases(t, compoundErrorOKTestCases)
 }
 
 type compoundErrorAsErrorTestCase struct {
@@ -157,30 +165,27 @@ type compoundErrorAsErrorTestCase struct {
 	expectNil bool
 }
 
-var compoundErrorAsErrorTestCases = []compoundErrorAsErrorTestCase{
-	{
-		name:      "empty errors",
-		errs:      S[error](),
-		expectNil: true,
-	},
-	{
-		name:      "nil slice",
-		errs:      nil,
-		expectNil: true,
-	},
-	{
-		name:      "single error",
-		errs:      S(errors.New("error")),
-		expectNil: false,
-	},
-	{
-		name:      "multiple errors",
-		errs:      S(errors.New("first"), errors.New("second")),
-		expectNil: false,
-	},
+// newCompoundErrorAsErrorTestCase creates a new compoundErrorAsErrorTestCase
+func newCompoundErrorAsErrorTestCase(name string, errs []error, expectNil bool) compoundErrorAsErrorTestCase {
+	return compoundErrorAsErrorTestCase{
+		name:      name,
+		errs:      errs,
+		expectNil: expectNil,
+	}
 }
 
-func (tc compoundErrorAsErrorTestCase) test(t *testing.T) {
+var compoundErrorAsErrorTestCases = []compoundErrorAsErrorTestCase{
+	newCompoundErrorAsErrorTestCase("empty errors", S[error](), true),
+	newCompoundErrorAsErrorTestCase("nil slice", nil, true),
+	newCompoundErrorAsErrorTestCase("single error", S(errors.New("error")), false),
+	newCompoundErrorAsErrorTestCase("multiple errors", S(errors.New("first"), errors.New("second")), false),
+}
+
+func (tc compoundErrorAsErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc compoundErrorAsErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 	ce := &CompoundError{Errs: tc.errs}
 	result := ce.AsError()
@@ -200,9 +205,7 @@ func (tc compoundErrorAsErrorTestCase) test(t *testing.T) {
 }
 
 func TestCompoundErrorAsError(t *testing.T) {
-	for _, tc := range compoundErrorAsErrorTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, compoundErrorAsErrorTestCases)
 }
 
 type compoundErrorAppendErrorTestCase struct {
@@ -212,34 +215,31 @@ type compoundErrorAppendErrorTestCase struct {
 	expectedLen int
 }
 
-var compoundErrorAppendErrorTestCases = []compoundErrorAppendErrorTestCase{
-	{
-		name:        "append to empty",
-		initial:     S[error](),
-		toAppend:    S(errors.New("first")),
-		expectedLen: 1,
-	},
-	{
-		name:        "append multiple",
-		initial:     S(errors.New("existing")),
-		toAppend:    S(errors.New("first"), errors.New("second")),
-		expectedLen: 3,
-	},
-	{
-		name:        "append with nils",
-		initial:     S(errors.New("existing")),
-		toAppend:    S[error](nil, errors.New("valid"), nil),
-		expectedLen: 2,
-	},
-	{
-		name:        "append all nils",
-		initial:     S(errors.New("existing")),
-		toAppend:    S[error](nil, nil),
-		expectedLen: 1,
-	},
+// newCompoundErrorAppendErrorTestCase creates a new compoundErrorAppendErrorTestCase
+func newCompoundErrorAppendErrorTestCase(name string, initial, toAppend []error,
+	expectedLen int) compoundErrorAppendErrorTestCase {
+	return compoundErrorAppendErrorTestCase{
+		name:        name,
+		initial:     initial,
+		toAppend:    toAppend,
+		expectedLen: expectedLen,
+	}
 }
 
-func (tc compoundErrorAppendErrorTestCase) test(t *testing.T) {
+var compoundErrorAppendErrorTestCases = []compoundErrorAppendErrorTestCase{
+	newCompoundErrorAppendErrorTestCase("append to empty", S[error](), S(errors.New("first")), 1),
+	newCompoundErrorAppendErrorTestCase("append multiple", S(errors.New("existing")),
+		S(errors.New("first"), errors.New("second")), 3),
+	newCompoundErrorAppendErrorTestCase("append with nils", S(errors.New("existing")),
+		S[error](nil, errors.New("valid"), nil), 2),
+	newCompoundErrorAppendErrorTestCase("append all nils", S(errors.New("existing")), S[error](nil, nil), 1),
+}
+
+func (tc compoundErrorAppendErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc compoundErrorAppendErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 	ce := &CompoundError{Errs: tc.initial}
 	result := ce.AppendError(tc.toAppend...)
@@ -263,9 +263,7 @@ func (tc compoundErrorAppendErrorTestCase) test(t *testing.T) {
 }
 
 func TestCompoundErrorAppendError(t *testing.T) {
-	for _, tc := range compoundErrorAppendErrorTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, compoundErrorAppendErrorTestCases)
 }
 
 func TestCompoundErrorAppendErrorWithCompoundError(t *testing.T) {
@@ -340,56 +338,38 @@ type compoundErrorAppendTestCase struct {
 	expectNote  bool
 }
 
+// newCompoundErrorAppendTestCase creates a new compoundErrorAppendTestCase
+//
+//revive:disable-next-line:argument-limit
+func newCompoundErrorAppendTestCase(name string, initial []error, err error, note string,
+	args []any, expectedLen int, expectNote bool) compoundErrorAppendTestCase {
+	return compoundErrorAppendTestCase{
+		name:        name,
+		initial:     initial,
+		err:         err,
+		note:        note,
+		args:        args,
+		expectedLen: expectedLen,
+		expectNote:  expectNote,
+	}
+}
+
 var compoundErrorAppendTestCases = []compoundErrorAppendTestCase{
-	{
-		name:        "nil error, empty note",
-		initial:     S[error](),
-		err:         nil,
-		note:        "",
-		args:        nil,
-		expectedLen: 0,
-		expectNote:  false,
-	},
-	{
-		name:        "nil error, with note",
-		initial:     S[error](),
-		err:         nil,
-		note:        "note only",
-		args:        nil,
-		expectedLen: 1,
-		expectNote:  true,
-	},
-	{
-		name:        "error without note",
-		initial:     S[error](),
-		err:         errors.New("test error"),
-		note:        "",
-		args:        nil,
-		expectedLen: 1,
-		expectNote:  false,
-	},
-	{
-		name:        "error with note",
-		initial:     S[error](),
-		err:         errors.New("test error"),
-		note:        "wrapped note",
-		args:        nil,
-		expectedLen: 1,
-		expectNote:  true,
-	},
-	{
-		name:        "formatted note",
-		initial:     S[error](),
-		err:         errors.New("test error"),
-		note:        "wrapped %s: %d",
-		args:        S[any]("note", 42),
-		expectedLen: 1,
-		expectNote:  true,
-	},
+	newCompoundErrorAppendTestCase("nil error, empty note", S[error](), nil, "", nil, 0, false),
+	newCompoundErrorAppendTestCase("nil error, with note", S[error](), nil, "note only", nil, 1, true),
+	newCompoundErrorAppendTestCase("error without note", S[error](), errors.New("test error"), "", nil, 1, false),
+	newCompoundErrorAppendTestCase("error with note", S[error](), errors.New("test error"),
+		"wrapped note", nil, 1, true),
+	newCompoundErrorAppendTestCase("formatted note", S[error](), errors.New("test error"),
+		"wrapped %s: %d", S[any]("note", 42), 1, true),
+}
+
+func (tc compoundErrorAppendTestCase) Name() string {
+	return tc.name
 }
 
 //revive:disable-next-line:cognitive-complexity
-func (tc compoundErrorAppendTestCase) test(t *testing.T) {
+func (tc compoundErrorAppendTestCase) Test(t *testing.T) {
 	t.Helper()
 	ce := &CompoundError{Errs: tc.initial}
 	result := ce.Append(tc.err, tc.note, tc.args...)
@@ -426,9 +406,7 @@ func (tc compoundErrorAppendTestCase) test(t *testing.T) {
 }
 
 func TestCompoundErrorAppend(t *testing.T) {
-	for _, tc := range compoundErrorAppendTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, compoundErrorAppendTestCases)
 }
 
 func TestCompoundErrorAppendChaining(t *testing.T) {

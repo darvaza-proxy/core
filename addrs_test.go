@@ -7,6 +7,12 @@ import (
 	"testing"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var _ TestCase = parseAddrTestCase{}
+var _ TestCase = parseNetIPTestCase{}
+var _ TestCase = addrFromNetIPTestCase{}
+var _ TestCase = getInterfacesNamesTestCase{}
+
 // Test cases for ParseAddr
 type parseAddrTestCase struct {
 	// netip.Addr struct - result value
@@ -21,69 +27,46 @@ type parseAddrTestCase struct {
 }
 
 var parseAddrTestCases = []parseAddrTestCase{
-	{
-		name:    "IPv4 address",
-		input:   "192.168.1.1",
-		want:    netip.MustParseAddr("192.168.1.1"),
-		wantErr: false,
-	},
-	{
-		name:    "IPv6 address",
-		input:   "2001:db8::1",
-		want:    netip.MustParseAddr("2001:db8::1"),
-		wantErr: false,
-	},
-	{
-		name:    "IPv4 unspecified shorthand",
-		input:   "0",
-		want:    netip.IPv4Unspecified(),
-		wantErr: false,
-	},
-	{
-		name:    "IPv6 unspecified",
-		input:   "::",
-		want:    netip.IPv6Unspecified(),
-		wantErr: false,
-	},
-	{
-		name:    "IPv4 loopback",
-		input:   "127.0.0.1",
-		want:    netip.MustParseAddr("127.0.0.1"),
-		wantErr: false,
-	},
-	{
-		name:    "IPv6 loopback",
-		input:   "::1",
-		want:    netip.MustParseAddr("::1"),
-		wantErr: false,
-	},
-	{
-		name:    "Invalid address",
-		input:   "not-an-ip",
-		want:    netip.Addr{},
-		wantErr: true,
-	},
-	{
-		name:    "Empty string",
-		input:   "",
-		want:    netip.Addr{},
-		wantErr: true,
-	},
-	{
-		name:    "IPv4 with port",
-		input:   "192.168.1.1:8080",
-		want:    netip.Addr{},
-		wantErr: true,
-	},
-	{
-		name:    "IPv6 with zone",
-		input:   "fe80::1%eth0",
-		want:    netip.MustParseAddr("fe80::1%eth0"),
-		wantErr: false,
-	},
+	newParseAddrTestCaseStr("IPv4 address", "192.168.1.1", "192.168.1.1", false),
+	newParseAddrTestCaseStr("IPv6 address", "2001:db8::1", "2001:db8::1", false),
+	newParseAddrTestCase("IPv4 unspecified shorthand", "0", netip.IPv4Unspecified(), false),
+	newParseAddrTestCase("IPv6 unspecified", "::", netip.IPv6Unspecified(), false),
+	newParseAddrTestCaseStr("IPv4 loopback", "127.0.0.1", "127.0.0.1", false),
+	newParseAddrTestCaseStr("IPv6 loopback", "::1", "::1", false),
+	newParseAddrTestCaseStr("Invalid address", "not-an-ip", "", true),
+	newParseAddrTestCaseStr("Empty string", "", "", true),
+	newParseAddrTestCaseStr("IPv4 with port", "192.168.1.1:8080", "", true),
+	newParseAddrTestCaseStr("IPv6 with zone", "fe80::1%eth0", "fe80::1%eth0", false),
 }
 
-func (tc parseAddrTestCase) test(t *testing.T) {
+func newParseAddrTestCase(name, input string, want netip.Addr, wantErr bool) parseAddrTestCase {
+	return parseAddrTestCase{
+		name:    name,
+		input:   input,
+		want:    want,
+		wantErr: wantErr,
+	}
+}
+
+//revive:disable-next-line:flag-parameter
+func newParseAddrTestCaseStr(name, input, wantAddr string, wantErr bool) parseAddrTestCase {
+	var want netip.Addr
+	if !wantErr && wantAddr != "" {
+		want = netip.MustParseAddr(wantAddr)
+	}
+	return parseAddrTestCase{
+		name:    name,
+		input:   input,
+		want:    want,
+		wantErr: wantErr,
+	}
+}
+
+func (tc parseAddrTestCase) Name() string {
+	return tc.name
+}
+
+func (tc parseAddrTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, err := ParseAddr(tc.input)
@@ -102,9 +85,7 @@ func (tc parseAddrTestCase) test(t *testing.T) {
 }
 
 func TestParseAddr(t *testing.T) {
-	for _, tc := range parseAddrTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, parseAddrTestCases)
 }
 
 // Test cases for ParseNetIP
@@ -116,45 +97,28 @@ type parseNetIPTestCase struct {
 }
 
 var parseNetIPTestCases = []parseNetIPTestCase{
-	{
-		name:    "IPv4 address",
-		input:   "192.168.1.1",
-		want:    net.ParseIP("192.168.1.1"),
-		wantErr: false,
-	},
-	{
-		name:    "IPv6 address",
-		input:   "2001:db8::1",
-		want:    net.ParseIP("2001:db8::1"),
-		wantErr: false,
-	},
-	{
-		name:    "IPv4 unspecified shorthand",
-		input:   "0",
-		want:    net.IPv4zero,
-		wantErr: false,
-	},
-	{
-		name:    "IPv6 unspecified",
-		input:   "::",
-		want:    net.IPv6zero,
-		wantErr: false,
-	},
-	{
-		name:    "Invalid address",
-		input:   "invalid",
-		want:    nil,
-		wantErr: true,
-	},
-	{
-		name:    "Empty string",
-		input:   "",
-		want:    nil,
-		wantErr: true,
-	},
+	newParseNetIPTestCase("IPv4 address", "192.168.1.1", net.ParseIP("192.168.1.1"), false),
+	newParseNetIPTestCase("IPv6 address", "2001:db8::1", net.ParseIP("2001:db8::1"), false),
+	newParseNetIPTestCase("IPv4 unspecified shorthand", "0", net.IPv4zero, false),
+	newParseNetIPTestCase("IPv6 unspecified", "::", net.IPv6zero, false),
+	newParseNetIPTestCase("Invalid address", "invalid", nil, true),
+	newParseNetIPTestCase("Empty string", "", nil, true),
 }
 
-func (tc parseNetIPTestCase) test(t *testing.T) {
+func newParseNetIPTestCase(name, input string, want net.IP, wantErr bool) parseNetIPTestCase {
+	return parseNetIPTestCase{
+		name:    name,
+		input:   input,
+		want:    want,
+		wantErr: wantErr,
+	}
+}
+
+func (tc parseNetIPTestCase) Name() string {
+	return tc.name
+}
+
+func (tc parseNetIPTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, err := ParseNetIP(tc.input)
@@ -173,9 +137,7 @@ func (tc parseNetIPTestCase) test(t *testing.T) {
 }
 
 func TestParseNetIP(t *testing.T) {
-	for _, tc := range parseNetIPTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, parseNetIPTestCases)
 }
 
 // Test cases for AddrFromNetIP
@@ -194,78 +156,35 @@ type addrFromNetIPTestCase struct {
 }
 
 var addrFromNetIPTestCases = []addrFromNetIPTestCase{
-	{
-		name: "IPAddr IPv4",
-		input: &net.IPAddr{
-			IP: net.ParseIP("192.168.1.1"),
-		},
-		want: netip.MustParseAddr("192.168.1.1"),
-		ok:   true,
-	},
-	{
-		name: "IPAddr IPv6",
-		input: &net.IPAddr{
-			IP: net.ParseIP("2001:db8::1"),
-		},
-		want: netip.MustParseAddr("2001:db8::1"),
-		ok:   true,
-	},
-	{
-		name: "IPNet IPv4",
-		input: &net.IPNet{
-			IP:   net.ParseIP("10.0.0.0"),
-			Mask: net.CIDRMask(24, 32),
-		},
-		want: netip.MustParseAddr("10.0.0.0"),
-		ok:   true,
-	},
-	{
-		name: "IPNet IPv6",
-		input: &net.IPNet{
-			IP:   net.ParseIP("2001:db8::"),
-			Mask: net.CIDRMask(64, 128),
-		},
-		want: netip.MustParseAddr("2001:db8::"),
-		ok:   true,
-	},
-	{
-		name:  "TCPAddr",
-		input: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080},
-		want:  netip.Addr{},
-		ok:    false,
-	},
-	{
-		name:  "UDPAddr",
-		input: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080},
-		want:  netip.Addr{},
-		ok:    false,
-	},
-	{
-		name:  "nil input",
-		input: nil,
-		want:  netip.Addr{},
-		ok:    false,
-	},
-	{
-		name: "IPAddr with nil IP",
-		input: &net.IPAddr{
-			IP: nil,
-		},
-		want: netip.Addr{},
-		ok:   false,
-	},
-	{
-		name: "IPNet with nil IP",
-		input: &net.IPNet{
-			IP:   nil,
-			Mask: net.CIDRMask(24, 32),
-		},
-		want: netip.Addr{},
-		ok:   false,
-	},
+	newAddrFromNetIPTestCase("IPAddr IPv4", &net.IPAddr{IP: net.ParseIP("192.168.1.1")},
+		netip.MustParseAddr("192.168.1.1"), true),
+	newAddrFromNetIPTestCase("IPAddr IPv6", &net.IPAddr{IP: net.ParseIP("2001:db8::1")},
+		netip.MustParseAddr("2001:db8::1"), true),
+	newAddrFromNetIPTestCase("IPNet IPv4", &net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
+		netip.MustParseAddr("10.0.0.0"), true),
+	newAddrFromNetIPTestCase("IPNet IPv6", &net.IPNet{IP: net.ParseIP("2001:db8::"), Mask: net.CIDRMask(64, 128)},
+		netip.MustParseAddr("2001:db8::"), true),
+	newAddrFromNetIPTestCase("TCPAddr", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, netip.Addr{}, false),
+	newAddrFromNetIPTestCase("UDPAddr", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, netip.Addr{}, false),
+	newAddrFromNetIPTestCase("nil input", nil, netip.Addr{}, false),
+	newAddrFromNetIPTestCase("IPAddr with nil IP", &net.IPAddr{IP: nil}, netip.Addr{}, false),
+	newAddrFromNetIPTestCase("IPNet with nil IP", &net.IPNet{IP: nil, Mask: net.CIDRMask(24, 32)}, netip.Addr{}, false),
 }
 
-func (tc addrFromNetIPTestCase) test(t *testing.T) {
+func newAddrFromNetIPTestCase(name string, input net.Addr, want netip.Addr, ok bool) addrFromNetIPTestCase {
+	return addrFromNetIPTestCase{
+		name:  name,
+		input: input,
+		want:  want,
+		ok:    ok,
+	}
+}
+
+func (tc addrFromNetIPTestCase) Name() string {
+	return tc.name
+}
+
+func (tc addrFromNetIPTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, ok := AddrFromNetIP(tc.input)
@@ -278,48 +197,28 @@ func (tc addrFromNetIPTestCase) test(t *testing.T) {
 }
 
 func TestAddrFromNetIP(t *testing.T) {
-	for _, tc := range addrFromNetIPTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, addrFromNetIPTestCases)
 }
 
 // Test GetStringIPAddresses
-//
-//revive:disable-next-line:cognitive-complexity
 func TestGetStringIPAddresses(t *testing.T) {
 	// Since we can't easily mock net.InterfaceByName and net.InterfaceAddrs,
 	// we'll test with the real interfaces but handle the case where there are none
 
-	t.Run("all interfaces", func(t *testing.T) {
-		addrs, err := GetStringIPAddresses()
-		if err != nil {
-			// Some systems might not have any interfaces
-			t.Logf("Got error (possibly no interfaces): %v", err)
-			return
-		}
+	t.Run("all interfaces", testAllStringInterfaces)
 
-		// At least check it returns a slice (could be empty)
-		if addrs == nil {
-			t.Error("Expected non-nil slice")
-		}
-
-		// Verify all returned addresses are valid strings
-		for _, addr := range addrs {
-			if _, err := netip.ParseAddr(addr); err != nil {
-				t.Errorf("Invalid address string: %s", addr)
-			}
-		}
-	})
-
-	t.Run("specific interface", func(t *testing.T) {
-		// Try with a non-existent interface
-		_, err := GetStringIPAddresses("invalid-interface-name")
-		if err == nil {
-			t.Error("Expected error for invalid interface")
-		}
-	})
+	t.Run("specific interface", testSpecificInvalidInterface)
 
 	t.Run("loopback interface", testLoopbackInterface)
+}
+
+func testSpecificInvalidInterface(t *testing.T) {
+	t.Helper()
+	// Try with a non-existent interface
+	_, err := GetStringIPAddresses("invalid-interface-name")
+	if err == nil {
+		t.Error("Expected error for invalid interface")
+	}
 }
 
 func testLoopbackInterface(t *testing.T) {
@@ -344,77 +243,105 @@ func testLoopbackInterface(t *testing.T) {
 	}
 }
 
+func testAllStringInterfaces(t *testing.T) {
+	t.Helper()
+	addrs, err := GetStringIPAddresses()
+	if err != nil {
+		// Some systems might not have any interfaces
+		t.Logf("Got error (possibly no interfaces): %v", err)
+		return
+	}
+
+	// At least check it returns a slice (could be empty)
+	if addrs == nil {
+		t.Error("Expected non-nil slice")
+	}
+
+	// Verify all returned addresses are valid strings
+	for _, addr := range addrs {
+		if _, err := netip.ParseAddr(addr); err != nil {
+			t.Errorf("Invalid address string: %s", addr)
+		}
+	}
+}
+
 // Test GetNetIPAddresses
-//
-//revive:disable-next-line:cognitive-complexity
 func TestGetNetIPAddresses(t *testing.T) {
-	t.Run("all interfaces", func(t *testing.T) {
-		addrs, err := GetNetIPAddresses()
-		if err != nil {
-			// Some systems might not have any interfaces
-			t.Logf("Got error (possibly no interfaces): %v", err)
-			return
-		}
+	t.Run("all interfaces", testAllNetIPInterfaces)
+	t.Run("invalid interface", testInvalidNetIPInterface)
+}
 
-		// At least check it returns a slice (could be empty)
-		if addrs == nil {
-			t.Error("Expected non-nil slice")
-		}
+func testAllNetIPInterfaces(t *testing.T) {
+	t.Helper()
+	addrs, err := GetNetIPAddresses()
+	if err != nil {
+		// Some systems might not have any interfaces
+		t.Logf("Got error (possibly no interfaces): %v", err)
+		return
+	}
 
-		// Verify all returned addresses are valid net.IP
-		for _, addr := range addrs {
-			if len(addr) == 0 {
-				t.Error("Got nil or empty net.IP")
-			}
-		}
-	})
+	// At least check it returns a slice (could be empty)
+	if addrs == nil {
+		t.Error("Expected non-nil slice")
+	}
 
-	t.Run("invalid interface", func(t *testing.T) {
-		_, err := GetNetIPAddresses("invalid-interface-name")
-		if err == nil {
-			t.Error("Expected error for invalid interface")
+	// Verify all returned addresses are valid net.IP
+	for _, addr := range addrs {
+		if len(addr) == 0 {
+			t.Error("Got nil or empty net.IP")
 		}
-	})
+	}
+}
+
+func testInvalidNetIPInterface(t *testing.T) {
+	t.Helper()
+	_, err := GetNetIPAddresses("invalid-interface-name")
+	if err == nil {
+		t.Error("Expected error for invalid interface")
+	}
 }
 
 // Test GetIPAddresses
-//
-//revive:disable-next-line:cognitive-complexity
 func TestGetIPAddresses(t *testing.T) {
-	t.Run("all interfaces", func(t *testing.T) {
-		addrs, err := GetIPAddresses()
-		if err != nil {
-			// Some systems might not have any interfaces
-			t.Logf("Got error (possibly no interfaces): %v", err)
-			return
-		}
+	t.Run("all interfaces", testAllIPAddressInterfaces)
+	t.Run("multiple interfaces with error", testMultipleInterfacesWithError)
+}
 
-		// At least check it returns a slice (could be empty)
-		if addrs == nil {
-			t.Error("Expected non-nil slice")
-		}
+func testAllIPAddressInterfaces(t *testing.T) {
+	t.Helper()
+	addrs, err := GetIPAddresses()
+	if err != nil {
+		// Some systems might not have any interfaces
+		t.Logf("Got error (possibly no interfaces): %v", err)
+		return
+	}
 
-		// Verify all returned addresses are valid
-		for _, addr := range addrs {
-			if !addr.IsValid() {
-				t.Error("Got invalid netip.Addr")
-			}
-		}
-	})
+	// At least check it returns a slice (could be empty)
+	if addrs == nil {
+		t.Error("Expected non-nil slice")
+	}
 
-	t.Run("multiple interfaces with error", func(t *testing.T) {
-		// Try with one valid and one invalid interface
-		ifaces, err := GetInterfacesNames()
-		if err != nil || len(ifaces) == 0 {
-			t.Skip("No interfaces available for testing")
+	// Verify all returned addresses are valid
+	for _, addr := range addrs {
+		if !addr.IsValid() {
+			t.Error("Got invalid netip.Addr")
 		}
+	}
+}
 
-		// Mix valid and invalid interface names
-		_, err = GetIPAddresses(ifaces[0], "invalid-interface-name")
-		if err == nil {
-			t.Error("Expected error when one interface doesn't exist")
-		}
-	})
+func testMultipleInterfacesWithError(t *testing.T) {
+	t.Helper()
+	// Try with one valid and one invalid interface
+	ifaces, err := GetInterfacesNames()
+	if err != nil || len(ifaces) == 0 {
+		t.Skip("No interfaces available for testing")
+	}
+
+	// Mix valid and invalid interface names
+	_, err = GetIPAddresses(ifaces[0], "invalid-interface-name")
+	if err == nil {
+		t.Error("Expected error when one interface doesn't exist")
+	}
 }
 
 // Test GetInterfacesNames
@@ -424,91 +351,76 @@ type getInterfacesNamesTestCase struct {
 }
 
 var getInterfacesNamesTestCases = []getInterfacesNamesTestCase{
-	{
-		name:   "no exclusions",
-		except: nil,
-	},
-	{
-		name:   "empty exclusions",
-		except: S[string](),
-	},
-	{
-		name:   "exclude invalid",
-		except: S("invalid-interface"),
-	},
-	{
-		name:   "exclude multiple",
-		except: S("eth0", "eth1", "lo"),
-	},
+	newGetInterfacesNamesTestCase("no exclusions", nil),
+	newGetInterfacesNamesTestCase("empty exclusions", S[string]()),
+	newGetInterfacesNamesTestCase("exclude invalid", S("invalid-interface")),
+	newGetInterfacesNamesTestCase("exclude multiple", S("eth0", "eth1", "lo")),
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc getInterfacesNamesTestCase) test(t *testing.T) {
+func newGetInterfacesNamesTestCase(name string, except []string) getInterfacesNamesTestCase {
+	return getInterfacesNamesTestCase{
+		name:   name,
+		except: except,
+	}
+}
+
+func (tc getInterfacesNamesTestCase) Name() string {
+	return tc.name
+}
+
+func (tc getInterfacesNamesTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	names, err := GetInterfacesNames(tc.except...)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
-
-	if names == nil {
-		t.Error("Expected non-nil slice")
-		return
-	}
+	AssertNoError(t, err, "GetInterfacesNames")
+	AssertNotNil(t, names, "interface names slice")
 
 	// Check that excluded names are not in the result
 	for _, excluded := range tc.except {
-		for _, name := range names {
-			if name == excluded {
-				t.Errorf("Found excluded interface %s in result", excluded)
-			}
-		}
+		AssertFalse(t, SliceContains(names, excluded), "contains interface %q", excluded)
 	}
 
 	// Verify no duplicates
 	seen := make(map[string]bool)
 	for _, name := range names {
-		if seen[name] {
-			t.Errorf("Duplicate interface name: %s", name)
-		}
+		AssertFalse(t, seen[name], "duplicate interface %q", name)
 		seen[name] = true
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
 func TestGetInterfacesNames(t *testing.T) {
-	for _, tc := range getInterfacesNamesTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, getInterfacesNamesTestCases)
 
 	// Additional test: verify exclusion actually works
-	t.Run("exclusion removes interfaces", func(t *testing.T) {
-		all, err := GetInterfacesNames()
-		if err != nil || len(all) == 0 {
-			t.Skip("No interfaces available for testing")
-		}
+	t.Run("exclusion removes interfaces", testExclusionRemovesInterfaces)
+}
 
-		// Exclude the first interface
-		excluded := all[0]
-		filtered, err := GetInterfacesNames(excluded)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			return
-		}
+func testExclusionRemovesInterfaces(t *testing.T) {
+	t.Helper()
+	all, err := GetInterfacesNames()
+	if err != nil || len(all) == 0 {
+		t.Skip("No interfaces available for testing")
+	}
 
-		// Should have one less interface
-		if len(filtered) != len(all)-1 {
-			t.Errorf("Expected %d interfaces, got %d", len(all)-1, len(filtered))
-		}
+	// Exclude the first interface
+	excluded := all[0]
+	filtered, err := GetInterfacesNames(excluded)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
 
-		// Verify the excluded interface is not present
-		for _, name := range filtered {
-			if name == excluded {
-				t.Errorf("Found excluded interface %s in result", excluded)
-			}
+	// Should have one less interface
+	if len(filtered) != len(all)-1 {
+		t.Errorf("Expected %d interfaces, got %d", len(all)-1, len(filtered))
+	}
+
+	// Verify the excluded interface is not present
+	for _, name := range filtered {
+		if name == excluded {
+			t.Errorf("Found excluded interface %s in result", excluded)
 		}
-	})
+	}
 }
 
 // Test internal helper functions
@@ -550,33 +462,37 @@ func TestAsNetIPAddresses(t *testing.T) {
 	}
 }
 
-//revive:disable-next-line:cognitive-complexity
 func TestAsNetIP(t *testing.T) {
-	t.Run("IPv4", func(t *testing.T) {
-		addr := netip.MustParseAddr("192.168.1.1")
-		ip := asNetIP(addr)
-		expected := net.ParseIP("192.168.1.1").To4()
-		if !ip.Equal(expected) {
-			t.Errorf("Expected %v, got %v", expected, ip)
-		}
-		// Should be 4 bytes for IPv4
-		if len(ip) != 4 {
-			t.Errorf("Expected 4 bytes for IPv4, got %d", len(ip))
-		}
-	})
+	t.Run("IPv4", testAsNetIPv4)
+	t.Run("IPv6", testAsNetIPv6)
+}
 
-	t.Run("IPv6", func(t *testing.T) {
-		addr := netip.MustParseAddr("2001:db8::1")
-		ip := asNetIP(addr)
-		expected := net.ParseIP("2001:db8::1")
-		if !ip.Equal(expected) {
-			t.Errorf("Expected %v, got %v", expected, ip)
-		}
-		// Should be 16 bytes for IPv6
-		if len(ip) != 16 {
-			t.Errorf("Expected 16 bytes for IPv6, got %d", len(ip))
-		}
-	})
+func testAsNetIPv4(t *testing.T) {
+	t.Helper()
+	addr := netip.MustParseAddr("192.168.1.1")
+	ip := asNetIP(addr)
+	expected := net.ParseIP("192.168.1.1").To4()
+	if !ip.Equal(expected) {
+		t.Errorf("Expected %v, got %v", expected, ip)
+	}
+	// Should be 4 bytes for IPv4
+	if len(ip) != 4 {
+		t.Errorf("Expected 4 bytes for IPv4, got %d", len(ip))
+	}
+}
+
+func testAsNetIPv6(t *testing.T) {
+	t.Helper()
+	addr := netip.MustParseAddr("2001:db8::1")
+	ip := asNetIP(addr)
+	expected := net.ParseIP("2001:db8::1")
+	if !ip.Equal(expected) {
+		t.Errorf("Expected %v, got %v", expected, ip)
+	}
+	// Should be 16 bytes for IPv6
+	if len(ip) != 16 {
+		t.Errorf("Expected 16 bytes for IPv6, got %d", len(ip))
+	}
 }
 
 func TestAppendNetIPAsIP(t *testing.T) {

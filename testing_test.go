@@ -7,6 +7,9 @@ import (
 	"testing"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var _ TestCase = (*mockTestCase)(nil)
+
 // Test MockT implementation
 func TestMockT(t *testing.T) {
 	t.Run("initial state", testMockTInitialState)
@@ -379,10 +382,17 @@ func (tc *mockTestCase) Test(_ *testing.T) {
 	tc.called = true
 }
 
+func newMockTestCase(name string) *mockTestCase {
+	return &mockTestCase{
+		name:   name,
+		called: false,
+	}
+}
+
 func TestRunTestCases(t *testing.T) {
-	tc1 := &mockTestCase{name: "test1"}
-	tc2 := &mockTestCase{name: "test2"}
-	tc3 := &mockTestCase{name: "test3"}
+	tc1 := newMockTestCase("test1")
+	tc2 := newMockTestCase("test2")
+	tc3 := newMockTestCase("test3")
 
 	cases := []TestCase{tc1, tc2, tc3}
 	RunTestCases(t, cases)

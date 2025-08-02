@@ -5,99 +5,87 @@ import (
 	"testing"
 )
 
+// TestCase validations
+var _ TestCase = asRecoveredTestCase{}
+var _ TestCase = catcherDoTestCase{}
+var _ TestCase = catcherTryTestCase{}
+var _ TestCase = catchTestCase{}
+var _ TestCase = catchWithPanicRecoveryTestCase{}
+
 type asRecoveredTestCase struct {
-	// Large fields - interface types and strings
-	expected any
 	input    any
+	expected any
 	name     string
-
-	// Small fields (1 byte) - booleans
-	isNil bool
 }
 
-var asRecoveredTestCases = []asRecoveredTestCase{
-	{
-		name:     "nil input",
-		input:    nil,
-		expected: nil,
-		isNil:    true,
-	},
-	{
-		name:     "string panic",
-		input:    "test panic",
-		expected: "test panic",
-		isNil:    false,
-	},
-	{
-		name:     "error panic",
-		input:    errors.New("test error"),
-		expected: "test error", // String comparison for error content
-		isNil:    false,
-	},
-	{
-		name:     "int panic",
-		input:    42,
-		expected: 42,
-		isNil:    false,
-	},
-	{
-		name:     "already recovered",
-		input:    NewPanicError(1, "already wrapped"),
-		expected: "already wrapped",
-		isNil:    false,
-	},
+func (tc asRecoveredTestCase) Name() string { return tc.name }
+
+func (tc asRecoveredTestCase) MustNil() bool { return IsNil(tc.input) }
+
+func newAsRecoveredTestCase(name string, input, expected any) asRecoveredTestCase {
+	return asRecoveredTestCase{
+		name:     name,
+		input:    input,
+		expected: expected,
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-//revive:disable-next-line:cyclomatic
-func (tc asRecoveredTestCase) test(t *testing.T) {
+func asRecoveredTestCases() []asRecoveredTestCase {
+	var testError = errors.New("test error")
+	var panicError = NewPanicError(1, "wrapped error")
+
+	return []asRecoveredTestCase{
+		newAsRecoveredTestCase("nil input", nil, nil),
+		newAsRecoveredTestCase("string panic", "test panic", "test panic"),
+		newAsRecoveredTestCase("error panic", testError, testError),
+		newAsRecoveredTestCase("int panic", 42, 42),
+		newAsRecoveredTestCase("already recovered", panicError, panicError),
+	}
+}
+
+func (tc asRecoveredTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := AsRecovered(tc.input)
 
-	if tc.isNil {
-		if result != nil {
-			t.Fatalf("expected nil, got %v", result)
-		}
+	if tc.MustNil() {
+		AssertNil(t, result, "nil result")
 		return
 	}
 
-	if result == nil {
-		t.Fatalf("expected non-nil result, got nil")
-	}
-
-	// Test Recovered interface
-	recovered := result.Recovered()
-
-	// Handle different types appropriately for comparison
-	switch exp := tc.expected.(type) {
-	case string:
-		// For string inputs, they get converted to errors
-		if err, ok := recovered.(error); ok {
-			AssertEqual(t, exp, err.Error(), "recovered error message mismatch")
-		} else if recovered != exp {
-			t.Fatalf("expected recovered value %v, got %v", exp, recovered)
+	if AssertNotNil(t, result, "not nil result") {
+		err, ok := AssertTypeIs[Recovered](t, result, "recovered panic error")
+		if ok {
+			tc.testRecovered(t, err)
 		}
-	case error:
-		if err, ok := recovered.(error); ok {
-			AssertEqual(t, exp.Error(), err.Error(), "recovered error message mismatch")
-		} else {
-			t.Fatalf("expected error type, got %T", recovered)
-		}
-	default:
-		AssertEqual(t, tc.expected, recovered, "recovered value mismatch")
-	}
-
-	// Test Error method
-	errorStr := result.Error()
-	if errorStr == "" {
-		t.Fatalf("expected non-empty error string")
 	}
 }
 
-func TestAsRecovered(t *testing.T) {
-	for _, tc := range asRecoveredTestCases {
-		t.Run(tc.name, tc.test)
+func (tc asRecoveredTestCase) testRecovered(t *testing.T, result Recovered) {
+	if expectedError, asIs := tc.expected.(Recovered); asIs {
+		// pass-through
+		AssertEqual(t, expectedError, result, "pass-through recovered")
+		return
 	}
+
+	// recovered
+	recovered := result.Recovered()
+	if s0, ok := tc.expected.(string); ok {
+		if s1, ok := recovered.(string); ok {
+			// string vs string
+			AssertEqual(t, s0, s1, "recovered string")
+		} else if err, ok := AssertTypeIs[error](t, recovered, "recovered error"); ok {
+			// special case of strings converted to errors
+			AssertEqual(t, s0, err.Error(), "recovered string")
+		}
+
+		return
+	}
+
+	AssertEqual(t, tc.expected, recovered, "recovered value")
+}
+
+func TestAsRecovered(t *testing.T) {
+	RunTestCases(t, asRecoveredTestCases())
 }
 
 type catcherDoTestCase struct {
@@ -107,59 +95,44 @@ type catcherDoTestCase struct {
 	expectPanic bool
 }
 
-var catcherDoTestCases = []catcherDoTestCase{
-	{
-		name: "successful function",
-		fn: func() error {
+func catcherDoTestCases() []catcherDoTestCase {
+	return []catcherDoTestCase{
+		newCatcherDoTestCase("successful function", func() error {
 			return nil
-		},
-		expectError: false,
-		expectPanic: false,
-	},
-	{
-		name: "function returns error",
-		fn: func() error {
+		}, false, false),
+		newCatcherDoTestCase("function returns error", func() error {
 			return errors.New("test error")
-		},
-		expectError: true,
-		expectPanic: false,
-	},
-	{
-		name: "function panics with string",
-		fn: func() error {
+		}, true, false),
+		newCatcherDoTestCase("function panics with string", func() error {
 			panic("test panic")
-		},
-		expectError: true,
-		expectPanic: true,
-	},
-	{
-		name: "function panics with error",
-		fn: func() error {
+		}, true, true),
+		newCatcherDoTestCase("function panics with error", func() error {
 			panic(errors.New("panic error"))
-		},
-		expectError: true,
-		expectPanic: true,
-	},
-	{
-		name: "function panics with int",
-		fn: func() error {
+		}, true, true),
+		newCatcherDoTestCase("function panics with int", func() error {
 			panic(42)
-		},
-		expectError: true,
-		expectPanic: true,
-	},
-	{
-		name:        "nil function",
-		fn:          nil,
-		expectError: false,
-		expectPanic: false,
-	},
+		}, true, true),
+		newCatcherDoTestCase("nil function", nil, false, false),
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc catcherDoTestCase) test(t *testing.T) {
+func newCatcherDoTestCase(name string, fn func() error, expectError, expectPanic bool) catcherDoTestCase {
+	return catcherDoTestCase{
+		name:        name,
+		fn:          fn,
+		expectError: expectError,
+		expectPanic: expectPanic,
+	}
+}
+
+func (tc catcherDoTestCase) Name() string {
+	return tc.name
+}
+
+func (tc catcherDoTestCase) Test(t *testing.T) {
 	t.Helper()
 	var catcher Catcher
+
 	err := catcher.Do(tc.fn)
 
 	if tc.expectError {
@@ -168,21 +141,15 @@ func (tc catcherDoTestCase) test(t *testing.T) {
 		AssertNoError(t, err, "Catcher.Do error")
 	}
 
-	if tc.expectError && tc.expectPanic {
-		if recovered, ok := err.(Recovered); ok {
-			if recovered.Recovered() == nil {
-				t.Fatalf("expected recovered panic value, got nil")
-			}
-		} else {
-			t.Fatalf("expected Recovered error, got %T", err)
+	if tc.expectPanic {
+		if recovered, ok := AssertTypeIs[Recovered](t, err, "Recovered error type"); ok {
+			AssertNotNil(t, recovered.Recovered(), "recovered panic value")
 		}
 	}
 }
 
 func TestCatcherDo(t *testing.T) {
-	for _, tc := range catcherDoTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, catcherDoTestCases())
 }
 
 type catcherTryTestCase struct {
@@ -192,41 +159,35 @@ type catcherTryTestCase struct {
 	expectPanic bool
 }
 
-var catcherTryTestCases = []catcherTryTestCase{
-	{
-		name: "successful function",
-		fn: func() error {
+func catcherTryTestCases() []catcherTryTestCase {
+	return []catcherTryTestCase{
+		newCatcherTryTestCase("successful function", func() error {
 			return nil
-		},
-		expectError: false,
-		expectPanic: false,
-	},
-	{
-		name: "function returns error",
-		fn: func() error {
+		}, false, false),
+		newCatcherTryTestCase("function returns error", func() error {
 			return errors.New("test error")
-		},
-		expectError: true,
-		expectPanic: false,
-	},
-	{
-		name: "function panics",
-		fn: func() error {
+		}, true, false),
+		newCatcherTryTestCase("function panics", func() error {
 			panic("test panic")
-		},
-		expectError: false,
-		expectPanic: true,
-	},
-	{
-		name:        "nil function",
-		fn:          nil,
-		expectError: false,
-		expectPanic: false,
-	},
+		}, false, true),
+		newCatcherTryTestCase("nil function", nil, false, false),
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc catcherTryTestCase) test(t *testing.T) {
+func newCatcherTryTestCase(name string, fn func() error, expectError, expectPanic bool) catcherTryTestCase {
+	return catcherTryTestCase{
+		name:        name,
+		fn:          fn,
+		expectError: expectError,
+		expectPanic: expectPanic,
+	}
+}
+
+func (tc catcherTryTestCase) Name() string {
+	return tc.name
+}
+
+func (tc catcherTryTestCase) Test(t *testing.T) {
 	t.Helper()
 	var catcher Catcher
 	err := catcher.Try(tc.fn)
@@ -240,26 +201,23 @@ func (tc catcherTryTestCase) test(t *testing.T) {
 	// Check recovered panic
 	recovered := catcher.Recovered()
 	if tc.expectPanic {
-		if recovered == nil {
-			t.Fatalf("expected recovered panic, got nil")
-		}
-	} else if recovered != nil {
-		t.Fatalf("expected no recovered panic, got %v", recovered)
+		_, _ = AssertTypeIs[Recovered](t, recovered, "expected recovered panic")
+	} else {
+		AssertNil(t, recovered, "no recovered panic")
 	}
 }
 
 func TestCatcherTry(t *testing.T) {
-	for _, tc := range catcherTryTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, catcherTryTestCases())
 }
 
 func TestCatcherRecovered(t *testing.T) {
 	var catcher Catcher
 
 	// Initially no panic
-	if recovered := catcher.Recovered(); recovered != nil {
-		t.Fatalf("expected nil recovered, got %v", recovered)
+	recovered := catcher.Recovered()
+	if !AssertNil(t, recovered, "initially nil recovered") {
+		t.Fail()
 	}
 
 	// After panic
@@ -267,16 +225,16 @@ func TestCatcherRecovered(t *testing.T) {
 		panic("test panic")
 	})
 
-	recovered := catcher.Recovered()
-	if recovered == nil {
-		t.Fatalf("expected recovered panic, got nil")
+	recovered = catcher.Recovered()
+	if !AssertNotNil(t, recovered, "recovered panic after Try") {
+		t.Fail()
 	}
 
 	// String panics get converted to errors by NewPanicError
 	if err, ok := recovered.Recovered().(error); ok {
-		AssertEqual(t, "test panic", err.Error(), "panic error message mismatch")
+		AssertEqual(t, "test panic", err.Error(), "error message")
 	} else {
-		t.Fatalf("expected error type for string panic, got %T", recovered.Recovered())
+		AssertTypeIs[string](t, recovered.Recovered(), "string panic type")
 	}
 }
 
@@ -306,19 +264,16 @@ func TestCatcherConcurrent(t *testing.T) {
 	<-done
 
 	recovered := catcher.Recovered()
-	if recovered == nil {
-		t.Fatalf("expected recovered panic, got nil")
-	}
+	AssertNotNil(t, recovered, "concurrent recovered panic")
 
 	// Should be either "first panic" or "second panic" (converted to errors)
 	panicValue := recovered.Recovered()
 	if err, ok := panicValue.(error); ok {
 		errorStr := err.Error()
-		if errorStr != "first panic" && errorStr != "second panic" {
-			t.Fatalf("unexpected panic value: %v", errorStr)
-		}
+		AssertTrue(t, errorStr == "first panic" || errorStr == "second panic",
+			"panic value is first or second")
 	} else {
-		t.Fatalf("expected error type for string panic, got %T", panicValue)
+		_, _ = AssertTypeIs[error](t, panicValue, "concurrent panic type")
 	}
 }
 
@@ -328,31 +283,33 @@ type catchTestCase struct {
 	expectError bool
 }
 
-var catchTestCases = []catchTestCase{
-	{
-		name: "successful function",
-		fn: func() error {
+func catchTestCases() []catchTestCase {
+	return []catchTestCase{
+		newCatchTestCase("successful function", func() error {
 			return nil
-		},
-		expectError: false,
-	},
-	{
-		name: "function returns error",
-		fn: func() error {
+		}, false),
+		newCatchTestCase("function returns error", func() error {
 			return errors.New("test error")
-		},
-		expectError: true,
-	},
-	{
-		name: "function panics",
-		fn: func() error {
+		}, true),
+		newCatchTestCase("function panics", func() error {
 			panic("test panic")
-		},
-		expectError: true,
-	},
+		}, true),
+	}
 }
 
-func (tc catchTestCase) test(t *testing.T) {
+func newCatchTestCase(name string, fn func() error, expectError bool) catchTestCase {
+	return catchTestCase{
+		name:        name,
+		fn:          fn,
+		expectError: expectError,
+	}
+}
+
+func (tc catchTestCase) Name() string {
+	return tc.name
+}
+
+func (tc catchTestCase) Test(t *testing.T) {
 	t.Helper()
 	err := Catch(tc.fn)
 
@@ -364,9 +321,7 @@ func (tc catchTestCase) test(t *testing.T) {
 }
 
 func TestCatch(t *testing.T) {
-	for _, tc := range catchTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, catchTestCases())
 }
 
 type catchWithPanicRecoveryTestCase struct {
@@ -374,17 +329,29 @@ type catchWithPanicRecoveryTestCase struct {
 	name  string
 }
 
-var catchWithPanicRecoveryTestCases = []catchWithPanicRecoveryTestCase{
-	{name: "string panic", value: "string panic"},
-	{name: "int panic", value: 42},
-	{name: "float panic", value: 3.14},
-	{name: "error panic", value: errors.New("error panic")},
-	{name: "formatted error", value: errors.New("formatted error")},
-	// Skip slice and map as they are not comparable
+func catchWithPanicRecoveryTestCases() []catchWithPanicRecoveryTestCase {
+	return []catchWithPanicRecoveryTestCase{
+		newCatchWithPanicRecoveryTestCase("string panic", "string panic"),
+		newCatchWithPanicRecoveryTestCase("int panic", 42),
+		newCatchWithPanicRecoveryTestCase("float panic", 3.14),
+		newCatchWithPanicRecoveryTestCase("error panic", errors.New("error panic")),
+		newCatchWithPanicRecoveryTestCase("formatted error", errors.New("formatted error")),
+		// Skip slice and map as they are not comparable
+	}
 }
 
-//revive:disable-next-line:cognitive-complexity
-func (tc catchWithPanicRecoveryTestCase) test(t *testing.T) {
+func newCatchWithPanicRecoveryTestCase(name string, value any) catchWithPanicRecoveryTestCase {
+	return catchWithPanicRecoveryTestCase{
+		name:  name,
+		value: value,
+	}
+}
+
+func (tc catchWithPanicRecoveryTestCase) Name() string {
+	return tc.name
+}
+
+func (tc catchWithPanicRecoveryTestCase) Test(t *testing.T) {
 	t.Helper()
 	err := Catch(func() error {
 		panic(tc.value)
@@ -398,20 +365,18 @@ func (tc catchWithPanicRecoveryTestCase) test(t *testing.T) {
 		// Handle string conversion to error by NewPanicError
 		if s, ok := tc.value.(string); ok {
 			if err, ok := panicValue.(error); ok {
-				AssertEqual(t, s, err.Error(), "panic error message mismatch")
+				AssertEqual(t, s, err.Error(), "error message")
 			} else {
-				t.Fatalf("expected error type for string panic, got %T", panicValue)
+				_, _ = AssertTypeIs[error](t, panicValue, "string panic type")
 			}
 		} else {
-			AssertEqual(t, tc.value, panicValue, "panic value mismatch")
+			AssertEqual(t, tc.value, panicValue, "panic value")
 		}
 	} else {
-		t.Fatalf("expected Recovered error, got %T", err)
+		_, _ = AssertTypeIs[Recovered](t, err, "Recovered error type")
 	}
 }
 
 func TestCatchWithPanicRecovery(t *testing.T) {
-	for _, tc := range catchWithPanicRecoveryTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, catchWithPanicRecoveryTestCases())
 }

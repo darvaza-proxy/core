@@ -7,44 +7,54 @@ import (
 	"time"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var (
+	_ TestCase = spinLockTryLockTestCase{}
+	_ TestCase = spinLockLockTestCase{}
+	_ TestCase = spinLockUnlockTestCase{}
+)
+
 type spinLockTryLockTestCase struct {
 	setup    func() *SpinLock
 	name     string
 	expected bool
 }
 
-var spinLockTryLockTestCases = []spinLockTryLockTestCase{
-	{
-		name: "unlocked spinlock",
-		setup: func() *SpinLock {
-			return new(SpinLock)
-		},
-		expected: true,
-	},
-	{
-		name: "already locked spinlock",
-		setup: func() *SpinLock {
-			sl := new(SpinLock)
-			sl.TryLock()
-			return sl
-		},
-		expected: false,
-	},
+// Factory function for spinLockTryLockTestCase
+func newSpinLockTryLockTestCase(name string, setup func() *SpinLock, expected bool) spinLockTryLockTestCase {
+	return spinLockTryLockTestCase{
+		name:     name,
+		setup:    setup,
+		expected: expected,
+	}
 }
 
-func (tc spinLockTryLockTestCase) test(t *testing.T) {
+var spinLockTryLockTestCases = []spinLockTryLockTestCase{
+	newSpinLockTryLockTestCase("unlocked spinlock", func() *SpinLock {
+		return new(SpinLock)
+	}, true),
+	newSpinLockTryLockTestCase("already locked spinlock", func() *SpinLock {
+		sl := new(SpinLock)
+		sl.TryLock()
+		return sl
+	}, false),
+}
+
+func (tc spinLockTryLockTestCase) Name() string {
+	return tc.name
+}
+
+func (tc spinLockTryLockTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	sl := tc.setup()
 	result := sl.TryLock()
 
-	AssertEqual(t, tc.expected, result, "TryLock() result mismatch")
+	AssertEqual(t, tc.expected, result, "TryLock")
 }
 
 func TestSpinLockTryLock(t *testing.T) {
-	for _, tc := range spinLockTryLockTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, spinLockTryLockTestCases)
 }
 
 type spinLockLockTestCase struct {
@@ -52,22 +62,28 @@ type spinLockLockTestCase struct {
 	name  string
 }
 
-var spinLockLockTestCases = []spinLockLockTestCase{
-	{
-		name: "unlocked spinlock",
-		setup: func() *SpinLock {
-			return new(SpinLock)
-		},
-	},
-	{
-		name: "contended spinlock",
-		setup: func() *SpinLock {
-			return new(SpinLock)
-		},
-	},
+// Factory function for spinLockLockTestCase
+func newSpinLockLockTestCase(name string, setup func() *SpinLock) spinLockLockTestCase {
+	return spinLockLockTestCase{
+		name:  name,
+		setup: setup,
+	}
 }
 
-func (tc spinLockLockTestCase) test(t *testing.T) {
+var spinLockLockTestCases = []spinLockLockTestCase{
+	newSpinLockLockTestCase("unlocked spinlock", func() *SpinLock {
+		return new(SpinLock)
+	}),
+	newSpinLockLockTestCase("contended spinlock", func() *SpinLock {
+		return new(SpinLock)
+	}),
+}
+
+func (tc spinLockLockTestCase) Name() string {
+	return tc.name
+}
+
+func (tc spinLockLockTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	sl := tc.setup()
@@ -101,7 +117,7 @@ func (tc spinLockLockTestCase) test(t *testing.T) {
 		for range acquired {
 			count++
 		}
-		AssertEqual(t, 2, count, "Expected 2 lock acquisitions")
+		AssertEqual(t, 2, count, "lock count")
 	} else {
 		// Simple case
 		sl.Lock()
@@ -112,9 +128,7 @@ func (tc spinLockLockTestCase) test(t *testing.T) {
 }
 
 func TestSpinLockLock(t *testing.T) {
-	for _, tc := range spinLockLockTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, spinLockLockTestCases)
 }
 
 type spinLockUnlockTestCase struct {
@@ -123,60 +137,63 @@ type spinLockUnlockTestCase struct {
 	shouldPanic bool
 }
 
-var spinLockUnlockTestCases = []spinLockUnlockTestCase{
-	{
-		name: "locked spinlock",
-		setup: func() *SpinLock {
-			sl := new(SpinLock)
-			sl.Lock()
-			return sl
-		},
-		shouldPanic: false,
-	},
-	{
-		name: "unlocked spinlock",
-		setup: func() *SpinLock {
-			return new(SpinLock)
-		},
-		shouldPanic: true,
-	},
+// Factory function for spinLockUnlockTestCase
+func newSpinLockUnlockTestCase(name string, setup func() *SpinLock, shouldPanic bool) spinLockUnlockTestCase {
+	return spinLockUnlockTestCase{
+		name:        name,
+		setup:       setup,
+		shouldPanic: shouldPanic,
+	}
 }
 
-func (tc spinLockUnlockTestCase) test(t *testing.T) {
+var spinLockUnlockTestCases = []spinLockUnlockTestCase{
+	newSpinLockUnlockTestCase("locked spinlock", func() *SpinLock {
+		sl := new(SpinLock)
+		sl.Lock()
+		return sl
+	}, false),
+	newSpinLockUnlockTestCase("unlocked spinlock", func() *SpinLock {
+		return new(SpinLock)
+	}, true),
+}
+
+func (tc spinLockUnlockTestCase) Name() string {
+	return tc.name
+}
+
+func (tc spinLockUnlockTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	sl := tc.setup()
 
 	if tc.shouldPanic {
-		AssertPanic(t, func() { sl.Unlock() }, "invalid SpinLock.Unlock", "Unlock should panic on unlocked spinlock")
+		AssertPanic(t, func() { sl.Unlock() }, "invalid SpinLock.Unlock", "Unlock unlocked")
 	} else {
-		AssertNoPanic(t, func() { sl.Unlock() }, "Unlock should not panic on locked spinlock")
+		AssertNoPanic(t, func() { sl.Unlock() }, "Unlock locked")
 	}
 }
 
 func TestSpinLockUnlock(t *testing.T) {
-	for _, tc := range spinLockUnlockTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, spinLockUnlockTestCases)
 }
 
 func testSpinLockNilPtr(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
 	ptr := sl.ptr()
-	AssertEqual(t, (*uint32)(nil), ptr, "nil SpinLock ptr() should return nil")
+	AssertEqual(t, (*uint32)(nil), ptr, "nil ptr")
 }
 
 func testSpinLockNilTryLock(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
-	AssertPanic(t, func() { sl.TryLock() }, nil, "nil SpinLock TryLock should panic")
+	AssertPanic(t, func() { sl.TryLock() }, nil, "nil TryLock")
 }
 
 func testSpinLockNilUnlock(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
-	AssertPanic(t, func() { sl.Unlock() }, nil, "nil SpinLock Unlock should panic")
+	AssertPanic(t, func() { sl.Unlock() }, nil, "nil Unlock")
 }
 
 func TestSpinLockNilReceiver(t *testing.T) {
@@ -205,7 +222,7 @@ func TestSpinLockConcurrency(t *testing.T) {
 	AssertNoError(t, err, "concurrent test")
 
 	expected := int64(numGoroutines * numIterations)
-	AssertEqual(t, expected, counter, "counter should match expected value")
+	AssertEqual(t, expected, counter, "counter value")
 }
 
 func BenchmarkSpinLockUncontended(b *testing.B) {
