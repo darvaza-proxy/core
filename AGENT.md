@@ -8,6 +8,9 @@ repository. For developers and general project information, please refer to
 ## Related Documentation
 
 - [README.md](README.md) - Package overview and API reference
+- [TESTING.md](TESTING.md) - Testing patterns and guidelines for all
+  darvaza.org projects
+- [TESTING_core.md](TESTING_core.md) - Core-specific testing patterns
 
 ## Repository Overview
 
@@ -19,7 +22,7 @@ It serves as the base for other darvaza.org projects.
 
 Before starting development, ensure you have:
 
-- Go 1.22 or later installed (check with `go version`).
+- Go 1.23 or later installed (check with `go version`).
 - `make` command available (usually pre-installed on Unix systems).
 - `$GOPATH` configured correctly (typically `~/go`).
 - Git configured for proper line endings.
@@ -171,167 +174,14 @@ Always run `make tidy` before committing to ensure proper formatting.
 - Comprehensive coverage for generic functions is expected.
 - Testing utilities log successful assertions for better debugging.
 
-#### Test Helper Functions
+**Development Testing Guidelines:**
 
-The project uses a comprehensive set of public test helper functions defined in
-`testing.go` to reduce boilerplate and improve test consistency:
+For comprehensive testing patterns and assertion function usage, see:
 
-**Slice Creation:**
-
-- `S[T](values...)` - Creates test slices concisely: `S(1, 2, 3)` instead of
-  `[]int{1, 2, 3}`
-- `S[T]()` - Creates empty slices: `S[string]()` instead of `[]string{}`
-
-**Assertion Helpers:**
-
-- `AssertEqual[T](t, expected, actual, msg...)` - Generic value comparison with
-  better error messages
-- `AssertSliceEqual[T](t, expected, actual, msg...)` - Slice comparison using
-  `reflect.DeepEqual`
-- `AssertError(t, err, msg...)` - Assert error is not nil
-- `AssertNoError(t, err, msg...)` - Assert error is nil
-- `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
-  Boolean assertions
-- `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - Nil
-  checking
-- `AssertPanic(t, fn, expectedPanic, msg...)` - Simplified panic testing
-- `AssertNoPanic(t, fn, msg...)` - Ensure functions don't panic
-- `AssertContains(t, text, substring, msg...)` - String containment
-- `AssertTypeIs[T](t, value, msg...)` - Type assertion with casting
-- `AssertErrorIs(t, err, target, msg...)` - Error chain checking
-
-**Advanced Helpers:**
-
-- `RunConcurrentTest(t, numWorkers, workerFn)` - Concurrent testing with
-  goroutines
-- `RunBenchmark(b, setupFn, execFn)` - Benchmark testing with setup/execution
-  phases
-- `RunTestCases(t, []TestCase)` - Table-driven test runner (requires
-  `TestCase` interface)
-- `MockT` - Thread-safe mock testing.T for testing assertion functions
-  themselves
-
-**MockT Features:**
-
-MockT provides a complete mock implementation of the testing.T interface with
-enhanced capabilities:
-
-- **Thread-safe operations**: All methods are protected by sync.RWMutex for
-  concurrent use
-- **Helper call tracking**: HelperCalled field counts how many times
-  Helper() was called
-- **Failed state management**: Failed() reports test failure state; Error()
-  and Errorf() automatically mark as failed
-- **Formatted logging**: Errorf() and Logf() provide printf-style formatting
-- **Complete state inspection**: HasErrors(), HasLogs(), LastError(),
-  LastLog() for detailed testing
-- **State reset**: Reset() clears all collected data and resets counters
-
-```go
-// Example MockT usage for testing assertion functions
-func TestMyAssertion(t *testing.T) {
-    mock := &MockT{}
-
-    // Test successful assertion
-    MyAssert(mock, true, "should pass")
-    AssertFalse(t, mock.HasErrors(), "no errors expected")
-    AssertTrue(t, mock.HasLogs(), "success should be logged")
-
-    // Test failed assertion
-    mock.Reset()
-    MyAssert(mock, false, "should fail")
-    AssertTrue(t, mock.HasErrors(), "error expected")
-    AssertTrue(t, mock.Failed(), "test should be marked as failed")
-
-    lastErr, ok := mock.LastError()
-    AssertTrue(t, ok, "should have error message")
-    AssertContains(t, lastErr, "should fail", "error message content")
-}
-```
-
-**Usage Examples:**
-
-```go
-// Before: Manual assertions
-if !reflect.DeepEqual(got, expected) {
-    t.Errorf("Expected %v, got %v", expected, got)
-}
-
-// After: Helper function
-core.AssertSliceEqual(t, expected, got, "operation result")
-
-// Before: Manual error checking
-if err == nil {
-    t.Error("Expected error but got nil")
-}
-
-// After: Helper function
-core.AssertError(t, err, "operation should fail")
-```
-
-These helpers provide:
-
-- Consistent error messages across all tests
-- Success logging for better debugging
-- Reduced boilerplate code
-- Better test maintainability
-- Clear test intent
-
-**Quick Development Reference:**
-
-```go
-// Use public testing utilities
-import "darvaza.org/core"
-
-// Table-driven test structure
-type myTestCase struct {
-    input    string
-    expected result
-    wantErr  bool
-}
-
-func (tc myTestCase) test(t *testing.T) {
-    t.Helper()
-    result, err := processInput(tc.input)
-
-    if tc.wantErr {
-        AssertError(t, err, "process error")
-        return
-    }
-
-    AssertNoError(t, err, "process")
-    AssertEqual(t, tc.expected, result, "result")
-}
-```
-
-**Usage Examples:**
-
-```go
-// Before: Manual assertions
-if !reflect.DeepEqual(got, expected) {
-    t.Errorf("Expected %v, got %v", expected, got)
-}
-
-// After: Helper function
-AssertSliceEqual(t, expected, got, "operation failed")
-
-// Before: Manual error checking
-if expectError && err == nil {
-    t.Error("Expected error but got nil")
-} else if !expectError && err != nil {
-    t.Errorf("Expected no error but got: %v", err)
-}
-
-// After: Helper function
-AssertError(t, err, expectError, "operation error expectation")
-```
-
-These helpers provide:
-
-- Consistent error messages across all tests
-- Reduced boilerplate code
-- Better test maintainability
-- Clearer test intent
+- [TESTING.md](./TESTING.md) - General testing patterns for all darvaza.org
+  projects
+- [TESTING_core.md](./TESTING_core.md) - Core-specific testing patterns and
+  self-testing approaches
 
 ## Important Notes
 

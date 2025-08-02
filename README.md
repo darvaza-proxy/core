@@ -4,7 +4,7 @@
 [![Go Report Card][goreport-badge]][goreport]
 [![codecov][codecov-badge]][codecov]
 
-This package contains simple mechanisms used by other darvaza-proxy
+This package contains simple mechanisms used by other darvaza.org
 projects. It's not allowed to have dependencies outside of Go's Standard
 Library, and if something should be on a subdirectory, it shouldn't be here.
 
@@ -405,51 +405,66 @@ fmt.Printf("Debug stack:%#+v", stack)
 This package provides comprehensive public testing utilities for both internal
 library tests and external library users.
 
-### Quick Reference
+### T Interface and MockT
 
-```go
-import "darvaza.org/core"
+* `T` interface - abstracts testing functionality for both `*testing.T` and
+  mock implementations.
+* `MockT` - thread-safe mock testing.T implementation with error/log
+  collection, helper tracking, state inspection (`HasErrors()`, `HasLogs()`,
+  `LastError()`, `LastLog()`), and reset capabilities.
 
-// Concise slice creation
-testData := core.S(1, 2, 3)           // []int{1, 2, 3}
-emptyStrings := core.S[string]()      // []string{}
+### Test Helpers
 
-// Standard assertions
-core.AssertEqual(t, expected, actual, "value")
-core.AssertNoError(t, err, "operation")
-core.AssertTrue(t, condition, "check")
+* `S[T](values...)` - concise slice creation: `S(1, 2, 3)` instead of
+  `[]int{1, 2, 3}`.
+* `S[T]()` - empty slice creation: `S[string]()` instead of `[]string{}`.
 
-// Testing test code with thread-safe MockT
-mock := &core.MockT{}
-core.AssertEqual(mock, 42, 42, "equality")
-if mock.Failed() {
-    t.Errorf("Unexpected failure: %v", mock.Errors)
-}
-```
+### Assertion Functions
 
-### Features
+All assertions return boolean results, log successful cases, and work with
+both `*testing.T` and `MockT`:
 
-* **14 assertion functions** - `AssertEqual`, `AssertError`, `AssertPanic`, etc.
-* **Thread-safe MockT** - complete mock testing.T implementation with failure
-  tracking, formatted logging, and helper call counting.
-* **Advanced utilities** - `RunConcurrentTest(), RunBenchmark()`.
-* **Generic support** - type-safe operations with Go generics.
-* **Success logging** - all assertions log successful cases for debugging.
+#### Basic Assertions
 
-## Development
+* `AssertEqual[T](t, expected, actual, msg...)` - generic value comparison.
+* `AssertSliceEqual[T](t, expected, actual, msg...)` - slice comparison using
+  `reflect.DeepEqual`.
+* `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
+  boolean assertions.
+* `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - nil
+  checking.
+* `AssertContains(t, text, substring, msg...)` - string containment.
 
-For detailed development setup, build commands, and AI agent guidance:
+#### Error and Type Assertions
 
-* [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
-  patterns
+* `AssertError(t, err, msg...)` / `AssertNoError(t, err, msg...)` - error
+  presence/absence.
+* `AssertErrorIs(t, err, target, msg...)` - error chain checking with
+  `errors.Is`.
+* `AssertTypeIs[T](t, value, msg...)` - type assertion with casting, returns
+  (value, ok).
+* `AssertPanic(t, fn, expectedPanic, msg...)` / `AssertNoPanic(t, fn, msg...)` -
+  panic testing.
 
-### Quick Start
+### Advanced Testing Utilities
 
-```bash
-make all    # Full build cycle (get deps, generate, tidy, build)
-make test   # Run tests
-make tidy   # Format and tidy (run before committing)
-```
+* `TestCase` interface - standardised interface for table-driven tests with
+  `Name()` and `Test(t)` methods.
+* `RunTestCases[T TestCase](t, cases)` - table-driven test runner for
+  TestCase implementations.
+* `RunConcurrentTest(t, numWorkers, workerFn)` - concurrent testing with
+  goroutines.
+* `RunBenchmark(b, setupFn, execFn)` - benchmark testing with
+  setup/execution phases.
+
+### Documentation
+
+For detailed testing patterns and guidelines:
+
+* [TESTING.md](./TESTING.md) - General testing patterns for all darvaza.org
+  projects
+* [TESTING_core.md](./TESTING_core.md) - Core-specific testing patterns and
+  self-testing approaches
 
 ## Synchronization
 
@@ -479,6 +494,23 @@ Context-aware error group with cancellation:
 
 * ~~SpinLock~~ Deprecated in favour of
   [darvaza.org/x/sync/spinlock][x-sync-spinlock]
+
+## Development
+
+**Requirements:** Go 1.23 or later
+
+For detailed development setup, build commands, and AI agent guidance:
+
+* [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
+  patterns
+
+### Quick Start
+
+```bash
+make all    # Full build cycle (get deps, generate, tidy, build)
+make test   # Run tests
+make tidy   # Format and tidy (run before committing)
+```
 
 ## See also
 
