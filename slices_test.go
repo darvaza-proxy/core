@@ -154,20 +154,20 @@ func TestSliceRandom(t *testing.T) {
 		name   string
 		want   string
 		input  []string
-		wantok bool
+		wantOK bool
 	}{
-		{name: "empty", input: S[string](), want: string(""), wantok: false},
-		{name: "one", input: S("one"), want: string("one"), wantok: true},
-		{name: "random", input: S("one", "two", "three", "four", "five", "six"), want: string(""), wantok: true},
+		{name: "empty", input: S[string](), want: string(""), wantOK: false},
+		{name: "one", input: S("one"), want: string("one"), wantOK: true},
+		{name: "random", input: S("one", "two", "three", "four", "five", "six"), want: string(""), wantOK: true},
 	}
 	for _, tc := range tests {
 		if tc.name != "random" {
 			got, ok := SliceRandom(tc.input)
-			AssertBool(t, ok, tc.wantok, "SliceRandom ok status mismatch for %s", tc.name)
+			AssertBool(t, ok, tc.wantOK, "SliceRandom ok status mismatch for %s", tc.name)
 			AssertEqual(t, tc.want, got, "SliceRandom result mismatch for %s", tc.name)
 		} else {
 			u, ok := SliceRandom(tc.input)
-			AssertBool(t, ok, tc.wantok, "SliceRandom ok status mismatch for %s", tc.name)
+			AssertBool(t, ok, tc.wantOK, "SliceRandom ok status mismatch for %s", tc.name)
 			t.Logf("random from one,two,three,four,five,six: %s", u)
 		}
 	}
