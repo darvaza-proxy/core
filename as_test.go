@@ -16,7 +16,7 @@ type asTestCase struct {
 	name string
 
 	// Boolean fields (1 byte) - expected result flags
-	wantOk bool
+	wantOK bool
 }
 
 func (tc asTestCase) test(t *testing.T) {
@@ -26,24 +26,24 @@ func (tc asTestCase) test(t *testing.T) {
 	switch want := tc.want.(type) {
 	case string:
 		got, ok := As[any, string](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+		if ok != tc.wantOK {
+			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
 		}
 		if got != want {
 			t.Errorf("As() got = %v, want %v", got, want)
 		}
 	case int:
 		got, ok := As[any, int](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+		if ok != tc.wantOK {
+			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
 		}
 		if got != want {
 			t.Errorf("As() got = %v, want %v", got, want)
 		}
 	case error:
 		got, ok := As[any, error](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+		if ok != tc.wantOK {
+			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
 		}
 		if ok && got.Error() != want.Error() {
 			t.Errorf("As() got = %v, want %v", got, want)
@@ -51,10 +51,10 @@ func (tc asTestCase) test(t *testing.T) {
 	default:
 		// Test cases where conversion should fail
 		got, ok := As[any, string](tc.input)
-		if ok != tc.wantOk {
-			t.Errorf("As() ok = %v, want %v", ok, tc.wantOk)
+		if ok != tc.wantOK {
+			t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
 		}
-		if tc.wantOk && got != "" {
+		if tc.wantOK && got != "" {
 			t.Errorf("As() got = %v, want zero value", got)
 		}
 	}
@@ -66,15 +66,15 @@ type asFnTestCase struct {
 	fn     func(any) (string, bool)
 	input  any
 	want   string
-	wantOk bool
+	wantOK bool
 }
 
 func (tc asFnTestCase) test(t *testing.T) {
 	t.Helper()
 
 	got, ok := AsFn(tc.fn, tc.input)
-	if ok != tc.wantOk {
-		t.Errorf("AsFn() ok = %v, want %v", ok, tc.wantOk)
+	if ok != tc.wantOK {
+		t.Errorf("AsFn() ok = %v, want %v", ok, tc.wantOK)
 	}
 	if got != tc.want {
 		t.Errorf("AsFn() got = %v, want %v", got, tc.want)
@@ -203,37 +203,37 @@ func TestAs(t *testing.T) {
 			name:   "string to string",
 			input:  "hello",
 			want:   "hello",
-			wantOk: true,
+			wantOK: true,
 		},
 		{
 			name:   "int to int",
 			input:  42,
 			want:   42,
-			wantOk: true,
+			wantOK: true,
 		},
 		{
 			name:   "error to error",
 			input:  errors.New("test error"),
 			want:   errors.New("test error"),
-			wantOk: true,
+			wantOK: true,
 		},
 		{
 			name:   "int to string fails",
 			input:  42,
 			want:   "",
-			wantOk: false,
+			wantOK: false,
 		},
 		{
 			name:   "nil to string",
 			input:  nil,
 			want:   "",
-			wantOk: false,
+			wantOK: false,
 		},
 		{
 			name:   "nil to error",
 			input:  nil,
 			want:   error(nil),
-			wantOk: false,
+			wantOK: false,
 		},
 	}
 
@@ -257,28 +257,28 @@ func TestAsFn(t *testing.T) {
 			fn:     intToString,
 			input:  42,
 			want:   "42",
-			wantOk: true,
+			wantOK: true,
 		},
 		{
 			name:   "with valid conversion function but wrong type",
 			fn:     intToString,
 			input:  "not an int",
 			want:   "",
-			wantOk: false,
+			wantOK: false,
 		},
 		{
 			name:   "with nil function",
 			fn:     nil,
 			input:  42,
 			want:   "",
-			wantOk: false,
+			wantOK: false,
 		},
 		{
 			name:   "with function returning false",
 			fn:     func(any) (string, bool) { return "ignored", false },
 			input:  42,
 			want:   "ignored",
-			wantOk: false,
+			wantOK: false,
 		},
 	}
 

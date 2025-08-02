@@ -96,13 +96,13 @@ func TestCompoundErrorUnwrap(t *testing.T) {
 	}
 }
 
-type compoundErrorOkTestCase struct {
+type compoundErrorOKTestCase struct {
 	name     string
 	errs     []error
 	expected bool
 }
 
-var compoundErrorOkTestCases = []compoundErrorOkTestCase{
+var compoundErrorOKTestCases = []compoundErrorOKTestCase{
 	{
 		name:     "empty errors",
 		errs:     S[error](),
@@ -125,20 +125,30 @@ var compoundErrorOkTestCases = []compoundErrorOkTestCase{
 	},
 }
 
-func (tc compoundErrorOkTestCase) test(t *testing.T) {
-	t.Helper()
-	ce := &CompoundError{Errs: tc.errs}
-	result := ce.Ok()
-
-	if result != tc.expected {
-		t.Fatalf("expected %t, got %t", tc.expected, result)
-	}
+func (tc compoundErrorOKTestCase) Name() string {
+	return tc.name
 }
 
-func TestCompoundErrorOk(t *testing.T) {
-	for _, tc := range compoundErrorOkTestCases {
-		t.Run(tc.name, tc.test)
+func (tc compoundErrorOKTestCase) Test(t *testing.T) {
+	t.Helper()
+	ce := &CompoundError{Errs: tc.errs}
+
+	// Test both OK() and deprecated Ok() methods
+	resultOK := ce.OK()
+	resultOk := ce.Ok()
+
+	AssertEqual(t, tc.expected, resultOK, "OK() method")
+	AssertEqual(t, tc.expected, resultOk, "Ok() method")
+	AssertEqual(t, resultOK, resultOk, "OK() and Ok() should return same result")
+}
+
+func TestCompoundErrorOK(t *testing.T) {
+	// Convert to []TestCase for use with RunTestCases
+	testCases := make([]TestCase, len(compoundErrorOKTestCases))
+	for i, tc := range compoundErrorOKTestCases {
+		testCases[i] = tc
 	}
+	RunTestCases(t, testCases)
 }
 
 type compoundErrorAsErrorTestCase struct {

@@ -264,7 +264,7 @@ The `CompoundError` type aggregates multiple errors:
 * Implements both `Unwrap() []error` and `Errors() []error` interfaces.
 * `.AppendError(err)` / `.Append(errs...)` - add errors.
 * `.AsError()` - convert to single error or nil.
-* `.Ok()` - check if no errors.
+* `.OK()` - check if no errors.
 
 ### Panic Handling
 

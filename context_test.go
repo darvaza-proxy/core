@@ -231,7 +231,7 @@ type contextKeyGetTestCase struct {
 	key           *ContextKey[int]
 	name          string
 	expectedValue int
-	expectedOk    bool
+	expectedOK    bool
 }
 
 func (tc contextKeyGetTestCase) test(t *testing.T) {
@@ -239,17 +239,17 @@ func (tc contextKeyGetTestCase) test(t *testing.T) {
 
 	value, ok := tc.key.Get(tc.ctx)
 	AssertEqual(t, tc.expectedValue, value, "Get returned wrong value")
-	AssertBool(t, ok, tc.expectedOk, "Get returned wrong ok value")
+	AssertBool(t, ok, tc.expectedOK, "Get returned wrong ok value")
 }
 
 func contextKeyGetTest(ctx context.Context, name string, key *ContextKey[int],
-	expectedValue int, expectedOk bool) contextKeyGetTestCase {
+	expectedValue int, expectedOK bool) contextKeyGetTestCase {
 	return contextKeyGetTestCase{
 		ctx:           ctx,
 		key:           key,
 		name:          name,
 		expectedValue: expectedValue,
-		expectedOk:    expectedOk,
+		expectedOK:    expectedOK,
 	}
 }
 
