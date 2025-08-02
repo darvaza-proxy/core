@@ -128,7 +128,7 @@ type isZeroTestCase struct {
 
 func (tc isZeroTestCase) test(t *testing.T) {
 	result := IsZero(tc.value)
-	AssertBool(t, result, tc.expected, "IsZero() result")
+	AssertEqual(t, tc.expected, result, "IsZero result")
 }
 
 func newIsZeroTestCase(name string, value any, expected bool) isZeroTestCase {
@@ -191,7 +191,7 @@ type isZeroInterfaceTestCase struct {
 
 func (tc isZeroInterfaceTestCase) test(t *testing.T) {
 	result := IsZero(tc.value)
-	AssertBool(t, result, tc.expected, "IsZero() with interface")
+	AssertEqual(t, tc.expected, result, "IsZero with interface")
 }
 
 func newIsZeroInterfaceTestCase(name string, value any, expected bool) isZeroInterfaceTestCase {
@@ -225,7 +225,7 @@ type isZeroEdgeCaseTestCase struct {
 
 func (tc isZeroEdgeCaseTestCase) test(t *testing.T) {
 	result := IsZero(tc.value)
-	AssertBool(t, result, tc.expected, "IsZero() edge case")
+	AssertEqual(t, tc.expected, result, "IsZero edge case")
 }
 
 func newIsZeroEdgeCaseTestCase(name string, value any, expected bool) isZeroEdgeCaseTestCase {
@@ -266,7 +266,7 @@ type initializationSemanticsTestCase struct {
 
 func (tc initializationSemanticsTestCase) test(t *testing.T) {
 	result := IsZero(tc.value)
-	AssertBool(t, result, tc.expected, tc.description)
+	AssertEqual(t, tc.expected, result, tc.description)
 }
 
 func newInitializationSemanticsTestCase(
@@ -338,7 +338,7 @@ func TestIsZeroPracticalInitialization(t *testing.T) {
 	AssertSliceEqual(t, []string{"default", "values"}, items, "slice should be initialized")
 
 	// Items is now initialized, so IsZero returns false
-	AssertBool(t, IsZero(items), false, "initialized slice should not be zero")
+	AssertFalse(t, IsZero(items), "initialized slice zero")
 
 	// Example 2: Conditional map initialization
 	var cache map[string]int
@@ -377,12 +377,12 @@ func TestIsZeroWithReflectValue(t *testing.T) {
 	// Test that a zero reflect.Value is considered zero
 	var zeroValue reflect.Value
 	result := IsZero(zeroValue)
-	AssertBool(t, result, true, "IsZero() with zero reflect.Value should return true")
+	AssertTrue(t, result, "IsZero with zero reflect.Value")
 
 	// Test that a valid reflect.Value is not considered zero
 	validValue := reflect.ValueOf(42)
 	result2 := IsZero(validValue)
-	AssertBool(t, result2, false, "IsZero() with valid reflect.Value should return false")
+	AssertFalse(t, result2, "IsZero with valid reflect.Value")
 }
 
 type complexStruct struct {
@@ -402,7 +402,7 @@ type complexStructTestCase struct {
 
 func (tc complexStructTestCase) test(t *testing.T) {
 	result := IsZero(tc.value)
-	AssertBool(t, result, tc.expected, "IsZero() with complex struct")
+	AssertEqual(t, tc.expected, result, "IsZero with complex struct")
 }
 
 func newComplexStructTestCase(name string, value complexStruct, expected bool) complexStructTestCase {
@@ -439,7 +439,7 @@ type pointerTestCase struct {
 
 func (tc pointerTestCase) test(t *testing.T) {
 	result := IsZero(tc.value)
-	AssertBool(t, result, tc.expected, "IsZero() with pointers")
+	AssertEqual(t, tc.expected, result, "IsZero with pointers")
 }
 
 func newPointerTestCase(name string, value any) pointerTestCase {
@@ -488,7 +488,7 @@ type nestedStructTestCase struct {
 
 func (tc nestedStructTestCase) test(t *testing.T) {
 	result := IsZero(tc.value)
-	AssertBool(t, result, tc.expected, "IsZero() with nested structs")
+	AssertEqual(t, tc.expected, result, "IsZero with nested structs")
 }
 
 func newNestedStructTestCase(name string, value outer, expected bool) nestedStructTestCase {
@@ -522,7 +522,7 @@ type isNilTestCase struct {
 
 func (tc isNilTestCase) test(t *testing.T) {
 	result := IsNil(tc.value)
-	AssertBool(t, result, tc.expected, "IsNil() result")
+	AssertEqual(t, tc.expected, result, "IsNil result")
 }
 
 func newIsNilTestCase(name string, value any, expected bool) isNilTestCase {
@@ -594,8 +594,8 @@ func (tc isNilVsIsZeroTestCase) test(t *testing.T) {
 	nilResult := IsNil(tc.value)
 	zeroResult := IsZero(tc.value)
 
-	AssertBool(t, nilResult, tc.expectedNil, tc.description+" - IsNil")
-	AssertBool(t, zeroResult, tc.expectedZero, tc.description+" - IsZero")
+	AssertEqual(t, tc.expectedNil, nilResult, tc.description+" - IsNil")
+	AssertEqual(t, tc.expectedZero, zeroResult, tc.description+" - IsZero")
 }
 
 func newIsNilVsIsZeroTestCase(name string, value any, expectedNil, expectedZero bool,
@@ -666,24 +666,24 @@ func TestIsNilWithReflectValue(t *testing.T) {
 	// Test that an invalid reflect.Value is considered nil
 	var invalidValue reflect.Value
 	result := IsNil(invalidValue)
-	AssertBool(t, result, true, "IsNil() with invalid reflect.Value should return true")
+	AssertTrue(t, result, "IsNil with invalid reflect.Value")
 
 	// Test that a valid reflect.Value with nil content is considered nil
 	var nilPtr *int
 	nilPtrValue := reflect.ValueOf(nilPtr)
 	result2 := IsNil(nilPtrValue)
-	AssertBool(t, result2, true, "IsNil() with reflect.Value containing nil should return true")
+	AssertTrue(t, result2, "IsNil with reflect.Value containing nil")
 
 	// Test that a valid reflect.Value with non-nil content is not considered nil
 	nonNilPtr := new(int)
 	nonNilPtrValue := reflect.ValueOf(nonNilPtr)
 	result3 := IsNil(nonNilPtrValue)
-	AssertBool(t, result3, false, "IsNil() with reflect.Value containing non-nil should return false")
+	AssertFalse(t, result3, "IsNil with reflect.Value containing non-nil")
 
 	// Test that a valid reflect.Value with basic type is not considered nil
 	intValue := reflect.ValueOf(42)
 	result4 := IsNil(intValue)
-	AssertBool(t, result4, false, "IsNil() with reflect.Value containing basic type should return false")
+	AssertFalse(t, result4, "IsNil with reflect.Value containing basic type")
 }
 
 func TestIsNilTypedNilEdgeCases(t *testing.T) {
@@ -692,26 +692,26 @@ func TestIsNilTypedNilEdgeCases(t *testing.T) {
 	// Interface containing typed nil
 	var nilPtr *int
 	var vi any = nilPtr
-	AssertBool(t, IsNil(vi), true, "interface containing typed nil should be nil")
+	AssertTrue(t, IsNil(vi), "interface containing typed nil")
 
 	// Slice of pointers with nil elements
 	var ptrSlice []*int
 	ptrSlice = append(ptrSlice, nil)
-	AssertBool(t, IsNil(ptrSlice), false, "slice containing nil elements is not nil itself")
-	AssertBool(t, IsNil(ptrSlice[0]), true, "nil element in slice should be nil")
+	AssertFalse(t, IsNil(ptrSlice), "slice containing nil elements")
+	AssertTrue(t, IsNil(ptrSlice[0]), "nil element in slice")
 
 	// Map with nil values
 	nilMap := map[string]*int{"key": nil}
-	AssertBool(t, IsNil(nilMap), false, "map with nil values is not nil itself")
-	AssertBool(t, IsNil(nilMap["key"]), true, "nil value in map should be nil")
+	AssertFalse(t, IsNil(nilMap), "map with nil values")
+	AssertTrue(t, IsNil(nilMap["key"]), "nil value in map")
 
 	// Channel operations
 	var ch chan int
-	AssertBool(t, IsNil(ch), true, "nil channel should be nil")
+	AssertTrue(t, IsNil(ch), "nil channel")
 
 	ch = make(chan int)
 	close(ch)
-	AssertBool(t, IsNil(ch), false, "closed channel should not be nil")
+	AssertFalse(t, IsNil(ch), "closed channel")
 }
 
 func BenchmarkZero(b *testing.B) {

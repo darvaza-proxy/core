@@ -1,8 +1,13 @@
 # AGENT.md
+<!-- cspell:ignore linters -->
 
 This file provides guidance to AI agents when working with code in this
 repository. For developers and general project information, please refer to
 [README.md](README.md) first.
+
+## Related Documentation
+
+- [README.md](README.md) - Package overview and API reference
 
 ## Repository Overview
 
@@ -162,13 +167,14 @@ Always run `make tidy` before committing to ensure proper formatting.
 ### Testing Patterns
 
 - Table-driven tests are preferred.
-- Helper functions like `S[T]()` create test slices.
+- All testing utilities are public in `testing.go` for external use.
 - Comprehensive coverage for generic functions is expected.
+- Testing utilities log successful assertions for better debugging.
 
 #### Test Helper Functions
 
-The project uses a comprehensive set of test helper functions defined in
-`testutils_test.go` to reduce boilerplate and improve test consistency:
+The project uses a comprehensive set of public test helper functions defined in
+`testing.go` to reduce boilerplate and improve test consistency:
 
 **Slice Creation:**
 
@@ -182,11 +188,17 @@ The project uses a comprehensive set of test helper functions defined in
   better error messages
 - `AssertSliceEqual[T](t, expected, actual, msg...)` - Slice comparison using
   `reflect.DeepEqual`
-- `AssertError(t, err, expectError, msg...)` - Standardized error expectation
+- `AssertError(t, err, msg...)` - Assert error is not nil
+- `AssertNoError(t, err, msg...)` - Assert error is nil
+- `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
+  Boolean assertions
+- `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - Nil
   checking
-- `AssertBool(t, actual, expected, msg...)` - Boolean assertions with context
 - `AssertPanic(t, fn, expectedPanic, msg...)` - Simplified panic testing
 - `AssertNoPanic(t, fn, msg...)` - Ensure functions don't panic
+- `AssertContains(t, text, substring, msg...)` - String containment
+- `AssertTypeIs[T](t, value, msg...)` - Type assertion with casting
+- `AssertErrorIs(t, err, target, msg...)` - Error chain checking
 
 **Advanced Helpers:**
 
@@ -196,6 +208,101 @@ The project uses a comprehensive set of test helper functions defined in
   phases
 - `RunTestCases(t, []TestCase)` - Table-driven test runner (requires
   `TestCase` interface)
+- `MockT` - Thread-safe mock testing.T for testing assertion functions
+  themselves
+
+**MockT Features:**
+
+MockT provides a complete mock implementation of the testing.T interface with
+enhanced capabilities:
+
+- **Thread-safe operations**: All methods are protected by sync.RWMutex for
+  concurrent use
+- **Helper call tracking**: HelperCalled field counts how many times
+  Helper() was called
+- **Failed state management**: Failed() reports test failure state; Error()
+  and Errorf() automatically mark as failed
+- **Formatted logging**: Errorf() and Logf() provide printf-style formatting
+- **Complete state inspection**: HasErrors(), HasLogs(), LastError(),
+  LastLog() for detailed testing
+- **State reset**: Reset() clears all collected data and resets counters
+
+```go
+// Example MockT usage for testing assertion functions
+func TestMyAssertion(t *testing.T) {
+    mock := &MockT{}
+
+    // Test successful assertion
+    MyAssert(mock, true, "should pass")
+    AssertFalse(t, mock.HasErrors(), "no errors expected")
+    AssertTrue(t, mock.HasLogs(), "success should be logged")
+
+    // Test failed assertion
+    mock.Reset()
+    MyAssert(mock, false, "should fail")
+    AssertTrue(t, mock.HasErrors(), "error expected")
+    AssertTrue(t, mock.Failed(), "test should be marked as failed")
+
+    lastErr, ok := mock.LastError()
+    AssertTrue(t, ok, "should have error message")
+    AssertContains(t, lastErr, "should fail", "error message content")
+}
+```
+
+**Usage Examples:**
+
+```go
+// Before: Manual assertions
+if !reflect.DeepEqual(got, expected) {
+    t.Errorf("Expected %v, got %v", expected, got)
+}
+
+// After: Helper function
+core.AssertSliceEqual(t, expected, got, "operation result")
+
+// Before: Manual error checking
+if err == nil {
+    t.Error("Expected error but got nil")
+}
+
+// After: Helper function
+core.AssertError(t, err, "operation should fail")
+```
+
+These helpers provide:
+
+- Consistent error messages across all tests
+- Success logging for better debugging
+- Reduced boilerplate code
+- Better test maintainability
+- Clear test intent
+
+**Quick Development Reference:**
+
+```go
+// Use public testing utilities
+import "darvaza.org/core"
+
+// Table-driven test structure
+type myTestCase struct {
+    input    string
+    expected result
+    wantErr  bool
+}
+
+func (tc myTestCase) test(t *testing.T) {
+    t.Helper()
+    result, err := processInput(tc.input)
+
+    if tc.wantErr {
+        AssertError(t, err, "process error")
+        return
+    }
+
+    AssertNoError(t, err, "process")
+    AssertEqual(t, tc.expected, result, "result")
+}
+```
 
 **Usage Examples:**
 

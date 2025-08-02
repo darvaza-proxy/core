@@ -32,7 +32,7 @@ func TestIsErrorFn(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := IsErrorFn(tc.checkFn, tc.errs...)
-			AssertBool(t, result, tc.expected, "IsErrorFn() result")
+			AssertEqual(t, tc.expected, result, "IsErrorFn result")
 		})
 	}
 }
@@ -67,8 +67,8 @@ func TestIsErrorFn2(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			is, known := IsErrorFn2(tc.checkFn, tc.errs...)
-			AssertBool(t, is, tc.expectedIs, "IsErrorFn2() first return value")
-			AssertBool(t, known, tc.expectedKnown, "IsErrorFn2() second return value")
+			AssertEqual(t, tc.expectedIs, is, "IsErrorFn2 is result")
+			AssertEqual(t, tc.expectedKnown, known, "IsErrorFn2 known result")
 		})
 	}
 }
@@ -186,7 +186,7 @@ func (tc isErrorTestCase) test(t *testing.T) {
 	t.Helper()
 
 	result := IsError(tc.err, tc.errs...)
-	AssertBool(t, result, tc.expected, "IsError result")
+	AssertEqual(t, tc.expected, result, "IsError result")
 }
 
 func TestIsError(t *testing.T) {
@@ -242,20 +242,20 @@ func (tc temporaryErrorTestCase) test(t *testing.T) {
 
 	// Test interface methods
 	if tempErr, ok := result.(interface{ IsTemporary() bool }); ok {
-		AssertBool(t, tempErr.IsTemporary(), true, "IsTemporary() should return true")
+		AssertTrue(t, tempErr.IsTemporary(), "IsTemporary result")
 	}
 
 	if timeoutErr, ok := result.(interface{ IsTimeout() bool }); ok {
-		AssertBool(t, timeoutErr.IsTimeout(), tc.isTimeout, "IsTimeout() result")
+		AssertEqual(t, tc.isTimeout, timeoutErr.IsTimeout(), "IsTimeout result")
 	}
 
 	// Test legacy methods
 	if tempErr, ok := result.(interface{ Temporary() bool }); ok {
-		AssertBool(t, tempErr.Temporary(), true, "Temporary() should return true")
+		AssertTrue(t, tempErr.Temporary(), "Temporary result")
 	}
 
 	if timeoutErr, ok := result.(interface{ Timeout() bool }); ok {
-		AssertBool(t, timeoutErr.Timeout(), tc.isTimeout, "Timeout() result")
+		AssertEqual(t, tc.isTimeout, timeoutErr.Timeout(), "Timeout result")
 	}
 }
 
@@ -292,8 +292,8 @@ func TestTemporaryErrorNilReceiver(t *testing.T) {
 	var tempErr *TemporaryError
 
 	AssertEqual(t, tempErr.Error(), "", "nil TemporaryError should return empty string")
-	AssertBool(t, tempErr.IsTimeout(), false, "nil TemporaryError IsTimeout should return false")
-	AssertBool(t, tempErr.Timeout(), false, "nil TemporaryError Timeout should return false")
+	AssertFalse(t, tempErr.IsTimeout(), "nil TemporaryError IsTimeout")
+	AssertFalse(t, tempErr.Timeout(), "nil TemporaryError Timeout")
 }
 
 // Test case for CheckIsTemporary function
@@ -307,8 +307,8 @@ type checkIsTemporaryTestCase struct {
 func (tc checkIsTemporaryTestCase) test(t *testing.T) {
 	t.Helper()
 	is, known := CheckIsTemporary(tc.err)
-	AssertBool(t, is, tc.expectedIs, "CheckIsTemporary is result")
-	AssertBool(t, known, tc.expectedKnown, "CheckIsTemporary known result")
+	AssertEqual(t, tc.expectedIs, is, "CheckIsTemporary is result")
+	AssertEqual(t, tc.expectedKnown, known, "CheckIsTemporary known result")
 }
 
 func newCheckIsTemporaryTestCase(name string, err error, expectedIs, expectedKnown bool) checkIsTemporaryTestCase {
@@ -350,7 +350,7 @@ type isTemporaryTestCase struct {
 func (tc isTemporaryTestCase) test(t *testing.T) {
 	t.Helper()
 	result := IsTemporary(tc.err)
-	AssertBool(t, result, tc.expected, "IsTemporary result")
+	AssertEqual(t, tc.expected, result, "IsTemporary result")
 }
 
 func newIsTemporaryTestCase(name string, err error, expected bool) isTemporaryTestCase {
@@ -394,8 +394,8 @@ type checkIsTimeoutTestCase struct {
 func (tc checkIsTimeoutTestCase) test(t *testing.T) {
 	t.Helper()
 	is, known := CheckIsTimeout(tc.err)
-	AssertBool(t, is, tc.expectedIs, "CheckIsTimeout is result")
-	AssertBool(t, known, tc.expectedKnown, "CheckIsTimeout known result")
+	AssertEqual(t, tc.expectedIs, is, "CheckIsTimeout is result")
+	AssertEqual(t, tc.expectedKnown, known, "CheckIsTimeout known result")
 }
 
 func newCheckIsTimeoutTestCase(name string, err error, expectedIs, expectedKnown bool) checkIsTimeoutTestCase {
@@ -437,7 +437,7 @@ type isTimeoutTestCase struct {
 func (tc isTimeoutTestCase) test(t *testing.T) {
 	t.Helper()
 	result := IsTimeout(tc.err)
-	AssertBool(t, result, tc.expected, "IsTimeout result")
+	AssertEqual(t, tc.expected, result, "IsTimeout result")
 }
 
 func newIsTimeoutTestCase(name string, err error, expected bool) isTimeoutTestCase {

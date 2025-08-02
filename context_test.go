@@ -62,7 +62,7 @@ func (tc withTimeoutTestCase) test(t *testing.T) {
 
 	if tc.expectTimeout {
 		_, hasDeadline := ctx.Deadline()
-		AssertBool(t, hasDeadline, true, "WithTimeout should set deadline for positive duration")
+		AssertTrue(t, hasDeadline, "deadline set")
 		return
 	}
 
@@ -159,7 +159,7 @@ func (tc withTimeoutCauseTestCase) test(t *testing.T) {
 
 	if tc.expectTimeout {
 		_, hasDeadline := ctx.Deadline()
-		AssertBool(t, hasDeadline, true, "WithTimeoutCause should set deadline for positive duration")
+		AssertTrue(t, hasDeadline, "deadline set")
 		return
 	}
 
@@ -239,7 +239,7 @@ func (tc contextKeyGetTestCase) test(t *testing.T) {
 
 	value, ok := tc.key.Get(tc.ctx)
 	AssertEqual(t, tc.expectedValue, value, "Get returned wrong value")
-	AssertBool(t, ok, tc.expectedOK, "Get returned wrong ok value")
+	AssertEqual(t, tc.expectedOK, ok, "Get ok value")
 }
 
 func contextKeyGetTest(ctx context.Context, name string, key *ContextKey[int],

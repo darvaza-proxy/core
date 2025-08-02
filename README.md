@@ -400,6 +400,57 @@ fmt.Printf("Stack trace:%+v", stack)
 fmt.Printf("Debug stack:%#+v", stack)
 ```
 
+## Testing Utilities
+
+This package provides comprehensive public testing utilities for both internal
+library tests and external library users.
+
+### Quick Reference
+
+```go
+import "darvaza.org/core"
+
+// Concise slice creation
+testData := core.S(1, 2, 3)           // []int{1, 2, 3}
+emptyStrings := core.S[string]()      // []string{}
+
+// Standard assertions
+core.AssertEqual(t, expected, actual, "value")
+core.AssertNoError(t, err, "operation")
+core.AssertTrue(t, condition, "check")
+
+// Testing test code with thread-safe MockT
+mock := &core.MockT{}
+core.AssertEqual(mock, 42, 42, "equality")
+if mock.Failed() {
+    t.Errorf("Unexpected failure: %v", mock.Errors)
+}
+```
+
+### Features
+
+* **14 assertion functions** - `AssertEqual`, `AssertError`, `AssertPanic`, etc.
+* **Thread-safe MockT** - complete mock testing.T implementation with failure
+  tracking, formatted logging, and helper call counting.
+* **Advanced utilities** - `RunConcurrentTest(), RunBenchmark()`.
+* **Generic support** - type-safe operations with Go generics.
+* **Success logging** - all assertions log successful cases for debugging.
+
+## Development
+
+For detailed development setup, build commands, and AI agent guidance:
+
+* [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
+  patterns
+
+### Quick Start
+
+```bash
+make all    # Full build cycle (get deps, generate, tidy, build)
+make test   # Run tests
+make tidy   # Format and tidy (run before committing)
+```
+
 ## Synchronization
 
 ### WaitGroup

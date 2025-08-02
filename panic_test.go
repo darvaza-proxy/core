@@ -162,7 +162,11 @@ func (tc catcherDoTestCase) test(t *testing.T) {
 	var catcher Catcher
 	err := catcher.Do(tc.fn)
 
-	AssertError(t, err, tc.expectError, "Catcher.Do error expectation mismatch")
+	if tc.expectError {
+		AssertError(t, err, "Catcher.Do error")
+	} else {
+		AssertNoError(t, err, "Catcher.Do error")
+	}
 
 	if tc.expectError && tc.expectPanic {
 		if recovered, ok := err.(Recovered); ok {
@@ -227,7 +231,11 @@ func (tc catcherTryTestCase) test(t *testing.T) {
 	var catcher Catcher
 	err := catcher.Try(tc.fn)
 
-	AssertError(t, err, tc.expectError, "Catcher.Try error expectation mismatch")
+	if tc.expectError {
+		AssertError(t, err, "Catcher.Try error")
+	} else {
+		AssertNoError(t, err, "Catcher.Try error")
+	}
 
 	// Check recovered panic
 	recovered := catcher.Recovered()
@@ -348,7 +356,11 @@ func (tc catchTestCase) test(t *testing.T) {
 	t.Helper()
 	err := Catch(tc.fn)
 
-	AssertError(t, err, tc.expectError, "Catch error expectation mismatch")
+	if tc.expectError {
+		AssertError(t, err, "Catch error")
+	} else {
+		AssertNoError(t, err, "Catch error")
+	}
 }
 
 func TestCatch(t *testing.T) {
@@ -378,7 +390,7 @@ func (tc catchWithPanicRecoveryTestCase) test(t *testing.T) {
 		panic(tc.value)
 	})
 
-	AssertError(t, err, true, "expected error from panic")
+	AssertError(t, err, "expected error from panic")
 
 	if recovered, ok := err.(Recovered); ok {
 		panicValue := recovered.Recovered()

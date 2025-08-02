@@ -163,11 +163,11 @@ func TestSliceRandom(t *testing.T) {
 	for _, tc := range tests {
 		if tc.name != "random" {
 			got, ok := SliceRandom(tc.input)
-			AssertBool(t, ok, tc.wantOK, "SliceRandom ok status mismatch for %s", tc.name)
+			AssertEqual(t, tc.wantOK, ok, "SliceRandom ok for %s", tc.name)
 			AssertEqual(t, tc.want, got, "SliceRandom result mismatch for %s", tc.name)
 		} else {
 			u, ok := SliceRandom(tc.input)
-			AssertBool(t, ok, tc.wantOK, "SliceRandom ok status mismatch for %s", tc.name)
+			AssertEqual(t, tc.wantOK, ok, "SliceRandom ok for %s", tc.name)
 			t.Logf("random from one,two,three,four,five,six: %s", u)
 		}
 	}
@@ -185,7 +185,7 @@ func (tc sliceContainsTestCase) test(t *testing.T) {
 	t.Helper()
 
 	result := SliceContains(tc.slice, tc.value)
-	AssertBool(t, result, tc.expected, "SliceContains result")
+	AssertEqual(t, tc.expected, result, "SliceContains result")
 }
 
 func TestSliceContains(t *testing.T) {

@@ -93,7 +93,7 @@ func (tc spinLockLockTestCase) test(t *testing.T) {
 			return nil
 		})
 
-		AssertError(t, err, false, "concurrent lock test should not fail")
+		AssertNoError(t, err, "concurrent lock test")
 		close(acquired)
 
 		// Both should have acquired the lock
@@ -202,7 +202,7 @@ func TestSpinLockConcurrency(t *testing.T) {
 		return nil
 	})
 
-	AssertError(t, err, false, "concurrent test should not fail")
+	AssertNoError(t, err, "concurrent test")
 
 	expected := int64(numGoroutines * numIterations)
 	AssertEqual(t, expected, counter, "counter should match expected value")

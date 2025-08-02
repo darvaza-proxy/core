@@ -117,7 +117,7 @@ func (tc listContainsTestCase) test(t *testing.T) {
 	}
 
 	result := ListContains(l, tc.target)
-	AssertBool(t, result, tc.expected, "ListContains result")
+	AssertEqual(t, tc.expected, result, "ListContains result")
 }
 
 func TestListContains(t *testing.T) {
@@ -140,7 +140,7 @@ func TestListContains(t *testing.T) {
 	// Test nil list
 	t.Run("nil list", func(t *testing.T) {
 		result := ListContains((*list.List)(nil), 42)
-		AssertBool(t, result, false, "ListContains nil list")
+		AssertFalse(t, result, "ListContains nil list")
 	})
 }
 
@@ -224,7 +224,7 @@ func TestListContainsFn(t *testing.T) {
 		result := ListContainsFn(l, 0, func(_, val int) bool {
 			return val > 2
 		})
-		AssertBool(t, result, true, "ListContainsFn custom function")
+		AssertTrue(t, result, "ListContainsFn custom function")
 	})
 
 	// Test with nil list
@@ -232,7 +232,7 @@ func TestListContainsFn(t *testing.T) {
 		result := ListContainsFn((*list.List)(nil), 42, func(a, b int) bool {
 			return a == b
 		})
-		AssertBool(t, result, false, "ListContainsFn nil list")
+		AssertFalse(t, result, "ListContainsFn nil list")
 	})
 
 	// Test with nil function
@@ -241,7 +241,7 @@ func TestListContainsFn(t *testing.T) {
 		l.PushBack(42)
 
 		result := ListContainsFn(l, 42, nil)
-		AssertBool(t, result, false, "ListContainsFn nil function")
+		AssertFalse(t, result, "ListContainsFn nil function")
 	})
 }
 
@@ -367,7 +367,7 @@ func testListForEachElementNilAndEarlyReturn(t *testing.T, name string,
 
 		var called bool
 		iterFn(l, nil)
-		AssertBool(t, called, false, name+" nil function should not call anything")
+		AssertFalse(t, called, name+" nil function")
 	})
 
 	// Test early return
