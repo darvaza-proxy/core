@@ -24,6 +24,7 @@
     "dylib",
     "errgroup",
     "Errorf",
+    "Fatalf",
     "fieldalignment",
     "funcname",
     "gocovmerge",

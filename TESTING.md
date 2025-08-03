@@ -834,6 +834,28 @@ func TestMyAssertion(t *testing.T) {
 }
 ```
 
+### Testing Fatal/FailNow Scenarios
+
+MockT supports testing functions that call Fatal/FailNow methods via the `Run()`
+method, which recovers from FailNow panics:
+
+```go
+func TestAssertionFailure(t *testing.T) {
+    mock := &core.MockT{}
+
+    // Test assertion that calls Fatal internally
+    ok := mock.Run("failing assertion", func(mt core.T) {
+        core.AssertEqual(mt, 1, 2, "should fail")
+        // This would call mt.Fatal() internally if we used:
+        // if !core.AssertEqual(mt, 1, 2, "should fail") { mt.FailNow() }
+    })
+
+    core.AssertFalse(t, ok, "assertion should fail")
+    core.AssertTrue(t, mock.Failed(), "mock should be marked as failed")
+    core.AssertTrue(t, mock.HasErrors(), "should have error message")
+}
+```
+
 ## Error Testing Patterns
 
 ### Expected Errors
