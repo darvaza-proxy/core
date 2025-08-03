@@ -427,6 +427,8 @@ both `*testing.T` and `MockT`:
 #### Basic Assertions
 
 * `AssertEqual[T](t, expected, actual, msg...)` - generic value comparison.
+* `AssertNotEqual[T](t, expected, actual, msg...)` - generic inequality
+  comparison.
 * `AssertSliceEqual[T](t, expected, actual, msg...)` - slice comparison using
   `reflect.DeepEqual`.
 * `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -

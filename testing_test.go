@@ -67,6 +67,33 @@ func TestAssertEqual(t *testing.T) {
 	AssertTrue(t, strings.Contains(lastErr, "expected 42, got 24"), "error message contains values")
 }
 
+// Test AssertNotEqual
+func TestAssertNotEqual(t *testing.T) {
+	mock := &MockT{}
+
+	// Test successful assertion
+	result := AssertNotEqual(mock, 42, 24, "not equal test")
+	AssertTrue(t, result, "AssertNotEqual result when not equal")
+	AssertFalse(t, mock.HasErrors(), "no errors on success")
+	AssertTrue(t, mock.HasLogs(), "has logs on success")
+
+	lastLog, ok := mock.LastLog()
+	AssertTrue(t, ok, "LastLog ok on success")
+	AssertEqual(t, "not equal test: 24", lastLog, "log message on success")
+
+	mock.Reset()
+
+	// Test failed assertion
+	result = AssertNotEqual(mock, 42, 42, "equal test")
+	AssertFalse(t, result, "AssertNotEqual result when equal")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	AssertFalse(t, mock.HasLogs(), "no logs on failure")
+
+	lastErr, ok := mock.LastError()
+	AssertTrue(t, ok, "LastError ok on failure")
+	AssertTrue(t, strings.Contains(lastErr, "expected not 42, got 42"), "error message contains values")
+}
+
 // Test AssertSliceEqual
 func TestAssertSliceEqual(t *testing.T) {
 	mock := &MockT{}

@@ -195,6 +195,26 @@ func AssertEqual[U comparable](t T, expected, actual U, name string, args ...any
 	return ok
 }
 
+// AssertNotEqual compares two values and ensures they are different.
+// This is a generic helper that works with any comparable type.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	AssertNotEqual(t, 42, result, "result value")
+//	AssertNotEqual(t, "hello", str, "string %d comparison", 1)
+func AssertNotEqual[U comparable](t T, expected, actual U, name string, args ...any) bool {
+	t.Helper()
+	ok := actual != expected
+	if !ok {
+		doError(t, name, args, "expected not %v, got %v", expected, actual)
+	} else {
+		doLog(t, name, args, "%v", actual)
+	}
+	return ok
+}
+
 // AssertSliceEqual compares two slices and reports differences.
 // This uses reflect.DeepEqual for comprehensive comparison.
 // The name parameter can include printf-style formatting.
