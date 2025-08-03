@@ -15,6 +15,9 @@ var _ TestCase = catchWithPanicRecoveryTestCase{}
 var _ TestCase = mustSuccessTestCase{}
 var _ TestCase = mustPanicTestCase{}
 var _ TestCase = maybeTestCase{}
+var _ TestCase = mustOKSuccessTestCase{}
+var _ TestCase = mustOKPanicTestCase{}
+var _ TestCase = maybeOKTestCase{}
 
 type asRecoveredTestCase struct {
 	input    any
@@ -586,6 +589,217 @@ func TestMaybe(t *testing.T) {
 		newMaybeTestCase("int with error", 0, errors.New("another ignored error")),
 		newMaybeTestCase("nil pointer with error", (*int)(nil), errors.New("pointer error")),
 		newMaybeTestCase("struct with error", struct{ Name string }{"test"}, fmt.Errorf("formatted: %d", 123)),
+	}
+
+	RunTestCases(t, testCases)
+}
+
+// testMustOK is a helper to test MustOK function by catching panics.
+// It wraps MustOK calls in panic recovery to allow testing both success
+// and panic scenarios. Returns the value and any recovered panic as an error.
+func testMustOK[T any](v0 T, ok bool) (v1 T, e1 error) {
+	defer func() {
+		if e2 := AsRecovered(recover()); e2 != nil {
+			e1 = e2
+		}
+	}()
+
+	v1 = MustOK(v0, ok)
+	return v1, nil
+}
+
+// mustOKSuccessTestCase tests MustOK function success scenarios where no panic should occur.
+type mustOKSuccessTestCase struct {
+	// Large fields first - interfaces (8 bytes on 64-bit)
+	value any
+
+	// Small fields last - strings (16 bytes on 64-bit), bool (1 byte)
+	name string
+	ok   bool
+}
+
+// newMustOKSuccessTestCase creates a new mustOKSuccessTestCase with the given parameters.
+// For success cases, ok is always true.
+func newMustOKSuccessTestCase(name string, value any) mustOKSuccessTestCase {
+	return mustOKSuccessTestCase{
+		value: value,
+		ok:    true,
+		name:  name,
+	}
+}
+
+func (tc mustOKSuccessTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mustOKSuccessTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	tc.testMustOKWithValue(t)
+}
+
+// testMustOKT is a generic test helper for MustOK function with comparable types.
+// It handles the common pattern of testing MustOK with a value and verifying
+// the result matches expectations.
+func testMustOKT[V comparable](t *testing.T, tc mustOKSuccessTestCase, value V) {
+	t.Helper()
+
+	got, err := testMustOK(value, tc.ok)
+	AssertNoError(t, err, "MustOK success")
+	AssertEqual(t, value, got, "MustOK value")
+}
+
+// testMustOKSlice is a specialized test helper for MustOK function with slice types.
+func testMustOKSlice[V any](t *testing.T, tc mustOKSuccessTestCase, value []V) {
+	t.Helper()
+
+	got, err := testMustOK(value, tc.ok)
+	AssertNoError(t, err, "MustOK success")
+	AssertSliceEqual(t, value, got, "MustOK slice")
+}
+
+// testMustOKWithValue dispatches to the appropriate test helper.
+func (tc mustOKSuccessTestCase) testMustOKWithValue(t *testing.T) {
+	t.Helper()
+
+	// Test with different types using type switches
+	switch v := tc.value.(type) {
+	case string:
+		testMustOKT(t, tc, v)
+	case int:
+		testMustOKT(t, tc, v)
+	case bool:
+		testMustOKT(t, tc, v)
+	case []int:
+		testMustOKSlice(t, tc, v)
+	case *int:
+		testMustOKT(t, tc, v)
+	case struct{ Name string }:
+		testMustOKT(t, tc, v)
+	default:
+		t.Errorf("unsupported test value type: %T", tc.value)
+	}
+}
+
+func TestMustOKSuccess(t *testing.T) {
+	testCases := []mustOKSuccessTestCase{
+		newMustOKSuccessTestCase("string success", "hello"),
+		newMustOKSuccessTestCase("int success", 42),
+		newMustOKSuccessTestCase("bool success", true),
+		newMustOKSuccessTestCase("slice success", S(1, 2, 3)),
+		newMustOKSuccessTestCase("nil pointer success", (*int)(nil)),
+		newMustOKSuccessTestCase("struct success", struct{ Name string }{"test"}),
+	}
+
+	RunTestCases(t, testCases)
+}
+
+// mustOKPanicTestCase tests MustOK function panic scenarios where MustOK should panic.
+type mustOKPanicTestCase struct {
+	// Large fields first - interfaces (8 bytes)
+	value any
+
+	// Small fields last - string (16 bytes), bool (1 byte)
+	name string
+	ok   bool
+}
+
+// newMustOKPanicTestCase creates a new mustOKPanicTestCase with the given parameters.
+// For panic cases, ok is always false.
+func newMustOKPanicTestCase(name string, value any) mustOKPanicTestCase {
+	return mustOKPanicTestCase{
+		name:  name,
+		value: value,
+		ok:    false,
+	}
+}
+
+func (tc mustOKPanicTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mustOKPanicTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	_, err := testMustOK(tc.value, tc.ok)
+	AssertError(t, err, "MustOK panic")
+
+	// Verify it's a proper PanicError
+	panicErr, ok := AssertTypeIs[*PanicError](t, err, "panic type")
+	if ok {
+		// Verify stack trace exists
+		stack := panicErr.CallStack()
+		AssertTrue(t, len(stack) > 0, "has stack trace")
+
+		// Verify the error message contains our expected text
+		AssertContains(t, panicErr.Error(), "core.MustOK: operation failed", "panic message")
+	}
+}
+
+func TestMustOKPanic(t *testing.T) {
+	testCases := []mustOKPanicTestCase{
+		newMustOKPanicTestCase("string panic", "hello"),
+		newMustOKPanicTestCase("int panic", 42),
+		newMustOKPanicTestCase("bool panic", false),
+		newMustOKPanicTestCase("slice panic", S(1, 2, 3)),
+		newMustOKPanicTestCase("nil pointer panic", (*int)(nil)),
+		newMustOKPanicTestCase("struct panic", struct{ Name string }{"test"}),
+	}
+
+	RunTestCases(t, testCases)
+}
+
+type maybeOKTestCase struct {
+	// Large fields first - interfaces (8 bytes)
+	value any
+
+	// Small fields last - string (16 bytes), bool (1 byte)
+	name string
+	ok   bool
+}
+
+func newMaybeOKTestCase(name string, value any, ok bool) maybeOKTestCase {
+	return maybeOKTestCase{
+		name:  name,
+		value: value,
+		ok:    ok,
+	}
+}
+
+func (tc maybeOKTestCase) Name() string {
+	return tc.name
+}
+
+func (tc maybeOKTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Test with different types using type switches
+	switch v := tc.value.(type) {
+	case string:
+		got := MaybeOK(v, tc.ok)
+		AssertEqual(t, v, got, "MaybeOK string")
+	case int:
+		got := MaybeOK(v, tc.ok)
+		AssertEqual(t, v, got, "MaybeOK int")
+	case *int:
+		got := MaybeOK(v, tc.ok)
+		AssertEqual(t, v, got, "MaybeOK pointer")
+	case struct{ Name string }:
+		got := MaybeOK(v, tc.ok)
+		AssertEqual(t, v, got, "MaybeOK struct")
+	default:
+		t.Errorf("unsupported test value type: %T", tc.value)
+	}
+}
+
+func TestMaybeOK(t *testing.T) {
+	testCases := []maybeOKTestCase{
+		newMaybeOKTestCase("string with true", "hello", true),
+		newMaybeOKTestCase("string with false", "world", false),
+		newMaybeOKTestCase("int with true", 42, true),
+		newMaybeOKTestCase("int with false", 0, false),
+		newMaybeOKTestCase("nil pointer with false", (*int)(nil), false),
+		newMaybeOKTestCase("struct with false", struct{ Name string }{"test"}, false),
 	}
 
 	RunTestCases(t, testCases)

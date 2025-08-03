@@ -300,6 +300,12 @@ Convenience functions for common error-handling patterns:
 * `Maybe[T](value T, err error) T` - always returns the value, ignoring any
   error. Useful when you want to proceed with a default or zero value regardless
   of error status.
+* `MustOK[T](value T, ok bool) T` - returns value or panics with `PanicError` if
+  ok is false. Useful for operations that should always succeed, such as map
+  access or type assertions that are guaranteed to be valid.
+* `MaybeOK[T](value T, ok bool) T` - always returns the value, ignoring the ok
+  flag. Useful when you want to proceed with a default or zero value regardless
+  of operation success.
 
 ```go
 // Must - panic on error (use in tests, config loading, etc.)
@@ -309,6 +315,14 @@ conn := Must(net.Dial("tcp", "localhost:8080"))  // panics if dial fails
 // Maybe - ignore errors, proceed with values
 content := Maybe(os.ReadFile("optional.txt"))  // empty string if file missing
 count := Maybe(strconv.Atoi(userInput))  // zero if parsing fails
+
+// MustOK - panic on failure (use when operation should always succeed)
+value := MustOK(MapValue(m, "key", 0))  // panics if key doesn't exist
+str := MustOK(As[any, string](v))  // panics if v is not a string
+
+// MaybeOK - ignore ok flag, proceed with values
+value := MaybeOK(MapValue(m, "key", 0))  // zero value if key doesn't exist
+str := MaybeOK(As[any, string](v))  // zero value if type assertion fails
 ```
 
 ### Unreachable Conditions

@@ -115,3 +115,42 @@ func Must[V any](value V, err error) V {
 func Maybe[V any](value V, _ error) V {
 	return value
 }
+
+// MustOK panics if ok is false, otherwise returns value.
+// This is useful for situations where operations should always succeed,
+// such as accessing map values that are known to exist or type assertions
+// that are guaranteed to be valid. It follows the common Go pattern
+// of Must* functions that panic on failure. The panic includes proper stack
+// traces pointing to the caller.
+//
+// Example usage:
+//
+//	value := MustOK(MapValue(m, "key", 0))  // panics if key doesn't exist in map
+//	str := MustOK(As[any, string](v))  // panics if v is not a string
+//	result := MustOK(someFunc())  // panics if someFunc returns false for ok
+//
+// revive:disable-next-line:flag-parameter
+func MustOK[V any](value V, ok bool) V {
+	if !ok {
+		panic(NewPanicError(1, "core.MustOK: operation failed"))
+	}
+	return value
+}
+
+// MaybeOK returns the value, ignoring the ok flag.
+// This is useful when you want to proceed with a default or zero value
+// regardless of whether the operation succeeded. Unlike MustOK, it never panics.
+//
+// Example usage:
+//
+//	// Use zero value if key doesn't exist in map
+//	value := MaybeOK(MapValue(m, "key", 0))
+//
+//	// Use zero value if type assertion fails
+//	str := MaybeOK(As[any, string](v))
+//
+//	// Chain operations where success is non-critical
+//	result := MaybeOK(someFunc())
+func MaybeOK[V any](value V, _ bool) V {
+	return value
+}
