@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var _ TestCase = splitAddrPortCase{}
+var _ TestCase = splitHostPortCase{}
+var _ TestCase = makeHostPortCase{}
+var _ TestCase = joinHostPortCase{}
+var _ TestCase = doMakeHostPortCase{}
+var _ TestCase = doJoinHostPortCase{}
+var _ TestCase = ipForHostPortCase{}
+var _ TestCase = addrErrCase{}
+
 type splitAddrPortCase struct {
 	name     string
 	addrPort string
@@ -13,7 +23,11 @@ type splitAddrPortCase struct {
 	ok       bool
 }
 
-func (tc splitAddrPortCase) test(t *testing.T) {
+func (tc splitAddrPortCase) Name() string {
+	return tc.name
+}
+
+func (tc splitAddrPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	a, p, err := SplitAddrPort(tc.addrPort)
@@ -59,9 +73,7 @@ func splitAddrPortTestCases() []splitAddrPortCase {
 }
 
 func TestSplitAddrPort(t *testing.T) {
-	for _, tc := range splitAddrPortTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, splitAddrPortTestCases())
 }
 
 type splitHostPortCase struct {
@@ -71,7 +83,11 @@ type splitHostPortCase struct {
 	ok         bool
 }
 
-func (tc splitHostPortCase) test(t *testing.T) {
+func (tc splitHostPortCase) Name() string {
+	return tc.name
+}
+
+func (tc splitHostPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	h, p, err := SplitHostPort(tc.hostport)
@@ -127,9 +143,7 @@ func splitHostPortTestCases() []splitHostPortCase {
 }
 
 func TestSplitHostPort(t *testing.T) {
-	for _, tc := range splitHostPortTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, splitHostPortTestCases())
 }
 
 type makeHostPortCase struct {
@@ -140,7 +154,11 @@ type makeHostPortCase struct {
 	defaultPort uint16
 }
 
-func (tc makeHostPortCase) test(t *testing.T) {
+func (tc makeHostPortCase) Name() string {
+	return tc.name
+}
+
+func (tc makeHostPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	result, err := MakeHostPort(tc.hostPort, tc.defaultPort)
@@ -195,9 +213,7 @@ func makeHostPortTestCases() []makeHostPortCase {
 }
 
 func TestMakeHostPort(t *testing.T) {
-	for _, tc := range makeHostPortTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, makeHostPortTestCases())
 }
 
 type joinHostPortCase struct {
@@ -208,7 +224,11 @@ type joinHostPortCase struct {
 	ok       bool
 }
 
-func (tc joinHostPortCase) test(t *testing.T) {
+func (tc joinHostPortCase) Name() string {
+	return tc.name
+}
+
+func (tc joinHostPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	result, err := JoinHostPort(tc.host, tc.port)
@@ -262,9 +282,7 @@ func joinHostPortTestCases() []joinHostPortCase {
 }
 
 func TestJoinHostPort(t *testing.T) {
-	for _, tc := range joinHostPortTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, joinHostPortTestCases())
 }
 
 type doMakeHostPortCase struct {
@@ -276,7 +294,11 @@ type doMakeHostPortCase struct {
 	defaultPort uint16
 }
 
-func (tc doMakeHostPortCase) test(t *testing.T) {
+func (tc doMakeHostPortCase) Name() string {
+	return tc.name
+}
+
+func (tc doMakeHostPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	result, err := doMakeHostPort(tc.host, tc.port, tc.defaultPort)
@@ -327,9 +349,7 @@ func doMakeHostPortTestCases() []doMakeHostPortCase {
 }
 
 func TestDoMakeHostPort(t *testing.T) {
-	for _, tc := range doMakeHostPortTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, doMakeHostPortTestCases())
 }
 
 type doJoinHostPortCase struct {
@@ -340,7 +360,11 @@ type doJoinHostPortCase struct {
 	ok       bool
 }
 
-func (tc doJoinHostPortCase) test(t *testing.T) {
+func (tc doJoinHostPortCase) Name() string {
+	return tc.name
+}
+
+func (tc doJoinHostPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	result, err := doJoinHostPort(tc.host, tc.port)
@@ -384,9 +408,7 @@ func doJoinHostPortTestCases() []doJoinHostPortCase {
 }
 
 func TestDoJoinHostPort(t *testing.T) {
-	for _, tc := range doJoinHostPortTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, doJoinHostPortTestCases())
 }
 
 type ipForHostPortCase struct {
@@ -395,7 +417,11 @@ type ipForHostPortCase struct {
 	expected string
 }
 
-func (tc ipForHostPortCase) test(t *testing.T) {
+func (tc ipForHostPortCase) Name() string {
+	return tc.name
+}
+
+func (tc ipForHostPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	addr, err := ParseAddr(tc.input)
@@ -441,9 +467,7 @@ func ipForHostPortTestCases() []ipForHostPortCase {
 }
 
 func TestIPForHostPort(t *testing.T) {
-	for _, tc := range ipForHostPortTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, ipForHostPortTestCases())
 }
 
 type addrErrCase struct {
@@ -452,7 +476,11 @@ type addrErrCase struct {
 	why  string
 }
 
-func (tc addrErrCase) test(t *testing.T) {
+func (tc addrErrCase) Name() string {
+	return tc.name
+}
+
+func (tc addrErrCase) Test(t *testing.T) {
 	t.Helper()
 
 	err := addrErr(tc.addr, tc.why)
@@ -504,7 +532,5 @@ func addrErrTestCases() []addrErrCase {
 }
 
 func TestAddrErr(t *testing.T) {
-	for _, tc := range addrErrTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, addrErrTestCases())
 }

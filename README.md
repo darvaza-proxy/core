@@ -4,7 +4,7 @@
 [![Go Report Card][goreport-badge]][goreport]
 [![codecov][codecov-badge]][codecov]
 
-This package contains simple mechanisms used by other darvaza-proxy
+This package contains simple mechanisms used by other darvaza.org
 projects. It's not allowed to have dependencies outside of Go's Standard
 Library, and if something should be on a subdirectory, it shouldn't be here.
 
@@ -290,6 +290,41 @@ defer func() {
 }()
 ```
 
+### Must/Maybe Utilities
+
+Convenience functions for common error-handling patterns:
+
+* `Must[T](value T, err error) T` - returns value or panics with `PanicError` if
+  err is not nil. Follows the common Go pattern of Must* functions for cases
+  where errors should never occur.
+* `Maybe[T](value T, err error) T` - always returns the value, ignoring any
+  error. Useful when you want to proceed with a default or zero value regardless
+  of error status.
+* `MustOK[T](value T, ok bool) T` - returns value or panics with `PanicError` if
+  ok is false. Useful for operations that should always succeed, such as map
+  access or type assertions that are guaranteed to be valid.
+* `MaybeOK[T](value T, ok bool) T` - always returns the value, ignoring the ok
+  flag. Useful when you want to proceed with a default or zero value regardless
+  of operation success.
+
+```go
+// Must - panic on error (use in tests, config loading, etc.)
+config := Must(loadConfig("config.json"))  // panics if loadConfig fails
+conn := Must(net.Dial("tcp", "localhost:8080"))  // panics if dial fails
+
+// Maybe - ignore errors, proceed with values
+content := Maybe(os.ReadFile("optional.txt"))  // empty string if file missing
+count := Maybe(strconv.Atoi(userInput))  // zero if parsing fails
+
+// MustOK - panic on failure (use when operation should always succeed)
+value := MustOK(MapValue(m, "key", 0))  // panics if key doesn't exist
+str := MustOK(As[any, string](v))  // panics if v is not a string
+
+// MaybeOK - ignore ok flag, proceed with values
+value := MaybeOK(MapValue(m, "key", 0))  // zero value if key doesn't exist
+str := MaybeOK(As[any, string](v))  // zero value if type assertion fails
+```
+
 ### Unreachable Conditions
 
 For indicating impossible code paths:
@@ -400,6 +435,74 @@ fmt.Printf("Stack trace:%+v", stack)
 fmt.Printf("Debug stack:%#+v", stack)
 ```
 
+## Testing Utilities
+
+This package provides comprehensive public testing utilities for both internal
+library tests and external library users.
+
+### T Interface and MockT
+
+* `T` interface - abstracts testing functionality for both `*testing.T` and
+  mock implementations.
+* `MockT` - thread-safe mock testing.T implementation with error/log
+  collection, helper tracking, state inspection (`HasErrors()`, `HasLogs()`,
+  `LastError()`, `LastLog()`), and reset capabilities.
+
+### Test Helpers
+
+* `S[T](values...)` - concise slice creation: `S(1, 2, 3)` instead of
+  `[]int{1, 2, 3}`.
+* `S[T]()` - empty slice creation: `S[string]()` instead of `[]string{}`.
+
+### Assertion Functions
+
+All assertions return boolean results, log successful cases, and work with
+both `*testing.T` and `MockT`:
+
+#### Basic Assertions
+
+* `AssertEqual[T](t, expected, actual, msg...)` - generic value comparison.
+* `AssertNotEqual[T](t, expected, actual, msg...)` - generic inequality
+  comparison.
+* `AssertSliceEqual[T](t, expected, actual, msg...)` - slice comparison using
+  `reflect.DeepEqual`.
+* `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
+  boolean assertions.
+* `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - nil
+  checking.
+* `AssertContains(t, text, substring, msg...)` - string containment.
+
+#### Error and Type Assertions
+
+* `AssertError(t, err, msg...)` / `AssertNoError(t, err, msg...)` - error
+  presence/absence.
+* `AssertErrorIs(t, err, target, msg...)` - error chain checking with
+  `errors.Is`.
+* `AssertTypeIs[T](t, value, msg...)` - type assertion with casting, returns
+  (value, ok).
+* `AssertPanic(t, fn, expectedPanic, msg...)` / `AssertNoPanic(t, fn, msg...)` -
+  panic testing.
+
+### Advanced Testing Utilities
+
+* `TestCase` interface - standardised interface for table-driven tests with
+  `Name()` and `Test(t)` methods.
+* `RunTestCases[T TestCase](t, cases)` - table-driven test runner for
+  TestCase implementations.
+* `RunConcurrentTest(t, numWorkers, workerFn)` - concurrent testing with
+  goroutines.
+* `RunBenchmark(b, setupFn, execFn)` - benchmark testing with
+  setup/execution phases.
+
+### Documentation
+
+For detailed testing patterns and guidelines:
+
+* [TESTING.md](./TESTING.md) - General testing patterns for all darvaza.org
+  projects
+* [TESTING_core.md](./TESTING_core.md) - Core-specific testing patterns and
+  self-testing approaches
+
 ## Synchronization
 
 ### WaitGroup
@@ -428,6 +531,23 @@ Context-aware error group with cancellation:
 
 * ~~SpinLock~~ Deprecated in favour of
   [darvaza.org/x/sync/spinlock][x-sync-spinlock]
+
+## Development
+
+**Requirements:** Go 1.23 or later
+
+For detailed development setup, build commands, and AI agent guidance:
+
+* [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
+  patterns
+
+### Quick Start
+
+```bash
+make all    # Full build cycle (get deps, generate, tidy, build)
+make test   # Run tests
+make tidy   # Format and tidy (run before committing)
+```
 
 ## See also
 

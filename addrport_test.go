@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+// Compile-time verification that test case types implement TestCase interface
+var _ TestCase = addrPortTestCase{}
+var _ TestCase = typeSpecificAddrPortTestCase{}
+
 // Test cases for AddrPort
 type addrPortTestCase struct {
 	name   string
@@ -16,130 +20,44 @@ type addrPortTestCase struct {
 
 var addrPortTestCases = []addrPortTestCase{
 	// Direct netip.AddrPort types
-	{
-		name:   "direct AddrPort",
-		input:  netip.MustParseAddrPort("192.168.1.1:8080"),
-		want:   netip.MustParseAddrPort("192.168.1.1:8080"),
-		wantOK: true,
-	},
-	{
-		name:   "pointer to AddrPort",
-		input:  addrPortPtr(netip.MustParseAddrPort("10.0.0.1:443")),
-		want:   netip.MustParseAddrPort("10.0.0.1:443"),
-		wantOK: true,
-	},
-	{
-		name:   "zero AddrPort",
-		input:  netip.AddrPort{},
-		want:   netip.AddrPort{},
-		wantOK: true,
-	},
+	newAddrPortTestCase("direct AddrPort", netip.MustParseAddrPort("192.168.1.1:8080"),
+		netip.MustParseAddrPort("192.168.1.1:8080"), true),
+	newAddrPortTestCase("pointer to AddrPort", addrPortPtr(netip.MustParseAddrPort("10.0.0.1:443")),
+		netip.MustParseAddrPort("10.0.0.1:443"), true),
+	newAddrPortTestCase("zero AddrPort", netip.AddrPort{}, netip.AddrPort{}, true),
 	// TCP addresses
-	{
-		name:   "TCPAddr IPv4",
-		input:  &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080},
-		want:   netip.MustParseAddrPort("192.168.1.1:8080"),
-		wantOK: true,
-	},
-	{
-		name:   "TCPAddr IPv6",
-		input:  &net.TCPAddr{IP: net.ParseIP("2001:db8::1"), Port: 443},
-		want:   netip.MustParseAddrPort("[2001:db8::1]:443"),
-		wantOK: true,
-	},
-	{
-		name:   "TCPAddr with zone",
-		input:  &net.TCPAddr{IP: net.ParseIP("fe80::1"), Port: 22, Zone: "eth0"},
-		want:   netip.MustParseAddrPort("[fe80::1]:22"),
-		wantOK: true,
-	},
-	{
-		name:   "TCPAddr with nil IP",
-		input:  &net.TCPAddr{IP: nil, Port: 8080},
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
-	{
-		name:   "TCPAddr with zero port",
-		input:  &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0},
-		want:   netip.MustParseAddrPort("127.0.0.1:0"),
-		wantOK: true,
-	},
+	newAddrPortTestCase("TCPAddr IPv4", &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080},
+		netip.MustParseAddrPort("192.168.1.1:8080"), true),
+	newAddrPortTestCase("TCPAddr IPv6", &net.TCPAddr{IP: net.ParseIP("2001:db8::1"), Port: 443},
+		netip.MustParseAddrPort("[2001:db8::1]:443"), true),
+	newAddrPortTestCase("TCPAddr with zone", &net.TCPAddr{IP: net.ParseIP("fe80::1"), Port: 22, Zone: "eth0"},
+		netip.MustParseAddrPort("[fe80::1]:22"), true),
+	newAddrPortTestCase("TCPAddr with nil IP", &net.TCPAddr{IP: nil, Port: 8080}, netip.AddrPort{}, false),
+	newAddrPortTestCase("TCPAddr with zero port", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0},
+		netip.MustParseAddrPort("127.0.0.1:0"), true),
 	// UDP addresses
-	{
-		name:   "UDPAddr IPv4",
-		input:  &net.UDPAddr{IP: net.ParseIP("192.168.1.1"), Port: 53},
-		want:   netip.MustParseAddrPort("192.168.1.1:53"),
-		wantOK: true,
-	},
-	{
-		name:   "UDPAddr IPv6",
-		input:  &net.UDPAddr{IP: net.ParseIP("::1"), Port: 123},
-		want:   netip.MustParseAddrPort("[::1]:123"),
-		wantOK: true,
-	},
-	{
-		name:   "UDPAddr with nil IP",
-		input:  &net.UDPAddr{IP: nil, Port: 53},
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
+	newAddrPortTestCase("UDPAddr IPv4", &net.UDPAddr{IP: net.ParseIP("192.168.1.1"), Port: 53},
+		netip.MustParseAddrPort("192.168.1.1:53"), true),
+	newAddrPortTestCase("UDPAddr IPv6", &net.UDPAddr{IP: net.ParseIP("::1"), Port: 123},
+		netip.MustParseAddrPort("[::1]:123"), true),
+	newAddrPortTestCase("UDPAddr with nil IP", &net.UDPAddr{IP: nil, Port: 53}, netip.AddrPort{}, false),
 	// Interface types
-	{
-		name:   "type with AddrPort() method",
-		input:  addrPortProvider{netip.MustParseAddrPort("127.0.0.1:9090")},
-		want:   netip.MustParseAddrPort("127.0.0.1:9090"),
-		wantOK: true,
-	},
-	{
-		name:   "type with Addr() method returning TCPAddr",
-		input:  addrProvider{&net.TCPAddr{IP: net.ParseIP("10.0.0.1"), Port: 80}},
-		want:   netip.MustParseAddrPort("10.0.0.1:80"),
-		wantOK: true,
-	},
-	{
-		name:   "type with RemoteAddr() method",
-		input:  remoteAddrProvider{&net.UDPAddr{IP: net.ParseIP("8.8.8.8"), Port: 53}},
-		want:   netip.MustParseAddrPort("8.8.8.8:53"),
-		wantOK: true,
-	},
-	{
-		name:   "type with Addr() returning unsupported type",
-		input:  addrProvider{&net.UnixAddr{Name: "/tmp/socket", Net: "unix"}},
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
+	newAddrPortTestCase("type with AddrPort() method", addrPortProvider{netip.MustParseAddrPort("127.0.0.1:9090")},
+		netip.MustParseAddrPort("127.0.0.1:9090"), true),
+	newAddrPortTestCase("type with Addr() method returning TCPAddr",
+		addrProvider{&net.TCPAddr{IP: net.ParseIP("10.0.0.1"), Port: 80}},
+		netip.MustParseAddrPort("10.0.0.1:80"), true),
+	newAddrPortTestCase("type with RemoteAddr() method",
+		remoteAddrProvider{&net.UDPAddr{IP: net.ParseIP("8.8.8.8"), Port: 53}},
+		netip.MustParseAddrPort("8.8.8.8:53"), true),
+	newAddrPortTestCase("type with Addr() returning unsupported type",
+		addrProvider{&net.UnixAddr{Name: "/tmp/socket", Net: "unix"}}, netip.AddrPort{}, false),
 	// Invalid types
-	{
-		name:   "nil input",
-		input:  nil,
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
-	{
-		name:   "string",
-		input:  "192.168.1.1:8080",
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
-	{
-		name:   "int",
-		input:  8080,
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
-	{
-		name:   "net.IPAddr (no port)",
-		input:  &net.IPAddr{IP: net.ParseIP("192.168.1.1")},
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
-	{
-		name:   "empty struct",
-		input:  struct{}{},
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
+	newAddrPortTestCase("nil input", nil, netip.AddrPort{}, false),
+	newAddrPortTestCase("string", "192.168.1.1:8080", netip.AddrPort{}, false),
+	newAddrPortTestCase("int", 8080, netip.AddrPort{}, false),
+	newAddrPortTestCase("net.IPAddr (no port)", &net.IPAddr{IP: net.ParseIP("192.168.1.1")}, netip.AddrPort{}, false),
+	newAddrPortTestCase("empty struct", struct{}{}, netip.AddrPort{}, false),
 }
 
 // Helper to create pointer to AddrPort
@@ -172,7 +90,20 @@ func (p remoteAddrProvider) RemoteAddr() net.Addr {
 	return p.addr
 }
 
-func (tc addrPortTestCase) test(t *testing.T) {
+func newAddrPortTestCase(name string, input any, want netip.AddrPort, wantOK bool) addrPortTestCase {
+	return addrPortTestCase{
+		name:   name,
+		input:  input,
+		want:   want,
+		wantOK: wantOK,
+	}
+}
+
+func (tc addrPortTestCase) Name() string {
+	return tc.name
+}
+
+func (tc addrPortTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, ok := AddrPort(tc.input)
@@ -185,9 +116,7 @@ func (tc addrPortTestCase) test(t *testing.T) {
 }
 
 func TestAddrPort(t *testing.T) {
-	for _, tc := range addrPortTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, addrPortTestCases)
 }
 
 // Test typeSpecificAddrPort directly
@@ -199,51 +128,36 @@ type typeSpecificAddrPortTestCase struct {
 }
 
 var typeSpecificAddrPortTestCases = []typeSpecificAddrPortTestCase{
-	{
-		name:   "AddrPort value",
-		input:  netip.MustParseAddrPort("192.168.1.1:8080"),
-		want:   netip.MustParseAddrPort("192.168.1.1:8080"),
-		wantOK: true,
-	},
-	{
-		name:   "AddrPort pointer",
-		input:  addrPortPtr(netip.MustParseAddrPort("10.0.0.1:443")),
-		want:   netip.MustParseAddrPort("10.0.0.1:443"),
-		wantOK: true,
-	},
-	{
-		name:   "TCPAddr",
-		input:  &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9000},
-		want:   netip.MustParseAddrPort("127.0.0.1:9000"),
-		wantOK: true,
-	},
-	{
-		name:   "UDPAddr",
-		input:  &net.UDPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 53},
-		want:   netip.MustParseAddrPort("10.0.0.1:53"),
-		wantOK: true,
-	},
-	{
-		name:   "TCPAddr with invalid IP",
-		input:  &net.TCPAddr{IP: S[byte](1, 2, 3), Port: 80}, // Invalid IP length
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
-	{
-		name:   "UDPAddr with invalid IP",
-		input:  &net.UDPAddr{IP: S[byte](), Port: 80}, // Empty IP
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
-	{
-		name:   "unsupported type",
-		input:  "not an address",
-		want:   netip.AddrPort{},
-		wantOK: false,
-	},
+	newTypeSpecificAddrPortTestCase("AddrPort value", netip.MustParseAddrPort("192.168.1.1:8080"),
+		netip.MustParseAddrPort("192.168.1.1:8080"), true),
+	newTypeSpecificAddrPortTestCase("AddrPort pointer", addrPortPtr(netip.MustParseAddrPort("10.0.0.1:443")),
+		netip.MustParseAddrPort("10.0.0.1:443"), true),
+	newTypeSpecificAddrPortTestCase("TCPAddr", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9000},
+		netip.MustParseAddrPort("127.0.0.1:9000"), true),
+	newTypeSpecificAddrPortTestCase("UDPAddr", &net.UDPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 53},
+		netip.MustParseAddrPort("10.0.0.1:53"), true),
+	newTypeSpecificAddrPortTestCase("TCPAddr with invalid IP", &net.TCPAddr{IP: S[byte](1, 2, 3), Port: 80},
+		netip.AddrPort{}, false), // Invalid IP length
+	newTypeSpecificAddrPortTestCase("UDPAddr with invalid IP", &net.UDPAddr{IP: S[byte](), Port: 80},
+		netip.AddrPort{}, false), // Empty IP
+	newTypeSpecificAddrPortTestCase("unsupported type", "not an address", netip.AddrPort{}, false),
 }
 
-func (tc typeSpecificAddrPortTestCase) test(t *testing.T) {
+func newTypeSpecificAddrPortTestCase(name string, input any, want netip.AddrPort,
+	wantOK bool) typeSpecificAddrPortTestCase {
+	return typeSpecificAddrPortTestCase{
+		name:   name,
+		input:  input,
+		want:   want,
+		wantOK: wantOK,
+	}
+}
+
+func (tc typeSpecificAddrPortTestCase) Name() string {
+	return tc.name
+}
+
+func (tc typeSpecificAddrPortTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, ok := typeSpecificAddrPort(tc.input)
@@ -256,9 +170,7 @@ func (tc typeSpecificAddrPortTestCase) test(t *testing.T) {
 }
 
 func TestTypeSpecificAddrPort(t *testing.T) {
-	for _, tc := range typeSpecificAddrPortTestCases {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, typeSpecificAddrPortTestCases)
 }
 
 // Test edge cases and interface interactions

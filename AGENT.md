@@ -1,8 +1,16 @@
 # AGENT.md
+<!-- cspell:ignore linters -->
 
 This file provides guidance to AI agents when working with code in this
 repository. For developers and general project information, please refer to
 [README.md](README.md) first.
+
+## Related Documentation
+
+- [README.md](README.md) - Package overview and API reference
+- [TESTING.md](TESTING.md) - Testing patterns and guidelines for all
+  darvaza.org projects
+- [TESTING_core.md](TESTING_core.md) - Core-specific testing patterns
 
 ## Repository Overview
 
@@ -14,7 +22,7 @@ It serves as the base for other darvaza.org projects.
 
 Before starting development, ensure you have:
 
-- Go 1.22 or later installed (check with `go version`).
+- Go 1.23 or later installed (check with `go version`).
 - `make` command available (usually pre-installed on Unix systems).
 - `$GOPATH` configured correctly (typically `~/go`).
 - Git configured for proper line endings.
@@ -162,69 +170,18 @@ Always run `make tidy` before committing to ensure proper formatting.
 ### Testing Patterns
 
 - Table-driven tests are preferred.
-- Helper functions like `S[T]()` create test slices.
+- All testing utilities are public in `testing.go` for external use.
 - Comprehensive coverage for generic functions is expected.
+- Testing utilities log successful assertions for better debugging.
 
-#### Test Helper Functions
+**Development Testing Guidelines:**
 
-The project uses a comprehensive set of test helper functions defined in
-`testutils_test.go` to reduce boilerplate and improve test consistency:
+For comprehensive testing patterns and assertion function usage, see:
 
-**Slice Creation:**
-
-- `S[T](values...)` - Creates test slices concisely: `S(1, 2, 3)` instead of
-  `[]int{1, 2, 3}`
-- `S[T]()` - Creates empty slices: `S[string]()` instead of `[]string{}`
-
-**Assertion Helpers:**
-
-- `AssertEqual[T](t, expected, actual, msg...)` - Generic value comparison with
-  better error messages
-- `AssertSliceEqual[T](t, expected, actual, msg...)` - Slice comparison using
-  `reflect.DeepEqual`
-- `AssertError(t, err, expectError, msg...)` - Standardized error expectation
-  checking
-- `AssertBool(t, actual, expected, msg...)` - Boolean assertions with context
-- `AssertPanic(t, fn, expectedPanic, msg...)` - Simplified panic testing
-- `AssertNoPanic(t, fn, msg...)` - Ensure functions don't panic
-
-**Advanced Helpers:**
-
-- `RunConcurrentTest(t, numWorkers, workerFn)` - Concurrent testing with
-  goroutines
-- `RunBenchmark(b, setupFn, execFn)` - Benchmark testing with setup/execution
-  phases
-- `RunTestCases(t, []TestCase)` - Table-driven test runner (requires
-  `TestCase` interface)
-
-**Usage Examples:**
-
-```go
-// Before: Manual assertions
-if !reflect.DeepEqual(got, expected) {
-    t.Errorf("Expected %v, got %v", expected, got)
-}
-
-// After: Helper function
-AssertSliceEqual(t, expected, got, "operation failed")
-
-// Before: Manual error checking
-if expectError && err == nil {
-    t.Error("Expected error but got nil")
-} else if !expectError && err != nil {
-    t.Errorf("Expected no error but got: %v", err)
-}
-
-// After: Helper function
-AssertError(t, err, expectError, "operation error expectation")
-```
-
-These helpers provide:
-
-- Consistent error messages across all tests
-- Reduced boilerplate code
-- Better test maintainability
-- Clearer test intent
+- [TESTING.md](./TESTING.md) - General testing patterns for all darvaza.org
+  projects
+- [TESTING_core.md](./TESTING_core.md) - Core-specific testing patterns and
+  self-testing approaches
 
 ## Important Notes
 

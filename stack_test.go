@@ -7,6 +7,17 @@ import (
 	"testing"
 )
 
+// TestCase validations
+var _ TestCase = frameSplitNameTestCase{}
+var _ TestCase = frameNameTestCase{}
+var _ TestCase = framePkgNameTestCase{}
+var _ TestCase = framePkgFileTestCase{}
+var _ TestCase = frameFileLineTestCase{}
+var _ TestCase = frameFormatTestCase{}
+var _ TestCase = stackFormatTestCase{}
+var _ TestCase = formatLineTestCase{}
+var _ TestCase = writeFormatTestCase{}
+
 const (
 	MaxTestDepth = 16
 	MaxTestSpace = 6
@@ -70,22 +81,40 @@ func deepStackFrame(depth, space int) *Frame {
 	return hereStackFrame(space)
 }
 
-// revive:disable:cognitive-complexity
 func TestStackTrace(t *testing.T) {
-	// revive:enable:cognitive-complexity
 	stack := StackTrace(0)
 	if len(stack) < 2 || fmt.Sprintf("%n", stack[0]) != "TestStackTrace" {
 		t.Fatalf("StackTrace(%v): %s", 0, fmt.Sprintln(stack))
 	}
 
-	for i := 0; i < MaxTestDepth; i++ {
-		for j := 0; j < MaxTestSpace; j++ {
-			stack := deepStackTrace(i, j)
-			if !checkDeepStackTrace(stack, i) {
-				t.Fatalf("StackTrace(%v, %v): %v: %s",
-					i, j, len(stack), fmt.Sprintf("%n", stack))
-			}
+	for i := range MaxTestDepth {
+		for j := range MaxTestSpace {
+			testDeepStackTrace(t, i, j)
 		}
+	}
+}
+
+type stackTraceExpectation struct {
+	bottomFunc    string // Function at position 0
+	recurringFunc string // Function that appears multiple times
+	topFunc       string // Function we expect to find somewhere in the stack
+	expectedCount int    // Expected count of recurringFunc
+}
+
+func testDeepStackTrace(t *testing.T, depth, space int) {
+	t.Helper()
+	stack := deepStackTrace(depth, space)
+
+	expectation := stackTraceExpectation{
+		bottomFunc:    "deeperStackTrace",
+		recurringFunc: "deepStackTrace",
+		topFunc:       "TestStackTrace",
+		expectedCount: depth + 1, // deepStackTrace calls itself 'depth' times
+	}
+
+	if !validateStackTrace(stack, expectation) {
+		t.Fatalf("StackTrace(%v, %v): %v: %s",
+			depth, space, len(stack), fmt.Sprintf("%n", stack))
 	}
 }
 
@@ -103,44 +132,85 @@ func deepStackTrace(depth, space int) Stack {
 	return deeperStackTrace(space, space)
 }
 
-func checkStackFrameName(stack Stack, offset int, name string) bool {
-	if len(stack) > offset {
-		s := fmt.Sprintf("%n", stack[offset])
-		return s == name
-	}
-	return false
+func validateStackTrace(stack Stack, expectation stackTraceExpectation) bool {
+	analysis := analyzeStackTrace(stack, expectation)
+	return validateStackAnalysis(analysis, expectation)
 }
 
-func checkDeepStackTrace(stack Stack, depth int) bool {
-	t0 := 2 + depth
-	if !checkStackFrameName(stack, t0, "TestStackTrace") {
-		return false
+type stackAnalysis struct {
+	bottomPos      int
+	topPos         int
+	recurringCount int
+}
+
+func analyzeStackTrace(stack Stack, expectation stackTraceExpectation) stackAnalysis {
+	analysis := stackAnalysis{bottomPos: -1, topPos: -1}
+
+	for i, frame := range stack {
+		analyzeFrame(&analysis, frame, i, expectation)
 	}
-	if !checkStackFrameName(stack, 0, "deeperStackTrace") {
-		return false
-	}
-	for i := 1; i < t0; i++ {
-		if !checkStackFrameName(stack, i, "deepStackTrace") {
-			return false
+
+	return analysis
+}
+
+func analyzeFrame(analysis *stackAnalysis, frame Frame, position int, expectation stackTraceExpectation) {
+	funcName := frame.FuncName()
+	switch funcName {
+	case expectation.bottomFunc:
+		if analysis.bottomPos == -1 {
+			analysis.bottomPos = position
 		}
+	case expectation.topFunc:
+		if analysis.topPos == -1 {
+			analysis.topPos = position
+		}
+	case expectation.recurringFunc:
+		analysis.recurringCount++
 	}
-	return true
+}
+
+func validateStackAnalysis(analysis stackAnalysis, expectation stackTraceExpectation) bool {
+	return analysis.bottomPos == 0 &&
+		analysis.topPos != -1 &&
+		analysis.recurringCount == expectation.expectedCount
+}
+
+// Test case for Frame.SplitName method
+type frameSplitNameTestCase struct {
+	name             string
+	frame            *Frame
+	expectedPkgName  string
+	expectedFuncName string
+}
+
+func (tc frameSplitNameTestCase) Name() string {
+	return tc.name
+}
+
+func (tc frameSplitNameTestCase) Test(t *testing.T) {
+	t.Helper()
+	pkgName, funcName := tc.frame.SplitName()
+	assertFrameNames(t, tc.expectedPkgName, tc.expectedFuncName, pkgName, funcName)
+}
+
+func newFrameSplitNameTestCase(name string, frame *Frame, expectedPkgName,
+	expectedFuncName string) frameSplitNameTestCase {
+	return frameSplitNameTestCase{
+		name:             name,
+		frame:            frame,
+		expectedPkgName:  expectedPkgName,
+		expectedFuncName: expectedFuncName,
+	}
+}
+
+func frameSplitNameTestCases() []frameSplitNameTestCase {
+	return []frameSplitNameTestCase{
+		newFrameSplitNameTestCase("current function", Here(), "darvaza.org/core", "frameSplitNameTestCases"),
+	}
 }
 
 func TestFrameSplitName(t *testing.T) {
-	for _, tc := range []struct {
-		name             string
-		frame            *Frame
-		expectedPkgName  string
-		expectedFuncName string
-	}{
-		{"current function", Here(), "darvaza.org/core", "TestFrameSplitName"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			pkgName, funcName := tc.frame.SplitName()
-			assertFrameNames(t, tc.expectedPkgName, tc.expectedFuncName, pkgName, funcName)
-		})
-	}
+	RunTestCases(t, frameSplitNameTestCases())
 }
 
 func assertFrameNames(t *testing.T, expectedPkg, expectedFunc, actualPkg, actualFunc string) {
@@ -153,49 +223,85 @@ func assertFrameNames(t *testing.T, expectedPkg, expectedFunc, actualPkg, actual
 	}
 }
 
+// Test case for Frame.Name method
+type frameNameTestCase struct {
+	name     string
+	frame    *Frame
+	expected string
+}
+
+func (tc frameNameTestCase) Name() string {
+	return tc.name
+}
+
+func (tc frameNameTestCase) Test(t *testing.T) {
+	t.Helper()
+	if tc.frame == nil {
+		// Test nil Frame - create empty frame to test Name method
+		var frame Frame
+		AssertEqual(t, "", frame.Name(), "empty frame name")
+	} else {
+		AssertEqual(t, tc.expected, tc.frame.Name(), "frame name mismatch")
+	}
+}
+
+func newFrameNameTestCase(name string, frame *Frame, expected string) frameNameTestCase {
+	return frameNameTestCase{
+		name:     name,
+		frame:    frame,
+		expected: expected,
+	}
+}
+
+func frameNameTestCases() []frameNameTestCase {
+	return []frameNameTestCase{
+		newFrameNameTestCase("current function", Here(), "darvaza.org/core.frameNameTestCases"),
+		newFrameNameTestCase("nil frame", nil, ""),
+	}
+}
+
 // Test Frame.Name method (0% coverage)
 func TestFrameName(t *testing.T) {
-	testCases := []struct {
-		name     string
-		frame    *Frame
-		expected string
-	}{
-		{"current function", Here(), "darvaza.org/core.TestFrameName"},
-		{"nil frame", nil, ""},
-	}
+	RunTestCases(t, frameNameTestCases())
+}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.frame == nil {
-				// Test nil Frame - create empty frame to test Name method
-				var frame Frame
-				AssertEqual(t, "", frame.Name(), "empty frame should return empty name")
-			} else {
-				AssertEqual(t, tc.expected, tc.frame.Name(), "frame name mismatch")
-			}
-		})
+// Test case for Frame.PkgName method
+type framePkgNameTestCase struct {
+	name     string
+	frame    *Frame
+	expected string
+}
+
+func (tc framePkgNameTestCase) Name() string {
+	return tc.name
+}
+
+func (tc framePkgNameTestCase) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.expected, tc.frame.PkgName(), "package name mismatch")
+}
+
+func newFramePkgNameTestCase(name string, frame *Frame, expected string) framePkgNameTestCase {
+	return framePkgNameTestCase{
+		name:     name,
+		frame:    frame,
+		expected: expected,
+	}
+}
+
+func framePkgNameTestCases() []framePkgNameTestCase {
+	return []framePkgNameTestCase{
+		newFramePkgNameTestCase("current function", Here(), "darvaza.org/core"),
+		newFramePkgNameTestCase("empty frame", &Frame{name: ""}, ""),
+		newFramePkgNameTestCase("no package frame", &Frame{name: "func"}, ""),
+		newFramePkgNameTestCase("dot separator", &Frame{name: "pkg.func"}, "pkg"),
+		newFramePkgNameTestCase("slash separator", &Frame{name: "pkg/module.func"}, "pkg/module"),
 	}
 }
 
 // Test Frame.PkgName method (0% coverage)
 func TestFramePkgName(t *testing.T) {
-	testCases := []struct {
-		name     string
-		frame    *Frame
-		expected string
-	}{
-		{"current function", Here(), "darvaza.org/core"},
-		{"empty frame", &Frame{name: ""}, ""},
-		{"no package frame", &Frame{name: "func"}, ""},
-		{"dot separator", &Frame{name: "pkg.func"}, "pkg"},
-		{"slash separator", &Frame{name: "pkg/module.func"}, "pkg/module"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			AssertEqual(t, tc.expected, tc.frame.PkgName(), "package name mismatch")
-		})
-	}
+	RunTestCases(t, framePkgNameTestCases())
 }
 
 // Test Frame.File method (0% coverage)
@@ -210,11 +316,11 @@ func TestFrameFile(t *testing.T) {
 
 	// Test empty frame
 	emptyFrame := &Frame{file: ""}
-	AssertEqual(t, "", emptyFrame.File(), "empty frame should return empty file")
+	AssertEqual(t, "", emptyFrame.File(), "empty frame file")
 
 	// Test frame with file
 	testFrame := &Frame{file: "/path/to/file.go"}
-	AssertEqual(t, "/path/to/file.go", testFrame.File(), "frame should return file path")
+	AssertEqual(t, "/path/to/file.go", testFrame.File(), "frame file path")
 }
 
 // Test case for Frame.PkgFile method
@@ -224,7 +330,11 @@ type framePkgFileTestCase struct {
 	frame    Frame
 }
 
-func (tc framePkgFileTestCase) test(t *testing.T) {
+func (tc framePkgFileTestCase) Name() string {
+	return tc.name
+}
+
+func (tc framePkgFileTestCase) Test(t *testing.T) {
 	t.Helper()
 	AssertEqual(t, tc.expected, tc.frame.PkgFile(), "PkgFile output mismatch")
 }
@@ -282,9 +392,7 @@ func TestFramePkgFile(t *testing.T) {
 		),
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, tests)
 }
 
 // Test Frame.Line method (0% coverage)
@@ -299,11 +407,11 @@ func TestFrameLine(t *testing.T) {
 
 	// Test empty frame
 	emptyFrame := &Frame{line: 0}
-	AssertEqual(t, 0, emptyFrame.Line(), "empty frame should return 0 line")
+	AssertEqual(t, 0, emptyFrame.Line(), "empty frame line")
 
 	// Test frame with line
 	testFrame := &Frame{line: 42}
-	AssertEqual(t, 42, testFrame.Line(), "frame should return line number")
+	AssertEqual(t, 42, testFrame.Line(), "frame line number")
 }
 
 // Test case for Frame.FileLine method
@@ -313,7 +421,11 @@ type frameFileLineTestCase struct {
 	frame    Frame
 }
 
-func (tc frameFileLineTestCase) test(t *testing.T) {
+func (tc frameFileLineTestCase) Name() string {
+	return tc.name
+}
+
+func (tc frameFileLineTestCase) Test(t *testing.T) {
 	t.Helper()
 	AssertEqual(t, tc.expected, tc.frame.FileLine(), "FileLine output mismatch")
 }
@@ -337,9 +449,7 @@ func frameFileLineTestCases() []frameFileLineTestCase {
 
 // Test Frame.FileLine method (0% coverage)
 func TestFrameFileLine(t *testing.T) {
-	for _, tc := range frameFileLineTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, frameFileLineTestCases())
 }
 
 // Test Frame.String method (implements fmt.Stringer)
@@ -354,14 +464,14 @@ func TestFrameString(t *testing.T) {
 	expected := fmt.Sprintf("%v", frame)
 	actual := frame.String()
 
-	AssertEqual(t, expected, actual, "String() should be equivalent to %v format")
+	AssertEqual(t, expected, actual, "String format")
 
 	// Test with empty frame
 	emptyFrame := &Frame{}
 	expectedEmpty := fmt.Sprintf("%v", emptyFrame)
 	actualEmpty := emptyFrame.String()
 
-	AssertEqual(t, expectedEmpty, actualEmpty, "String() should work for empty frame")
+	AssertEqual(t, expectedEmpty, actualEmpty, "empty frame String")
 }
 
 // Test case for Frame.Format method
@@ -372,7 +482,11 @@ type frameFormatTestCase struct {
 	expected string
 }
 
-func (tc frameFormatTestCase) test(t *testing.T) {
+func (tc frameFormatTestCase) Name() string {
+	return tc.name
+}
+
+func (tc frameFormatTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := fmt.Sprintf(tc.format, tc.frame)
 	AssertEqual(t, tc.expected, result, "format output mismatch")
@@ -418,9 +532,7 @@ func frameFormatTestCases() []frameFormatTestCase {
 
 // Test Frame.Format method and helper functions (0% coverage)
 func TestFrameFormat(t *testing.T) {
-	for _, tc := range frameFormatTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, frameFormatTestCases())
 }
 
 // Test case for Stack.Format method
@@ -431,13 +543,17 @@ type stackFormatTestCase struct {
 	contains []string
 }
 
-func (tc stackFormatTestCase) test(t *testing.T) {
+func (tc stackFormatTestCase) Name() string {
+	return tc.name
+}
+
+func (tc stackFormatTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := fmt.Sprintf(tc.format, tc.stack)
 
 	// Special case for empty stack - check exact match
 	if len(tc.stack) == 0 && len(tc.contains) == 1 && tc.contains[0] == "" {
-		AssertEqual(t, "", result, "empty stack should produce empty output")
+		AssertEqual(t, "", result, "empty stack output")
 		return
 	}
 
@@ -480,9 +596,7 @@ func stackFormatTestCases() []stackFormatTestCase {
 
 // Test Stack.Format method (0% coverage)
 func TestStackFormat(t *testing.T) {
-	for _, tc := range stackFormatTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, stackFormatTestCases())
 }
 
 // Test Stack.String method (implements fmt.Stringer)
@@ -496,14 +610,14 @@ func TestStackString(t *testing.T) {
 	expected := fmt.Sprintf("%v", stack)
 	actual := stack.String()
 
-	AssertEqual(t, expected, actual, "String() should be equivalent to %v format")
+	AssertEqual(t, expected, actual, "String format")
 
 	// Test with empty stack
 	emptyStack := Stack{}
 	expectedEmpty := fmt.Sprintf("%v", emptyStack)
 	actualEmpty := emptyStack.String()
 
-	AssertEqual(t, expectedEmpty, actualEmpty, "String() should work for empty stack")
+	AssertEqual(t, expectedEmpty, actualEmpty, "empty stack String")
 }
 
 // Test case for formatLine function
@@ -513,10 +627,14 @@ type formatLineTestCase struct {
 	expected string
 }
 
-func (tc formatLineTestCase) test(t *testing.T) {
+func (tc formatLineTestCase) Name() string {
+	return tc.name
+}
+
+func (tc formatLineTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := fmt.Sprintf("%d", tc.frame)
-	AssertEqual(t, tc.expected, result, "formatLine should format line number")
+	AssertEqual(t, tc.expected, result, "formatted line")
 }
 
 func newFormatLineTestCase(name string, frame *Frame, expected string) formatLineTestCase {
@@ -536,9 +654,7 @@ func formatLineTestCases() []formatLineTestCase {
 
 // Test formatLine function directly (0% coverage)
 func TestFormatLineMethod(t *testing.T) {
-	for _, tc := range formatLineTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, formatLineTestCases())
 }
 
 // Test case for writeFormat edge cases
@@ -547,7 +663,11 @@ type writeFormatTestCase struct {
 	format string
 }
 
-func (tc writeFormatTestCase) test(t *testing.T) {
+func (tc writeFormatTestCase) Name() string {
+	return tc.name
+}
+
+func (tc writeFormatTestCase) Test(t *testing.T) {
 	t.Helper()
 	frame := &Frame{name: "test", file: "test.go", line: 10}
 	result := fmt.Sprintf(tc.format, frame)
@@ -578,7 +698,5 @@ func writeFormatTestCases() []writeFormatTestCase {
 
 // Test writeFormat error conditions for better coverage (60% -> higher)
 func TestWriteFormatEdgeCases(t *testing.T) {
-	for _, tc := range writeFormatTestCases() {
-		t.Run(tc.name, tc.test)
-	}
+	RunTestCases(t, writeFormatTestCases())
 }
