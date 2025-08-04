@@ -1,5 +1,5 @@
 .PHONY: all clean generate fmt tidy check-grammar check-spelling check-shell check-jq
-.PHONY: coverage codecov clean-coverage
+.PHONY: coverage codecov clean-coverage race
 .PHONY: FORCE
 
 GO ?= go
