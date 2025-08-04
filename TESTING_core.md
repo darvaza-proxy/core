@@ -158,21 +158,20 @@ func TestAssertEqual(t *testing.T) {
 
 #### Testing Fatal/FailNow Scenarios
 
-MockT's Run() method enables testing functions that call Fatal/FailNow:
+MockT's Run() method enables testing functions that call Fatal/FailNow methods,
+including the `AssertMust*` family of functions which automatically call
+`t.FailNow()` on assertion failure:
 
 ```go
 func TestFatalAssertion(t *testing.T) {
     mock := &MockT{}
 
-    // Test function that would call Fatal on failure
-    ok := mock.Run("fatal test", func(mt T) {
-        // This calls mt.Error() but doesn't panic
-        AssertEqual(mt, 1, 2, "will fail")
-
-        // To test actual Fatal behaviour:
-        if !AssertEqual(mt, 1, 2, "critical failure") {
-            mt.FailNow() // This will panic and be caught by Run()
-        }
+    // Test AssertMust* functions that call FailNow() automatically
+    ok := mock.Run("fatal assertion test", func(mt T) {
+        // This will call mt.FailNow() and cause Run() to return false
+        AssertMustEqual(mt, 1, 2, "critical failure")
+        // Execution stops here - this line won't be reached
+        mt.Log("should not reach here")
     })
 
     // Verify the test failed and was handled properly
@@ -184,6 +183,18 @@ func TestFatalAssertion(t *testing.T) {
     }
     if !mock.HasErrors() {
         t.Error("Should have recorded error messages")
+    }
+
+    // Traditional pattern - equivalent to AssertMust*
+    mock.Reset()
+    ok = mock.Run("manual fatal test", func(mt T) {
+        if !AssertEqual(mt, 1, 2, "manual check") {
+            mt.FailNow() // This will panic and be caught by Run()
+        }
+    })
+    // Verify same behaviour as AssertMust*
+    if ok {
+        t.Error("Manual FailNow should also cause test failure")
     }
 }
 ```
