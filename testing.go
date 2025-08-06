@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+var errMockTFailNow = errors.New("MockT.FailNow")
+
 // Compile-time verification that our types implement the T interface
 var (
 	_ T = (*testing.T)(nil)
@@ -21,14 +23,25 @@ type T interface {
 	Helper()
 	Error(args ...any)
 	Errorf(format string, args ...any)
+	Fatal(args ...any)
+	Fatalf(format string, args ...any)
 	Log(args ...any)
 	Logf(format string, args ...any)
 	Fail()
+	FailNow()
 	Failed() bool
 }
 
 // MockT is a mock implementation of the T interface for testing purposes.
 // It collects error and log messages instead of reporting them to the testing framework.
+//
+// MockT supports all standard testing methods including Fatal/Fatalf which panic
+// with a special error that can be caught by the Run method. This allows testing
+// of assertion functions and other utilities that may call Fatal methods.
+//
+// The Run method executes test functions and recovers from FailNow/Fatal panics,
+// making it ideal for testing assertion functions where you need to verify both
+// success and failure scenarios without terminating the test runner.
 type MockT struct {
 	Errors       []string
 	Logs         []string
@@ -47,33 +60,59 @@ func (m *MockT) Helper() {
 // Error implements the T interface and collects error messages.
 // It also marks the test as failed.
 func (m *MockT) Error(args ...any) {
+	msg := fmt.Sprint(args...)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Errors = append(m.Errors, fmt.Sprint(args...))
+	m.Errors = append(m.Errors, msg)
 	m.failed = true
 }
 
 // Errorf implements the T interface and collects formatted error messages.
 // It also marks the test as failed.
 func (m *MockT) Errorf(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Errors = append(m.Errors, fmt.Sprintf(format, args...))
+	m.Errors = append(m.Errors, msg)
 	m.failed = true
 }
 
 // Log implements the T interface and collects log messages.
 func (m *MockT) Log(args ...any) {
+	msg := fmt.Sprint(args...)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Logs = append(m.Logs, fmt.Sprint(args...))
+	m.Logs = append(m.Logs, msg)
 }
 
 // Logf implements the T interface and collects formatted log messages.
 func (m *MockT) Logf(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Logs = append(m.Logs, fmt.Sprintf(format, args...))
+	m.Logs = append(m.Logs, msg)
+}
+
+// Fatal implements the T interface and collects error messages, then panics.
+// It combines Error and FailNow functionality.
+func (m *MockT) Fatal(args ...any) {
+	msg := fmt.Sprint(args...)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Errors = append(m.Errors, msg)
+	m.failed = true
+	panic(errMockTFailNow)
+}
+
+// Fatalf implements the T interface and collects formatted error messages, then panics.
+// It combines Errorf and FailNow functionality.
+func (m *MockT) Fatalf(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Errors = append(m.Errors, msg)
+	m.failed = true
+	panic(errMockTFailNow)
 }
 
 // Fail implements the T interface and marks the test as failed.
@@ -81,6 +120,12 @@ func (m *MockT) Fail() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.failed = true
+}
+
+// FailNow implements the T interface and marks the test as failed, then panics.
+func (m *MockT) FailNow() {
+	m.Fail()
+	panic(errMockTFailNow)
 }
 
 // Failed implements the T interface and returns whether the test has been marked as failed.
@@ -132,6 +177,37 @@ func (m *MockT) Reset() {
 	m.Logs = nil
 	m.HelperCalled = 0
 	m.failed = false
+}
+
+// Run runs the test function f with the MockT instance and returns whether it passed.
+// It recovers from FailNow/Fatal panics and returns false if the test failed or panicked.
+// Non-FailNow panics are re-thrown. Returns false for nil MockT or nil function.
+//
+// This method is ideal for testing assertion functions that may call Fatal/FailNow:
+//
+//	mock := &MockT{}
+//	ok := mock.Run("test assertion", func(t T) {
+//		AssertEqual(t, 1, 2, "should fail") // This calls t.Fatal internally
+//	})
+//	// ok == false, mock.Failed() == true, mock.Errors contains failure message
+//
+// Unlike testing.T.Run, this method uses the same MockT instance throughout,
+// allowing inspection of all collected errors, logs, and failure state after execution.
+func (m *MockT) Run(_ string, f func(T)) (ok bool) {
+	if m == nil || f == nil {
+		return false
+	}
+
+	defer func() {
+		if r := recover(); r != nil && r != errMockTFailNow {
+			// Re-panic if it's not our FailNow error
+			panic(r)
+		}
+	}()
+
+	f(m)
+
+	return !m.Failed()
 }
 
 // S is a helper function for creating test slices in a more concise way.

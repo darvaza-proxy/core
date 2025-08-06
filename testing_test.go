@@ -631,3 +631,201 @@ func testMockTConcurrent(t *testing.T) {
 	AssertEqual(t, expectedLogs, len(mock.Logs), "concurrent log count")
 	AssertEqual(t, expectedHelpers, mock.HelperCalled, "concurrent helper count")
 }
+
+func TestMockTFatal(t *testing.T) {
+	mock := &MockT{}
+
+	// Test Fatal panics and records error
+	ok := mock.Run("fatal test", func(mt T) {
+		mt.Fatal("test fatal message")
+	})
+
+	AssertFalse(t, ok, "Fatal should cause test to fail")
+	AssertTrue(t, mock.Failed(), "Fatal should mark test as failed")
+	AssertEqual(t, 1, len(mock.Errors), "Fatal should record error")
+	AssertEqual(t, "test fatal message", mock.Errors[0], "Fatal error message")
+}
+
+func TestMockTFatalf(t *testing.T) {
+	mock := &MockT{}
+
+	// Test Fatalf panics and records formatted error
+	ok := mock.Run("fatalf test", func(mt T) {
+		mt.Fatalf("test %s message %d", "fatalf", 42)
+	})
+
+	AssertFalse(t, ok, "Fatalf should cause test to fail")
+	AssertTrue(t, mock.Failed(), "Fatalf should mark test as failed")
+	AssertEqual(t, 1, len(mock.Errors), "Fatalf should record error")
+	AssertEqual(t, "test fatalf message 42", mock.Errors[0], "Fatalf error message")
+}
+
+func TestMockTFailNow(t *testing.T) {
+	mock := &MockT{}
+
+	// Test FailNow panics and marks as failed
+	ok := mock.Run("FailNow test", func(mt T) {
+		mt.FailNow()
+	})
+
+	AssertFalse(t, ok, "FailNow should cause test to fail")
+	AssertTrue(t, mock.Failed(), "FailNow should mark test as failed")
+	AssertEqual(t, 0, len(mock.Errors), "FailNow should not record error")
+}
+
+func TestMockTRunSuccess(t *testing.T) {
+	mock := &MockT{}
+
+	// Test successful run
+	ok := mock.Run("success test", func(mt T) {
+		mt.Log("test passed")
+	})
+
+	AssertTrue(t, ok, "Successful test should return true")
+	AssertFalse(t, mock.Failed(), "Successful test should not be marked as failed")
+	AssertEqual(t, 1, len(mock.Logs), "Should record log message")
+	AssertEqual(t, "test passed", mock.Logs[0], "Log message content")
+}
+
+func TestMockTRunNilChecks(t *testing.T) {
+	// Test nil MockT
+	var mock *MockT
+	ok := mock.Run("nil test", func(mt T) {
+		mt.Log("should not run")
+	})
+	AssertFalse(t, ok, "nil MockT should return false")
+
+	// Test nil function
+	mock = &MockT{}
+	ok = mock.Run("nil func test", nil)
+	AssertFalse(t, ok, "nil function should return false")
+}
+
+func TestMockTRunPanicPropagation(t *testing.T) {
+	mock := &MockT{}
+
+	// Test that non-FailNow panics are propagated
+	AssertPanic(t, func() {
+		mock.Run("panic test", func(_ T) {
+			panic("custom panic")
+		})
+	}, "custom panic", "Non-FailNow panics should be propagated")
+}
+
+// Test early abort pattern: if !Assert() { FailNow() }
+func TestEarlyAbortPattern(t *testing.T) {
+	t.Run("successful assertion continues", testEarlyAbortSuccess)
+	t.Run("failed assertion aborts", testEarlyAbortFailure)
+	t.Run("multiple assertions with early abort", testEarlyAbortMultiple)
+	t.Run("mixed patterns", testEarlyAbortMixed)
+}
+
+func testEarlyAbortSuccess(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test successful assertion that continues execution
+	ok := mock.Run("early abort success", func(mt T) {
+		if !AssertEqual(mt, 42, 42, "equal values") {
+			mt.FailNow()
+		}
+		// This should execute
+		mt.Log("execution continues after successful assertion")
+	})
+
+	AssertTrue(t, ok, "Test should pass when assertion succeeds")
+	AssertFalse(t, mock.Failed(), "Should not be marked as failed")
+	AssertEqual(t, 2, len(mock.Logs), "Should have 2 log messages")
+	// First log from AssertEqual success, second from explicit Log
+	AssertTrue(t, strings.Contains(mock.Logs[0], "equal values: 42"), "First log from assertion")
+}
+
+func testEarlyAbortFailure(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test failed assertion that aborts execution
+	ok := mock.Run("early abort failure", func(mt T) {
+		if !AssertEqual(mt, 42, 24, "different values") {
+			mt.FailNow()
+		}
+		// This should NOT execute
+		mt.Log("this should not be reached")
+	})
+
+	AssertFalse(t, ok, "Test should fail when assertion fails and FailNow is called")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 1, len(mock.Errors), "Should have error from failed assertion")
+	AssertEqual(t, 0, len(mock.Logs), "Should have no logs after early abort")
+	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 42, got 24"), "Error from failed assertion")
+}
+
+func testEarlyAbortMultiple(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test multiple assertions with early abort pattern
+	ok := mock.Run("multiple early abort", func(mt T) {
+		if !AssertEqual(mt, "hello", "hello", "first check") {
+			mt.FailNow()
+		}
+		if !AssertTrue(mt, true, "second check") {
+			mt.FailNow()
+		}
+		if !AssertEqual(mt, 1, 2, "third check") {
+			mt.FailNow() // This should abort
+		}
+		// This should NOT execute
+		mt.Log("unreachable code")
+	})
+
+	AssertFalse(t, ok, "Test should fail on third assertion")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 1, len(mock.Errors), "Should have one error from failed assertion")
+	AssertEqual(t, 2, len(mock.Logs), "Should have logs from first two successful assertions")
+	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 1, got 2"), "Error from third assertion")
+}
+
+func testEarlyAbortMixed(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test mixing early abort pattern with regular assertions
+	ok := mock.Run("mixed patterns", func(mt T) {
+		// Regular assertion (doesn't abort on failure)
+		AssertEqual(mt, 1, 2, "regular assertion")
+
+		// Early abort pattern (aborts on failure)
+		if !AssertEqual(mt, "test", "test", "critical assertion") {
+			mt.FailNow()
+		}
+
+		// This should execute because the critical assertion passed
+		mt.Log("continuing after critical assertion")
+
+		// Another early abort that fails
+		if !AssertFalse(mt, true, "should be false") {
+			mt.FailNow() // This should abort
+		}
+
+		// This should NOT execute
+		mt.Log("unreachable after failed critical assertion")
+	})
+
+	AssertFalse(t, ok, "Test should fail due to early abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 2, len(mock.Errors), "Should have two errors")
+	AssertEqual(t, 2, len(mock.Logs), "Should have two logs before abort")
+
+	// Check the error messages
+	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 1, got 2"),
+		"First error from regular assertion")
+	AssertTrue(t, strings.Contains(mock.Errors[1], "expected false, got true"),
+		"Second error from early abort assertion")
+
+	// Check log messages
+	AssertTrue(t, strings.Contains(mock.Logs[0], "critical assertion: test"),
+		"Log from successful critical assertion")
+	AssertTrue(t, strings.Contains(mock.Logs[1], "continuing after critical assertion"),
+		"Log showing execution continued")
+}
