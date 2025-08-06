@@ -829,3 +829,354 @@ func testEarlyAbortMixed(t *testing.T) {
 	AssertTrue(t, strings.Contains(mock.Logs[1], "continuing after critical assertion"),
 		"Log showing execution continued")
 }
+
+// Test AssertMustFoo() functions that call FailNow() on failure
+func TestAssertMustFunctions(t *testing.T) {
+	t.Run("AssertMustEqual", testAssertMustEqual)
+	t.Run("AssertMustNotEqual", testAssertMustNotEqual)
+	t.Run("AssertMustSliceEqual", testAssertMustSliceEqual)
+	t.Run("AssertMustContains", testAssertMustContains)
+	t.Run("AssertMustError", testAssertMustError)
+	t.Run("AssertMustNoError", testAssertMustNoError)
+	t.Run("AssertMustPanic", testAssertMustPanic)
+	t.Run("AssertMustNoPanic", testAssertMustNoPanic)
+	t.Run("AssertMustTrue", testAssertMustTrue)
+	t.Run("AssertMustFalse", testAssertMustFalse)
+	t.Run("AssertMustErrorIs", testAssertMustErrorIs)
+	t.Run("AssertMustTypeIs", testAssertMustTypeIs)
+	t.Run("AssertMustNil", testAssertMustNil)
+	t.Run("AssertMustNotNil", testAssertMustNotNil)
+}
+
+func testAssertMustEqual(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case - should not call FailNow
+	ok := mock.Run("success", func(mt T) {
+		AssertMustEqual(mt, 42, 42, "equal values")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+	AssertFalse(t, mock.Failed(), "Should not be marked as failed")
+	AssertEqual(t, 2, len(mock.Logs), "Should have logs from assertion and continuation")
+
+	mock.Reset()
+
+	// Test failure case - should call FailNow and abort
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustEqual(mt, 42, 24, "different values")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 1, len(mock.Errors), "Should have error from failed assertion")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNotEqual(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNotEqual(mt, 42, 24, "different values")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNotEqual(mt, 42, 42, "equal values")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustSliceEqual(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustSliceEqual(mt, S(1, 2, 3), S(1, 2, 3), "equal slices")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustSliceEqual(mt, S(1, 2, 3), S(1, 2, 4), "different slices")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustContains(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustContains(mt, "hello world", "world", "contains substring")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustContains(mt, "hello world", "xyz", "missing substring")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustError(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustError(mt, errors.New("test error"), "expects error")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustError(mt, nil, "expects error but got nil")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNoError(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNoError(mt, nil, "expects no error")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNoError(mt, errors.New("unexpected error"), "expects no error")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustPanic(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustPanic(mt, func() { panic("test panic") }, nil, "expects panic")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustPanic(mt, func() {}, nil, "expects panic but got none")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNoPanic(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNoPanic(mt, func() {}, "expects no panic")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNoPanic(mt, func() { panic("unexpected") }, "expects no panic")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustTrue(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustTrue(mt, true, "expects true")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustTrue(mt, false, "expects true but got false")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustFalse(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustFalse(mt, false, "expects false")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustFalse(mt, true, "expects false but got true")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustErrorIs(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+	baseErr := errors.New("base error")
+	wrappedErr := errors.Join(baseErr, errors.New("wrapped"))
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustErrorIs(mt, wrappedErr, baseErr, "error should match")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	otherErr := errors.New("other error")
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustErrorIs(mt, wrappedErr, otherErr, "error should not match")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustTypeIs(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		var val any = "hello"
+		result := AssertMustTypeIs[string](mt, val, "type should match")
+		mt.Log("execution continues")
+		AssertEqual(mt, "hello", result, "should return cast value")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		var val any = 42
+		result := AssertMustTypeIs[string](mt, val, "type should not match")
+		mt.Log("should not reach here")
+		// result should be zero value but we shouldn't reach here
+		_ = result
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNil(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNil(mt, nil, "expects nil")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNil(mt, "not nil", "expects nil but got value")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNotNil(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNotNil(mt, "not nil", "expects not nil")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNotNil(mt, nil, "expects not nil but got nil")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}

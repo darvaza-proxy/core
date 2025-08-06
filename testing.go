@@ -611,3 +611,206 @@ func collectErrors(errCh chan error) error {
 	}
 	return nil
 }
+
+// AssertMustEqual calls AssertEqual and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustEqual(t, 42, result, "result value")
+//	AssertMustEqual(t, "hello", str, "string %d comparison", 1)
+func AssertMustEqual[U comparable](t T, expected, actual U, name string, args ...any) {
+	t.Helper()
+	if !AssertEqual(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNotEqual calls AssertNotEqual and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNotEqual(t, 42, result, "result value")
+//	AssertMustNotEqual(t, "hello", str, "string %d comparison", 1)
+func AssertMustNotEqual[U comparable](t T, expected, actual U, name string, args ...any) {
+	t.Helper()
+	if !AssertNotEqual(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustSliceEqual calls AssertSliceEqual and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustSliceEqual(t, S(1, 2, 3), result, "result slice")
+//	AssertMustSliceEqual(t, S("a", "b"), strings, "string slice %s", "test")
+func AssertMustSliceEqual[U any](t T, expected, actual []U, name string, args ...any) {
+	t.Helper()
+	if !AssertSliceEqual(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustContains calls AssertContains and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustContains(t, "hello world", "world", "substring check")
+//	AssertMustContains(t, output, "success", "command output for %s", cmd)
+func AssertMustContains(t T, s, substr, name string, args ...any) {
+	t.Helper()
+	if !AssertContains(t, s, substr, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustError calls AssertError and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustError(t, err, "parse error")
+//	AssertMustError(t, err, "operation %s", "save")
+func AssertMustError(t T, err error, name string, args ...any) {
+	t.Helper()
+	if !AssertError(t, err, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNoError calls AssertNoError and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNoError(t, err, "initialization")
+//	AssertMustNoError(t, err, "loading %s", filename)
+func AssertMustNoError(t T, err error, name string, args ...any) {
+	t.Helper()
+	if !AssertNoError(t, err, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustPanic calls AssertPanic and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustPanic(t, func() { someFunctionThatPanics() }, nil, "panic test")
+//	AssertMustPanic(t, func() { divide(1, 0) }, "division by zero", "divide %d by zero", 1)
+func AssertMustPanic(t T, fn func(), expectedPanic any, name string, args ...any) {
+	t.Helper()
+	if !AssertPanic(t, fn, expectedPanic, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNoPanic calls AssertNoPanic and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNoPanic(t, func() { safeFunction() }, "safe function")
+//	AssertMustNoPanic(t, func() { handleNilInput(nil) }, "nil input %s", "handling")
+func AssertMustNoPanic(t T, fn func(), name string, args ...any) {
+	t.Helper()
+	if !AssertNoPanic(t, fn, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustTrue calls AssertTrue and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustTrue(t, result, "operation succeeded")
+//	AssertMustTrue(t, isValid, "validation for %s", field)
+//
+// revive:disable-next-line:flag-parameter
+func AssertMustTrue(t T, value bool, name string, args ...any) {
+	t.Helper()
+	if !AssertTrue(t, value, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustFalse calls AssertFalse and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustFalse(t, hasError, "no errors expected")
+//	AssertMustFalse(t, isEmpty, "container %s should not be empty", name)
+//
+// revive:disable-next-line:flag-parameter
+func AssertMustFalse(t T, value bool, name string, args ...any) {
+	t.Helper()
+	if !AssertFalse(t, value, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustErrorIs calls AssertErrorIs and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustErrorIs(t, err, ErrNotFound, "lookup error")
+//	AssertMustErrorIs(t, err, ErrInvalid, "validation for %s", field)
+func AssertMustErrorIs(t T, err, target error, name string, args ...any) {
+	t.Helper()
+	if !AssertErrorIs(t, err, target, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustTypeIs calls AssertTypeIs and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+// Returns the cast value on success, or the zero value if the test fails.
+//
+// Example usage:
+//
+//	val := AssertMustTypeIs[*MyError](t, err, "error type")
+//	config := AssertMustTypeIs[*Config](t, result, "config type for %s", name)
+func AssertMustTypeIs[U any](t T, value any, name string, args ...any) U {
+	t.Helper()
+	result, ok := AssertTypeIs[U](t, value, name, args...)
+	if !ok {
+		t.FailNow()
+	}
+	return result
+}
+
+// AssertMustNil calls AssertNil and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNil(t, err, "error should be nil")
+//	AssertMustNil(t, ptr, "pointer %s should be nil", ptrName)
+func AssertMustNil(t T, value any, name string, args ...any) {
+	t.Helper()
+	if !AssertNil(t, value, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNotNil calls AssertNotNil and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNotNil(t, result, "result should not be nil")
+//	AssertMustNotNil(t, m, "map %s should not be nil", mapName)
+func AssertMustNotNil(t T, value any, name string, args ...any) {
+	t.Helper()
+	if !AssertNotNil(t, value, name, args...) {
+		t.FailNow()
+	}
+}

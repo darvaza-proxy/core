@@ -507,6 +507,57 @@ both `*testing.T` and `MockT`:
 * `AssertPanic(t, fn, expectedPanic, msg...)` / `AssertNoPanic(t, fn, msg...)` -
   panic testing.
 
+#### Fatal Assertions
+
+All `AssertMustFoo()` functions call the corresponding `AssertFoo()` function
+and automatically call `t.FailNow()` if the assertion fails, terminating test
+execution immediately. These follow Go testing conventions where "Fatal"
+methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
+
+**Key Differences:**
+
+* `AssertFoo()` - like `t.Error()`, logs failure and allows test to continue.
+* `AssertMustFoo()` - like `t.Fatal()`, logs failure and terminates test
+  execution.
+
+**Fatal Assertion Functions:**
+
+* `AssertMustEqual[T](t, expected, actual, msg...)` - terminate on inequality.
+* `AssertMustNotEqual[T](t, expected, actual, msg...)` - terminate on equality.
+* `AssertMustSliceEqual[T](t, expected, actual, msg...)` - terminate on slice
+  inequality.
+* `AssertMustTrue(t, condition, msg...)` /
+  `AssertMustFalse(t, condition, msg...)` - terminate on boolean mismatch.
+* `AssertMustNil(t, value, msg...)` / `AssertMustNotNil(t, value, msg...)` -
+  terminate on nil check failure.
+* `AssertMustContains(t, text, substring, msg...)` - terminate if substring not
+  found.
+* `AssertMustError(t, err, msg...)` / `AssertMustNoError(t, err, msg...)` -
+  terminate on error expectation mismatch.
+* `AssertMustErrorIs(t, err, target, msg...)` - terminate on error chain
+  mismatch.
+* `AssertMustTypeIs[T](t, value, msg...) T` - terminate on type assertion
+  failure, returns cast value.
+* `AssertMustPanic(t, fn, expectedPanic, msg...)` /
+  `AssertMustNoPanic(t, fn, msg...)` - terminate on panic expectation mismatch.
+
+**Usage Examples:**
+
+```go
+// Error pattern - logs failure, test continues
+AssertEqual(t, expected, actual, "value check")
+// execution continues even if assertion fails
+
+// Fatal pattern - logs failure, test terminates
+AssertMustEqual(t, expected, actual, "critical value check")
+// execution stops here if assertion fails
+
+// Traditional early abort pattern (equivalent to AssertMust*)
+if !AssertEqual(t, expected, actual, "critical value") {
+    t.FailNow()
+}
+```
+
 ### Advanced Testing Utilities
 
 * `TestCase` interface - standardised interface for table-driven tests with
@@ -563,7 +614,7 @@ Context-aware error group with cancellation:
 For detailed development setup, build commands, and AI agent guidance:
 
 * [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
-  patterns
+  patterns.
 
 ### Quick Start
 
