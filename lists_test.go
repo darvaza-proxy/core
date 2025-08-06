@@ -219,9 +219,7 @@ func (tc listCopyTestCase) Test(t *testing.T) {
 	}
 
 	// Verify they are different lists (not the same pointer)
-	if orig == copied {
-		t.Error("ListCopy should return a different list instance")
-	}
+	AssertNotSame(t, orig, copied, "list instance")
 
 	// Verify independence - modifying one doesn't affect the other
 	if orig.Len() > 0 {

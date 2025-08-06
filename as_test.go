@@ -162,8 +162,8 @@ func (tc sliceAsTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := SliceAs[any, string](tc.input)
-	if len(got) != len(tc.want) {
-		t.Fatalf("SliceAs() len = %v, want %v", len(got), len(tc.want))
+	if !AssertEqual(t, len(tc.want), len(got), "slice length") {
+		return
 	}
 	for i, v := range got {
 		if v != tc.want[i] {
@@ -198,8 +198,8 @@ func (tc sliceAsFnTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := SliceAsFn(tc.fn, tc.input)
-	if len(got) != len(tc.want) {
-		t.Fatalf("SliceAsFn() len = %v, want %v", len(got), len(tc.want))
+	if !AssertEqual(t, len(tc.want), len(got), "slice length") {
+		return
 	}
 	for i, v := range got {
 		if v != tc.want[i] {
@@ -299,8 +299,8 @@ func (tc asErrorsTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := AsErrors(tc.input)
-	if len(got) != tc.wantLen {
-		t.Fatalf("AsErrors() len = %v, want %v", len(got), tc.wantLen)
+	if !AssertEqual(t, tc.wantLen, len(got), "slice length") {
+		return
 	}
 	for i, err := range got {
 		if err.Error() != tc.wantMsgs[i] {
