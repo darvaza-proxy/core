@@ -154,3 +154,40 @@ func MustOK[V any](value V, ok bool) V {
 func MaybeOK[V any](value V, _ bool) V {
 	return value
 }
+
+// MustT panics if type conversion fails, otherwise returns the converted value.
+// This is useful for type conversions that should always succeed, such as
+// casting values to interfaces they are known to implement or converting
+// between compatible types. It follows the common Go pattern of Must* functions
+// that panic on failure. The panic includes proper stack traces pointing to
+// the caller.
+//
+// Example usage:
+//
+//	str := MustT[string](value)  // panics if value is not a string
+//	num := MustT[int](value)     // panics if value is not an int
+//	reader := MustT[io.Reader](value)  // panics if value doesn't implement io.Reader
+func MustT[T any](value any) T {
+	result, ok := value.(T)
+	if !ok {
+		panic(NewPanicErrorf(1, "core.MustT: failed to convert %T to %T", value, result))
+	}
+	return result
+}
+
+// MaybeT returns the converted value if type conversion succeeds, otherwise
+// returns the zero value of the target type. This is useful when you want to
+// proceed with a default value regardless of whether the type conversion
+// succeeded. Unlike MustT, it never panics.
+//
+// Example usage:
+//
+//	// Use zero value if conversion fails
+//	str := MaybeT[string](value)  // empty string if value is not a string
+//	num := MaybeT[int](value)     // zero if value is not an int
+//	reader := MaybeT[io.Reader](value)  // nil if value doesn't implement io.Reader
+func MaybeT[T any](value any) T {
+	// revive:disable-next-line:unchecked-type-assertion
+	result, _ := value.(T)
+	return result
+}
