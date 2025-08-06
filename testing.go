@@ -515,6 +515,68 @@ func AssertNotNil(t T, value any, name string, args ...any) bool {
 	return ok
 }
 
+// AssertSame asserts that two values are the same.
+// For reference types, this tests that they point to the same underlying
+// data. For value types, this tests that they have equal values.
+// This is useful for testing that two slices, maps, or pointers reference
+// the same memory location, not just equal contents.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	slice1 := []int{1, 2, 3}
+//	slice2 := slice1
+//	AssertSame(t, slice1, slice2, "slice reference")
+//
+//	map1 := make(map[string]int)
+//	map2 := map1
+//	AssertSame(t, map1, map2, "map reference")
+//
+//	AssertSame(t, 42, 42, "number value")
+//	AssertSame(t, "hello", "hello", "string value")
+func AssertSame(t T, expected, actual any, name string, args ...any) bool {
+	t.Helper()
+	ok := IsSame(expected, actual)
+	if !ok {
+		doError(t, name, args, "expected same value or reference, got different")
+	} else {
+		doLog(t, name, args, "same value or reference")
+	}
+	return ok
+}
+
+// AssertNotSame asserts that two values are not the same.
+// For reference types, this tests that they do not point to the same
+// underlying data. For value types, this tests that they have different
+// values. This is useful for testing that two slices, maps, or pointers
+// reference different memory locations, even if they have equal contents.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	slice1 := []int{1, 2, 3}
+//	slice2 := []int{1, 2, 3}  // same content, different backing array
+//	AssertNotSame(t, slice1, slice2, "slice reference")
+//
+//	map1 := make(map[string]int)
+//	map2 := make(map[string]int)  // different maps
+//	AssertNotSame(t, map1, map2, "map reference")
+//
+//	AssertNotSame(t, 42, 43, "number value")
+//	AssertNotSame(t, "hello", "world", "string value")
+func AssertNotSame(t T, expected, actual any, name string, args ...any) bool {
+	t.Helper()
+	ok := !IsSame(expected, actual)
+	if !ok {
+		doError(t, name, args, "expected different values or references, got same")
+	} else {
+		doLog(t, name, args, "different values or references")
+	}
+	return ok
+}
+
 // RunConcurrentTest runs multiple goroutines and waits for completion.
 // This standardizes concurrent testing patterns.
 //

@@ -2,9 +2,11 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 // TestCase validations
@@ -14,6 +16,8 @@ var _ TestCase = isZeroTestCase{}
 var _ TestCase = isNilTestCase{}
 var _ TestCase = isNilVsIsZeroTestCase{}
 var _ TestCase = initializationSemanticsTestCase{}
+var _ TestCase = isSameTestCase{}
+var _ TestCase = isSameStackOverflowTestCase{}
 
 type zeroTestCase[T comparable] struct {
 	expected T
@@ -875,4 +879,541 @@ func testZeroEdgeCasesNilFuncPointer(t *testing.T) {
 	// Initialize the function
 	fn = func() string { return "initialized" }
 	AssertEqual(t, "initialized", fn(), "function result")
+}
+
+// isSameTestCase tests IsSame function
+type isSameTestCase struct {
+	// Large fields first (interfaces, strings) - 8+ bytes
+	a           any
+	b           any
+	description string
+	name        string
+
+	// Small fields last (booleans) - 1 byte
+	expected bool
+}
+
+func (tc isSameTestCase) Name() string {
+	return tc.name
+}
+
+func (tc isSameTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	result := IsSame(tc.a, tc.b)
+	AssertEqual(t, tc.expected, result, tc.description)
+}
+
+func newIsSameTestCase(name string, a, b any, expected bool,
+	description string) isSameTestCase {
+	return isSameTestCase{
+		name:        name,
+		a:           a,
+		b:           b,
+		expected:    expected,
+		description: description,
+	}
+}
+
+func isSameValueTypeTestCases() []isSameTestCase {
+	return S(
+		// Value types - compared by equality
+		newIsSameTestCase("same integers", 42, 42, true,
+			"same integers should be same"),
+		newIsSameTestCase("different integers", 42, 43, false,
+			"different integers should not be same"),
+		newIsSameTestCase("same strings", "hello", "hello", true,
+			"same strings should be same"),
+		newIsSameTestCase("different strings", "hello", "world", false,
+			"different strings should not be same"),
+		newIsSameTestCase("same booleans", true, true, true,
+			"same booleans should be same"),
+		newIsSameTestCase("different booleans", true, false, false,
+			"different booleans should not be same"),
+		newIsSameTestCase("same floats", 3.14, 3.14, true,
+			"same floats should be same"),
+		newIsSameTestCase("different floats", 3.14, 2.71, false,
+			"different floats should not be same"),
+	)
+}
+
+func isSameReferenceTypeTestCases() []isSameTestCase {
+	slice1 := S(1, 2, 3)
+	slice2 := slice1
+	slice3 := S(1, 2, 3)
+
+	map1 := map[string]int{"a": 1}
+	map2 := map1
+	map3 := map[string]int{"a": 1}
+
+	ch1 := make(chan int)
+	ch2 := ch1
+	ch3 := make(chan int)
+
+	fn1 := func() {}
+	fn2 := fn1
+	fn3 := func() {}
+
+	x := 42
+	ptr1 := &x
+	ptr2 := ptr1
+	ptr3 := &x
+
+	// Empty slices from separate make() calls
+	emptySlice1 := make([]int, 0)
+	emptySlice2 := make([]int, 0)
+
+	// Zero-length slices from same backing array
+	baseArray := []int{1, 2, 3, 4, 5}
+	zeroLen1 := baseArray[2:2] // zero-length slice at position 2
+	zeroLen2 := baseArray[2:2] // same zero-length slice
+	zeroLen3 := baseArray[3:3] // different zero-length slice from same array
+
+	return S(
+		// Slices - compared by backing array pointer
+		newIsSameTestCase("same slice reference", slice1, slice2, true,
+			"slices with same backing array should be same"),
+		newIsSameTestCase("different slice reference", slice1, slice3, false,
+			"slices with different backing arrays should not be same"),
+
+		// Empty slice tests
+		newIsSameTestCase("two empty slices from separate make()", emptySlice1, emptySlice2, false,
+			"empty slices from separate make() calls should not be same"),
+		newIsSameTestCase("zero-length slices from same position", zeroLen1, zeroLen2, true,
+			"zero-length slices from same array position should be same"),
+		newIsSameTestCase("zero-length slices from different positions", zeroLen1, zeroLen3, false,
+			"zero-length slices from different positions should not be same"),
+
+		// Maps - compared by map pointer
+		newIsSameTestCase("same map reference", map1, map2, true,
+			"maps with same reference should be same"),
+		newIsSameTestCase("different map reference", map1, map3, false,
+			"maps with different references should not be same"),
+
+		// Channels - compared by channel pointer
+		newIsSameTestCase("same channel reference", ch1, ch2, true,
+			"channels with same reference should be same"),
+		newIsSameTestCase("different channel reference", ch1, ch3, false,
+			"channels with different references should not be same"),
+
+		// Functions - compared by function pointer
+		newIsSameTestCase("same function reference", fn1, fn2, true,
+			"functions with same reference should be same"),
+		newIsSameTestCase("different function reference", fn1, fn3, false,
+			"functions with different references should not be same"),
+
+		// Pointers - compared by address
+		newIsSameTestCase("same pointer reference", ptr1, ptr2, true,
+			"pointers with same reference should be same"),
+		newIsSameTestCase("pointers to same address", ptr1, ptr3, true,
+			"pointers to same address should be same"),
+	)
+}
+
+func isSameNilTestCases() []isSameTestCase {
+	var nilSlice1, nilSlice2 []int
+	var nilMap1, nilMap2 map[string]int
+	var nilPtr1, nilPtr2 *int
+	var nilChan1, nilChan2 chan int
+	var nilFunc1, nilFunc2 func()
+
+	return S(
+		// Untyped nil
+		newIsSameTestCase("both untyped nil", nil, nil, true,
+			"both untyped nil should be same"),
+		newIsSameTestCase("untyped nil vs typed nil", nil, nilPtr1, false,
+			"untyped nil vs typed nil should not be same"),
+
+		// Typed nils of same type
+		newIsSameTestCase("same type nil slices", nilSlice1, nilSlice2, true,
+			"nil slices of same type should be same"),
+		newIsSameTestCase("same type nil maps", nilMap1, nilMap2, true,
+			"nil maps of same type should be same"),
+		newIsSameTestCase("same type nil pointers", nilPtr1, nilPtr2, true,
+			"nil pointers of same type should be same"),
+		newIsSameTestCase("same type nil channels", nilChan1, nilChan2, true,
+			"nil channels of same type should be same"),
+		newIsSameTestCase("same type nil functions", nilFunc1, nilFunc2, true,
+			"nil functions of same type should be same"),
+
+		// Nil vs non-nil
+		newIsSameTestCase("nil vs empty slice", nilSlice1, S[int](), false,
+			"nil slice vs empty slice should not be same"),
+		newIsSameTestCase("nil vs empty map", nilMap1, map[string]int{}, false,
+			"nil map vs empty map should not be same"),
+		newIsSameTestCase("nil vs non-nil pointer", nilPtr1, new(int), false,
+			"nil pointer vs non-nil pointer should not be same"),
+	)
+}
+
+func isSameDifferentTypeTestCases() []isSameTestCase {
+	return S(
+		// Different types should never be same
+		newIsSameTestCase("int vs string", 42, "42", false,
+			"different types should not be same"),
+		newIsSameTestCase("int vs float", 42, 42.0, false,
+			"different numeric types should not be same"),
+		newIsSameTestCase("slice vs array", S(1, 2, 3), [3]int{1, 2, 3}, false,
+			"slice vs array should not be same"),
+		newIsSameTestCase("int slice vs string slice", S(1, 2, 3), S("1", "2", "3"), false,
+			"slices of different types should not be same"),
+	)
+}
+
+func isSameInterfaceTestCases() []isSameTestCase {
+	x := 42
+	ptr1 := &x
+	ptr2 := ptr1
+
+	var interface1 any = ptr1
+	var interface2 any = ptr2
+	var interface3 any = &x
+
+	slice1 := S(1, 2, 3)
+	slice2 := slice1
+	var interface4 any = slice1
+	var interface5 any = slice2
+
+	// Critical nil interface cases for interface comparison coverage
+	var nilInterface1 any
+	var nilInterface2 any
+	var nonNilInterface any = 42
+
+	// Nested interface cases
+	var nestedInterface1 = interface1
+	var nestedInterface2 = interface2
+
+	return S(
+		// Both interfaces nil - handled by isSameTypedNil
+		newIsSameTestCase("both interfaces nil", nilInterface1, nilInterface2, true,
+			"both nil interfaces should be same"),
+
+		// One nil, one not nil - handled by isSameTypedNil
+		newIsSameTestCase("nil vs non-nil interface", nilInterface1, nonNilInterface, false,
+			"nil interface vs non-nil interface should not be same"),
+		newIsSameTestCase("non-nil vs nil interface", nonNilInterface, nilInterface1, false,
+			"non-nil interface vs nil interface should not be same"),
+
+		// Both non-nil interfaces - handled by interface case in isSamePointer
+		newIsSameTestCase("interfaces with same pointer", interface1, interface2, true,
+			"interfaces containing same pointer should be same"),
+		newIsSameTestCase("interfaces with pointers to same address", interface1, interface3, true,
+			"interfaces with pointers to same address should be same"),
+		newIsSameTestCase("interfaces with same slice", interface4, interface5, true,
+			"interfaces containing same slice should be same"),
+
+		// Interfaces with values
+		newIsSameTestCase("interfaces with same value", any(42), any(42), true,
+			"interfaces with same value should be same"),
+		newIsSameTestCase("interfaces with different values", any(42), any(43), false,
+			"interfaces with different values should not be same"),
+
+		// Nested interface comparisons - recursive interface handling
+		newIsSameTestCase("nested interfaces same", nestedInterface1, nestedInterface2, true,
+			"nested interfaces with same content should be same"),
+		newIsSameTestCase("interface vs nested interface", interface1, nestedInterface1, true,
+			"interface and nested interface with same content should be same"),
+
+		// Interface containing different reference types
+		newIsSameTestCase("interfaces with different slices", any(S(1, 2, 3)), any(S(1, 2, 3)), false,
+			"interfaces with different slice backing arrays should not be same"),
+		newIsSameTestCase("interfaces with different maps",
+			any(map[string]int{"a": 1}), any(map[string]int{"a": 1}), false,
+			"interfaces with different map references should not be same"),
+	)
+}
+
+func TestIsSame(t *testing.T) {
+	t.Run("value types", func(t *testing.T) {
+		RunTestCases(t, isSameValueTypeTestCases())
+	})
+	t.Run("reference types", func(t *testing.T) {
+		RunTestCases(t, isSameReferenceTypeTestCases())
+	})
+	t.Run("nil handling", func(t *testing.T) {
+		RunTestCases(t, isSameNilTestCases())
+	})
+	t.Run("different types", func(t *testing.T) {
+		RunTestCases(t, isSameDifferentTypeTestCases())
+	})
+	t.Run("interfaces", func(t *testing.T) {
+		RunTestCases(t, isSameInterfaceTestCases())
+	})
+	t.Run("unsafe pointers", func(t *testing.T) {
+		RunTestCases(t, isSameUnsafePointerTestCases())
+	})
+	t.Run("complex numbers", func(t *testing.T) {
+		RunTestCases(t, isSameComplexTestCases())
+	})
+}
+
+func isSameInterfaceReflectValueTestCases() []isSameTestCase {
+	// Create interface variables
+	var interface1 any = 42
+	var interface2 any = 42
+	var interface3 any = 43
+
+	// Create reflect.Values with Kind() == reflect.Interface
+	v1 := reflect.ValueOf(&interface1).Elem()
+	v2 := reflect.ValueOf(&interface2).Elem()
+	v3 := reflect.ValueOf(&interface3).Elem()
+
+	return S(
+		// Same values in interface reflect.Values
+		newIsSameTestCase("interface reflect.Values with same value", v1, v2, true,
+			"interface reflect.Values containing same value should be same"),
+
+		// Different values in interface reflect.Values
+		newIsSameTestCase("interface reflect.Values with different values", v1, v3, false,
+			"interface reflect.Values containing different values should not be same"),
+	)
+}
+
+// Test reflect.Values with Kind() == reflect.Interface
+func TestIsSameInterfaceReflectValues(t *testing.T) {
+	RunTestCases(t, isSameInterfaceReflectValueTestCases())
+}
+
+func isSameInvalidReflectValueTestCases() []isSameTestCase {
+	invalid1 := reflect.Value{}
+	invalid2 := reflect.Value{}
+	valid := reflect.ValueOf(42)
+	var nilValue reflect.Value
+
+	return S(
+		// Two invalid reflect.Values - now returns false since we can't compare them
+		newIsSameTestCase("two invalid reflect.Values", invalid1, invalid2, false,
+			"two invalid reflect.Values cannot be compared"),
+
+		// Invalid vs valid
+		newIsSameTestCase("invalid vs valid reflect.Value", invalid1, valid, false,
+			"invalid and valid reflect.Value should not be same"),
+		newIsSameTestCase("valid vs invalid reflect.Value", valid, invalid1, false,
+			"valid and invalid reflect.Value should not be same"),
+
+		// Nil reflect.Value vs invalid
+		newIsSameTestCase("nil vs invalid reflect.Value", nilValue, invalid1, false,
+			"nil and invalid reflect.Values cannot be compared"),
+	)
+}
+
+// Also test IsZero and IsNil with invalid reflect.Values
+func isInvalidReflectValueZeroNilTestCases() []isZeroTestCase {
+	invalid := reflect.Value{}
+
+	return S(
+		newIsZeroTestCase("invalid reflect.Value IsZero", invalid, true),
+	)
+}
+
+func isInvalidReflectValueNilTestCases() []isNilTestCase {
+	invalid := reflect.Value{}
+
+	return S(
+		newIsNilTestCase("invalid reflect.Value IsNil", invalid, true),
+	)
+}
+
+// Test invalid reflect.Values in IsSame
+func TestIsSameInvalidReflectValues(t *testing.T) {
+	t.Run("IsSame", func(t *testing.T) {
+		RunTestCases(t, isSameInvalidReflectValueTestCases())
+	})
+
+	t.Run("IsZero", func(t *testing.T) {
+		RunTestCases(t, isInvalidReflectValueZeroNilTestCases())
+	})
+
+	t.Run("IsNil", func(t *testing.T) {
+		RunTestCases(t, isInvalidReflectValueNilTestCases())
+	})
+}
+
+// isSameStackOverflowTestCase tests stack overflow scenarios for IsSame function
+type isSameStackOverflowTestCase struct {
+	// Large fields first - interfaces and strings (8+ bytes)
+	setupFunc   func() (any, any)
+	description string
+	name        string
+
+	// Small fields last - booleans (1 byte)
+	expected bool
+}
+
+func (tc isSameStackOverflowTestCase) Name() string {
+	return tc.name
+}
+
+func (tc isSameStackOverflowTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	a, b := tc.setupFunc()
+	result := IsSame(a, b)
+	AssertEqual(t, tc.expected, result, tc.description)
+}
+
+func newIsSameStackOverflowTestCase(name string,
+	setupFunc func() (any, any), expected bool,
+	description string) isSameStackOverflowTestCase {
+	return isSameStackOverflowTestCase{
+		name:        name,
+		setupFunc:   setupFunc,
+		expected:    expected,
+		description: description,
+	}
+}
+
+func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
+	return S(
+		// Circular interface references
+		newIsSameStackOverflowTestCase("circular interface references", func() (any, any) {
+			var a, b any
+			a = &b
+			b = &a
+			return a, b
+		}, false, "circular interface references should not be same"),
+
+		newIsSameStackOverflowTestCase("same circular reference", func() (any, any) {
+			var a any
+			a = &a
+			c := &a
+			d := &a
+			return c, d
+		}, true, "pointers to same circular reference should be same"),
+
+		// Deeply nested interfaces
+		newIsSameStackOverflowTestCase("different deep nested chains", func() (any, any) {
+			var current1 any = 42
+			for i := 0; i < 100; i++ {
+				next := current1
+				current1 = &next
+			}
+
+			var current2 any = 42
+			for i := 0; i < 100; i++ {
+				next := current2
+				current2 = &next
+			}
+
+			return current1, current2
+		}, false, "different deep nested chains should not be same"),
+
+		newIsSameStackOverflowTestCase("same deep nested chain", func() (any, any) {
+			var current any = 42
+			for i := 0; i < 100; i++ {
+				next := current
+				current = &next
+			}
+
+			return current, current
+		}, true, "same deep nested chain should be same"),
+
+		// Self-referential structures
+		newIsSameStackOverflowTestCase("different self-referential nodes", func() (any, any) {
+			type Node struct {
+				Next  *Node
+				Value int
+			}
+
+			node1 := &Node{Value: 1}
+			node1.Next = node1
+
+			node2 := &Node{Value: 1}
+			node2.Next = node2
+
+			var interface1 any = node1
+			var interface2 any = node2
+
+			return interface1, interface2
+		}, false, "different self-referential nodes should not be same"),
+
+		newIsSameStackOverflowTestCase("same self-referential node", func() (any, any) {
+			type Node struct {
+				Next  *Node
+				Value int
+			}
+
+			node1 := &Node{Value: 1}
+			node1.Next = node1
+
+			var interface1 any = node1
+			var interface2 any = node1
+
+			return interface1, interface2
+		}, true, "same self-referential node should be same"),
+
+		newIsSameStackOverflowTestCase("nested interface with self-referential content", func() (any, any) {
+			type Node struct {
+				Next  *Node
+				Value int
+			}
+
+			node := &Node{Value: 1}
+			node.Next = node
+
+			var interface1 any = node
+			nested1 := interface1
+			nested2 := interface1
+
+			return nested1, nested2
+		}, true, "nested interfaces with same self-referential content should be same"),
+	)
+}
+
+func isSameUnsafePointerTestCases() []isSameTestCase {
+	x := 42
+	ptr := &x
+
+	// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
+	unsafePtr1 := unsafe.Pointer(ptr)
+	unsafePtr2 := unsafePtr1
+	// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
+	unsafePtr3 := unsafe.Pointer(&x) // Same address, different unsafe.Pointer
+
+	y := 42
+	// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
+	unsafePtr4 := unsafe.Pointer(&y) // Different address
+
+	return S(
+		newIsSameTestCase("same unsafe pointer", unsafePtr1, unsafePtr2, true,
+			"same unsafe pointer should be same"),
+		newIsSameTestCase("unsafe pointers to same address", unsafePtr1, unsafePtr3, true,
+			"unsafe pointers to same address should be same"),
+		newIsSameTestCase("unsafe pointers to different addresses", unsafePtr1, unsafePtr4, false,
+			"unsafe pointers to different addresses should not be same"),
+
+		// Nil unsafe pointers
+		newIsSameTestCase("nil unsafe pointers",
+			// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
+			unsafe.Pointer(nil), unsafe.Pointer(nil), true,
+			"nil unsafe pointers should be same"),
+	)
+}
+
+func isSameComplexTestCases() []isSameTestCase {
+	return S(
+		// Complex64
+		newIsSameTestCase("same complex64", complex64(1+2i), complex64(1+2i), true,
+			"same complex64 values should be same"),
+		newIsSameTestCase("different complex64", complex64(1+2i), complex64(1+3i), false,
+			"different complex64 values should not be same"),
+
+		// Complex128
+		newIsSameTestCase("same complex128", complex128(1+2i), complex128(1+2i), true,
+			"same complex128 values should be same"),
+		newIsSameTestCase("different complex128", complex128(1+2i), complex128(2+2i), false,
+			"different complex128 values should not be same"),
+
+		// Edge cases with NaN and Inf
+		newIsSameTestCase("complex with NaN",
+			complex(math.NaN(), 1), complex(math.NaN(), 1), false,
+			"complex with NaN should not be same (NaN != NaN)"),
+		newIsSameTestCase("complex with Inf",
+			complex(math.Inf(1), 1), complex(math.Inf(1), 1), true,
+			"complex with same Inf should be same"),
+	)
+}
+
+func TestIsSameStackOverflow(t *testing.T) {
+	RunTestCases(t, isSameStackOverflowTestCases())
 }

@@ -124,6 +124,13 @@ Key distinctions from `IsZero`:
 * **Structs**: `IsNil(struct{}{})` returns `false` (structs cannot be nil),
   `IsZero(struct{}{})` returns `true` (zero struct is uninitialized).
 
+#### Same Value Detection
+
+* `IsSame(a, b)` - reports whether two values are the same. For reference
+  types (slices, maps, pointers), compares by pointer equality. For value
+  types (numbers, strings, booleans), compares by equal values. Two nils
+  of the same type are considered the same.
+
 #### Other Utilities
 
 * `Coalesce[T](values...)` returns the first non-zero value.
@@ -490,6 +497,10 @@ both `*testing.T` and `MockT`:
   comparison.
 * `AssertSliceEqual[T](t, expected, actual, msg...)` - slice comparison using
   `reflect.DeepEqual`.
+* `AssertSame(t, expected, actual, msg...)` - same value/reference comparison
+  using pointer equality for reference types, value equality for basic types.
+* `AssertNotSame(t, expected, actual, msg...)` - different value/reference
+  comparison.
 * `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
   boolean assertions.
 * `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - nil
