@@ -15,6 +15,7 @@ var _ TestCase = isNilTestCase{}
 var _ TestCase = isNilVsIsZeroTestCase{}
 var _ TestCase = initializationSemanticsTestCase{}
 var _ TestCase = isSameTestCase{}
+var _ TestCase = isSameStackOverflowTestCase{}
 
 type zeroTestCase[T comparable] struct {
 	expected T
@@ -1139,4 +1140,139 @@ func TestIsSameInterfaceReflectValues(t *testing.T) {
 	// The interface case in isSamePointer() handles this by extracting concrete values
 	result := IsSame(v1, v2)
 	AssertTrue(t, result, "Same values in interface reflect.Values should be same")
+}
+
+// isSameStackOverflowTestCase tests stack overflow scenarios for IsSame function
+type isSameStackOverflowTestCase struct {
+	// Large fields first - interfaces and strings (8+ bytes)
+	setupFunc   func() (any, any)
+	description string
+	name        string
+
+	// Small fields last - booleans (1 byte)
+	expected bool
+}
+
+func (tc isSameStackOverflowTestCase) Name() string {
+	return tc.name
+}
+
+func (tc isSameStackOverflowTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	a, b := tc.setupFunc()
+	result := IsSame(a, b)
+	AssertEqual(t, tc.expected, result, tc.description)
+}
+
+func newIsSameStackOverflowTestCase(name string,
+	setupFunc func() (any, any), expected bool,
+	description string) isSameStackOverflowTestCase {
+	return isSameStackOverflowTestCase{
+		name:        name,
+		setupFunc:   setupFunc,
+		expected:    expected,
+		description: description,
+	}
+}
+
+func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
+	return S(
+		// Circular interface references
+		newIsSameStackOverflowTestCase("circular interface references", func() (any, any) {
+			var a, b any
+			a = &b
+			b = &a
+			return a, b
+		}, false, "circular interface references should not be same"),
+
+		newIsSameStackOverflowTestCase("same circular reference", func() (any, any) {
+			var a any
+			a = &a
+			c := &a
+			d := &a
+			return c, d
+		}, true, "pointers to same circular reference should be same"),
+
+		// Deeply nested interfaces
+		newIsSameStackOverflowTestCase("different deep nested chains", func() (any, any) {
+			var current1 any = 42
+			for i := 0; i < 100; i++ {
+				next := current1
+				current1 = &next
+			}
+
+			var current2 any = 42
+			for i := 0; i < 100; i++ {
+				next := current2
+				current2 = &next
+			}
+
+			return current1, current2
+		}, false, "different deep nested chains should not be same"),
+
+		newIsSameStackOverflowTestCase("same deep nested chain", func() (any, any) {
+			var current any = 42
+			for i := 0; i < 100; i++ {
+				next := current
+				current = &next
+			}
+
+			return current, current
+		}, true, "same deep nested chain should be same"),
+
+		// Self-referential structures
+		newIsSameStackOverflowTestCase("different self-referential nodes", func() (any, any) {
+			type Node struct {
+				Next  *Node
+				Value int
+			}
+
+			node1 := &Node{Value: 1}
+			node1.Next = node1
+
+			node2 := &Node{Value: 1}
+			node2.Next = node2
+
+			var interface1 any = node1
+			var interface2 any = node2
+
+			return interface1, interface2
+		}, false, "different self-referential nodes should not be same"),
+
+		newIsSameStackOverflowTestCase("same self-referential node", func() (any, any) {
+			type Node struct {
+				Next  *Node
+				Value int
+			}
+
+			node1 := &Node{Value: 1}
+			node1.Next = node1
+
+			var interface1 any = node1
+			var interface2 any = node1
+
+			return interface1, interface2
+		}, true, "same self-referential node should be same"),
+
+		newIsSameStackOverflowTestCase("nested interface with self-referential content", func() (any, any) {
+			type Node struct {
+				Next  *Node
+				Value int
+			}
+
+			node := &Node{Value: 1}
+			node.Next = node
+
+			var interface1 any = node
+			nested1 := interface1
+			nested2 := interface1
+
+			return nested1, nested2
+		}, true, "nested interfaces with same self-referential content should be same"),
+	)
+}
+
+func TestIsSameStackOverflow(t *testing.T) {
+	RunTestCases(t, isSameStackOverflowTestCases())
 }
