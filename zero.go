@@ -130,18 +130,23 @@ func IsZero(vi any) bool {
 //	IsNil(num)                   // false - integers cannot be nil
 //	IsZero(num)                  // true  - zero integer is uninitialized
 func IsNil(vi any) bool {
-	switch p := vi.(type) {
-	case nil:
-		// untyped nil
+	if vi == nil {
 		return true
-	case reflect.Value:
-		// Special handling for reflect.Value to avoid double-wrapping
-		return isReflectValueNil(p)
-	default:
-		// Use reflection to check for nil
-		v := reflect.ValueOf(vi)
-		return isReflectValueNil(v)
 	}
+
+	// Use reflection to check for nil
+	v := asReflectValue(vi)
+	return isReflectValueNil(v)
+}
+
+// asReflectValue returns a reflect.Value for the given value.
+// If the value is already a reflect.Value, it returns it directly.
+// Otherwise, it calls reflect.ValueOf().
+func asReflectValue(v any) reflect.Value {
+	if rv, ok := v.(reflect.Value); ok {
+		return rv
+	}
+	return reflect.ValueOf(v)
 }
 
 // isReflectValueZero reports whether a reflect.Value is zero.
@@ -168,4 +173,144 @@ func isReflectValueNil(v reflect.Value) bool {
 		// Basic types, structs, arrays cannot be nil
 		return false
 	}
+}
+
+// isReflectValueSame reports whether two reflect.Values are the same.
+// This helper reduces code duplication in IsSame.
+func isReflectValueSame(va, vb reflect.Value) bool {
+	if va.Type() != vb.Type() {
+		// different types
+		return false
+	}
+
+	if same, ok := isSameTypedNil(va, vb); ok {
+		// typed nil decision
+		return same
+	}
+
+	return isSamePointer(va, vb)
+}
+
+// IsSame reports whether two values are the same.
+// It answers the question: "Are these values the same?"
+//
+// For reference types, IsSame returns true when they point to the same
+// underlying data:
+//   - Two slices pointing to the same backing array.
+//   - Two maps pointing to the same map data.
+//   - Two channels pointing to the same channel.
+//   - Two function values pointing to the same function.
+//   - Two pointers pointing to the same address.
+//   - Two interfaces containing the same pointer value.
+//
+// For value types, IsSame returns true when they have equal values:
+//   - Numbers with the same value (42 == 42).
+//   - Strings with the same content ("hello" == "hello").
+//   - Booleans with the same value (true == true).
+//
+// IsSame returns false for:
+//   - Different backing arrays/maps/channels/functions/pointers.
+//   - Different values for basic types.
+//   - One nil and one non-nil value.
+//   - Different types.
+//
+// For basic types (int, string, bool), IsSame compares by value.
+// For reference types (slices, maps, pointers), IsSame compares by reference.
+//
+// Example:
+//
+//	// Value types - compared by value
+//	IsSame(42, 42)           // true  - same value
+//	IsSame(42, 43)           // false - different values
+//	IsSame("hello", "hello") // true  - same string content
+//	IsSame("hello", "world") // false - different strings
+//
+//	// Nil handling
+//	IsSame(nil, nil)         // true  - both untyped nil
+//	var s1, s2 []int         // both nil slices of same type
+//	IsSame(s1, s2)           // true  - both nil of same type
+//	IsSame(s1, []int{})      // false - one nil, one empty slice
+//
+//	// Reference types - compared by reference
+//	slice1 := []int{1, 2, 3}
+//	slice2 := slice1         // same backing array
+//	slice3 := []int{1, 2, 3} // different backing array
+//	IsSame(slice1, slice2)   // true  - same backing array
+//	IsSame(slice1, slice3)   // false - different backing arrays
+//
+//	map1 := make(map[string]int)
+//	map2 := map1             // same map
+//	map3 := make(map[string]int) // different map
+//	IsSame(map1, map2)       // true  - same map
+//	IsSame(map1, map3)       // false - different maps
+//
+//	x := 42
+//	ptr1 := &x
+//	ptr2 := ptr1             // same pointer
+//	ptr3 := &x               // different pointer variable, same address
+//	IsSame(ptr1, ptr2)       // true  - same pointer
+//	IsSame(ptr1, ptr3)       // true  - both point to same address
+func IsSame(a, b any) bool {
+	if same, ok := isSameNil(a, b); ok {
+		// untyped nil decision
+		return same
+	}
+
+	va := asReflectValue(a)
+	vb := asReflectValue(b)
+
+	return isReflectValueSame(va, vb)
+}
+
+func isSameNil(a, b any) (same, ok bool) {
+	switch {
+	case a == nil && b == nil:
+		// both nil
+		return true, true
+	case a == nil || b == nil:
+		return false, true
+		// one nil, one not
+	default:
+		// neither is nil
+		return false, false
+	}
+}
+
+func isSameTypedNil(va, vb reflect.Value) (result, handled bool) {
+	aNil := isReflectValueNil(va)
+	bNil := isReflectValueNil(vb)
+
+	switch {
+	case aNil && bNil:
+		// both nil
+		return true, true
+	case aNil || bNil:
+		// one nil, one not
+		return false, true
+	default:
+		// neither is nil
+		return false, false
+	}
+}
+
+// isSamePointer compares pointer equality based on the reflect value kind.
+// For interface types, it extracts the concrete values and recursively compares them.
+// Note: By the time this function is called, nil interfaces have already been
+// handled by isSameTypedNil, so interface values here are guaranteed to be non-nil.
+func isSamePointer(va, vb reflect.Value) bool {
+	var ok bool
+	switch va.Kind() {
+	case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func, reflect.UnsafePointer:
+		ok = va.Pointer() == vb.Pointer()
+	case reflect.Interface:
+		// Extract concrete values and compare them recursively
+		a := va.Elem().Interface()
+		b := vb.Elem().Interface()
+		ok = IsSame(a, b)
+	case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.Bool:
+		ok = va.Interface() == vb.Interface()
+	}
+	return ok
 }

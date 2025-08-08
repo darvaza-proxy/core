@@ -193,6 +193,21 @@ func (m *MockT) Reset() {
 //
 // Unlike testing.T.Run, this method uses the same MockT instance throughout,
 // allowing inspection of all collected errors, logs, and failure state after execution.
+//
+// This Run method enables compatibility patterns where test functions need to work
+// with both *testing.T and MockT. Use interface type assertions to detect Run
+// method support:
+//
+//	func doRun(t core.T, name string, fn func(core.T)) {
+//		switch tt := t.(type) {
+//		case interface { Run(string, func(*testing.T)) bool }:
+//			tt.Run(name, func(subT *testing.T) { fn(subT) })
+//		case interface { Run(string, func(core.T)) bool }:
+//			tt.Run(name, fn)
+//		default:
+//			fn(t) // Fallback for simple core.T implementations
+//		}
+//	}
 func (m *MockT) Run(_ string, f func(T)) (ok bool) {
 	if m == nil || f == nil {
 		return false
@@ -515,6 +530,68 @@ func AssertNotNil(t T, value any, name string, args ...any) bool {
 	return ok
 }
 
+// AssertSame asserts that two values are the same.
+// For reference types, this tests that they point to the same underlying
+// data. For value types, this tests that they have equal values.
+// This is useful for testing that two slices, maps, or pointers reference
+// the same memory location, not just equal contents.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	slice1 := []int{1, 2, 3}
+//	slice2 := slice1
+//	AssertSame(t, slice1, slice2, "slice reference")
+//
+//	map1 := make(map[string]int)
+//	map2 := map1
+//	AssertSame(t, map1, map2, "map reference")
+//
+//	AssertSame(t, 42, 42, "number value")
+//	AssertSame(t, "hello", "hello", "string value")
+func AssertSame(t T, expected, actual any, name string, args ...any) bool {
+	t.Helper()
+	ok := IsSame(expected, actual)
+	if !ok {
+		doError(t, name, args, "expected same value or reference, got different")
+	} else {
+		doLog(t, name, args, "same value or reference")
+	}
+	return ok
+}
+
+// AssertNotSame asserts that two values are not the same.
+// For reference types, this tests that they do not point to the same
+// underlying data. For value types, this tests that they have different
+// values. This is useful for testing that two slices, maps, or pointers
+// reference different memory locations, even if they have equal contents.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	slice1 := []int{1, 2, 3}
+//	slice2 := []int{1, 2, 3}  // same content, different backing array
+//	AssertNotSame(t, slice1, slice2, "slice reference")
+//
+//	map1 := make(map[string]int)
+//	map2 := make(map[string]int)  // different maps
+//	AssertNotSame(t, map1, map2, "map reference")
+//
+//	AssertNotSame(t, 42, 43, "number value")
+//	AssertNotSame(t, "hello", "world", "string value")
+func AssertNotSame(t T, expected, actual any, name string, args ...any) bool {
+	t.Helper()
+	ok := !IsSame(expected, actual)
+	if !ok {
+		doError(t, name, args, "expected different values or references, got same")
+	} else {
+		doLog(t, name, args, "different values or references")
+	}
+	return ok
+}
+
 // RunConcurrentTest runs multiple goroutines and waits for completion.
 // This standardizes concurrent testing patterns.
 //
@@ -811,6 +888,36 @@ func AssertMustNil(t T, value any, name string, args ...any) {
 func AssertMustNotNil(t T, value any, name string, args ...any) {
 	t.Helper()
 	if !AssertNotNil(t, value, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustSame asserts that two values are the same, calling t.FailNow() on failure.
+//
+// For value types (numbers, strings, booleans), same-ness means equal values.
+// For reference types (slices, maps, pointers, channels, functions), same-ness
+// means pointer equality to the same underlying data structure.
+//
+//	AssertMustSame(t, slice1, slice2, "slice reference")
+//	AssertMustSame(t, 42, 42, "number value")
+func AssertMustSame(t T, expected, actual any, name string, args ...any) {
+	t.Helper()
+	if !AssertSame(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNotSame asserts that two values are not the same, calling t.FailNow() on failure.
+//
+// For value types (numbers, strings, booleans), same-ness means equal values.
+// For reference types (slices, maps, pointers, channels, functions), same-ness
+// means pointer equality to the same underlying data structure.
+//
+//	AssertMustNotSame(t, slice1, slice2, "slice reference")
+//	AssertMustNotSame(t, 42, 43, "number value")
+func AssertMustNotSame(t T, expected, actual any, name string, args ...any) {
+	t.Helper()
+	if !AssertNotSame(t, expected, actual, name, args...) {
 		t.FailNow()
 	}
 }

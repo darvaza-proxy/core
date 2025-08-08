@@ -317,9 +317,7 @@ func testErrGroupSubsequentCancellation(t *testing.T) {
 	}
 
 	// Should keep the first error
-	if err := eg.Err(); err != cause1 {
-		t.Errorf("Expected first error %v, got %v", cause1, err)
-	}
+	AssertSame(t, cause1, eg.Err(), "error instance")
 }
 
 func testErrGroupNilCause(t *testing.T) {
@@ -332,9 +330,7 @@ func testErrGroupNilCause(t *testing.T) {
 		t.Error("Expected first cancellation to return true")
 	}
 
-	if err := eg.Err(); err != context.Canceled {
-		t.Errorf("Expected context.Canceled, got %v", err)
-	}
+	AssertSame(t, context.Canceled, eg.Err(), "error instance")
 }
 
 func TestErrGroupCancel(t *testing.T) {
@@ -357,9 +353,7 @@ func TestErrGroupOnError(t *testing.T) {
 	// Give time for onError to be called
 	time.Sleep(1 * time.Millisecond)
 
-	if errorReceived != testErr {
-		t.Errorf("Expected onError to receive %v, got %v", testErr, errorReceived)
-	}
+	AssertSame(t, testErr, errorReceived, "error instance")
 }
 
 func TestErrGroupContext(t *testing.T) {
@@ -494,9 +488,7 @@ func testErrGroupCatcherErrorWhenNotCancelled(t *testing.T) {
 	testErr := errors.New("test error")
 	result := eg.defaultErrGroupCatcher(testErr)
 
-	if result != testErr {
-		t.Errorf("Expected %v, got %v", testErr, result)
-	}
+	AssertSame(t, testErr, result, "error instance")
 }
 
 func testErrGroupCatcherErrorWhenCancelled(t *testing.T) {
