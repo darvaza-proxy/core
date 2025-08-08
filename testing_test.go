@@ -632,6 +632,100 @@ func testMockTConcurrent(t *testing.T) {
 	AssertEqual(t, expectedHelpers, mock.HelperCalled, "concurrent helper count")
 }
 
+// Test AssertSame
+func TestAssertSame(t *testing.T) {
+	mock := &MockT{}
+
+	// Test successful assertion with value types
+	result := AssertSame(mock, 42, 42, "same value test")
+	AssertTrue(t, result, "AssertSame result when same values")
+	AssertFalse(t, mock.HasErrors(), "no errors on success")
+	AssertTrue(t, mock.HasLogs(), "has logs on success")
+
+	lastLog, ok := mock.LastLog()
+	AssertTrue(t, ok, "LastLog ok on success")
+	AssertEqual(t, "same value test: same value or reference", lastLog, "log message on success")
+
+	mock.Reset()
+
+	// Test successful assertion with reference types
+	slice1 := S(1, 2, 3)
+	slice2 := slice1
+	result = AssertSame(mock, slice1, slice2, "same slice test")
+	AssertTrue(t, result, "AssertSame result when same slices")
+	AssertFalse(t, mock.HasErrors(), "no errors on slice success")
+	AssertTrue(t, mock.HasLogs(), "has logs on slice success")
+
+	mock.Reset()
+
+	// Test failed assertion with value types
+	result = AssertSame(mock, 42, 43, "different value test")
+	AssertFalse(t, result, "AssertSame result when different values")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	AssertFalse(t, mock.HasLogs(), "no logs on failure")
+
+	lastErr, ok := mock.LastError()
+	AssertTrue(t, ok, "LastError ok on failure")
+	AssertTrue(t, strings.Contains(lastErr, "expected same value or reference, got different"),
+		"error message on failure")
+
+	mock.Reset()
+
+	// Test failed assertion with reference types
+	slice3 := S(1, 2, 3)
+	result = AssertSame(mock, slice1, slice3, "different slice test")
+	AssertFalse(t, result, "AssertSame result when different slices")
+	AssertTrue(t, mock.HasErrors(), "has errors on slice failure")
+	AssertFalse(t, mock.HasLogs(), "no logs on slice failure")
+}
+
+// Test AssertNotSame
+func TestAssertNotSame(t *testing.T) {
+	mock := &MockT{}
+
+	// Test successful assertion with value types
+	result := AssertNotSame(mock, 42, 43, "different value test")
+	AssertTrue(t, result, "AssertNotSame result when different values")
+	AssertFalse(t, mock.HasErrors(), "no errors on success")
+	AssertTrue(t, mock.HasLogs(), "has logs on success")
+
+	lastLog, ok := mock.LastLog()
+	AssertTrue(t, ok, "LastLog ok on success")
+	AssertEqual(t, "different value test: different values or references", lastLog, "log message on success")
+
+	mock.Reset()
+
+	// Test successful assertion with reference types
+	slice1 := S(1, 2, 3)
+	slice2 := S(1, 2, 3) // same contents, different backing arrays
+	result = AssertNotSame(mock, slice1, slice2, "different slice test")
+	AssertTrue(t, result, "AssertNotSame result when different slices")
+	AssertFalse(t, mock.HasErrors(), "no errors on slice success")
+	AssertTrue(t, mock.HasLogs(), "has logs on slice success")
+
+	mock.Reset()
+
+	// Test failed assertion with value types
+	result = AssertNotSame(mock, 42, 42, "same value test")
+	AssertFalse(t, result, "AssertNotSame result when same values")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	AssertFalse(t, mock.HasLogs(), "no logs on failure")
+
+	lastErr, ok := mock.LastError()
+	AssertTrue(t, ok, "LastError ok on failure")
+	AssertTrue(t, strings.Contains(lastErr, "expected different values or references, got same"),
+		"error message on failure")
+
+	mock.Reset()
+
+	// Test failed assertion with reference types
+	slice3 := slice1 // same reference
+	result = AssertNotSame(mock, slice1, slice3, "same slice test")
+	AssertFalse(t, result, "AssertNotSame result when same slices")
+	AssertTrue(t, mock.HasErrors(), "has errors on slice failure")
+	AssertFalse(t, mock.HasLogs(), "no logs on slice failure")
+}
+
 func TestMockTFatal(t *testing.T) {
 	mock := &MockT{}
 
@@ -846,6 +940,8 @@ func TestAssertMustFunctions(t *testing.T) {
 	t.Run("AssertMustTypeIs", testAssertMustTypeIs)
 	t.Run("AssertMustNil", testAssertMustNil)
 	t.Run("AssertMustNotNil", testAssertMustNotNil)
+	t.Run("AssertMustSame", testAssertMustSame)
+	t.Run("AssertMustNotSame", testAssertMustNotSame)
 }
 
 func testAssertMustEqual(t *testing.T) {
@@ -1174,6 +1270,60 @@ func testAssertMustNotNil(t *testing.T) {
 	// Test failure case
 	ok = mock.Run("failure", func(mt T) {
 		AssertMustNotNil(mt, nil, "expects not nil but got nil")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustSame(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	slice1 := []int{1, 2, 3}
+	slice2 := slice1 // Same reference
+
+	// Test success case - same reference
+	ok := mock.Run("success", func(mt T) {
+		AssertMustSame(mt, slice1, slice2, "same slice reference")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case - different references
+	slice3 := []int{1, 2, 3} // Different reference
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustSame(mt, slice1, slice3, "different slice references")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNotSame(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	slice1 := []int{1, 2, 3}
+	slice3 := []int{1, 2, 3} // Different reference
+
+	// Test success case - different references
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNotSame(mt, slice1, slice3, "different slice references")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case - same reference
+	slice2 := slice1 // Same reference
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNotSame(mt, slice1, slice2, "same slice reference")
 		mt.Log("should not reach here")
 	})
 	AssertFalse(t, ok, "Failure case should abort")
