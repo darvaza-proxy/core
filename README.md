@@ -551,6 +551,9 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
   failure, returns cast value.
 * `AssertMustPanic(t, fn, expectedPanic, msg...)` /
   `AssertMustNoPanic(t, fn, msg...)` - terminate on panic expectation mismatch.
+* `AssertMustSame(t, expected, actual, msg...)` /
+  `AssertMustNotSame(t, expected, actual, msg...)` - terminate on same-ness
+  mismatch.
 
 **Usage Examples:**
 

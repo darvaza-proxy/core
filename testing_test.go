@@ -940,6 +940,8 @@ func TestAssertMustFunctions(t *testing.T) {
 	t.Run("AssertMustTypeIs", testAssertMustTypeIs)
 	t.Run("AssertMustNil", testAssertMustNil)
 	t.Run("AssertMustNotNil", testAssertMustNotNil)
+	t.Run("AssertMustSame", testAssertMustSame)
+	t.Run("AssertMustNotSame", testAssertMustNotSame)
 }
 
 func testAssertMustEqual(t *testing.T) {
@@ -1268,6 +1270,60 @@ func testAssertMustNotNil(t *testing.T) {
 	// Test failure case
 	ok = mock.Run("failure", func(mt T) {
 		AssertMustNotNil(mt, nil, "expects not nil but got nil")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustSame(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	slice1 := []int{1, 2, 3}
+	slice2 := slice1 // Same reference
+
+	// Test success case - same reference
+	ok := mock.Run("success", func(mt T) {
+		AssertMustSame(mt, slice1, slice2, "same slice reference")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case - different references
+	slice3 := []int{1, 2, 3} // Different reference
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustSame(mt, slice1, slice3, "different slice references")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNotSame(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	slice1 := []int{1, 2, 3}
+	slice3 := []int{1, 2, 3} // Different reference
+
+	// Test success case - different references
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNotSame(mt, slice1, slice3, "different slice references")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case - same reference
+	slice2 := slice1 // Same reference
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNotSame(mt, slice1, slice2, "same slice reference")
 		mt.Log("should not reach here")
 	})
 	AssertFalse(t, ok, "Failure case should abort")

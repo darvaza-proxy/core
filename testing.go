@@ -876,3 +876,33 @@ func AssertMustNotNil(t T, value any, name string, args ...any) {
 		t.FailNow()
 	}
 }
+
+// AssertMustSame asserts that two values are the same, calling t.FailNow() on failure.
+//
+// For value types (numbers, strings, booleans), same-ness means equal values.
+// For reference types (slices, maps, pointers, channels, functions), same-ness
+// means pointer equality to the same underlying data structure.
+//
+//	AssertMustSame(t, slice1, slice2, "slice reference")
+//	AssertMustSame(t, 42, 42, "number value")
+func AssertMustSame(t T, expected, actual any, name string, args ...any) {
+	t.Helper()
+	if !AssertSame(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNotSame asserts that two values are not the same, calling t.FailNow() on failure.
+//
+// For value types (numbers, strings, booleans), same-ness means equal values.
+// For reference types (slices, maps, pointers, channels, functions), same-ness
+// means pointer equality to the same underlying data structure.
+//
+//	AssertMustNotSame(t, slice1, slice2, "slice reference")
+//	AssertMustNotSame(t, 42, 43, "number value")
+func AssertMustNotSame(t T, expected, actual any, name string, args ...any) {
+	t.Helper()
+	if !AssertNotSame(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
