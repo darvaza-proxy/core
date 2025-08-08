@@ -193,6 +193,21 @@ func (m *MockT) Reset() {
 //
 // Unlike testing.T.Run, this method uses the same MockT instance throughout,
 // allowing inspection of all collected errors, logs, and failure state after execution.
+//
+// This Run method enables compatibility patterns where test functions need to work
+// with both *testing.T and MockT. Use interface type assertions to detect Run
+// method support:
+//
+//	func doRun(t core.T, name string, fn func(core.T)) {
+//		switch tt := t.(type) {
+//		case interface { Run(string, func(*testing.T)) bool }:
+//			tt.Run(name, func(subT *testing.T) { fn(subT) })
+//		case interface { Run(string, func(core.T)) bool }:
+//			tt.Run(name, fn)
+//		default:
+//			fn(t) // Fallback for simple core.T implementations
+//		}
+//	}
 func (m *MockT) Run(_ string, f func(T)) (ok bool) {
 	if m == nil || f == nil {
 		return false

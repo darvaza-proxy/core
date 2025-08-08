@@ -479,6 +479,25 @@ library tests and external library users.
   `LastError()`, `LastLog()`), reset capabilities, and full Fatal/FailNow
   support with panic recovery via the `Run()` method.
 
+### Cross-Compatible Test Functions
+
+For test utilities that need to work with both `*testing.T` and `MockT`, use
+interface type assertions to detect `Run()` method support. This enables
+nested subtests that gracefully degrade to direct function calls:
+
+```go
+func doRun(t T, name string, fn func(T)) {
+    switch tt := t.(type) {
+    case interface { Run(string, func(*testing.T)) bool }:
+        tt.Run(name, func(subT *testing.T) { fn(subT) })
+    case interface { Run(string, func(T)) bool }:
+        tt.Run(name, fn)
+    default:
+        fn(t) // Fallback for simple T implementations
+    }
+}
+```
+
 ### Test Helpers
 
 * `S[T](values...)` - concise slice creation: `S(1, 2, 3)` instead of
