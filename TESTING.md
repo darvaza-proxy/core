@@ -112,6 +112,27 @@ core.AssertPanic(t, func() { panic("test") }, "panic")
 core.AssertNoPanic(t, func() { /* safe code */ }, "no panic")
 ```
 
+**Fatal Assertions (`AssertMust*`):**
+
+All `AssertMustFoo()` functions call the corresponding `AssertFoo()` function
+and automatically call `t.FailNow()` if the assertion fails, terminating test
+execution immediately:
+
+```go
+// Standard assertions - log failure, test continues
+core.AssertEqual(t, expected, actual, "value")
+// ... test execution continues even if assertion fails
+
+// Fatal assertions - log failure, test terminates
+core.AssertMustEqual(t, expected, actual, "critical value")
+// ... test execution stops here if assertion fails
+```
+
+**Key Difference:**
+
+* `AssertFoo()` - like `t.Error()`, allows test to continue after failure.
+* `AssertMustFoo()` - like `t.Fatal()`, terminates test on failure.
+
 ### Assertion Function Hierarchy Guidelines
 
 When creating custom assertion functions, follow these hierarchy principles.
@@ -151,11 +172,11 @@ func AssertCustomTrue(t core.T, condition bool, name string,
 
 **Key Principles:**
 
-- **Avoid circular dependencies**: Don't test assertions using themselves.
-- **Maintain consistency**: Derived functions should use base functions for
+* **Avoid circular dependencies**: Don't test assertions using themselves.
+* **Maintain consistency**: Derived functions should use base functions for
   uniform error formatting and logging behaviour.
-- **Use helper pattern**: Always call `t.Helper()` in assertion functions.
-- **Follow naming**: Use `Assert` prefix and descriptive suffixes.
+* **Use helper pattern**: Always call `t.Helper()` in assertion functions.
+* **Follow naming**: Use `Assert` prefix and descriptive suffixes.
 
 **Understanding Assertion Prefixes:**
 
@@ -178,10 +199,10 @@ core.AssertTrue(t, SliceContains(got, k), "key %q present", k)
 
 **Prefix Guidelines:**
 
-- Use **short, descriptive prefixes** (1-3 words).
-- The prefix will be combined with the actual value: `"prefix: value"`.
-- For formatted messages, use printf-style formatting: `"contains %v", key`.
-- Avoid complete sentences - they become redundant with the logged value.
+* Use **short, descriptive prefixes** (1-3 words).
+* The prefix will be combined with the actual value: `"prefix: value"`.
+* For formatted messages, use printf-style formatting: `"contains %v", key`.
+* Avoid complete sentences - they become redundant with the logged value.
 
 ## COMPLIANT Test Structure Patterns
 
@@ -834,6 +855,28 @@ func TestMyAssertion(t *testing.T) {
 }
 ```
 
+### Testing Fatal/FailNow Scenarios
+
+MockT supports testing functions that call Fatal/FailNow methods via the `Run()`
+method, which recovers from FailNow panics:
+
+```go
+func TestAssertionFailure(t *testing.T) {
+    mock := &core.MockT{}
+
+    // Test assertion that calls Fatal internally
+    ok := mock.Run("failing assertion", func(mt core.T) {
+        core.AssertEqual(mt, 1, 2, "should fail")
+        // This would call mt.Fatal() internally if we used:
+        // if !core.AssertEqual(mt, 1, 2, "should fail") { mt.FailNow() }
+    })
+
+    core.AssertFalse(t, ok, "assertion should fail")
+    core.AssertTrue(t, mock.Failed(), "mock should be marked as failed")
+    core.AssertTrue(t, mock.HasErrors(), "should have error message")
+}
+```
+
 ## Error Testing Patterns
 
 ### Expected Errors
@@ -894,11 +937,11 @@ Run with: `go test -tags=integration`
 
 ### Test Naming
 
-- Test functions: `TestFunctionName`.
-- Test types: `functionNameTestCase`.
-- TestCase interface methods:
-  - `func (tc testCaseType) Name() string` - returns test case name
-  - `func (tc testCaseType) Test(t *testing.T)` - runs the test logic
+* Test functions: `TestFunctionName`.
+* Test types: `functionNameTestCase`.
+* TestCase interface methods:
+  * `func (tc testCaseType) Name() string` - returns test case name
+  * `func (tc testCaseType) Test(t *testing.T)` - runs the test logic
 
 ### Documentation
 
@@ -921,11 +964,11 @@ func (tc parseURLTestCase) Test(t *testing.T) {
 
 ### Clean Tests
 
-- Use `t.Helper()` in all helper functions.
-- Prefer table-driven tests over individual test functions.
-- Keep setup and clean-up minimal.
-- Use meaningful assertion descriptions.
-- Test both success and failure paths.
+* Use `t.Helper()` in all helper functions.
+* Prefer table-driven tests over individual test functions.
+* Keep setup and clean-up minimal.
+* Use meaningful assertion descriptions.
+* Test both success and failure paths.
 
 ### Test Data
 
@@ -1079,16 +1122,16 @@ func validationTestCases(fieldName string) []validationTestCase {
 
 Before committing test code, verify ALL 6 requirements:
 
-- [ ] **TestCase Interface Validations**: Added `var _ TestCase = ...` for
+* [ ] **TestCase Interface Validations**: Added `var _ TestCase = ...` for
       all test case types
-- [ ] **Factory Functions**: Created `newTestCaseTypeName()` for all test
+* [ ] **Factory Functions**: Created `newTestCaseTypeName()` for all test
       case types
-- [ ] **Factory Usage**: All test case declarations use factory functions
+* [ ] **Factory Usage**: All test case declarations use factory functions
       (no naked struct literals)
-- [ ] **RunTestCases Usage**: All test functions use `RunTestCases(t, cases)`
-- [ ] **Anonymous Functions**: No `t.Run()` anonymous functions longer than
+* [ ] **RunTestCases Usage**: All test functions use `RunTestCases(t, cases)`
+* [ ] **Anonymous Functions**: No `t.Run()` anonymous functions longer than
       3 lines
-- [ ] **Test Case List Factories**: Complex test case generation uses
+* [ ] **Test Case List Factories**: Complex test case generation uses
       `myFooTestCases()` factory functions
 
 ## Summary
@@ -1096,11 +1139,11 @@ Before committing test code, verify ALL 6 requirements:
 By following these **MANDATORY** guidelines, all darvaza.org projects will
 have:
 
-- **Consistent testing patterns** across the entire ecosystem.
-- **Lint-compliant code** that meets complexity requirements.
-- **Maintainable tests** that are easy to read and modify.
-- **Reliable test suites** with excellent error reporting.
-- **Comprehensive coverage** with meaningful assertions.
+* **Consistent testing patterns** across the entire ecosystem.
+* **Lint-compliant code** that meets complexity requirements.
+* **Maintainable tests** that are easy to read and modify.
+* **Reliable test suites** with excellent error reporting.
+* **Comprehensive coverage** with meaningful assertions.
 
 The key is to treat test code with the same care as production code, using
 the excellent utilities provided by `darvaza.org/core` to maintain

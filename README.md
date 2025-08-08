@@ -298,31 +298,54 @@ Convenience functions for common error-handling patterns:
   err is not nil. Follows the common Go pattern of Must* functions for cases
   where errors should never occur.
 * `Maybe[T](value T, err error) T` - always returns the value, ignoring any
-  error. Useful when you want to proceed with a default or zero value regardless
-  of error status.
+  error. When an error occurs, the returned value may be the zero value of type
+  T depending on the function that produced it.
 * `MustOK[T](value T, ok bool) T` - returns value or panics with `PanicError` if
   ok is false. Useful for operations that should always succeed, such as map
   access or type assertions that are guaranteed to be valid.
 * `MaybeOK[T](value T, ok bool) T` - always returns the value, ignoring the ok
-  flag. Useful when you want to proceed with a default or zero value regardless
-  of operation success.
+  flag. When ok is false, the returned value is typically the zero value of
+  type T from the failed operation.
+* `MustT[T](value any) T` - equivalent to `MustOK(As[any, T](value))`. Returns
+  converted value or panics with `PanicError` if type conversion fails.
+* `MaybeT[T](value any) T` - equivalent to `MaybeOK(As[any, T](value))`. Returns
+  converted value on success, or the zero value of type T if conversion fails.
+
+All these utilities work together with the `As[any, T]` function, which returns
+`(value, ok)` for type conversion, allowing custom handling of conversion
+failures.
 
 ```go
 // Must - panic on error (use in tests, config loading, etc.)
 config := Must(loadConfig("config.json"))  // panics if loadConfig fails
 conn := Must(net.Dial("tcp", "localhost:8080"))  // panics if dial fails
 
-// Maybe - ignore errors, proceed with values
-content := Maybe(os.ReadFile("optional.txt"))  // empty string if file missing
-count := Maybe(strconv.Atoi(userInput))  // zero if parsing fails
+// Maybe - ignore errors, proceed with values (may be zero values)
+content := Maybe(os.ReadFile("optional.txt"))  // []byte{} if file missing
+count := Maybe(strconv.Atoi(userInput))       // 0 if parsing fails
 
 // MustOK - panic on failure (use when operation should always succeed)
 value := MustOK(MapValue(m, "key", 0))  // panics if key doesn't exist
-str := MustOK(As[any, string](v))  // panics if v is not a string
+str := MustOK(As[any, string](v))       // panics if v is not a string
 
-// MaybeOK - ignore ok flag, proceed with values
-value := MaybeOK(MapValue(m, "key", 0))  // zero value if key doesn't exist
-str := MaybeOK(As[any, string](v))  // zero value if type assertion fails
+// MaybeOK - ignore ok flag, proceed with values (zero values on failure)
+value := MaybeOK(MapValue(m, "key", 0))  // 0 if key doesn't exist
+str := MaybeOK(As[any, string](v))       // "" if type assertion fails
+
+// MustT - equivalent to MustOK(As[any, T](value))
+str := MustT[string](value)  // panics if value is not a string
+num := MustT[int](value)     // panics if value is not an int
+
+// MaybeT - equivalent to MaybeOK(As[any, T](value))
+str := MaybeT[string](value)  // "" (zero value) if value is not a string
+num := MaybeT[int](value)     // 0 (zero value) if value is not an int
+
+// As - the building block for type conversion with custom handling
+if str, ok := As[any, string](value); ok {
+    // use converted string
+} else {
+    str = "custom default"  // your own fallback logic
+}
 ```
 
 ### Unreachable Conditions
@@ -446,7 +469,8 @@ library tests and external library users.
   mock implementations.
 * `MockT` - thread-safe mock testing.T implementation with error/log
   collection, helper tracking, state inspection (`HasErrors()`, `HasLogs()`,
-  `LastError()`, `LastLog()`), and reset capabilities.
+  `LastError()`, `LastLog()`), reset capabilities, and full Fatal/FailNow
+  support with panic recovery via the `Run()` method.
 
 ### Test Helpers
 
@@ -482,6 +506,57 @@ both `*testing.T` and `MockT`:
   (value, ok).
 * `AssertPanic(t, fn, expectedPanic, msg...)` / `AssertNoPanic(t, fn, msg...)` -
   panic testing.
+
+#### Fatal Assertions
+
+All `AssertMustFoo()` functions call the corresponding `AssertFoo()` function
+and automatically call `t.FailNow()` if the assertion fails, terminating test
+execution immediately. These follow Go testing conventions where "Fatal"
+methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
+
+**Key Differences:**
+
+* `AssertFoo()` - like `t.Error()`, logs failure and allows test to continue.
+* `AssertMustFoo()` - like `t.Fatal()`, logs failure and terminates test
+  execution.
+
+**Fatal Assertion Functions:**
+
+* `AssertMustEqual[T](t, expected, actual, msg...)` - terminate on inequality.
+* `AssertMustNotEqual[T](t, expected, actual, msg...)` - terminate on equality.
+* `AssertMustSliceEqual[T](t, expected, actual, msg...)` - terminate on slice
+  inequality.
+* `AssertMustTrue(t, condition, msg...)` /
+  `AssertMustFalse(t, condition, msg...)` - terminate on boolean mismatch.
+* `AssertMustNil(t, value, msg...)` / `AssertMustNotNil(t, value, msg...)` -
+  terminate on nil check failure.
+* `AssertMustContains(t, text, substring, msg...)` - terminate if substring not
+  found.
+* `AssertMustError(t, err, msg...)` / `AssertMustNoError(t, err, msg...)` -
+  terminate on error expectation mismatch.
+* `AssertMustErrorIs(t, err, target, msg...)` - terminate on error chain
+  mismatch.
+* `AssertMustTypeIs[T](t, value, msg...) T` - terminate on type assertion
+  failure, returns cast value.
+* `AssertMustPanic(t, fn, expectedPanic, msg...)` /
+  `AssertMustNoPanic(t, fn, msg...)` - terminate on panic expectation mismatch.
+
+**Usage Examples:**
+
+```go
+// Error pattern - logs failure, test continues
+AssertEqual(t, expected, actual, "value check")
+// execution continues even if assertion fails
+
+// Fatal pattern - logs failure, test terminates
+AssertMustEqual(t, expected, actual, "critical value check")
+// execution stops here if assertion fails
+
+// Traditional early abort pattern (equivalent to AssertMust*)
+if !AssertEqual(t, expected, actual, "critical value") {
+    t.FailNow()
+}
+```
 
 ### Advanced Testing Utilities
 
@@ -539,7 +614,7 @@ Context-aware error group with cancellation:
 For detailed development setup, build commands, and AI agent guidance:
 
 * [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
-  patterns
+  patterns.
 
 ### Quick Start
 

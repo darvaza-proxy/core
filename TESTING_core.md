@@ -128,6 +128,10 @@ enhanced capabilities:
 - **Complete state inspection**: HasErrors(), HasLogs(), LastError(),
   LastLog() for detailed testing
 - **State reset**: Reset() clears all collected data and resets counters
+- **Fatal/FailNow support**: Full implementation of Fatal(), Fatalf(), and
+  FailNow() methods with proper panic behaviour
+- **Panic recovery**: Run() method executes test functions and recovers from
+  FailNow panics, enabling testing of fatal assertion patterns
 
 #### MockT Usage Examples
 
@@ -149,6 +153,49 @@ func TestAssertEqual(t *testing.T) {
  result = AssertEqual(mock, 42, 24, "inequality")
  AssertFalse(t, result, "returns false")
  AssertTrue(t, mock.HasErrors(), "has errors")
+}
+```
+
+#### Testing Fatal/FailNow Scenarios
+
+MockT's Run() method enables testing functions that call Fatal/FailNow methods,
+including the `AssertMust*` family of functions which automatically call
+`t.FailNow()` on assertion failure:
+
+```go
+func TestFatalAssertion(t *testing.T) {
+    mock := &MockT{}
+
+    // Test AssertMust* functions that call FailNow() automatically
+    ok := mock.Run("fatal assertion test", func(mt T) {
+        // This will call mt.FailNow() and cause Run() to return false
+        AssertMustEqual(mt, 1, 2, "critical failure")
+        // Execution stops here - this line won't be reached
+        mt.Log("should not reach here")
+    })
+
+    // Verify the test failed and was handled properly
+    if ok {
+        t.Error("Run should return false for failed test")
+    }
+    if !mock.Failed() {
+        t.Error("MockT should be marked as failed")
+    }
+    if !mock.HasErrors() {
+        t.Error("Should have recorded error messages")
+    }
+
+    // Traditional pattern - equivalent to AssertMust*
+    mock.Reset()
+    ok = mock.Run("manual fatal test", func(mt T) {
+        if !AssertEqual(mt, 1, 2, "manual check") {
+            mt.FailNow() // This will panic and be caught by Run()
+        }
+    })
+    // Verify same behaviour as AssertMust*
+    if ok {
+        t.Error("Manual FailNow should also cause test failure")
+    }
 }
 ```
 

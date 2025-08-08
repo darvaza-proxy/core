@@ -18,6 +18,9 @@ var _ TestCase = maybeTestCase{}
 var _ TestCase = mustOKSuccessTestCase{}
 var _ TestCase = mustOKPanicTestCase{}
 var _ TestCase = maybeOKTestCase{}
+var _ TestCase = mustTSuccessTestCase{}
+var _ TestCase = mustTPanicTestCase{}
+var _ TestCase = maybeTTestCase{}
 
 type asRecoveredTestCase struct {
 	input    any
@@ -803,4 +806,240 @@ func TestMaybeOK(t *testing.T) {
 	}
 
 	RunTestCases(t, testCases)
+}
+
+// Test cases for MustT function
+type mustTSuccessTestCase struct {
+	input    any
+	expected any
+	name     string
+}
+
+func newMustTSuccessTestCase(name string, input, expected any) mustTSuccessTestCase {
+	return mustTSuccessTestCase{
+		name:     name,
+		input:    input,
+		expected: expected,
+	}
+}
+
+func (tc mustTSuccessTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mustTSuccessTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Test successful type conversions that don't panic
+	switch expected := tc.expected.(type) {
+	case string:
+		got := MustT[string](tc.input)
+		AssertEqual(t, expected, got, "MustT to string")
+	case int:
+		got := MustT[int](tc.input)
+		AssertEqual(t, expected, got, "MustT to int")
+	case float64:
+		got := MustT[float64](tc.input)
+		AssertEqual(t, expected, got, "MustT to float64")
+	case error:
+		got := MustT[error](tc.input)
+		AssertEqual(t, expected, got, "MustT to error")
+	case fmt.Stringer:
+		got := MustT[fmt.Stringer](tc.input)
+		AssertEqual(t, expected.String(), got.String(), "MustT to fmt.Stringer")
+	default:
+		t.Errorf("unsupported expected type: %T", tc.expected)
+	}
+}
+
+func TestMustTSuccess(t *testing.T) {
+	testErr := errors.New("test")
+	testCases := []mustTSuccessTestCase{
+		newMustTSuccessTestCase("string to string", "hello", "hello"),
+		newMustTSuccessTestCase("int to int", 42, 42),
+		newMustTSuccessTestCase("float64 to float64", 3.14, 3.14),
+		newMustTSuccessTestCase("error to error", testErr, testErr),
+		newMustTSuccessTestCase("string to fmt.Stringer",
+			mockStringer{value: "test"}, mockStringer{value: "test"}),
+	}
+
+	RunTestCases(t, testCases)
+}
+
+type mustTPanicTestCase struct {
+	input  any
+	target string // target type description for error message
+	name   string
+}
+
+func newMustTPanicTestCase(name, target string, input any) mustTPanicTestCase {
+	return mustTPanicTestCase{
+		name:   name,
+		target: target,
+		input:  input,
+	}
+}
+
+func (tc mustTPanicTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mustTPanicTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Test type conversions that should panic
+	switch tc.target {
+	case "string":
+		AssertPanic(t, func() {
+			_ = MustT[string](tc.input)
+		}, nil, "MustT should panic for invalid string conversion")
+	case "int":
+		AssertPanic(t, func() {
+			_ = MustT[int](tc.input)
+		}, nil, "MustT should panic for invalid int conversion")
+	case "error":
+		AssertPanic(t, func() {
+			_ = MustT[error](tc.input)
+		}, nil, "MustT should panic for invalid error conversion")
+	case "fmt.Stringer":
+		AssertPanic(t, func() {
+			_ = MustT[fmt.Stringer](tc.input)
+		}, nil, "MustT should panic for invalid fmt.Stringer conversion")
+	default:
+		t.Errorf("unsupported target type: %s", tc.target)
+	}
+}
+
+func TestMustTPanic(t *testing.T) {
+	testCases := []mustTPanicTestCase{
+		newMustTPanicTestCase("int to string", "string", 42),
+		newMustTPanicTestCase("string to int", "int", "hello"),
+		newMustTPanicTestCase("string to error", "error", "not an error"),
+		newMustTPanicTestCase("int to fmt.Stringer", "fmt.Stringer", 42),
+		newMustTPanicTestCase("nil to string", "string", nil),
+	}
+
+	RunTestCases(t, testCases)
+}
+
+// Test cases for MaybeT function
+type maybeTTestCase struct {
+	input    any
+	target   string // target type description
+	expected any    // expected result (zero value if conversion fails)
+	name     string
+}
+
+func newMaybeTTestCase(name, target string, input, expected any) maybeTTestCase {
+	return maybeTTestCase{
+		name:     name,
+		target:   target,
+		input:    input,
+		expected: expected,
+	}
+}
+
+func (tc maybeTTestCase) Name() string {
+	return tc.name
+}
+
+func (tc maybeTTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Test type conversions with MaybeT (never panics)
+	switch tc.target {
+	case "string":
+		tc.testString(t)
+	case "int":
+		tc.testInt(t)
+	case "error":
+		tc.testError(t)
+	case "fmt.Stringer":
+		tc.testStringer(t)
+	default:
+		t.Errorf("unsupported target type: %s", tc.target)
+	}
+}
+
+func (tc maybeTTestCase) testString(t *testing.T) {
+	t.Helper()
+	got := MaybeT[string](tc.input)
+	expected, ok := tc.expected.(string)
+	if !ok {
+		t.Errorf("expected value is not a string: %T", tc.expected)
+		return
+	}
+	AssertEqual(t, expected, got, "MaybeT to string")
+}
+
+func (tc maybeTTestCase) testInt(t *testing.T) {
+	t.Helper()
+	got := MaybeT[int](tc.input)
+	expected, ok := tc.expected.(int)
+	if !ok {
+		t.Errorf("expected value is not an int: %T", tc.expected)
+		return
+	}
+	AssertEqual(t, expected, got, "MaybeT to int")
+}
+
+func (tc maybeTTestCase) testError(t *testing.T) {
+	t.Helper()
+	got := MaybeT[error](tc.input)
+	if tc.expected == nil {
+		AssertNil(t, got, "MaybeT to error (nil)")
+	} else {
+		expected, ok := tc.expected.(error)
+		if !ok {
+			t.Errorf("expected value is not an error: %T", tc.expected)
+			return
+		}
+		AssertEqual(t, expected, got, "MaybeT to error")
+	}
+}
+
+func (tc maybeTTestCase) testStringer(t *testing.T) {
+	t.Helper()
+	got := MaybeT[fmt.Stringer](tc.input)
+	if tc.expected == nil {
+		AssertNil(t, got, "MaybeT to fmt.Stringer (nil)")
+	} else {
+		expected, ok := tc.expected.(fmt.Stringer)
+		if !ok {
+			t.Errorf("expected value is not a fmt.Stringer: %T", tc.expected)
+			return
+		}
+		AssertEqual(t, expected.String(), got.String(), "MaybeT to fmt.Stringer")
+	}
+}
+
+func TestMaybeT(t *testing.T) {
+	testErr := errors.New("test")
+	testCases := []maybeTTestCase{
+		// Successful conversions
+		newMaybeTTestCase("string to string", "string", "hello", "hello"),
+		newMaybeTTestCase("int to int", "int", 42, 42),
+		newMaybeTTestCase("error to error", "error", testErr, testErr),
+		newMaybeTTestCase("stringer to stringer", "fmt.Stringer",
+			mockStringer{value: "test"}, mockStringer{value: "test"}),
+
+		// Failed conversions (should return zero values)
+		newMaybeTTestCase("int to string", "string", 42, ""),
+		newMaybeTTestCase("string to int", "int", "hello", 0),
+		newMaybeTTestCase("string to error", "error", "not an error", nil),
+		newMaybeTTestCase("int to fmt.Stringer", "fmt.Stringer", 42, nil),
+		newMaybeTTestCase("nil to string", "string", nil, ""),
+		newMaybeTTestCase("nil to int", "int", nil, 0),
+	}
+
+	RunTestCases(t, testCases)
+}
+
+// Helper type for testing fmt.Stringer interface
+type mockStringer struct {
+	value string
+}
+
+func (ms mockStringer) String() string {
+	return ms.value
 }
