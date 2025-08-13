@@ -287,21 +287,31 @@ func TestZeroEdgeCases(t *testing.T) {
 	t.Run("nil func pointer", testZeroEdgeCasesNilFuncPointer)
 }
 
+func isZeroReflectValueTestCases() []isZeroTestCase {
+	return S(
+		// Invalid reflect.Value
+		newIsZeroTestCase("invalid reflect.Value", reflect.Value{}, true),
+
+		// Valid reflect.Value containing zero
+		newIsZeroTestCase("reflect.Value containing zero int", reflect.ValueOf(0), true),
+		newIsZeroTestCase("reflect.Value containing empty string", reflect.ValueOf(""), true),
+		newIsZeroTestCase("reflect.Value containing false", reflect.ValueOf(false), true),
+
+		// Valid reflect.Value containing non-zero
+		newIsZeroTestCase("reflect.Value containing non-zero int", reflect.ValueOf(42), false),
+		newIsZeroTestCase("reflect.Value containing non-empty string", reflect.ValueOf("hello"), false),
+		newIsZeroTestCase("reflect.Value containing true", reflect.ValueOf(true), false),
+
+		// reflect.Value containing nil pointer
+		newIsZeroTestCase("reflect.Value containing nil pointer", reflect.ValueOf((*int)(nil)), true),
+
+		// reflect.Value containing non-nil pointer
+		newIsZeroTestCase("reflect.Value containing non-nil pointer", reflect.ValueOf(new(int)), false),
+	)
+}
+
 func TestIsZeroReflectValue(t *testing.T) {
-	// Test with invalid reflect.Value
-	var v reflect.Value
-	result := IsZero(v)
-	AssertTrue(t, result, "IsZero with zero reflect.Value")
-
-	// Test with valid reflect.Value containing zero
-	v2 := reflect.ValueOf(0)
-	result2 := IsZero(v2)
-	AssertTrue(t, result2, "IsZero with valid reflect.Value containing zero")
-
-	// Test with valid reflect.Value containing non-zero
-	v3 := reflect.ValueOf(42)
-	result3 := IsZero(v3)
-	AssertFalse(t, result3, "IsZero with valid reflect.Value containing non-zero")
+	RunTestCases(t, isZeroReflectValueTestCases())
 }
 
 type complexStruct struct {
@@ -541,28 +551,30 @@ func TestIsNilVsIsZero(t *testing.T) {
 	RunTestCases(t, isNilVsIsZeroTestCases())
 }
 
+func isNilReflectValueTestCases() []isNilTestCase {
+	return S(
+		// Invalid reflect.Value
+		newIsNilTestCase("invalid reflect.Value", reflect.Value{}, true),
+
+		// Valid reflect.Value containing nil
+		newIsNilTestCase("reflect.Value containing nil pointer", reflect.ValueOf((*int)(nil)), true),
+		newIsNilTestCase("reflect.Value containing nil slice", reflect.ValueOf([]int(nil)), true),
+		newIsNilTestCase("reflect.Value containing nil map", reflect.ValueOf(map[string]int(nil)), true),
+
+		// Valid reflect.Value containing non-nil
+		newIsNilTestCase("reflect.Value containing non-nil pointer", reflect.ValueOf(new(int)), false),
+		newIsNilTestCase("reflect.Value containing empty slice", reflect.ValueOf([]int{}), false),
+		newIsNilTestCase("reflect.Value containing empty map", reflect.ValueOf(map[string]int{}), false),
+
+		// reflect.Value containing basic types (cannot be nil)
+		newIsNilTestCase("reflect.Value containing int", reflect.ValueOf(42), false),
+		newIsNilTestCase("reflect.Value containing string", reflect.ValueOf("hello"), false),
+		newIsNilTestCase("reflect.Value containing bool", reflect.ValueOf(true), false),
+	)
+}
+
 func TestIsNilWithReflectValue(t *testing.T) {
-	// Test that an invalid reflect.Value is considered nil
-	var invalidValue reflect.Value
-	result := IsNil(invalidValue)
-	AssertTrue(t, result, "IsNil with invalid reflect.Value")
-
-	// Test that a valid reflect.Value with nil content is considered nil
-	var nilPtr *int
-	nilPtrValue := reflect.ValueOf(nilPtr)
-	result2 := IsNil(nilPtrValue)
-	AssertTrue(t, result2, "IsNil with reflect.Value containing nil")
-
-	// Test that a valid reflect.Value with non-nil content is not considered nil
-	nonNilPtr := new(int)
-	nonNilPtrValue := reflect.ValueOf(nonNilPtr)
-	result3 := IsNil(nonNilPtrValue)
-	AssertFalse(t, result3, "IsNil with reflect.Value containing non-nil")
-
-	// Test that a valid reflect.Value with basic type is not considered nil
-	intValue := reflect.ValueOf(42)
-	result4 := IsNil(intValue)
-	AssertFalse(t, result4, "IsNil with reflect.Value containing basic type")
+	RunTestCases(t, isNilReflectValueTestCases())
 }
 
 func testIsNilSlices(t *testing.T) {
@@ -651,53 +663,40 @@ func testIsNilInterfaces(t *testing.T) {
 }
 
 // Test IsNil with reflect.Value
-func TestIsNilReflectValue(t *testing.T) {
-	// Test with invalid reflect.Value
-	var v reflect.Value
-	result := IsNil(v)
-	AssertEqual(t, true, result, "IsNil(invalid reflect.Value)")
+// TestIsNilReflectValue is now consolidated with TestIsNilWithReflectValue
+// This test was duplicating the same functionality
 
-	// Test with valid reflect.Value containing nil
-	var p *int
-	v2 := reflect.ValueOf(p)
-	result2 := IsNil(v2)
-	AssertEqual(t, true, result2, "IsNil(reflect.Value nil)")
+func isNilTypedInterfaceTestCases() []isNilTestCase {
+	var nilPtr *int
+	var typedNilInterface any = nilPtr
 
-	// Test with valid reflect.Value containing non-nil
-	i := 42
-	v3 := reflect.ValueOf(&i)
-	result3 := IsNil(v3)
-	AssertEqual(t, false, result3, "IsNil(reflect.Value non-nil)")
+	ptrArray := []*int{nil, nil, nil}
+	nilValueMap := map[string]*int{"key": nil}
+	var nilChan chan int
+	closedChan := make(chan int)
+	close(closedChan)
 
-	// Test with reflect.Value containing basic type
-	v4 := reflect.ValueOf(42)
-	result4 := IsNil(v4)
-	AssertEqual(t, false, result4, "IsNil(reflect.Value basic)")
+	return S(
+		// Typed nil in interface
+		newIsNilTestCase("interface containing typed nil pointer", typedNilInterface, true),
+
+		// Array/slice with nil elements
+		newIsNilTestCase("array with nil elements", ptrArray, false),
+		newIsNilTestCase("nil element in array", ptrArray[0], true),
+
+		// Map with nil values
+		newIsNilTestCase("map with nil values", nilValueMap, false),
+		newIsNilTestCase("nil value in map", nilValueMap["key"], true),
+
+		// Channel operations
+		newIsNilTestCase("nil channel", nilChan, true),
+		newIsNilTestCase("closed channel", closedChan, false),
+	)
 }
 
 // Test IsNil with typed nil in interface
 func TestIsNilTypedInterface(t *testing.T) {
-	var p *int
-	var vi any = p
-	AssertEqual(t, true, IsNil(vi), "typed nil")
-
-	// Test slice with nil elements
-	ptrSlice := []*int{nil, nil, nil} // array literal, not slice
-	AssertEqual(t, false, IsNil(ptrSlice), "slice with nils")
-	AssertEqual(t, true, IsNil(ptrSlice[0]), "nil element")
-
-	// Test map with nil values
-	nilMap := map[string]*int{"key": nil}
-	AssertFalse(t, IsNil(nilMap), "map with nil values")
-	AssertTrue(t, IsNil(nilMap["key"]), "nil value in map")
-
-	// Channel operations
-	var ch chan int
-	AssertTrue(t, IsNil(ch), "nil channel")
-
-	ch = make(chan int)
-	close(ch)
-	AssertFalse(t, IsNil(ch), "closed channel")
+	RunTestCases(t, isNilTypedInterfaceTestCases())
 }
 
 // initializationSemanticsTestCase tests initialization semantics patterns
