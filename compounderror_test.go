@@ -56,8 +56,8 @@ func (tc compoundErrorErrorTestCase) Test(t *testing.T) {
 	ce := &CompoundError{Errs: tc.errs}
 	result := ce.Error()
 
-	if result != tc.expected {
-		t.Fatalf("expected '%s', got '%s'", tc.expected, result)
+	if !AssertEqual(t, tc.expected, result, "error string") {
+		return
 	}
 }
 
@@ -74,13 +74,13 @@ func TestCompoundErrorErrors(t *testing.T) {
 	ce := &CompoundError{Errs: errs}
 	result := ce.Errors()
 
-	if len(result) != len(errs) {
-		t.Fatalf("expected %d errors, got %d", len(errs), len(result))
+	if !AssertEqual(t, len(errs), len(result), "error count") {
+		return
 	}
 
 	for i, err := range result {
-		if err != errs[i] {
-			t.Fatalf("expected error %d to be %v, got %v", i, errs[i], err)
+		if !AssertSame(t, errs[i], err, "error %d", i) {
+			return
 		}
 	}
 }
@@ -94,13 +94,13 @@ func TestCompoundErrorUnwrap(t *testing.T) {
 	ce := &CompoundError{Errs: errs}
 	result := ce.Unwrap()
 
-	if len(result) != len(errs) {
-		t.Fatalf("expected %d errors, got %d", len(errs), len(result))
+	if !AssertEqual(t, len(errs), len(result), "error count") {
+		return
 	}
 
 	for i, err := range result {
-		if err != errs[i] {
-			t.Fatalf("expected error %d to be %v, got %v", i, errs[i], err)
+		if !AssertSame(t, errs[i], err, "error %d", i) {
+			return
 		}
 	}
 }
@@ -191,16 +191,14 @@ func (tc compoundErrorAsErrorTestCase) Test(t *testing.T) {
 	result := ce.AsError()
 
 	if tc.expectNil {
-		if result != nil {
-			t.Fatalf("expected nil, got %v", result)
+		if !AssertNil(t, result, "result") {
+			return
 		}
 	} else {
-		if result == nil {
-			t.Fatalf("expected non-nil error, got nil")
+		if !AssertNotNil(t, result, "result") {
+			return
 		}
-		if result != ce {
-			t.Fatalf("expected same CompoundError instance, got different")
-		}
+		AssertSame(t, ce, result, "CompoundError instance")
 	}
 }
 
@@ -245,19 +243,19 @@ func (tc compoundErrorAppendErrorTestCase) Test(t *testing.T) {
 	result := ce.AppendError(tc.toAppend...)
 
 	// Test method chaining
-	if result != ce {
-		t.Fatalf("expected same CompoundError instance for chaining")
+	if !AssertSame(t, ce, result, "CompoundError instance") {
+		return
 	}
 
 	// Test length
-	if len(ce.Errs) != tc.expectedLen {
-		t.Fatalf("expected %d errors, got %d", tc.expectedLen, len(ce.Errs))
+	if !AssertEqual(t, tc.expectedLen, len(ce.Errs), "error count") {
+		return
 	}
 
 	// Test no nil errors were added
 	for i, err := range ce.Errs {
-		if err == nil {
-			t.Fatalf("unexpected nil error at index %d", i)
+		if !AssertNotNil(t, err, "error %d", i) {
+			return
 		}
 	}
 }
@@ -273,26 +271,26 @@ func TestCompoundErrorAppendErrorWithCompoundError(t *testing.T) {
 	result := ce1.AppendError(ce2)
 
 	// Test method chaining
-	if result != ce1 {
-		t.Fatalf("expected same CompoundError instance for chaining")
+	if !AssertSame(t, ce1, result, "CompoundError instance") {
+		return
 	}
 
 	// Should unwrap the compound error and append individual errors
 	expectedLen := 3 // original 1 + unwrapped 2
-	if len(ce1.Errs) != expectedLen {
-		t.Fatalf("expected %d errors, got %d", expectedLen, len(ce1.Errs))
+	if !AssertEqual(t, expectedLen, len(ce1.Errs), "error count") {
+		return
 	}
 
 	// Check error messages
 	errorStr := ce1.Error()
-	if !strings.Contains(errorStr, "first") {
-		t.Fatalf("expected 'first' in error string, got '%s'", errorStr)
+	if !AssertContains(t, errorStr, "first", "error string") {
+		return
 	}
-	if !strings.Contains(errorStr, "second") {
-		t.Fatalf("expected 'second' in error string, got '%s'", errorStr)
+	if !AssertContains(t, errorStr, "second", "error string") {
+		return
 	}
-	if !strings.Contains(errorStr, "third") {
-		t.Fatalf("expected 'third' in error string, got '%s'", errorStr)
+	if !AssertContains(t, errorStr, "third", "error string") {
+		return
 	}
 }
 
@@ -317,14 +315,14 @@ func TestCompoundErrorAppendErrorWithUnwrappable(t *testing.T) {
 	result := ce.AppendError(mock)
 
 	// Test method chaining
-	if result != ce {
-		t.Fatalf("expected same CompoundError instance for chaining")
+	if !AssertSame(t, ce, result, "CompoundError instance") {
+		return
 	}
 
 	// Should unwrap and append individual errors
 	expectedLen := 3 // original 1 + unwrapped 2
-	if len(ce.Errs) != expectedLen {
-		t.Fatalf("expected %d errors, got %d", expectedLen, len(ce.Errs))
+	if !AssertEqual(t, expectedLen, len(ce.Errs), "error count") {
+		return
 	}
 }
 
@@ -375,19 +373,17 @@ func (tc compoundErrorAppendTestCase) Test(t *testing.T) {
 	result := ce.Append(tc.err, tc.note, tc.args...)
 
 	// Test method chaining
-	if result != ce {
-		t.Fatalf("expected same CompoundError instance for chaining")
-	}
+	AssertSame(t, ce, result, "CompoundError instance")
 
 	// Test length
-	if len(ce.Errs) != tc.expectedLen {
-		t.Fatalf("expected %d errors, got %d", tc.expectedLen, len(ce.Errs))
+	if !AssertEqual(t, tc.expectedLen, len(ce.Errs), "error count") {
+		return
 	}
 
 	if tc.expectedLen > 0 {
 		lastErr := ce.Errs[len(ce.Errs)-1]
-		if lastErr == nil {
-			t.Fatalf("expected non-nil error")
+		if !AssertNotNil(t, lastErr, "last error") {
+			return
 		}
 
 		errorStr := lastErr.Error()
@@ -397,8 +393,10 @@ func (tc compoundErrorAppendTestCase) Test(t *testing.T) {
 				if len(tc.args) > 0 {
 					expectedNote = "wrapped note: 42" // for the formatted case
 				}
-				if !strings.Contains(errorStr, expectedNote) && !strings.Contains(errorStr, tc.note) {
-					t.Fatalf("expected note in error string, got '%s'", errorStr)
+				foundExpected := strings.Contains(errorStr, expectedNote)
+				foundOriginal := strings.Contains(errorStr, tc.note)
+				if !AssertTrue(t, foundExpected || foundOriginal, "note in error string") {
+					return
 				}
 			}
 		}
@@ -419,20 +417,20 @@ func TestCompoundErrorAppendChaining(t *testing.T) {
 		Append(errors.New("fourth"), "wrapped %s", "note")
 
 	// Test method chaining returns same instance
-	if result != ce {
-		t.Fatalf("expected same CompoundError instance for chaining")
+	if !AssertSame(t, ce, result, "CompoundError instance") {
+		return
 	}
 
 	// Test final length
 	expectedLen := 4
-	if len(ce.Errs) != expectedLen {
-		t.Fatalf("expected %d errors, got %d", expectedLen, len(ce.Errs))
+	if !AssertEqual(t, expectedLen, len(ce.Errs), "error count") {
+		return
 	}
 
 	// Test that all errors are non-nil
 	for i, err := range ce.Errs {
-		if err == nil {
-			t.Fatalf("unexpected nil error at index %d", i)
+		if !AssertNotNil(t, err, "error %d", i) {
+			return
 		}
 	}
 }
@@ -443,12 +441,12 @@ func TestCompoundErrorNilHandling(t *testing.T) {
 
 	_ = ce.AppendError(nil, errors.New("valid"), nil)
 
-	if len(ce.Errs) != 1 {
-		t.Fatalf("expected 1 error, got %d", len(ce.Errs))
+	if !AssertEqual(t, 1, len(ce.Errs), "error count") {
+		return
 	}
 
-	if ce.Errs[0].Error() != "valid" {
-		t.Fatalf("expected 'valid' error, got '%s'", ce.Errs[0].Error())
+	if !AssertEqual(t, "valid", ce.Errs[0].Error(), "error message") {
+		return
 	}
 }
 
@@ -462,13 +460,13 @@ func TestCompoundErrorIsInterface(t *testing.T) {
 	var _ error = ce
 
 	// Test that Error() method works
-	if ce.Error() == "" {
-		t.Fatalf("expected non-empty error string")
+	if !AssertTrue(t, ce.Error() != "", "non-empty error string") {
+		return
 	}
 
 	// Test that Errors() method works
 	errs := ce.Errors()
-	if len(errs) != 1 {
-		t.Fatalf("expected 1 error, got %d", len(errs))
+	if !AssertEqual(t, 1, len(errs), "error count") {
+		return
 	}
 }

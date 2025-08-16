@@ -62,6 +62,7 @@
     "portless",
     "rhqv",
     "shellcheck",
+    "skipcq",
     "splithostport",
     "staticcheck",
     "strconv",
