@@ -149,6 +149,8 @@ for log messages, not a complete message:
 core.AssertEqual(t, expected, actual, "value")
 core.AssertNotEqual(t, expected, actual, "value")
 core.AssertSliceEqual(t, expectedSlice, actualSlice, "slice")
+core.AssertSame(t, expected, actual, "same reference/value")
+core.AssertNotSame(t, expected, actual, "different reference/value")
 core.AssertTrue(t, condition, "condition")
 core.AssertFalse(t, condition, "negation")
 core.AssertNil(t, value, "nil check")

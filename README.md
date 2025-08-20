@@ -124,6 +124,13 @@ Key distinctions from `IsZero`:
 * **Structs**: `IsNil(struct{}{})` returns `false` (structs cannot be nil),
   `IsZero(struct{}{})` returns `true` (zero struct is uninitialized).
 
+#### Same Value Detection
+
+* `IsSame(a, b)` - reports whether two values are the same. For reference
+  types (slices, maps, pointers), compares by pointer equality. For value
+  types (numbers, strings, booleans), compares by equal values. Two nils
+  of the same type are considered the same.
+
 #### Other Utilities
 
 * `Coalesce[T](values...)` returns the first non-zero value.
@@ -472,6 +479,25 @@ library tests and external library users.
   `LastError()`, `LastLog()`), reset capabilities, and full Fatal/FailNow
   support with panic recovery via the `Run()` method.
 
+### Cross-Compatible Test Functions
+
+For test utilities that need to work with both `*testing.T` and `MockT`, use
+interface type assertions to detect `Run()` method support. This enables
+nested subtests that gracefully degrade to direct function calls:
+
+```go
+func doRun(t T, name string, fn func(T)) {
+    switch tt := t.(type) {
+    case interface { Run(string, func(*testing.T)) bool }:
+        tt.Run(name, func(subT *testing.T) { fn(subT) })
+    case interface { Run(string, func(T)) bool }:
+        tt.Run(name, fn)
+    default:
+        fn(t) // Fallback for simple T implementations
+    }
+}
+```
+
 ### Test Helpers
 
 * `S[T](values...)` - concise slice creation: `S(1, 2, 3)` instead of
@@ -490,6 +516,10 @@ both `*testing.T` and `MockT`:
   comparison.
 * `AssertSliceEqual[T](t, expected, actual, msg...)` - slice comparison using
   `reflect.DeepEqual`.
+* `AssertSame(t, expected, actual, msg...)` - same value/reference comparison
+  using pointer equality for reference types, value equality for basic types.
+* `AssertNotSame(t, expected, actual, msg...)` - different value/reference
+  comparison.
 * `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
   boolean assertions.
 * `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - nil
@@ -540,6 +570,9 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
   failure, returns cast value.
 * `AssertMustPanic(t, fn, expectedPanic, msg...)` /
   `AssertMustNoPanic(t, fn, msg...)` - terminate on panic expectation mismatch.
+* `AssertMustSame(t, expected, actual, msg...)` /
+  `AssertMustNotSame(t, expected, actual, msg...)` - terminate on same-ness
+  mismatch.
 
 **Usage Examples:**
 
