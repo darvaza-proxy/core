@@ -141,7 +141,7 @@ gen_make_targets() {
 		depsx="\$(COVERAGE_DIR)"
 		;;
 	race)
-		call="CGO_ENABLED=1 \$(GO) test -race \$(GOTEST_FLAGS) ./..."
+		call="env CGO_ENABLED=1 \$(GO) test -race -count=1 \$(GOTEST_FLAGS) ./..."
 		;;
 	*)
 		call="\$(GO) $cmd -v ./..."
@@ -251,6 +251,6 @@ clean-coverage: ; $(info $(M) cleaning coverage data…)
 
 # Merge all coverage profiles into a single file
 $(COVERAGE_DIR)/coverage.out: | coverage ; $(info $(M) merging coverage profiles…)
-	$Q $(TOOLSDIR)/merge_coverage.sh $(wildcard $(COVERAGE_DIR)/coverage_*.prof) > $@~
+	$Q $(TOOLSDIR)/merge_coverage.sh $(COVERAGE_DIR)/coverage_*.prof > $@~
 	$Q mv $@~ $@
 EOT
