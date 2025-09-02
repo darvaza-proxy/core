@@ -29,7 +29,30 @@ REVIVE_RUN_ARGS ?= -config $(REVIVE_CONF) -formatter friendly
 REVIVE_URL ?= github.com/mgechev/revive@$(REVIVE_VERSION)
 REVIVE ?= $(GO) run $(REVIVE_URL)
 
+FIX_WHITESPACE ?= $(TOOLSDIR)/fix_whitespace.sh
+# Exclude Go files (handled separately by gofmt)
+FIX_WHITESPACE_EXCLUDE_GO ?= -name '*.go'
+# Exclude binary and image files
+FIX_WHITESPACE_EXCLUDE_BINARY_EXTS ?= exe dll so dylib a o test
+FIX_WHITESPACE_EXCLUDE_IMAGE_EXTS ?= png jpg jpeg gif ico pdf
+FIX_WHITESPACE_EXCLUDE_ARCHIVE_EXTS ?= zip tar gz bz2 xz 7z
+FIX_WHITESPACE_EXCLUDE_OTHER_EXTS ?= bin dat
+# Combine all exclusions
+FIX_WHITESPACE_EXCLUDE_EXTS ?= \
+	$(FIX_WHITESPACE_EXCLUDE_ARCHIVE_EXTS) \
+	$(FIX_WHITESPACE_EXCLUDE_BINARY_EXTS) \
+	$(FIX_WHITESPACE_EXCLUDE_IMAGE_EXTS) \
+	$(FIX_WHITESPACE_EXCLUDE_OTHER_EXTS)
+FIX_WHITESPACE_EXCLUDE_PATTERNS ?= $(patsubst %,-o -name '*.%',$(FIX_WHITESPACE_EXCLUDE_EXTS))
+FIX_WHITESPACE_EXCLUDE ?= $(FIX_WHITESPACE_EXCLUDE_GO) $(FIX_WHITESPACE_EXCLUDE_PATTERNS)
+FIX_WHITESPACE_ARGS ?= . \! \( $(FIX_WHITESPACE_EXCLUDE) \)
+
 PNPX ?= pnpx
+
+FIND_FILES_PRUNE_RULES ?= -name vendor -o -name .git -o -name node_modules
+FIND_FILES_PRUNE_ARGS ?= \( $(FIND_FILES_PRUNE_RULES) \) -prune
+FIND_FILES_GO_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.go'
+FIND_FILES_MARKDOWN_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.md'
 
 ifndef MARKDOWNLINT
 ifeq ($(shell $(PNPX) markdownlint-cli --version 2>&1 | grep -q '^[0-9]' && echo yes),yes)
@@ -66,29 +89,6 @@ SHELLCHECK = true
 endif
 endif
 SHELLCHECK_FLAGS ?=
-
-FIX_WHITESPACE ?= $(TOOLSDIR)/fix_whitespace.sh
-# Exclude Go files (handled separately by gofmt)
-FIX_WHITESPACE_EXCLUDE_GO ?= -name '*.go'
-# Exclude binary and image files
-FIX_WHITESPACE_EXCLUDE_BINARY_EXTS ?= exe dll so dylib a o test
-FIX_WHITESPACE_EXCLUDE_IMAGE_EXTS ?= png jpg jpeg gif ico pdf
-FIX_WHITESPACE_EXCLUDE_ARCHIVE_EXTS ?= zip tar gz bz2 xz 7z
-FIX_WHITESPACE_EXCLUDE_OTHER_EXTS ?= bin dat
-# Combine all exclusions
-FIX_WHITESPACE_EXCLUDE_EXTS ?= \
-	$(FIX_WHITESPACE_EXCLUDE_ARCHIVE_EXTS) \
-	$(FIX_WHITESPACE_EXCLUDE_BINARY_EXTS) \
-	$(FIX_WHITESPACE_EXCLUDE_IMAGE_EXTS) \
-	$(FIX_WHITESPACE_EXCLUDE_OTHER_EXTS)
-FIX_WHITESPACE_EXCLUDE_PATTERNS ?= $(patsubst %,-o -name '*.%',$(FIX_WHITESPACE_EXCLUDE_EXTS))
-FIX_WHITESPACE_EXCLUDE ?= $(FIX_WHITESPACE_EXCLUDE_GO) $(FIX_WHITESPACE_EXCLUDE_PATTERNS)
-FIX_WHITESPACE_ARGS ?= . \! \( $(FIX_WHITESPACE_EXCLUDE) \)
-
-FIND_FILES_PRUNE_RULES ?= -name vendor -o -name .git -o -name node_modules
-FIND_FILES_PRUNE_ARGS ?= \( $(FIND_FILES_PRUNE_RULES) \) -prune
-FIND_FILES_GO_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.go'
-FIND_FILES_MARKDOWN_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.md'
 
 V = 0
 Q = $(if $(filter 1,$V),,@)
