@@ -535,7 +535,7 @@ both `*testing.T` and `MockT`:
 * `AssertTypeIs[T](t, value, msg...)` - type assertion with casting, returns
   (value, ok).
 * `AssertPanic(t, fn, expectedPanic, msg...)` / `AssertNoPanic(t, fn, msg...)` -
-  panic testing.
+  panic testing with type-aware matching.
 
 #### Fatal Assertions
 

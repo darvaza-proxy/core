@@ -372,30 +372,114 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 }
 
 // AssertPanic runs a function expecting it to panic and optionally validates the panic value.
-// This standardizes panic testing patterns.
+// The expectedPanic parameter determines how the panic value is validated:
+//
+//   - nil: Any panic is acceptable (most common case - just verify it panics).
+//   - error: Uses errors.Is semantics to match error chains (resilient to wrapping).
+//   - string: Checks if the panic message contains this substring (resilient to message changes).
+//   - Recovered: Direct comparison without unwrapping (for testing panic recovery).
+//   - other types: Exact equality check after unwrapping Recovered if present.
+//
+// This type-specific matching makes tests more resilient to implementation changes
+// whilst still validating that panics occur for the right reasons.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
 // Example usage:
 //
-//	AssertPanic(t, func() { someFunctionThatPanics() }, nil, "panic test")
-//	AssertPanic(t, func() { divide(1, 0) }, "division by zero", "divide %d by zero", 1)
+//	// Just verify it panics (most common)
+//	AssertPanic(t, func() { slice[999] }, nil, "out of bounds")
+//
+//	// Check panic message contains substring
+//	AssertPanic(t, func() { divide(1, 0) }, "division", "divide by zero")
+//
+//	// Check panic with specific error type
+//	AssertPanic(t, func() { mustValidate(nil) }, ErrValidation, "validation")
 func AssertPanic(t T, fn func(), expectedPanic any, name string, args ...any) (ok bool) {
 	t.Helper()
 	defer func() {
-		r := recover()
-		if r == nil {
-			doError(t, name, args, "expected panic but got nil")
-			return
-		}
-		if expectedPanic != nil && !reflect.DeepEqual(r, expectedPanic) {
-			doError(t, name, args, "expected panic %v, got %v", expectedPanic, r)
-			return
-		}
-		ok = true
-		doLog(t, name, args, "%v", r)
+		ok = doAssertPanic(t, recover(), expectedPanic, name, args...)
 	}()
 	fn()
+	return ok
+}
+
+func doAssertPanic(t T, recovered, expected any, name string, args ...any) bool {
+	t.Helper()
+
+	// Check if panic occurred
+	if recovered == nil {
+		doError(t, name, args, "expected panic but got nil")
+		return false
+	}
+
+	switch target := expected.(type) {
+	case nil:
+		// Any panic is acceptable
+		doLog(t, name, args, "panic: %v", recovered)
+		return true
+	case Recovered:
+		// Direct comparison without unwrapping
+		return doAssertPanicEqual(t, recovered, expected, name, args...)
+	case error:
+		// Error chain matching
+		return doAssertPanicError(t, recovered, target, name, args...)
+	case string:
+		// Substring matching
+		return doAssertPanicContains(t, recovered, target, name, args...)
+	default:
+		// Exact equality after potential unwrapping
+		if r, ok := recovered.(Recovered); ok {
+			recovered = r.Recovered()
+		}
+		return doAssertPanicEqual(t, recovered, expected, name, args...)
+	}
+}
+
+func doAssertPanicEqual(t T, recovered, expected any, name string, args ...any) bool {
+	t.Helper()
+
+	ok := reflect.DeepEqual(recovered, expected)
+	if ok {
+		doLog(t, name, args, "panic: %v", recovered)
+	} else {
+		doError(t, name, args, "expected panic %v, got %v", expected, recovered)
+	}
+
+	return ok
+}
+
+func doAssertPanicError(t T, recovered any, target error, name string, args ...any) bool {
+	t.Helper()
+
+	err := AsRecovered(recovered)
+	ok := errors.Is(err, target)
+	if ok {
+		doLog(t, name, args, "panic error: %v", err)
+	} else {
+		doError(t, name, args, "expected panic error %v, got %v", target, err)
+	}
+
+	return ok
+}
+
+func doAssertPanicContains(t T, recovered any, substr, name string, args ...any) bool {
+	var msg string
+
+	t.Helper()
+	if s, ok := recovered.(string); ok {
+		msg = s
+	} else {
+		msg = AsRecovered(recovered).Error()
+	}
+
+	ok := strings.Contains(msg, substr)
+	if ok {
+		doLog(t, name, args, "panic contains %q: %q", substr, msg)
+	} else {
+		doError(t, name, args, "expected panic to contain %q, got %q", substr, msg)
+	}
+
 	return ok
 }
 
