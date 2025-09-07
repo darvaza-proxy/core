@@ -286,40 +286,107 @@ func TestAssertTypeIs(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
-// Test AssertPanic
-func TestAssertPanic(t *testing.T) {
+// assertPanicTestCase for table-driven tests
+type assertPanicTestCase struct {
+	panicFn      func()
+	expected     any
+	logContains  string
+	name         string
+	desc         string
+	expectResult bool
+	expectErrors bool
+}
+
+// Compile-time verification
+var _ TestCase = assertPanicTestCase{}
+
+func (tc assertPanicTestCase) Name() string {
+	return tc.name
+}
+
+func (tc assertPanicTestCase) Test(t *testing.T) {
+	t.Helper()
 	mock := &MockT{}
 
-	// Test AssertPanic with panic (success)
-	result := AssertPanic(mock, func() { panic("test panic") }, nil, "panic test")
-	AssertTrue(t, result, "AssertPanic result with panic")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := AssertPanic(mock, tc.panicFn, tc.expected, tc.desc)
+	AssertEqual(t, tc.expectResult, result, "result")
+	AssertEqual(t, tc.expectErrors, mock.HasErrors(), "has errors")
 
-	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	AssertTrue(t, strings.Contains(lastLog, "test panic"), "log contains panic value")
+	if tc.logContains != "" && mock.HasLogs() {
+		lastLog, _ := mock.LastLog()
+		AssertContains(t, lastLog, tc.logContains, "log content")
+	}
+}
 
-	mock.Reset()
+// revive:disable-next-line:argument-limit
+func newAssertPanicTestCase(name string, panicFn func(), expected any, desc string,
+	expectResult, expectErrors bool, logContains string) assertPanicTestCase {
+	return assertPanicTestCase{
+		name:         name,
+		panicFn:      panicFn,
+		expected:     expected,
+		desc:         desc,
+		expectResult: expectResult,
+		expectErrors: expectErrors,
+		logContains:  logContains,
+	}
+}
 
-	// Test AssertPanic without panic (failure)
-	result = AssertPanic(mock, func() {}, nil, "no panic test")
-	AssertFalse(t, result, "AssertPanic result without panic")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+func assertPanicTestCases() []assertPanicTestCase {
+	testErr := errors.New("test error")
+	otherErr := errors.New("other error")
+	panicErr := NewPanicError(0, "recovered panic")
+	wrappedPanic := NewPanicError(0, 99)
 
-	mock.Reset()
+	return []assertPanicTestCase{
+		// Any panic tests
+		newAssertPanicTestCase("any panic accepted",
+			func() { panic("test panic") }, nil, "panic test",
+			true, false, "test panic"),
+		newAssertPanicTestCase("no panic fails",
+			func() {}, nil, "no panic test",
+			false, true, ""),
 
-	// Test AssertPanic with expected panic value (success)
-	result = AssertPanic(mock, func() { panic("specific") }, "specific", "specific panic test")
-	AssertTrue(t, result, "AssertPanic result with expected panic")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
+		// String matching tests
+		newAssertPanicTestCase("string substring match",
+			func() { panic("specific panic message") }, "specific", "string test",
+			true, false, "contains"),
+		newAssertPanicTestCase("string mismatch",
+			func() { panic("wrong") }, "expected", "wrong string test",
+			false, true, ""),
+		newAssertPanicTestCase("non-string panic with string expected",
+			func() { panic(123) }, "123", "non-string test",
+			true, false, "contains"),
 
-	mock.Reset()
+		// Error matching tests
+		newAssertPanicTestCase("error match",
+			func() { panic(testErr) }, testErr, "error test",
+			true, false, "panic error"),
+		newAssertPanicTestCase("error mismatch",
+			func() { panic(testErr) }, otherErr, "wrong error test",
+			false, true, ""),
 
-	// Test AssertPanic with wrong panic value (failure)
-	result = AssertPanic(mock, func() { panic("wrong") }, "expected", "wrong panic test")
-	AssertFalse(t, result, "AssertPanic result with wrong panic")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+		// Exact matching tests
+		newAssertPanicTestCase("integer match",
+			func() { panic(42) }, 42, "int test",
+			true, false, "panic: 42"),
+		newAssertPanicTestCase("integer mismatch",
+			func() { panic(42) }, 43, "wrong int test",
+			false, true, ""),
+
+		// Recovered type tests
+		newAssertPanicTestCase("Recovered type match",
+			func() { panic(panicErr) }, panicErr, "recovered test",
+			true, false, "panic:"),
+		newAssertPanicTestCase("Recovered unwrapping",
+			func() { panic(wrappedPanic) }, 99, "unwrapped test",
+			true, false, "panic: 99"),
+	}
+}
+
+// Test AssertPanic
+func TestAssertPanic(t *testing.T) {
+	RunTestCases(t, assertPanicTestCases())
 }
 
 // Test AssertNoPanic
