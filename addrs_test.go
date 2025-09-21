@@ -26,20 +26,22 @@ type parseAddrTestCase struct {
 	wantErr bool
 }
 
-var parseAddrTestCases = []parseAddrTestCase{
-	newParseAddrTestCaseStr("IPv4 address", "192.168.1.1", "192.168.1.1", false),
-	newParseAddrTestCaseStr("IPv6 address", "2001:db8::1", "2001:db8::1", false),
-	newParseAddrTestCase("IPv4 unspecified shorthand", "0", netip.IPv4Unspecified(), false),
-	newParseAddrTestCase("IPv6 unspecified", "::", netip.IPv6Unspecified(), false),
-	newParseAddrTestCaseStr("IPv4 loopback", "127.0.0.1", "127.0.0.1", false),
-	newParseAddrTestCaseStr("IPv6 loopback", "::1", "::1", false),
-	newParseAddrTestCaseStr("Invalid address", "not-an-ip", "", true),
-	newParseAddrTestCaseStr("Empty string", "", "", true),
-	newParseAddrTestCaseStr("IPv4 with port", "192.168.1.1:8080", "", true),
-	newParseAddrTestCaseStr("IPv6 with zone", "fe80::1%eth0", "fe80::1%eth0", false),
+func makeParseAddrTestCases() []TestCase {
+	return S(
+		newParseAddrTestCaseStr("IPv4 address", "192.168.1.1", "192.168.1.1", false),
+		newParseAddrTestCaseStr("IPv6 address", "2001:db8::1", "2001:db8::1", false),
+		newParseAddrTestCase("IPv4 unspecified shorthand", "0", netip.IPv4Unspecified(), false),
+		newParseAddrTestCase("IPv6 unspecified", "::", netip.IPv6Unspecified(), false),
+		newParseAddrTestCaseStr("IPv4 loopback", "127.0.0.1", "127.0.0.1", false),
+		newParseAddrTestCaseStr("IPv6 loopback", "::1", "::1", false),
+		newParseAddrTestCaseStr("Invalid address", "not-an-ip", "", true),
+		newParseAddrTestCaseStr("Empty string", "", "", true),
+		newParseAddrTestCaseStr("IPv4 with port", "192.168.1.1:8080", "", true),
+		newParseAddrTestCaseStr("IPv6 with zone", "fe80::1%eth0", "fe80::1%eth0", false),
+	)
 }
 
-func newParseAddrTestCase(name, input string, want netip.Addr, wantErr bool) parseAddrTestCase {
+func newParseAddrTestCase(name, input string, want netip.Addr, wantErr bool) TestCase {
 	return parseAddrTestCase{
 		name:    name,
 		input:   input,
@@ -49,7 +51,7 @@ func newParseAddrTestCase(name, input string, want netip.Addr, wantErr bool) par
 }
 
 //revive:disable-next-line:flag-parameter
-func newParseAddrTestCaseStr(name, input, wantAddr string, wantErr bool) parseAddrTestCase {
+func newParseAddrTestCaseStr(name, input, wantAddr string, wantErr bool) TestCase {
 	var want netip.Addr
 	if !wantErr && wantAddr != "" {
 		want = netip.MustParseAddr(wantAddr)
@@ -85,7 +87,7 @@ func (tc parseAddrTestCase) Test(t *testing.T) {
 }
 
 func TestParseAddr(t *testing.T) {
-	RunTestCases(t, parseAddrTestCases)
+	RunTestCases(t, makeParseAddrTestCases())
 }
 
 // Test cases for ParseNetIP
@@ -96,16 +98,18 @@ type parseNetIPTestCase struct {
 	wantErr bool
 }
 
-var parseNetIPTestCases = []parseNetIPTestCase{
-	newParseNetIPTestCase("IPv4 address", "192.168.1.1", net.ParseIP("192.168.1.1"), false),
-	newParseNetIPTestCase("IPv6 address", "2001:db8::1", net.ParseIP("2001:db8::1"), false),
-	newParseNetIPTestCase("IPv4 unspecified shorthand", "0", net.IPv4zero, false),
-	newParseNetIPTestCase("IPv6 unspecified", "::", net.IPv6zero, false),
-	newParseNetIPTestCase("Invalid address", "invalid", nil, true),
-	newParseNetIPTestCase("Empty string", "", nil, true),
+func makeParseNetIPTestCases() []TestCase {
+	return S(
+		newParseNetIPTestCase("IPv4 address", "192.168.1.1", net.ParseIP("192.168.1.1"), false),
+		newParseNetIPTestCase("IPv6 address", "2001:db8::1", net.ParseIP("2001:db8::1"), false),
+		newParseNetIPTestCase("IPv4 unspecified shorthand", "0", net.IPv4zero, false),
+		newParseNetIPTestCase("IPv6 unspecified", "::", net.IPv6zero, false),
+		newParseNetIPTestCase("Invalid address", "invalid", nil, true),
+		newParseNetIPTestCase("Empty string", "", nil, true),
+	)
 }
 
-func newParseNetIPTestCase(name, input string, want net.IP, wantErr bool) parseNetIPTestCase {
+func newParseNetIPTestCase(name, input string, want net.IP, wantErr bool) TestCase {
 	return parseNetIPTestCase{
 		name:    name,
 		input:   input,
@@ -137,7 +141,7 @@ func (tc parseNetIPTestCase) Test(t *testing.T) {
 }
 
 func TestParseNetIP(t *testing.T) {
-	RunTestCases(t, parseNetIPTestCases)
+	RunTestCases(t, makeParseNetIPTestCases())
 }
 
 // Test cases for AddrFromNetIP
@@ -155,23 +159,25 @@ type addrFromNetIPTestCase struct {
 	ok bool
 }
 
-var addrFromNetIPTestCases = []addrFromNetIPTestCase{
-	newAddrFromNetIPTestCase("IPAddr IPv4", &net.IPAddr{IP: net.ParseIP("192.168.1.1")},
-		netip.MustParseAddr("192.168.1.1"), true),
-	newAddrFromNetIPTestCase("IPAddr IPv6", &net.IPAddr{IP: net.ParseIP("2001:db8::1")},
-		netip.MustParseAddr("2001:db8::1"), true),
-	newAddrFromNetIPTestCase("IPNet IPv4", &net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
-		netip.MustParseAddr("10.0.0.0"), true),
-	newAddrFromNetIPTestCase("IPNet IPv6", &net.IPNet{IP: net.ParseIP("2001:db8::"), Mask: net.CIDRMask(64, 128)},
-		netip.MustParseAddr("2001:db8::"), true),
-	newAddrFromNetIPTestCase("TCPAddr", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, netip.Addr{}, false),
-	newAddrFromNetIPTestCase("UDPAddr", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, netip.Addr{}, false),
-	newAddrFromNetIPTestCase("nil input", nil, netip.Addr{}, false),
-	newAddrFromNetIPTestCase("IPAddr with nil IP", &net.IPAddr{IP: nil}, netip.Addr{}, false),
-	newAddrFromNetIPTestCase("IPNet with nil IP", &net.IPNet{IP: nil, Mask: net.CIDRMask(24, 32)}, netip.Addr{}, false),
+func makeAddrFromNetIPTestCases() []TestCase {
+	return S(
+		newAddrFromNetIPTestCase("IPAddr IPv4", &net.IPAddr{IP: net.ParseIP("192.168.1.1")},
+			netip.MustParseAddr("192.168.1.1"), true),
+		newAddrFromNetIPTestCase("IPAddr IPv6", &net.IPAddr{IP: net.ParseIP("2001:db8::1")},
+			netip.MustParseAddr("2001:db8::1"), true),
+		newAddrFromNetIPTestCase("IPNet IPv4", &net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
+			netip.MustParseAddr("10.0.0.0"), true),
+		newAddrFromNetIPTestCase("IPNet IPv6", &net.IPNet{IP: net.ParseIP("2001:db8::"), Mask: net.CIDRMask(64, 128)},
+			netip.MustParseAddr("2001:db8::"), true),
+		newAddrFromNetIPTestCase("TCPAddr", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, netip.Addr{}, false),
+		newAddrFromNetIPTestCase("UDPAddr", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8080}, netip.Addr{}, false),
+		newAddrFromNetIPTestCase("nil input", nil, netip.Addr{}, false),
+		newAddrFromNetIPTestCase("IPAddr with nil IP", &net.IPAddr{IP: nil}, netip.Addr{}, false),
+		newAddrFromNetIPTestCase("IPNet with nil IP", &net.IPNet{IP: nil, Mask: net.CIDRMask(24, 32)}, netip.Addr{}, false),
+	)
 }
 
-func newAddrFromNetIPTestCase(name string, input net.Addr, want netip.Addr, ok bool) addrFromNetIPTestCase {
+func newAddrFromNetIPTestCase(name string, input net.Addr, want netip.Addr, ok bool) TestCase {
 	return addrFromNetIPTestCase{
 		name:  name,
 		input: input,
@@ -197,7 +203,7 @@ func (tc addrFromNetIPTestCase) Test(t *testing.T) {
 }
 
 func TestAddrFromNetIP(t *testing.T) {
-	RunTestCases(t, addrFromNetIPTestCases)
+	RunTestCases(t, makeAddrFromNetIPTestCases())
 }
 
 // Test GetStringIPAddresses
@@ -205,14 +211,14 @@ func TestGetStringIPAddresses(t *testing.T) {
 	// Since we can't easily mock net.InterfaceByName and net.InterfaceAddrs,
 	// we'll test with the real interfaces but handle the case where there are none
 
-	t.Run("all interfaces", testAllStringInterfaces)
+	t.Run("all interfaces", runTestAllStringInterfaces)
 
-	t.Run("specific interface", testSpecificInvalidInterface)
+	t.Run("specific interface", runTestSpecificInvalidInterface)
 
-	t.Run("loopback interface", testLoopbackInterface)
+	t.Run("loopback interface", runTestLoopbackInterface)
 }
 
-func testSpecificInvalidInterface(t *testing.T) {
+func runTestSpecificInvalidInterface(t *testing.T) {
 	t.Helper()
 	// Try with a non-existent interface
 	_, err := GetStringIPAddresses("invalid-interface-name")
@@ -221,7 +227,7 @@ func testSpecificInvalidInterface(t *testing.T) {
 	}
 }
 
-func testLoopbackInterface(t *testing.T) {
+func runTestLoopbackInterface(t *testing.T) {
 	// Most systems have a loopback interface
 	loopbackNames := S("lo", "lo0", "Loopback Pseudo-Interface 1")
 
@@ -243,7 +249,7 @@ func testLoopbackInterface(t *testing.T) {
 	}
 }
 
-func testAllStringInterfaces(t *testing.T) {
+func runTestAllStringInterfaces(t *testing.T) {
 	t.Helper()
 	addrs, err := GetStringIPAddresses()
 	if err != nil {
@@ -267,11 +273,11 @@ func testAllStringInterfaces(t *testing.T) {
 
 // Test GetNetIPAddresses
 func TestGetNetIPAddresses(t *testing.T) {
-	t.Run("all interfaces", testAllNetIPInterfaces)
-	t.Run("invalid interface", testInvalidNetIPInterface)
+	t.Run("all interfaces", runTestAllNetIPInterfaces)
+	t.Run("invalid interface", runTestInvalidNetIPInterface)
 }
 
-func testAllNetIPInterfaces(t *testing.T) {
+func runTestAllNetIPInterfaces(t *testing.T) {
 	t.Helper()
 	addrs, err := GetNetIPAddresses()
 	if err != nil {
@@ -293,7 +299,7 @@ func testAllNetIPInterfaces(t *testing.T) {
 	}
 }
 
-func testInvalidNetIPInterface(t *testing.T) {
+func runTestInvalidNetIPInterface(t *testing.T) {
 	t.Helper()
 	_, err := GetNetIPAddresses("invalid-interface-name")
 	if err == nil {
@@ -303,11 +309,11 @@ func testInvalidNetIPInterface(t *testing.T) {
 
 // Test GetIPAddresses
 func TestGetIPAddresses(t *testing.T) {
-	t.Run("all interfaces", testAllIPAddressInterfaces)
-	t.Run("multiple interfaces with error", testMultipleInterfacesWithError)
+	t.Run("all interfaces", runTestAllIPAddressInterfaces)
+	t.Run("multiple interfaces with error", runTestMultipleInterfacesWithError)
 }
 
-func testAllIPAddressInterfaces(t *testing.T) {
+func runTestAllIPAddressInterfaces(t *testing.T) {
 	t.Helper()
 	addrs, err := GetIPAddresses()
 	if err != nil {
@@ -329,7 +335,7 @@ func testAllIPAddressInterfaces(t *testing.T) {
 	}
 }
 
-func testMultipleInterfacesWithError(t *testing.T) {
+func runTestMultipleInterfacesWithError(t *testing.T) {
 	t.Helper()
 	// Try with one valid and one invalid interface
 	ifaces, err := GetInterfacesNames()
@@ -350,14 +356,16 @@ type getInterfacesNamesTestCase struct {
 	except []string
 }
 
-var getInterfacesNamesTestCases = []getInterfacesNamesTestCase{
-	newGetInterfacesNamesTestCase("no exclusions", nil),
-	newGetInterfacesNamesTestCase("empty exclusions", S[string]()),
-	newGetInterfacesNamesTestCase("exclude invalid", S("invalid-interface")),
-	newGetInterfacesNamesTestCase("exclude multiple", S("eth0", "eth1", "lo")),
+func makeGetInterfacesNamesTestCases() []TestCase {
+	return S(
+		newGetInterfacesNamesTestCase("no exclusions", nil),
+		newGetInterfacesNamesTestCase("empty exclusions", S[string]()),
+		newGetInterfacesNamesTestCase("exclude invalid", S("invalid-interface")),
+		newGetInterfacesNamesTestCase("exclude multiple", S("eth0", "eth1", "lo")),
+	)
 }
 
-func newGetInterfacesNamesTestCase(name string, except []string) getInterfacesNamesTestCase {
+func newGetInterfacesNamesTestCase(name string, except []string) TestCase {
 	return getInterfacesNamesTestCase{
 		name:   name,
 		except: except,
@@ -389,13 +397,15 @@ func (tc getInterfacesNamesTestCase) Test(t *testing.T) {
 }
 
 func TestGetInterfacesNames(t *testing.T) {
-	RunTestCases(t, getInterfacesNamesTestCases)
+	t.Run("basic", func(t *testing.T) {
+		RunTestCases(t, makeGetInterfacesNamesTestCases())
+	})
 
 	// Additional test: verify exclusion actually works
-	t.Run("exclusion removes interfaces", testExclusionRemovesInterfaces)
+	t.Run("exclusion removes interfaces", runTestExclusionRemovesInterfaces)
 }
 
-func testExclusionRemovesInterfaces(t *testing.T) {
+func runTestExclusionRemovesInterfaces(t *testing.T) {
 	t.Helper()
 	all, err := GetInterfacesNames()
 	if err != nil || len(all) == 0 {
@@ -463,11 +473,11 @@ func TestAsNetIPAddresses(t *testing.T) {
 }
 
 func TestAsNetIP(t *testing.T) {
-	t.Run("IPv4", testAsNetIPv4)
-	t.Run("IPv6", testAsNetIPv6)
+	t.Run("IPv4", runTestAsNetIPv4)
+	t.Run("IPv6", runTestAsNetIPv6)
 }
 
-func testAsNetIPv4(t *testing.T) {
+func runTestAsNetIPv4(t *testing.T) {
 	t.Helper()
 	addr := netip.MustParseAddr("192.168.1.1")
 	ip := asNetIP(addr)
@@ -481,7 +491,7 @@ func testAsNetIPv4(t *testing.T) {
 	}
 }
 
-func testAsNetIPv6(t *testing.T) {
+func runTestAsNetIPv6(t *testing.T) {
 	t.Helper()
 	addr := netip.MustParseAddr("2001:db8::1")
 	ip := asNetIP(addr)

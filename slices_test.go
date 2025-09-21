@@ -40,7 +40,7 @@ func (tc sliceReverseTestCase) Test(t *testing.T) {
 }
 
 // Factory function for sliceReverseTestCase
-func newSliceReverseTestCase(name string, a, b []int) sliceReverseTestCase {
+func newSliceReverseTestCase(name string, a, b []int) TestCase {
 	return sliceReverseTestCase{
 		name: name,
 		a:    a,
@@ -48,18 +48,20 @@ func newSliceReverseTestCase(name string, a, b []int) sliceReverseTestCase {
 	}
 }
 
-var sliceReverseTestCases = []sliceReverseTestCase{
-	newSliceReverseTestCase("empty", S[int](), S[int]()),
-	newSliceReverseTestCase("single", S(1), S(1)),
-	newSliceReverseTestCase("two elements", S(1, 2), S(2, 1)),
-	newSliceReverseTestCase("three elements", S(1, 2, 3), S(3, 2, 1)),
-	newSliceReverseTestCase("four elements", S(1, 2, 3, 4), S(4, 3, 2, 1)),
-	newSliceReverseTestCase("five elements", S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)),
-	newSliceReverseTestCase("six elements", S(1, 2, 3, 4, 5, 6), S(6, 5, 4, 3, 2, 1)),
+func makeSliceReverseTestCases() []TestCase {
+	return S(
+		newSliceReverseTestCase("empty", S[int](), S[int]()),
+		newSliceReverseTestCase("single", S(1), S(1)),
+		newSliceReverseTestCase("two elements", S(1, 2), S(2, 1)),
+		newSliceReverseTestCase("three elements", S(1, 2, 3), S(3, 2, 1)),
+		newSliceReverseTestCase("four elements", S(1, 2, 3, 4), S(4, 3, 2, 1)),
+		newSliceReverseTestCase("five elements", S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)),
+		newSliceReverseTestCase("six elements", S(1, 2, 3, 4, 5, 6), S(6, 5, 4, 3, 2, 1)),
+	)
 }
 
 func TestSliceReverse(t *testing.T) {
-	RunTestCases(t, sliceReverseTestCases)
+	RunTestCases(t, makeSliceReverseTestCases())
 }
 
 var (
@@ -91,7 +93,7 @@ func cmp[T Ordered](a, b T) int {
 	}
 }
 
-func testSliceUnique[T Ordered](t *testing.T, before, after []T) {
+func runTestSliceUnique[T Ordered](t *testing.T, before, after []T) {
 	SliceSort(after, cmp[T])
 
 	s := SliceUnique(before)
@@ -115,16 +117,16 @@ func testSliceUnique[T Ordered](t *testing.T, before, after []T) {
 	AssertSliceEqual(t, s, s2, "return value")
 }
 
-func TestSliceUniqueInt(t *testing.T) {
-	testSliceUnique(t, ints, expectInts)
-}
-
-func TestSliceUniqueFloat(t *testing.T) {
-	testSliceUnique(t, float64s, expectFloat64s)
-}
-
-func TestSliceUniqueString(t *testing.T) {
-	testSliceUnique(t, strs, expectStrs)
+func TestSliceUnique(t *testing.T) {
+	t.Run("int", func(t *testing.T) {
+		runTestSliceUnique(t, ints, expectInts)
+	})
+	t.Run("float", func(t *testing.T) {
+		runTestSliceUnique(t, float64s, expectFloat64s)
+	})
+	t.Run("string", func(t *testing.T) {
+		runTestSliceUnique(t, strs, expectStrs)
+	})
 }
 
 // Test cases for SliceMinus function
@@ -145,7 +147,7 @@ func (tc sliceMinusTestCase) Test(t *testing.T) {
 	AssertSliceEqual(t, tc.expected, result, "SliceMinus", tc.a, tc.b)
 }
 
-func newSliceMinusTestCase(name string, a, b, expected []int) sliceMinusTestCase {
+func newSliceMinusTestCase(name string, a, b, expected []int) TestCase {
 	return sliceMinusTestCase{
 		name:     name,
 		a:        a,
@@ -155,14 +157,14 @@ func newSliceMinusTestCase(name string, a, b, expected []int) sliceMinusTestCase
 }
 
 func TestSliceMinus(t *testing.T) {
-	testCases := []sliceMinusTestCase{
+	testCases := S(
 		newSliceMinusTestCase("empty slices", S[int](), S[int](), S[int]()),
 		newSliceMinusTestCase("empty a", S[int](), S(1, 2), S[int]()),
 		newSliceMinusTestCase("empty b", S(1, 2), S[int](), S(1, 2)),
 		newSliceMinusTestCase("no overlap", S(1, 2), S(3, 4), S(1, 2)),
 		newSliceMinusTestCase("partial overlap", S(1, 2, 3, 4, 5), S(3, 4, 6, 7), S(1, 2, 5)),
 		newSliceMinusTestCase("complete overlap", S(1, 2, 3), S(1, 2, 3), S[int]()),
-	}
+	)
 
 	RunTestCases(t, testCases)
 }
@@ -187,7 +189,7 @@ func (tc sliceMinusFnTestCase) Test(t *testing.T) {
 }
 
 func newSliceMinusFnTestCase(name string, a, b, expected []string,
-	equal func(string, string) bool) sliceMinusFnTestCase {
+	equal func(string, string) bool) TestCase {
 	return sliceMinusFnTestCase{
 		name:     name,
 		a:        a,
@@ -202,7 +204,7 @@ func TestSliceMinusFn(t *testing.T) {
 		return va == vb
 	}
 
-	testCases := []sliceMinusFnTestCase{
+	testCases := S(
 		newSliceMinusFnTestCase("empty slices", S[string](), S[string](), S[string](), equal),
 		newSliceMinusFnTestCase("empty a", S[string](), S("x", "y"), S[string](), equal),
 		newSliceMinusFnTestCase("empty b", S("x", "y"), S[string](), S("x", "y"), equal),
@@ -210,7 +212,7 @@ func TestSliceMinusFn(t *testing.T) {
 		newSliceMinusFnTestCase("partial overlap", S("apple", "banana", "cherry"),
 			S("banana", "date"), S("apple", "cherry"), equal),
 		newSliceMinusFnTestCase("complete overlap", S("apple", "banana"), S("apple", "banana"), S[string](), equal),
-	}
+	)
 
 	RunTestCases(t, testCases)
 }
@@ -240,7 +242,7 @@ func (tc sliceRandomTestCase) Test(t *testing.T) {
 	}
 }
 
-func newSliceRandomTestCase(name string, input []string, want string, wantOK bool) sliceRandomTestCase {
+func newSliceRandomTestCase(name string, input []string, want string, wantOK bool) TestCase {
 	return sliceRandomTestCase{
 		name:   name,
 		input:  input,
@@ -250,11 +252,11 @@ func newSliceRandomTestCase(name string, input []string, want string, wantOK boo
 }
 
 func TestSliceRandom(t *testing.T) {
-	testCases := []sliceRandomTestCase{
+	testCases := S(
 		newSliceRandomTestCase("empty", S[string](), "", false),
 		newSliceRandomTestCase("one", S("one"), "one", true),
 		newSliceRandomTestCase("random", S("one", "two", "three", "four", "five", "six"), "", true),
-	}
+	)
 
 	RunTestCases(t, testCases)
 }
@@ -279,7 +281,7 @@ func (tc sliceContainsTestCase) Test(t *testing.T) {
 }
 
 // Factory function for sliceContainsTestCase
-func newSliceContainsTestCase(name string, slice []int, value int, expected bool) sliceContainsTestCase {
+func newSliceContainsTestCase(name string, slice []int, value int, expected bool) TestCase {
 	return sliceContainsTestCase{
 		name:     name,
 		slice:    slice,
@@ -289,7 +291,7 @@ func newSliceContainsTestCase(name string, slice []int, value int, expected bool
 }
 
 func TestSliceContains(t *testing.T) {
-	testCases := []sliceContainsTestCase{
+	testCases := S(
 		newSliceContainsTestCase("empty slice", S[int](), 42, false),
 		newSliceContainsTestCase("single element found", S(42), 42, true),
 		newSliceContainsTestCase("single element not found", S(42), 99, false),
@@ -299,7 +301,7 @@ func TestSliceContains(t *testing.T) {
 		newSliceContainsTestCase("last element", S(1, 2, 42), 42, true),
 		newSliceContainsTestCase("middle element", S(1, 42, 2), 42, true),
 		newSliceContainsTestCase("duplicate elements", S(1, 42, 2, 42, 3), 42, true),
-	}
+	)
 
 	RunTestCases(t, testCases)
 }
@@ -341,7 +343,7 @@ func TestSliceMap(t *testing.T) {
 	}
 
 	// Simple case first
-	t.Run("debug", testSliceMapDebug)
+	t.Run("debug", runTestSliceMapDebug)
 
 	// Test simple mapping
 	testCases := []sliceMapTestCase[int, string]{
@@ -351,12 +353,12 @@ func TestSliceMap(t *testing.T) {
 	}
 
 	// Test empty slice separately
-	t.Run("empty slice", testSliceMapEmpty)
+	t.Run("empty slice", runTestSliceMapEmpty)
 
 	RunTestCases(t, testCases)
 }
 
-func testSliceMapEmpty(t *testing.T) {
+func runTestSliceMapEmpty(t *testing.T) {
 	t.Helper()
 	intToString := func(_ []string, i int) []string {
 		return S(fmt.Sprintf("num_%d", i))
@@ -365,7 +367,7 @@ func testSliceMapEmpty(t *testing.T) {
 	AssertEqual(t, 0, len(result), "result slice length")
 }
 
-func testSliceMapDebug(t *testing.T) {
+func runTestSliceMapDebug(t *testing.T) {
 	t.Helper()
 	debug := func(partial []int, i int) []int {
 		t.Logf("partial=%v, i=%d", partial, i)
@@ -398,7 +400,7 @@ func (tc sliceReversedTestCase) Test(t *testing.T) {
 }
 
 // Factory function for sliceReversedTestCase
-func newSliceReversedTestCase(name string, input, expected []int) sliceReversedTestCase {
+func newSliceReversedTestCase(name string, input, expected []int) TestCase {
 	return sliceReversedTestCase{
 		name:     name,
 		input:    input,
@@ -407,14 +409,14 @@ func newSliceReversedTestCase(name string, input, expected []int) sliceReversedT
 }
 
 func TestSliceReversed(t *testing.T) {
-	testCases := []sliceReversedTestCase{
+	testCases := S(
 		newSliceReversedTestCase("empty slice", S[int](), S[int]()),
 		newSliceReversedTestCase("single element", S(42), S(42)),
 		newSliceReversedTestCase("two elements", S(1, 2), S(2, 1)),
 		newSliceReversedTestCase("three elements", S(1, 2, 3), S(3, 2, 1)),
 		newSliceReversedTestCase("four elements", S(1, 2, 3, 4), S(4, 3, 2, 1)),
 		newSliceReversedTestCase("five elements", S(1, 2, 3, 4, 5), S(5, 4, 3, 2, 1)),
-	}
+	)
 
 	RunTestCases(t, testCases)
 }
@@ -529,10 +531,10 @@ func TestSliceSortFn(t *testing.T) {
 	RunTestCases(t, stringTests)
 
 	// Test edge cases
-	t.Run("nil less function", testSliceSortFnNilFunction)
+	t.Run("nil less function", runTestSliceSortFnNilFunction)
 }
 
-func testSliceSortFnNilFunction(t *testing.T) {
+func runTestSliceSortFnNilFunction(t *testing.T) {
 	t.Helper()
 	original := S(3, 1, 2)
 	result := SliceCopy(original)

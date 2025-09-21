@@ -52,7 +52,7 @@ type withTimeoutTestCase struct {
 
 // newWithTimeoutTestCase creates a new withTimeoutTestCase
 func newWithTimeoutTestCase(parent context.Context, name string, timeout time.Duration,
-	expectTimeout bool) withTimeoutTestCase {
+	expectTimeout bool) TestCase {
 	return withTimeoutTestCase{
 		parent:        parent,
 		name:          name,
@@ -86,7 +86,7 @@ func (tc withTimeoutTestCase) Test(t *testing.T) {
 	}
 }
 
-func withTimeoutTestCases() []withTimeoutTestCase {
+func makeWithTimeoutTestCases() []TestCase {
 	var nilCtx context.Context
 
 	baseCtx := context.Background()
@@ -100,7 +100,7 @@ func withTimeoutTestCases() []withTimeoutTestCase {
 	)
 }
 
-func testWithTimeoutExpiration(t *testing.T) {
+func runTestWithTimeoutExpiration(t *testing.T) {
 	ctx, cancel := WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
@@ -113,7 +113,7 @@ func testWithTimeoutExpiration(t *testing.T) {
 	}
 }
 
-func testWithTimeoutCancellation(t *testing.T) {
+func runTestWithTimeoutCancellation(t *testing.T) {
 	ctx, cancel := WithTimeout(context.Background(), time.Hour)
 
 	select {
@@ -133,13 +133,15 @@ func testWithTimeoutCancellation(t *testing.T) {
 }
 
 func TestWithTimeout(t *testing.T) {
-	RunTestCases(t, withTimeoutTestCases())
+	t.Run("basic", func(t *testing.T) {
+		RunTestCases(t, makeWithTimeoutTestCases())
+	})
 
 	// Test timeout expiration
-	t.Run("timeout expiration", testWithTimeoutExpiration)
+	t.Run("timeout expiration", runTestWithTimeoutExpiration)
 
 	// Test cancellation
-	t.Run("cancellation", testWithTimeoutCancellation)
+	t.Run("cancellation", runTestWithTimeoutCancellation)
 }
 
 // Test cases for WithTimeoutCause function
@@ -153,7 +155,7 @@ type withTimeoutCauseTestCase struct {
 
 // newWithTimeoutCauseTestCase creates a new withTimeoutCauseTestCase
 func newWithTimeoutCauseTestCase(parent context.Context, name string,
-	timeout time.Duration, cause error, expectTimeout bool) withTimeoutCauseTestCase {
+	timeout time.Duration, cause error, expectTimeout bool) TestCase {
 	return withTimeoutCauseTestCase{
 		parent:        parent,
 		cause:         cause,
@@ -188,7 +190,7 @@ func (tc withTimeoutCauseTestCase) Test(t *testing.T) {
 	}
 }
 
-func withTimeoutCauseTestCases() []withTimeoutCauseTestCase {
+func makeWithTimeoutCauseTestCases() []TestCase {
 	var nilCtx context.Context
 	ctx := context.Background()
 	return S(
@@ -201,7 +203,7 @@ func withTimeoutCauseTestCases() []withTimeoutCauseTestCase {
 	)
 }
 
-func testWithTimeoutCauseExpiration(t *testing.T) {
+func runTestWithTimeoutCauseExpiration(t *testing.T) {
 	testErr := errors.New("custom timeout cause")
 	ctx, cancel := WithTimeoutCause(context.Background(), 10*time.Millisecond, testErr)
 	defer cancel()
@@ -220,10 +222,12 @@ func testWithTimeoutCauseExpiration(t *testing.T) {
 }
 
 func TestWithTimeoutCause(t *testing.T) {
-	RunTestCases(t, withTimeoutCauseTestCases())
+	t.Run("basic", func(t *testing.T) {
+		RunTestCases(t, makeWithTimeoutCauseTestCases())
+	})
 
 	// Test timeout expiration with cause
-	t.Run("timeout expiration with cause", testWithTimeoutCauseExpiration)
+	t.Run("timeout expiration with cause", runTestWithTimeoutCauseExpiration)
 }
 
 // Test cases for ContextKey Get function
@@ -237,7 +241,7 @@ type contextKeyGetTestCase struct {
 
 // newContextKeyGetTestCase creates a new contextKeyGetTestCase
 func newContextKeyGetTestCase(ctx context.Context, name string, key *ContextKey[int],
-	expectedValue int, expectedOk bool) contextKeyGetTestCase {
+	expectedValue int, expectedOk bool) TestCase {
 	return contextKeyGetTestCase{
 		ctx:           ctx,
 		key:           key,
@@ -259,7 +263,7 @@ func (tc contextKeyGetTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expectedOK, ok, "Get ok result")
 }
 
-func contextKeyGetTestCases() []contextKeyGetTestCase {
+func makeContextKeyGetTestCases() []TestCase {
 	var nilCtx context.Context
 	return S(
 		newContextKeyGetTestCase(context.Background(), "nil receiver", nil, 0, false),
@@ -271,5 +275,5 @@ func contextKeyGetTestCases() []contextKeyGetTestCase {
 }
 
 func TestContextKeyGet(t *testing.T) {
-	RunTestCases(t, contextKeyGetTestCases())
+	RunTestCases(t, makeContextKeyGetTestCases())
 }

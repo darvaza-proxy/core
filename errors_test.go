@@ -38,7 +38,7 @@ func (tc isErrorFnTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "IsErrorFn result")
 }
 
-func newIsErrorFnTestCase(name string, checkFn func(error) bool, expected bool, errs ...error) isErrorFnTestCase {
+func newIsErrorFnTestCase(name string, checkFn func(error) bool, expected bool, errs ...error) TestCase {
 	return isErrorFnTestCase{
 		name:     name,
 		checkFn:  checkFn,
@@ -47,7 +47,7 @@ func newIsErrorFnTestCase(name string, checkFn func(error) bool, expected bool, 
 	}
 }
 
-func TestIsErrorFn(t *testing.T) {
+func makeIsErrorFnMatchingTestCases() []TestCase {
 	testErr := errors.New("test error")
 	differentErr := errors.New("different error")
 	wrappedErr := fmt.Errorf("wrapped: %w", testErr)
@@ -56,7 +56,7 @@ func TestIsErrorFn(t *testing.T) {
 		return errors.Is(err, testErr)
 	}
 
-	testCases := []isErrorFnTestCase{
+	return []TestCase{
 		newIsErrorFnTestCase("matching error", isTestErr, true, testErr),
 		newIsErrorFnTestCase("non-matching error", isTestErr, false, differentErr),
 		newIsErrorFnTestCase("nil check function", nil, false, testErr),
@@ -64,8 +64,10 @@ func TestIsErrorFn(t *testing.T) {
 		newIsErrorFnTestCase("wrapped error", isTestErr, true, wrappedErr),
 		newIsErrorFnTestCase("nil error in slice", isTestErr, true, nil, testErr),
 	}
+}
 
-	RunTestCases(t, testCases)
+func TestIsErrorFn(t *testing.T) {
+	RunTestCases(t, makeIsErrorFnMatchingTestCases())
 }
 
 // Test cases for IsErrorFn2 function
@@ -99,7 +101,7 @@ func newIsErrorFn2TestCase(name string, checkFn func(error) (bool, bool),
 	}
 }
 
-func TestIsErrorFn2(t *testing.T) {
+func makeIsErrorFn2KnownStatusTestCases() []TestCase {
 	testErr := errors.New("test error")
 	differentErr := errors.New("different error")
 	wrappedErr := fmt.Errorf("wrapped: %w", testErr)
@@ -111,7 +113,7 @@ func TestIsErrorFn2(t *testing.T) {
 		return errors.Is(err, testErr), true
 	}
 
-	testCases := []isErrorFn2TestCase{
+	return []TestCase{
 		newIsErrorFn2TestCase("matching error", isTestErr, true, true, testErr),
 		newIsErrorFn2TestCase("non-matching error", isTestErr, false, true, differentErr),
 		newIsErrorFn2TestCase("nil check function", nil, false, true, testErr),
@@ -120,8 +122,10 @@ func TestIsErrorFn2(t *testing.T) {
 		newIsErrorFn2TestCase("unknown error type",
 			func(_ error) (bool, bool) { return false, false }, false, false, testErr),
 	}
+}
 
-	RunTestCases(t, testCases)
+func TestIsErrorFn2(t *testing.T) {
+	RunTestCases(t, makeIsErrorFn2KnownStatusTestCases())
 }
 
 // Test cases for QuietWrap function
@@ -133,7 +137,7 @@ type quietWrapTestCase struct {
 	args     []any
 }
 
-func newQuietWrapTestCase(name string, err error, format, expected string, args ...any) quietWrapTestCase {
+func newQuietWrapTestCase(name string, err error, format, expected string, args ...any) TestCase {
 	return quietWrapTestCase{
 		name:     name,
 		err:      err,
@@ -191,7 +195,7 @@ type coalesceErrorTestCase struct {
 	errs     []error
 }
 
-func newCoalesceErrorTestCase(name string, expected error, errs ...error) coalesceErrorTestCase {
+func newCoalesceErrorTestCase(name string, expected error, errs ...error) TestCase {
 	return coalesceErrorTestCase{
 		name:     name,
 		expected: expected,
@@ -237,7 +241,7 @@ type isErrorTestCase struct {
 	expected bool
 }
 
-func newIsErrorTestCase(name string, err error, expected bool, errs ...error) isErrorTestCase {
+func newIsErrorTestCase(name string, err error, expected bool, errs ...error) TestCase {
 	return isErrorTestCase{
 		name:     name,
 		err:      err,
@@ -257,13 +261,13 @@ func (tc isErrorTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "IsError result")
 }
 
-func TestIsError(t *testing.T) {
+func makeIsErrorErrorMatchingTestCases() []TestCase {
 	err1 := errors.New("error 1")
 	err2 := errors.New("error 2")
 	err3 := errors.New("error 3")
 	wrappedErr := fmt.Errorf("wrapped: %w", err1)
 
-	testCases := []isErrorTestCase{
+	return []TestCase{
 		newIsErrorTestCase("nil error", nil, false, err1),
 		newIsErrorTestCase("no target errors - non-nil", err1, true),
 		newIsErrorTestCase("no target errors - nil", nil, false),
@@ -274,8 +278,10 @@ func TestIsError(t *testing.T) {
 		newIsErrorTestCase("multiple targets", err2, true, err1, err2, err3),
 		newIsErrorTestCase("empty targets", err1, true),
 	}
+}
 
-	RunTestCases(t, testCases)
+func TestIsError(t *testing.T) {
+	RunTestCases(t, makeIsErrorErrorMatchingTestCases())
 }
 
 // Test cases for TemporaryError constructors and methods
@@ -381,7 +387,7 @@ func (tc checkIsTemporaryTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expectedKnown, known, "CheckIsTemporary known result")
 }
 
-func newCheckIsTemporaryTestCase(name string, err error, expectedIs, expectedKnown bool) checkIsTemporaryTestCase {
+func newCheckIsTemporaryTestCase(name string, err error, expectedIs, expectedKnown bool) TestCase {
 	return checkIsTemporaryTestCase{
 		err:           err,
 		name:          name,
@@ -390,7 +396,7 @@ func newCheckIsTemporaryTestCase(name string, err error, expectedIs, expectedKno
 	}
 }
 
-func checkIsTemporaryTestCases() []checkIsTemporaryTestCase {
+func makeCheckIsTemporaryTestCases() []TestCase {
 	tempErr := NewTemporaryError(errors.New("temp error"))
 	timeoutErr := NewTimeoutError(errors.New("timeout error"))
 	regularErr := errors.New("regular error")
@@ -405,7 +411,7 @@ func checkIsTemporaryTestCases() []checkIsTemporaryTestCase {
 
 // Test CheckIsTemporary function (0% coverage)
 func TestCheckIsTemporary(t *testing.T) {
-	RunTestCases(t, checkIsTemporaryTestCases())
+	RunTestCases(t, makeCheckIsTemporaryTestCases())
 }
 
 // Test case for IsTemporary function
@@ -425,7 +431,7 @@ func (tc isTemporaryTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "IsTemporary result")
 }
 
-func newIsTemporaryTestCase(name string, err error, expected bool) isTemporaryTestCase {
+func newIsTemporaryTestCase(name string, err error, expected bool) TestCase {
 	return isTemporaryTestCase{
 		err:      err,
 		name:     name,
@@ -433,7 +439,7 @@ func newIsTemporaryTestCase(name string, err error, expected bool) isTemporaryTe
 	}
 }
 
-func isTemporaryTestCases() []isTemporaryTestCase {
+func makeIsTemporaryTestCases() []TestCase {
 	tempErr := NewTemporaryError(errors.New("temp error"))
 	timeoutErr := NewTimeoutError(errors.New("timeout error"))
 	wrappedTempErr := fmt.Errorf("wrapped: %w", tempErr)
@@ -450,7 +456,7 @@ func isTemporaryTestCases() []isTemporaryTestCase {
 
 // Test IsTemporary function (0% coverage)
 func TestIsTemporary(t *testing.T) {
-	RunTestCases(t, isTemporaryTestCases())
+	RunTestCases(t, makeIsTemporaryTestCases())
 }
 
 // Test case for CheckIsTimeout function
@@ -472,7 +478,7 @@ func (tc checkIsTimeoutTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expectedKnown, known, "CheckIsTimeout known result")
 }
 
-func newCheckIsTimeoutTestCase(name string, err error, expectedIs, expectedKnown bool) checkIsTimeoutTestCase {
+func newCheckIsTimeoutTestCase(name string, err error, expectedIs, expectedKnown bool) TestCase {
 	return checkIsTimeoutTestCase{
 		err:           err,
 		name:          name,
@@ -481,7 +487,7 @@ func newCheckIsTimeoutTestCase(name string, err error, expectedIs, expectedKnown
 	}
 }
 
-func checkIsTimeoutTestCases() []checkIsTimeoutTestCase {
+func makeCheckIsTimeoutTestCases() []TestCase {
 	tempErr := NewTemporaryError(errors.New("temp error"))
 	timeoutErr := NewTimeoutError(errors.New("timeout error"))
 	regularErr := errors.New("regular error")
@@ -496,7 +502,7 @@ func checkIsTimeoutTestCases() []checkIsTimeoutTestCase {
 
 // Test CheckIsTimeout function (0% coverage)
 func TestCheckIsTimeout(t *testing.T) {
-	RunTestCases(t, checkIsTimeoutTestCases())
+	RunTestCases(t, makeCheckIsTimeoutTestCases())
 }
 
 // Test case for IsTimeout function
@@ -516,7 +522,7 @@ func (tc isTimeoutTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "IsTimeout result")
 }
 
-func newIsTimeoutTestCase(name string, err error, expected bool) isTimeoutTestCase {
+func newIsTimeoutTestCase(name string, err error, expected bool) TestCase {
 	return isTimeoutTestCase{
 		err:      err,
 		name:     name,
@@ -524,7 +530,7 @@ func newIsTimeoutTestCase(name string, err error, expected bool) isTimeoutTestCa
 	}
 }
 
-func isTimeoutTestCases() []isTimeoutTestCase {
+func makeIsTimeoutTestCases() []TestCase {
 	tempErr := NewTemporaryError(errors.New("temp error"))
 	timeoutErr := NewTimeoutError(errors.New("timeout error"))
 	wrappedTimeoutErr := fmt.Errorf("wrapped: %w", timeoutErr)
@@ -541,5 +547,5 @@ func isTimeoutTestCases() []isTimeoutTestCase {
 
 // Test IsTimeout function (0% coverage)
 func TestIsTimeout(t *testing.T) {
-	RunTestCases(t, isTimeoutTestCases())
+	RunTestCases(t, makeIsTimeoutTestCases())
 }

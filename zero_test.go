@@ -66,52 +66,52 @@ func newZeroRefTestCase[T any](name string, factory func() *T) zeroRefTestCase[T
 	}
 }
 
-var zeroIntTestCases = S(
+var zeroIntTestCases = S[zeroTestCase[int]](
 	newZeroTestCase("nil pointer", 0, func() *int { return nil }),
 	newZeroTestCase("non-nil pointer", 0, func() *int { v := 42; return &v }),
 )
 
-var zeroStringTestCases = S(
+var zeroStringTestCases = S[zeroTestCase[string]](
 	newZeroTestCase("nil pointer", "", func() *string { return nil }),
 	newZeroTestCase("non-nil pointer", "", func() *string { v := "hello"; return &v }),
 )
 
-var zeroBoolTestCases = S(
+var zeroBoolTestCases = S[zeroTestCase[bool]](
 	newZeroTestCase("nil pointer", false, func() *bool { return nil }),
 	newZeroTestCase("non-nil pointer", false, func() *bool { v := true; return &v }),
 )
 
-var zeroTimeTestCases = S(
+var zeroTimeTestCases = S[zeroTestCase[time.Time]](
 	newZeroTestCase("nil pointer", time.Time{}, func() *time.Time { return nil }),
 	newZeroTestCase("non-nil pointer", time.Time{}, func() *time.Time { v := time.Now(); return &v }),
 )
 
-var zeroSliceTestCases = S(
+var zeroSliceTestCases = S[zeroRefTestCase[[]int]](
 	newZeroRefTestCase("nil slice pointer", func() *[]int { return nil }),
-	newZeroRefTestCase("non-nil slice pointer", func() *[]int { v := S(1, 2, 3); return &v }),
+	newZeroRefTestCase("non-nil slice pointer", func() *[]int { v := S[int](1, 2, 3); return &v }),
 )
 
-var zeroMapTestCases = S(
+var zeroMapTestCases = S[zeroRefTestCase[map[string]int]](
 	newZeroRefTestCase("nil map pointer", func() *map[string]int { return nil }),
 	newZeroRefTestCase("non-nil map pointer", func() *map[string]int { v := map[string]int{"a": 1}; return &v }),
 )
 
-var zeroPointerTestCases = S(
+var zeroPointerTestCases = S[zeroRefTestCase[*int]](
 	newZeroRefTestCase("nil double pointer", func() **int { return nil }),
 	newZeroRefTestCase("non-nil double pointer", func() **int { v := 42; vp := &v; return &vp }),
 )
 
-var zeroInterfaceTestCases = S(
+var zeroInterfaceTestCases = S[zeroRefTestCase[any]](
 	newZeroRefTestCase("nil interface pointer", func() *any { return nil }),
 	newZeroRefTestCase("non-nil interface pointer", func() *any { var v any = 42; return &v }),
 )
 
-var zeroChannelTestCases = S(
+var zeroChannelTestCases = S[zeroRefTestCase[chan int]](
 	newZeroRefTestCase("nil channel pointer", func() *chan int { return nil }),
 	newZeroRefTestCase("non-nil channel pointer", func() *chan int { ch := make(chan int); return &ch }),
 )
 
-var zeroFuncTestCases = S(
+var zeroFuncTestCases = S[zeroRefTestCase[func()]](
 	newZeroRefTestCase("nil func pointer", func() *func() { return nil }),
 	newZeroRefTestCase("non-nil func pointer", func() *func() { fn := func() {}; return &fn }),
 )
@@ -123,14 +123,14 @@ func TestZero(t *testing.T) {
 	t.Run("slice", func(t *testing.T) { RunTestCases(t, zeroSliceTestCases) })
 	t.Run("map", func(t *testing.T) { RunTestCases(t, zeroMapTestCases) })
 	t.Run("pointer", func(t *testing.T) { RunTestCases(t, zeroPointerTestCases) })
-	t.Run("struct", testZeroStruct)
+	t.Run("struct", runTestZeroStruct)
 	t.Run("interface", func(t *testing.T) { RunTestCases(t, zeroInterfaceTestCases) })
 	t.Run("channel", func(t *testing.T) { RunTestCases(t, zeroChannelTestCases) })
 	t.Run("func", func(t *testing.T) { RunTestCases(t, zeroFuncTestCases) })
 	t.Run("time", func(t *testing.T) { RunTestCases(t, zeroTimeTestCases) })
 }
 
-func testZeroStruct(t *testing.T) {
+func runTestZeroStruct(t *testing.T) {
 	t.Helper()
 
 	type testStruct struct {
@@ -168,7 +168,7 @@ func (tc isZeroTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "IsZero result")
 }
 
-func newIsZeroTestCase(name string, value any, expected bool) isZeroTestCase {
+func newIsZeroTestCase(name string, value any, expected bool) TestCase {
 	return isZeroTestCase{
 		value:    value,
 		name:     name,
@@ -176,9 +176,8 @@ func newIsZeroTestCase(name string, value any, expected bool) isZeroTestCase {
 	}
 }
 
-func TestIsZero(t *testing.T) {
-	// Basic types
-	zeroTests := []isZeroTestCase{
+func makeIsZeroBasicTestCases() []TestCase {
+	return []TestCase{
 		newIsZeroTestCase("nil", nil, true),
 		newIsZeroTestCase("zero int", 0, true),
 		newIsZeroTestCase("non-zero int", 42, false),
@@ -219,16 +218,35 @@ func TestIsZero(t *testing.T) {
 		newIsZeroTestCase("zero uintptr", uintptr(0), true),
 		newIsZeroTestCase("non-zero uintptr", uintptr(0x12345678), false),
 	}
+}
 
-	RunTestCases(t, zeroTests)
+func TestIsZero(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		RunTestCases(t, makeIsZeroBasicTestCases())
+	})
+	t.Run("interface", func(t *testing.T) {
+		RunTestCases(t, makeIsZeroInterfaceTestCases())
+	})
+	t.Run("edge cases", func(t *testing.T) {
+		RunTestCases(t, makeIsZeroEdgeCasesTestCases())
+	})
+	t.Run("complex struct", func(t *testing.T) {
+		RunTestCases(t, makeIsZeroComplexStructTestCases())
+	})
+	t.Run("pointers", func(t *testing.T) {
+		RunTestCases(t, makeIsZeroPointersTestCases())
+	})
+	t.Run("nested structs", func(t *testing.T) {
+		RunTestCases(t, makeIsZeroNestedStructsTestCases())
+	})
 }
 
 // Test IsZero with interfaces containing values
-func TestIsZeroInterface(t *testing.T) {
+func makeIsZeroInterfaceTestCases() []TestCase {
 	var nilIntPtr *int
 	zeroIntPtr := new(int)
 
-	interfaceTests := []isZeroTestCase{
+	return []TestCase{
 		// nil interface
 		newIsZeroTestCase("nil interface", nil, true),
 		// interface containing nil pointer
@@ -248,17 +266,15 @@ func TestIsZeroInterface(t *testing.T) {
 		// interface containing nil slice
 		newIsZeroTestCase("interface containing nil slice", any([]int(nil)), true),
 	}
-
-	RunTestCases(t, interfaceTests)
 }
 
 // Test IsZero with edge cases
-func TestIsZeroEdgeCases(t *testing.T) {
-	edgeTests := []isZeroTestCase{
+func makeIsZeroEdgeCasesTestCases() []TestCase {
+	return []TestCase{
 		// Slices
 		newIsZeroTestCase("nil slice", []int(nil), true),
 		newIsZeroTestCase("empty slice", S[int](), false),
-		newIsZeroTestCase("non-empty slice", S(1, 2, 3), false),
+		newIsZeroTestCase("non-empty slice", S[int](1, 2, 3), false),
 		// Maps
 		newIsZeroTestCase("nil map", map[string]int(nil), true),
 		newIsZeroTestCase("empty map", map[string]int{}, false),
@@ -274,24 +290,22 @@ func TestIsZeroEdgeCases(t *testing.T) {
 		newIsZeroTestCase("non-zero array", [3]int{1, 2, 3}, false),
 		newIsZeroTestCase("partially zero array", [3]int{0, 0, 1}, false),
 	}
-
-	RunTestCases(t, edgeTests)
 }
 
 func TestZeroEdgeCases(t *testing.T) {
 	// Test Zero function returns expected values when passed nil
-	t.Run("nil slice pointer", testZeroEdgeCasesNilSlicePointer)
+	t.Run("nil slice pointer", runTestZeroEdgeCasesNilSlicePointer)
 
-	t.Run("nil map pointer", testZeroEdgeCasesNilMapPointer)
+	t.Run("nil map pointer", runTestZeroEdgeCasesNilMapPointer)
 
-	t.Run("nil pointer pointer", testZeroEdgeCasesNilPointerPointer)
+	t.Run("nil pointer pointer", runTestZeroEdgeCasesNilPointerPointer)
 
-	t.Run("nil channel pointer", testZeroEdgeCasesNilChannelPointer)
+	t.Run("nil channel pointer", runTestZeroEdgeCasesNilChannelPointer)
 
-	t.Run("nil func pointer", testZeroEdgeCasesNilFuncPointer)
+	t.Run("nil func pointer", runTestZeroEdgeCasesNilFuncPointer)
 }
 
-func isZeroReflectValueTestCases() []isZeroTestCase {
+func makeIsZeroReflectValueTestCases() []TestCase {
 	return S(
 		// Invalid reflect.Value
 		newIsZeroTestCase("invalid reflect.Value", reflect.Value{}, true),
@@ -315,7 +329,7 @@ func isZeroReflectValueTestCases() []isZeroTestCase {
 }
 
 func TestIsZeroReflectValue(t *testing.T) {
-	RunTestCases(t, isZeroReflectValueTestCases())
+	RunTestCases(t, makeIsZeroReflectValueTestCases())
 }
 
 type complexStruct struct {
@@ -328,8 +342,8 @@ type complexStruct struct {
 	IntField    int
 }
 
-func TestIsZeroComplexStruct(t *testing.T) {
-	complexTests := []isZeroTestCase{
+func makeIsZeroComplexStructTestCases() []TestCase {
+	return []TestCase{
 		newIsZeroTestCase("zero struct", complexStruct{}, true),
 		newIsZeroTestCase("struct with int field", complexStruct{
 			IntField: 42,
@@ -350,12 +364,10 @@ func TestIsZeroComplexStruct(t *testing.T) {
 			MapField: map[string]int{},
 		}, false),
 	}
-
-	RunTestCases(t, complexTests)
 }
 
 // Test IsZero with pointers
-func TestIsZeroPointers(t *testing.T) {
+func makeIsZeroPointersTestCases() []TestCase {
 	var nilInt *int
 	nonNilInt := new(int)
 	zeroInt := 0
@@ -366,15 +378,13 @@ func TestIsZeroPointers(t *testing.T) {
 	var nilIntPtr *int
 	ptrToNilPtr := &nilIntPtr
 
-	ptrTests := []isZeroTestCase{
+	return []TestCase{
 		newIsZeroTestCase("nil pointer", nilInt, true),
 		newIsZeroTestCase("non-nil pointer to zero", nonNilInt, false),
 		newIsZeroTestCase("pointer to zero value", ptrToZero, false),
 		newIsZeroTestCase("pointer to non-zero value", ptrToNonZero, false),
 		newIsZeroTestCase("pointer to nil pointer", ptrToNilPtr, false),
 	}
-
-	RunTestCases(t, ptrTests)
 }
 
 type outerStruct struct {
@@ -386,11 +396,11 @@ type innerStruct struct {
 }
 
 // Test IsZero with nested structs
-func TestIsZeroNestedStructs(t *testing.T) {
+func makeIsZeroNestedStructsTestCases() []TestCase {
 	var nilOuterPtr *outerStruct
 	zeroOuterPtr := &outerStruct{}
 
-	nestedTests := []isZeroTestCase{
+	return []TestCase{
 		newIsZeroTestCase("zero nested struct", outerStruct{}, true),
 		newIsZeroTestCase("nested struct with value", outerStruct{
 			Inner: innerStruct{
@@ -400,8 +410,6 @@ func TestIsZeroNestedStructs(t *testing.T) {
 		newIsZeroTestCase("pointer to zero nested struct", zeroOuterPtr, false),
 		newIsZeroTestCase("nil pointer to nested struct", nilOuterPtr, true),
 	}
-
-	RunTestCases(t, nestedTests)
 }
 
 // isNilTestCase tests IsNil function
@@ -422,7 +430,7 @@ func (tc isNilTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "IsNil result")
 }
 
-func newIsNilTestCase(name string, value any, expected bool) isNilTestCase {
+func newIsNilTestCase(name string, value any, expected bool) TestCase {
 	return isNilTestCase{
 		value:    value,
 		name:     name,
@@ -431,19 +439,17 @@ func newIsNilTestCase(name string, value any, expected bool) isNilTestCase {
 }
 
 func TestIsNil(t *testing.T) {
-	t.Run("basic", testIsNilBasic)
-	t.Run("pointers", testIsNilPointers)
-	t.Run("slices", testIsNilSlices)
-	t.Run("maps", testIsNilMaps)
-	t.Run("channels", testIsNilChannels)
-	t.Run("functions", testIsNilFunctions)
-	t.Run("interfaces", testIsNilInterfaces)
+	t.Run("basic", runTestIsNilBasic)
+	t.Run("pointers", runTestIsNilPointers)
+	t.Run("slices", runTestIsNilSlices)
+	t.Run("maps", runTestIsNilMaps)
+	t.Run("channels", runTestIsNilChannels)
+	t.Run("functions", runTestIsNilFunctions)
+	t.Run("interfaces", runTestIsNilInterfaces)
 }
 
-func testIsNilBasic(t *testing.T) {
-	t.Helper()
-
-	nilTests := []isNilTestCase{
+func makeIsNilBasicTestCases() []TestCase {
+	return []TestCase{
 		newIsNilTestCase("nil", nil, true),
 		newIsNilTestCase("non-nil int", 42, false),
 		newIsNilTestCase("zero int", 0, false),
@@ -452,22 +458,28 @@ func testIsNilBasic(t *testing.T) {
 		newIsNilTestCase("non-nil bool", true, false),
 		newIsNilTestCase("false bool", false, false),
 	}
-
-	RunTestCases(t, nilTests)
 }
 
-func testIsNilPointers(t *testing.T) {
+func runTestIsNilBasic(t *testing.T) {
 	t.Helper()
 
+	RunTestCases(t, makeIsNilBasicTestCases())
+}
+
+func makeIsNilPointersTestCases() []TestCase {
 	var nilPtr *int
 	nonNilPtr := new(int)
 
-	ptrTests := []isNilTestCase{
+	return []TestCase{
 		newIsNilTestCase("nil pointer", nilPtr, true),
 		newIsNilTestCase("non-nil pointer", nonNilPtr, false),
 	}
+}
 
-	RunTestCases(t, ptrTests)
+func runTestIsNilPointers(t *testing.T) {
+	t.Helper()
+
+	RunTestCases(t, makeIsNilPointersTestCases())
 }
 
 // isNilVsIsZeroTestCase tests both IsNil and IsZero behaviour on the same value
@@ -494,7 +506,7 @@ func (tc isNilVsIsZeroTestCase) Test(t *testing.T) {
 }
 
 func newIsNilVsIsZeroTestCase(name string, value any, expectedNil, expectedZero bool,
-	description string) isNilVsIsZeroTestCase {
+	description string) TestCase {
 	return isNilVsIsZeroTestCase{
 		name:         name,
 		value:        value,
@@ -504,7 +516,7 @@ func newIsNilVsIsZeroTestCase(name string, value any, expectedNil, expectedZero 
 	}
 }
 
-func isNilVsIsZeroTestCases() []isNilVsIsZeroTestCase {
+func makeIsNilVsIsZeroTestCases() []TestCase {
 	return S(
 		// Basic types: not nil but can be zero
 		newIsNilVsIsZeroTestCase("zero int", 0, false, true, "zero int is not nil but is zero"),
@@ -552,10 +564,10 @@ func isNilVsIsZeroTestCases() []isNilVsIsZeroTestCase {
 }
 
 func TestIsNilVsIsZero(t *testing.T) {
-	RunTestCases(t, isNilVsIsZeroTestCases())
+	RunTestCases(t, makeIsNilVsIsZeroTestCases())
 }
 
-func isNilReflectValueTestCases() []isNilTestCase {
+func makeIsNilReflectValueTestCases() []TestCase {
 	return S(
 		// Invalid reflect.Value
 		newIsNilTestCase("invalid reflect.Value", reflect.Value{}, true),
@@ -578,23 +590,25 @@ func isNilReflectValueTestCases() []isNilTestCase {
 }
 
 func TestIsNilWithReflectValue(t *testing.T) {
-	RunTestCases(t, isNilReflectValueTestCases())
+	RunTestCases(t, makeIsNilReflectValueTestCases())
 }
 
-func testIsNilSlices(t *testing.T) {
-	t.Helper()
-
+func makeIsNilSlicesTestCases() []TestCase {
 	var nilSlice []int
 	emptySlice := S[int]()
-	nonEmptySlice := S(1, 2, 3)
+	nonEmptySlice := S[int](1, 2, 3)
 
-	sliceTests := []isNilTestCase{
+	return []TestCase{
 		newIsNilTestCase("nil slice", nilSlice, true),
 		newIsNilTestCase("empty slice", emptySlice, false),
 		newIsNilTestCase("non-empty slice", nonEmptySlice, false),
 	}
+}
 
-	RunTestCases(t, sliceTests)
+func runTestIsNilSlices(t *testing.T) {
+	t.Helper()
+
+	RunTestCases(t, makeIsNilSlicesTestCases())
 
 	// Additional edge case tests from HEAD - interface containing typed nil
 	var nilPtr *int
@@ -608,69 +622,77 @@ func testIsNilSlices(t *testing.T) {
 	AssertTrue(t, IsNil(ptrSlice[0]), "nil element in slice")
 }
 
-func testIsNilMaps(t *testing.T) {
-	t.Helper()
-
+func makeIsNilMapsTestCases() []TestCase {
 	var nilMap map[string]int
 	emptyMap := map[string]int{}
 	nonEmptyMap := map[string]int{"a": 1}
 
-	mapTests := []isNilTestCase{
+	return []TestCase{
 		newIsNilTestCase("nil map", nilMap, true),
 		newIsNilTestCase("empty map", emptyMap, false),
 		newIsNilTestCase("non-empty map", nonEmptyMap, false),
 	}
-
-	RunTestCases(t, mapTests)
 }
 
-func testIsNilChannels(t *testing.T) {
+func runTestIsNilMaps(t *testing.T) {
 	t.Helper()
 
+	RunTestCases(t, makeIsNilMapsTestCases())
+}
+
+func makeIsNilChannelsTestCases() []TestCase {
 	var nilChan chan int
 	nonNilChan := make(chan int)
 
-	chanTests := []isNilTestCase{
+	return []TestCase{
 		newIsNilTestCase("nil channel", nilChan, true),
 		newIsNilTestCase("non-nil channel", nonNilChan, false),
 	}
-
-	RunTestCases(t, chanTests)
 }
 
-func testIsNilFunctions(t *testing.T) {
+func runTestIsNilChannels(t *testing.T) {
 	t.Helper()
 
+	RunTestCases(t, makeIsNilChannelsTestCases())
+}
+
+func makeIsNilFunctionsTestCases() []TestCase {
 	var nilFunc func()
 	nonNilFunc := func() {}
 
-	funcTests := []isNilTestCase{
+	return []TestCase{
 		newIsNilTestCase("nil function", nilFunc, true),
 		newIsNilTestCase("non-nil function", nonNilFunc, false),
 	}
-
-	RunTestCases(t, funcTests)
 }
 
-func testIsNilInterfaces(t *testing.T) {
+func runTestIsNilFunctions(t *testing.T) {
 	t.Helper()
 
+	RunTestCases(t, makeIsNilFunctionsTestCases())
+}
+
+func makeIsNilInterfacesTestCases() []TestCase {
 	var nilInterface fmt.Stringer
 	var nonNilInterface fmt.Stringer = time.Second // time.Duration implements fmt.Stringer
 
-	interfaceTests := []isNilTestCase{
+	return []TestCase{
 		newIsNilTestCase("nil interface", nilInterface, true),
 		newIsNilTestCase("non-nil interface", nonNilInterface, false),
 	}
+}
 
-	RunTestCases(t, interfaceTests)
+func runTestIsNilInterfaces(t *testing.T) {
+	t.Helper()
+
+	RunTestCases(t, makeIsNilInterfacesTestCases())
 }
 
 // Test IsNil with reflect.Value
 // TestIsNilReflectValue is now consolidated with TestIsNilWithReflectValue
 // This test was duplicating the same functionality
 
-func isNilTypedInterfaceTestCases() []isNilTestCase {
+func makeIsNilTypedInterfaceTestCases() []TestCase {
 	var nilPtr *int
 	var typedNilInterface any = nilPtr
 
@@ -700,7 +722,7 @@ func isNilTypedInterfaceTestCases() []isNilTestCase {
 
 // Test IsNil with typed nil in interface
 func TestIsNilTypedInterface(t *testing.T) {
-	RunTestCases(t, isNilTypedInterfaceTestCases())
+	RunTestCases(t, makeIsNilTypedInterfaceTestCases())
 }
 
 // initializationSemanticsTestCase tests initialization semantics patterns
@@ -724,7 +746,7 @@ func (tc initializationSemanticsTestCase) Test(t *testing.T) {
 
 func newInitializationSemanticsTestCase(
 	name string, value any, expected bool, description string,
-) initializationSemanticsTestCase {
+) TestCase {
 	return initializationSemanticsTestCase{
 		name:        name,
 		value:       value,
@@ -733,7 +755,7 @@ func newInitializationSemanticsTestCase(
 	}
 }
 
-func initializationSemanticsTestCases() []initializationSemanticsTestCase {
+func makeInitializationSemanticsTestCases() []TestCase {
 	return S(
 		// Slices: nil vs initialized empty
 		newInitializationSemanticsTestCase("nil slice", []int(nil), true, "nil slice needs initialization"),
@@ -775,7 +797,7 @@ func initializationSemanticsTestCases() []initializationSemanticsTestCase {
 
 func TestIsZeroInitializationSemantics(t *testing.T) {
 	// Test the key insight: initialized vs uninitialized state
-	RunTestCases(t, initializationSemanticsTestCases())
+	RunTestCases(t, makeInitializationSemanticsTestCases())
 }
 
 func TestIsZeroPracticalInitialization(t *testing.T) {
@@ -824,20 +846,20 @@ func TestIsZeroPracticalInitialization(t *testing.T) {
 	AssertEqual(t, "initialized", fn(), "function should be callable after initialization")
 }
 
-func testZeroEdgeCasesNilSlicePointer(t *testing.T) {
+func runTestZeroEdgeCasesNilSlicePointer(t *testing.T) {
 	t.Helper()
 	items := Zero[[]string](nil)
 	AssertNil(t, items, "Zero(nil)")
 
 	// Initialize the slice
-	items = S("default", "values")
-	AssertSliceEqual(t, S("default", "values"), items, "initialized slice")
+	items = S[string]("default", "values")
+	AssertSliceEqual(t, S[string]("default", "values"), items, "initialized slice")
 
 	// Check that it's not zero after initialization
 	AssertEqual(t, false, IsZero(items), "IsZero(initialized)")
 }
 
-func testZeroEdgeCasesNilMapPointer(t *testing.T) {
+func runTestZeroEdgeCasesNilMapPointer(t *testing.T) {
 	t.Helper()
 	cache := Zero[map[string]int](nil)
 	AssertNil(t, cache, "Zero(nil)")
@@ -848,7 +870,7 @@ func testZeroEdgeCasesNilMapPointer(t *testing.T) {
 	AssertEqual(t, 42, cache["key"], "map value")
 }
 
-func testZeroEdgeCasesNilPointerPointer(t *testing.T) {
+func runTestZeroEdgeCasesNilPointerPointer(t *testing.T) {
 	t.Helper()
 	ptr := Zero[*int](nil)
 	AssertNil(t, ptr, "Zero(nil)")
@@ -859,7 +881,7 @@ func testZeroEdgeCasesNilPointerPointer(t *testing.T) {
 	AssertEqual(t, 100, *ptr, "pointer value")
 }
 
-func testZeroEdgeCasesNilChannelPointer(t *testing.T) {
+func runTestZeroEdgeCasesNilChannelPointer(t *testing.T) {
 	t.Helper()
 	ch := Zero[chan int](nil)
 	AssertNil(t, ch, "Zero(nil)")
@@ -871,7 +893,7 @@ func testZeroEdgeCasesNilChannelPointer(t *testing.T) {
 	AssertEqual(t, 42, result, "channel value")
 }
 
-func testZeroEdgeCasesNilFuncPointer(t *testing.T) {
+func runTestZeroEdgeCasesNilFuncPointer(t *testing.T) {
 	t.Helper()
 	fn := Zero[func() string](nil)
 	AssertNil(t, fn, "Zero(nil)")
@@ -905,7 +927,7 @@ func (tc isSameTestCase) Test(t *testing.T) {
 }
 
 func newIsSameTestCase(name string, a, b any, expected bool,
-	description string) isSameTestCase {
+	description string) TestCase {
 	return isSameTestCase{
 		name:        name,
 		a:           a,
@@ -915,7 +937,7 @@ func newIsSameTestCase(name string, a, b any, expected bool,
 	}
 }
 
-func isSameValueTypeTestCases() []isSameTestCase {
+func makeIsSameValueTypeTestCases() []TestCase {
 	return S(
 		// Value types - compared by equality
 		newIsSameTestCase("same integers", 42, 42, true,
@@ -937,10 +959,10 @@ func isSameValueTypeTestCases() []isSameTestCase {
 	)
 }
 
-func isSameReferenceTypeTestCases() []isSameTestCase {
-	slice1 := S(1, 2, 3)
+func makeIsSameReferenceTypeTestCases() []TestCase {
+	slice1 := S[int](1, 2, 3)
 	slice2 := slice1
-	slice3 := S(1, 2, 3)
+	slice3 := S[int](1, 2, 3)
 
 	map1 := map[string]int{"a": 1}
 	map2 := map1
@@ -1010,7 +1032,7 @@ func isSameReferenceTypeTestCases() []isSameTestCase {
 	)
 }
 
-func isSameNilTestCases() []isSameTestCase {
+func makeIsSameNilTestCases() []TestCase {
 	var nilSlice1, nilSlice2 []int
 	var nilMap1, nilMap2 map[string]int
 	var nilPtr1, nilPtr2 *int
@@ -1046,21 +1068,21 @@ func isSameNilTestCases() []isSameTestCase {
 	)
 }
 
-func isSameDifferentTypeTestCases() []isSameTestCase {
+func makeIsSameDifferentTypeTestCases() []TestCase {
 	return S(
 		// Different types should never be same
 		newIsSameTestCase("int vs string", 42, "42", false,
 			"different types should not be same"),
 		newIsSameTestCase("int vs float", 42, 42.0, false,
 			"different numeric types should not be same"),
-		newIsSameTestCase("slice vs array", S(1, 2, 3), [3]int{1, 2, 3}, false,
+		newIsSameTestCase("slice vs array", S[int](1, 2, 3), [3]int{1, 2, 3}, false,
 			"slice vs array should not be same"),
-		newIsSameTestCase("int slice vs string slice", S(1, 2, 3), S("1", "2", "3"), false,
+		newIsSameTestCase("int slice vs string slice", S[int](1, 2, 3), S[string]("1", "2", "3"), false,
 			"slices of different types should not be same"),
 	)
 }
 
-func isSameInterfaceTestCases() []isSameTestCase {
+func makeIsSameInterfaceTestCases() []TestCase {
 	x := 42
 	ptr1 := &x
 	ptr2 := ptr1
@@ -1069,7 +1091,7 @@ func isSameInterfaceTestCases() []isSameTestCase {
 	var interface2 any = ptr2
 	var interface3 any = &x
 
-	slice1 := S(1, 2, 3)
+	slice1 := S[int](1, 2, 3)
 	slice2 := slice1
 	var interface4 any = slice1
 	var interface5 any = slice2
@@ -1115,7 +1137,7 @@ func isSameInterfaceTestCases() []isSameTestCase {
 			"interface and nested interface with same content should be same"),
 
 		// Interface containing different reference types
-		newIsSameTestCase("interfaces with different slices", any(S(1, 2, 3)), any(S(1, 2, 3)), false,
+		newIsSameTestCase("interfaces with different slices", any(S[int](1, 2, 3)), any(S[int](1, 2, 3)), false,
 			"interfaces with different slice backing arrays should not be same"),
 		newIsSameTestCase("interfaces with different maps",
 			any(map[string]int{"a": 1}), any(map[string]int{"a": 1}), false,
@@ -1125,29 +1147,29 @@ func isSameInterfaceTestCases() []isSameTestCase {
 
 func TestIsSame(t *testing.T) {
 	t.Run("value types", func(t *testing.T) {
-		RunTestCases(t, isSameValueTypeTestCases())
+		RunTestCases(t, makeIsSameValueTypeTestCases())
 	})
 	t.Run("reference types", func(t *testing.T) {
-		RunTestCases(t, isSameReferenceTypeTestCases())
+		RunTestCases(t, makeIsSameReferenceTypeTestCases())
 	})
 	t.Run("nil handling", func(t *testing.T) {
-		RunTestCases(t, isSameNilTestCases())
+		RunTestCases(t, makeIsSameNilTestCases())
 	})
 	t.Run("different types", func(t *testing.T) {
-		RunTestCases(t, isSameDifferentTypeTestCases())
+		RunTestCases(t, makeIsSameDifferentTypeTestCases())
 	})
 	t.Run("interfaces", func(t *testing.T) {
-		RunTestCases(t, isSameInterfaceTestCases())
+		RunTestCases(t, makeIsSameInterfaceTestCases())
 	})
 	t.Run("unsafe pointers", func(t *testing.T) {
-		RunTestCases(t, isSameUnsafePointerTestCases())
+		RunTestCases(t, makeIsSameUnsafePointerTestCases())
 	})
 	t.Run("complex numbers", func(t *testing.T) {
-		RunTestCases(t, isSameComplexTestCases())
+		RunTestCases(t, makeIsSameComplexTestCases())
 	})
 }
 
-func isSameInterfaceReflectValueTestCases() []isSameTestCase {
+func makeIsSameInterfaceReflectValueTestCases() []TestCase {
 	// Create interface variables
 	var interface1 any = 42
 	var interface2 any = 42
@@ -1171,10 +1193,10 @@ func isSameInterfaceReflectValueTestCases() []isSameTestCase {
 
 // Test reflect.Values with Kind() == reflect.Interface
 func TestIsSameInterfaceReflectValues(t *testing.T) {
-	RunTestCases(t, isSameInterfaceReflectValueTestCases())
+	RunTestCases(t, makeIsSameInterfaceReflectValueTestCases())
 }
 
-func isSameInvalidReflectValueTestCases() []isSameTestCase {
+func makeIsSameInvalidReflectValueTestCases() []TestCase {
 	invalid1 := reflect.Value{}
 	invalid2 := reflect.Value{}
 	valid := reflect.ValueOf(42)
@@ -1198,7 +1220,7 @@ func isSameInvalidReflectValueTestCases() []isSameTestCase {
 }
 
 // Also test IsZero and IsNil with invalid reflect.Values
-func isInvalidReflectValueZeroNilTestCases() []isZeroTestCase {
+func makeIsInvalidReflectValueZeroNilTestCases() []TestCase {
 	invalid := reflect.Value{}
 
 	return S(
@@ -1206,7 +1228,7 @@ func isInvalidReflectValueZeroNilTestCases() []isZeroTestCase {
 	)
 }
 
-func isInvalidReflectValueNilTestCases() []isNilTestCase {
+func makeIsInvalidReflectValueNilTestCases() []TestCase {
 	invalid := reflect.Value{}
 
 	return S(
@@ -1217,15 +1239,15 @@ func isInvalidReflectValueNilTestCases() []isNilTestCase {
 // Test invalid reflect.Values in IsSame
 func TestIsSameInvalidReflectValues(t *testing.T) {
 	t.Run("IsSame", func(t *testing.T) {
-		RunTestCases(t, isSameInvalidReflectValueTestCases())
+		RunTestCases(t, makeIsSameInvalidReflectValueTestCases())
 	})
 
 	t.Run("IsZero", func(t *testing.T) {
-		RunTestCases(t, isInvalidReflectValueZeroNilTestCases())
+		RunTestCases(t, makeIsInvalidReflectValueZeroNilTestCases())
 	})
 
 	t.Run("IsNil", func(t *testing.T) {
-		RunTestCases(t, isInvalidReflectValueNilTestCases())
+		RunTestCases(t, makeIsInvalidReflectValueNilTestCases())
 	})
 }
 
@@ -1254,7 +1276,7 @@ func (tc isSameStackOverflowTestCase) Test(t *testing.T) {
 
 func newIsSameStackOverflowTestCase(name string,
 	setupFunc func() (any, any), expected bool,
-	description string) isSameStackOverflowTestCase {
+	description string) TestCase {
 	return isSameStackOverflowTestCase{
 		name:        name,
 		setupFunc:   setupFunc,
@@ -1263,7 +1285,7 @@ func newIsSameStackOverflowTestCase(name string,
 	}
 }
 
-func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
+func makeIsSameStackOverflowTestCases() []TestCase {
 	return S(
 		// Circular interface references
 		newIsSameStackOverflowTestCase("circular interface references", func() (any, any) {
@@ -1360,7 +1382,7 @@ func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
 	)
 }
 
-func isSameUnsafePointerTestCases() []isSameTestCase {
+func makeIsSameUnsafePointerTestCases() []TestCase {
 	x := 42
 	ptr := &x
 
@@ -1390,7 +1412,7 @@ func isSameUnsafePointerTestCases() []isSameTestCase {
 	)
 }
 
-func isSameComplexTestCases() []isSameTestCase {
+func makeIsSameComplexTestCases() []TestCase {
 	return S(
 		// Complex64
 		newIsSameTestCase("same complex64", complex64(1+2i), complex64(1+2i), true,
@@ -1415,5 +1437,5 @@ func isSameComplexTestCases() []isSameTestCase {
 }
 
 func TestIsSameStackOverflow(t *testing.T) {
-	RunTestCases(t, isSameStackOverflowTestCases())
+	RunTestCases(t, makeIsSameStackOverflowTestCases())
 }

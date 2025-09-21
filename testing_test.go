@@ -12,16 +12,16 @@ var _ TestCase = (*mockTestCase)(nil)
 
 // Test MockT implementation
 func TestMockT(t *testing.T) {
-	t.Run("initial state", testMockTInitialState)
-	t.Run("helper functionality", testMockTHelper)
-	t.Run("error handling", testMockTErrors)
-	t.Run("log handling", testMockTLogs)
-	t.Run("fail functionality", testMockTFail)
-	t.Run("formatted logging", testMockTFormatted)
-	t.Run("multiple messages", testMockTMultiple)
-	t.Run("reset functionality", testMockTReset)
-	t.Run("empty state queries", testMockTEmptyQueries)
-	t.Run("concurrent safety", testMockTConcurrent)
+	t.Run("initial state", runTestMockTInitialState)
+	t.Run("helper functionality", runTestMockTHelper)
+	t.Run("error handling", runTestMockTErrors)
+	t.Run("log handling", runTestMockTLogs)
+	t.Run("fail functionality", runTestMockTFail)
+	t.Run("formatted logging", runTestMockTFormatted)
+	t.Run("multiple messages", runTestMockTMultiple)
+	t.Run("reset functionality", runTestMockTReset)
+	t.Run("empty state queries", runTestMockTEmptyQueries)
+	t.Run("concurrent safety", runTestMockTConcurrent)
 }
 
 // Test S helper function
@@ -349,7 +349,7 @@ func (tc assertPanicTestCase) Test(t *testing.T) {
 
 // revive:disable-next-line:argument-limit
 func newAssertPanicTestCase(name string, panicFn func(), expected any, desc string,
-	expectResult, expectErrors bool, logContains string) assertPanicTestCase {
+	expectResult, expectErrors bool, logContains string) TestCase {
 	return assertPanicTestCase{
 		name:         name,
 		panicFn:      panicFn,
@@ -361,13 +361,13 @@ func newAssertPanicTestCase(name string, panicFn func(), expected any, desc stri
 	}
 }
 
-func assertPanicTestCases() []assertPanicTestCase {
+func makeAssertPanicTestCases() []TestCase {
 	testErr := errors.New("test error")
 	otherErr := errors.New("other error")
 	panicErr := NewPanicError(0, "recovered panic")
 	wrappedPanic := NewPanicError(0, 99)
 
-	return []assertPanicTestCase{
+	return []TestCase{
 		// Any panic tests
 		newAssertPanicTestCase("any panic accepted",
 			func() { panic("test panic") }, nil, "panic test",
@@ -415,7 +415,7 @@ func assertPanicTestCases() []assertPanicTestCase {
 
 // Test AssertPanic
 func TestAssertPanic(t *testing.T) {
-	RunTestCases(t, assertPanicTestCases())
+	RunTestCases(t, makeAssertPanicTestCases())
 }
 
 // Test AssertNoPanic
@@ -485,13 +485,22 @@ func newMockTestCase(name string) *mockTestCase {
 	}
 }
 
-func TestRunTestCases(t *testing.T) {
+func makeRunTestCasesTestCases() []TestCase {
 	tc1 := newMockTestCase("test1")
 	tc2 := newMockTestCase("test2")
 	tc3 := newMockTestCase("test3")
 
-	cases := []TestCase{tc1, tc2, tc3}
+	return []TestCase{tc1, tc2, tc3}
+}
+
+func TestRunTestCases(t *testing.T) {
+	cases := makeRunTestCasesTestCases()
 	RunTestCases(t, cases)
+
+	// Extract test cases for verification
+	tc1 := AssertMustTypeIs[*mockTestCase](t, cases[0], "test case 1")
+	tc2 := AssertMustTypeIs[*mockTestCase](t, cases[1], "test case 2")
+	tc3 := AssertMustTypeIs[*mockTestCase](t, cases[2], "test case 3")
 
 	// Verify all test cases were called
 	AssertTrue(t, tc1.called, "test case 1 called")
@@ -520,7 +529,7 @@ func TestRunBenchmark(t *testing.T) {
 	AssertEqual(t, 10, execCount, "execution function called N times")
 }
 
-func testMockTInitialState(t *testing.T) {
+func runTestMockTInitialState(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -530,7 +539,7 @@ func testMockTInitialState(t *testing.T) {
 	AssertFalse(t, mock.Failed(), "initial Failed")
 }
 
-func testMockTHelper(t *testing.T) {
+func runTestMockTHelper(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -543,7 +552,7 @@ func testMockTHelper(t *testing.T) {
 	AssertEqual(t, 3, mock.HelperCalled, "HelperCalled after multiple calls")
 }
 
-func testMockTErrors(t *testing.T) {
+func runTestMockTErrors(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -558,7 +567,7 @@ func testMockTErrors(t *testing.T) {
 	AssertEqual(t, "test error", lastErr, "LastError value")
 }
 
-func testMockTLogs(t *testing.T) {
+func runTestMockTLogs(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -573,7 +582,7 @@ func testMockTLogs(t *testing.T) {
 	AssertEqual(t, "test log", lastLog, "LastLog value")
 }
 
-func testMockTFail(t *testing.T) {
+func runTestMockTFail(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -605,7 +614,7 @@ func testMockTFail(t *testing.T) {
 	AssertFalse(t, mock.Failed(), "Failed after Logf should be false")
 }
 
-func testMockTFormatted(t *testing.T) {
+func runTestMockTFormatted(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -634,7 +643,7 @@ func testMockTFormatted(t *testing.T) {
 	AssertEqual(t, "log 24: test message", lastLog, "LastLog value after Logf")
 }
 
-func testMockTMultiple(t *testing.T) {
+func runTestMockTMultiple(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -655,7 +664,7 @@ func testMockTMultiple(t *testing.T) {
 	AssertEqual(t, "second log", lastLog, "LastLog after multiple")
 }
 
-func testMockTReset(t *testing.T) {
+func runTestMockTReset(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -674,7 +683,7 @@ func testMockTReset(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Logs length after Reset")
 }
 
-func testMockTEmptyQueries(t *testing.T) {
+func runTestMockTEmptyQueries(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -687,7 +696,7 @@ func testMockTEmptyQueries(t *testing.T) {
 	AssertEqual(t, "", lastLog, "LastLog value when empty")
 }
 
-func testMockTConcurrent(t *testing.T) {
+func runTestMockTConcurrent(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -898,13 +907,13 @@ func TestMockTRunPanicPropagation(t *testing.T) {
 
 // Test early abort pattern: if !Assert() { FailNow() }
 func TestEarlyAbortPattern(t *testing.T) {
-	t.Run("successful assertion continues", testEarlyAbortSuccess)
-	t.Run("failed assertion aborts", testEarlyAbortFailure)
-	t.Run("multiple assertions with early abort", testEarlyAbortMultiple)
-	t.Run("mixed patterns", testEarlyAbortMixed)
+	t.Run("successful assertion continues", runTestEarlyAbortSuccess)
+	t.Run("failed assertion aborts", runTestEarlyAbortFailure)
+	t.Run("multiple assertions with early abort", runTestEarlyAbortMultiple)
+	t.Run("mixed patterns", runTestEarlyAbortMixed)
 }
 
-func testEarlyAbortSuccess(t *testing.T) {
+func runTestEarlyAbortSuccess(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -924,7 +933,7 @@ func testEarlyAbortSuccess(t *testing.T) {
 	AssertTrue(t, strings.Contains(mock.Logs[0], "equal values: 42"), "First log from assertion")
 }
 
-func testEarlyAbortFailure(t *testing.T) {
+func runTestEarlyAbortFailure(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -944,7 +953,7 @@ func testEarlyAbortFailure(t *testing.T) {
 	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 42, got 24"), "Error from failed assertion")
 }
 
-func testEarlyAbortMultiple(t *testing.T) {
+func runTestEarlyAbortMultiple(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -970,7 +979,7 @@ func testEarlyAbortMultiple(t *testing.T) {
 	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 1, got 2"), "Error from third assertion")
 }
 
-func testEarlyAbortMixed(t *testing.T) {
+func runTestEarlyAbortMixed(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1016,26 +1025,26 @@ func testEarlyAbortMixed(t *testing.T) {
 
 // Test AssertMustFoo() functions that call FailNow() on failure
 func TestAssertMustFunctions(t *testing.T) {
-	t.Run("AssertMustEqual", testAssertMustEqual)
-	t.Run("AssertMustNotEqual", testAssertMustNotEqual)
-	t.Run("AssertMustSliceEqual", testAssertMustSliceEqual)
-	t.Run("AssertMustContains", testAssertMustContains)
-	t.Run("AssertMustNotContain", testAssertMustNotContain)
-	t.Run("AssertMustError", testAssertMustError)
-	t.Run("AssertMustNoError", testAssertMustNoError)
-	t.Run("AssertMustPanic", testAssertMustPanic)
-	t.Run("AssertMustNoPanic", testAssertMustNoPanic)
-	t.Run("AssertMustTrue", testAssertMustTrue)
-	t.Run("AssertMustFalse", testAssertMustFalse)
-	t.Run("AssertMustErrorIs", testAssertMustErrorIs)
-	t.Run("AssertMustTypeIs", testAssertMustTypeIs)
-	t.Run("AssertMustNil", testAssertMustNil)
-	t.Run("AssertMustNotNil", testAssertMustNotNil)
-	t.Run("AssertMustSame", testAssertMustSame)
-	t.Run("AssertMustNotSame", testAssertMustNotSame)
+	t.Run("AssertMustEqual", runTestAssertMustEqual)
+	t.Run("AssertMustNotEqual", runTestAssertMustNotEqual)
+	t.Run("AssertMustSliceEqual", runTestAssertMustSliceEqual)
+	t.Run("AssertMustContains", runTestAssertMustContains)
+	t.Run("AssertMustNotContain", runTestAssertMustNotContain)
+	t.Run("AssertMustError", runTestAssertMustError)
+	t.Run("AssertMustNoError", runTestAssertMustNoError)
+	t.Run("AssertMustPanic", runTestAssertMustPanic)
+	t.Run("AssertMustNoPanic", runTestAssertMustNoPanic)
+	t.Run("AssertMustTrue", runTestAssertMustTrue)
+	t.Run("AssertMustFalse", runTestAssertMustFalse)
+	t.Run("AssertMustErrorIs", runTestAssertMustErrorIs)
+	t.Run("AssertMustTypeIs", runTestAssertMustTypeIs)
+	t.Run("AssertMustNil", runTestAssertMustNil)
+	t.Run("AssertMustNotNil", runTestAssertMustNotNil)
+	t.Run("AssertMustSame", runTestAssertMustSame)
+	t.Run("AssertMustNotSame", runTestAssertMustNotSame)
 }
 
-func testAssertMustEqual(t *testing.T) {
+func runTestAssertMustEqual(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1061,7 +1070,7 @@ func testAssertMustEqual(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustNotEqual(t *testing.T) {
+func runTestAssertMustNotEqual(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1084,7 +1093,7 @@ func testAssertMustNotEqual(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustSliceEqual(t *testing.T) {
+func runTestAssertMustSliceEqual(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1107,7 +1116,7 @@ func testAssertMustSliceEqual(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustContains(t *testing.T) {
+func runTestAssertMustContains(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1130,7 +1139,7 @@ func testAssertMustContains(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustNotContain(t *testing.T) {
+func runTestAssertMustNotContain(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1153,7 +1162,7 @@ func testAssertMustNotContain(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustError(t *testing.T) {
+func runTestAssertMustError(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1176,7 +1185,7 @@ func testAssertMustError(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustNoError(t *testing.T) {
+func runTestAssertMustNoError(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1199,7 +1208,7 @@ func testAssertMustNoError(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustPanic(t *testing.T) {
+func runTestAssertMustPanic(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1222,7 +1231,7 @@ func testAssertMustPanic(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustNoPanic(t *testing.T) {
+func runTestAssertMustNoPanic(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1245,7 +1254,7 @@ func testAssertMustNoPanic(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustTrue(t *testing.T) {
+func runTestAssertMustTrue(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1268,7 +1277,7 @@ func testAssertMustTrue(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustFalse(t *testing.T) {
+func runTestAssertMustFalse(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1291,7 +1300,7 @@ func testAssertMustFalse(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustErrorIs(t *testing.T) {
+func runTestAssertMustErrorIs(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 	baseErr := errors.New("base error")
@@ -1317,7 +1326,7 @@ func testAssertMustErrorIs(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustTypeIs(t *testing.T) {
+func runTestAssertMustTypeIs(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1345,7 +1354,7 @@ func testAssertMustTypeIs(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustNil(t *testing.T) {
+func runTestAssertMustNil(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1368,7 +1377,7 @@ func testAssertMustNil(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustNotNil(t *testing.T) {
+func runTestAssertMustNotNil(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1391,7 +1400,7 @@ func testAssertMustNotNil(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustSame(t *testing.T) {
+func runTestAssertMustSame(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 
@@ -1418,7 +1427,7 @@ func testAssertMustSame(t *testing.T) {
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
 }
 
-func testAssertMustNotSame(t *testing.T) {
+func runTestAssertMustNotSame(t *testing.T) {
 	t.Helper()
 	mock := &MockT{}
 

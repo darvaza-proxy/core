@@ -194,7 +194,7 @@ func (tc frameSplitNameTestCase) Test(t *testing.T) {
 }
 
 func newFrameSplitNameTestCase(name string, frame *Frame, expectedPkgName,
-	expectedFuncName string) frameSplitNameTestCase {
+	expectedFuncName string) TestCase {
 	return frameSplitNameTestCase{
 		name:             name,
 		frame:            frame,
@@ -203,14 +203,14 @@ func newFrameSplitNameTestCase(name string, frame *Frame, expectedPkgName,
 	}
 }
 
-func frameSplitNameTestCases() []frameSplitNameTestCase {
-	return []frameSplitNameTestCase{
-		newFrameSplitNameTestCase("current function", Here(), "darvaza.org/core", "frameSplitNameTestCases"),
-	}
+func makeFrameSplitNameTestCases() []TestCase {
+	return S(
+		newFrameSplitNameTestCase("current function", Here(), "darvaza.org/core", "makeFrameSplitNameTestCases"),
+	)
 }
 
 func TestFrameSplitName(t *testing.T) {
-	RunTestCases(t, frameSplitNameTestCases())
+	RunTestCases(t, makeFrameSplitNameTestCases())
 }
 
 func assertFrameNames(t *testing.T, expectedPkg, expectedFunc, actualPkg, actualFunc string) {
@@ -245,7 +245,7 @@ func (tc frameNameTestCase) Test(t *testing.T) {
 	}
 }
 
-func newFrameNameTestCase(name string, frame *Frame, expected string) frameNameTestCase {
+func newFrameNameTestCase(name string, frame *Frame, expected string) TestCase {
 	return frameNameTestCase{
 		name:     name,
 		frame:    frame,
@@ -253,16 +253,16 @@ func newFrameNameTestCase(name string, frame *Frame, expected string) frameNameT
 	}
 }
 
-func frameNameTestCases() []frameNameTestCase {
-	return []frameNameTestCase{
-		newFrameNameTestCase("current function", Here(), "darvaza.org/core.frameNameTestCases"),
+func makeFrameNameTestCases() []TestCase {
+	return S(
+		newFrameNameTestCase("current function", Here(), "darvaza.org/core.makeFrameNameTestCases"),
 		newFrameNameTestCase("nil frame", nil, ""),
-	}
+	)
 }
 
 // Test Frame.Name method (0% coverage)
 func TestFrameName(t *testing.T) {
-	RunTestCases(t, frameNameTestCases())
+	RunTestCases(t, makeFrameNameTestCases())
 }
 
 // Test case for Frame.PkgName method
@@ -281,7 +281,7 @@ func (tc framePkgNameTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, tc.frame.PkgName(), "package name mismatch")
 }
 
-func newFramePkgNameTestCase(name string, frame *Frame, expected string) framePkgNameTestCase {
+func newFramePkgNameTestCase(name string, frame *Frame, expected string) TestCase {
 	return framePkgNameTestCase{
 		name:     name,
 		frame:    frame,
@@ -289,19 +289,19 @@ func newFramePkgNameTestCase(name string, frame *Frame, expected string) framePk
 	}
 }
 
-func framePkgNameTestCases() []framePkgNameTestCase {
-	return []framePkgNameTestCase{
+func makeFramePkgNameTestCases() []TestCase {
+	return S(
 		newFramePkgNameTestCase("current function", Here(), "darvaza.org/core"),
 		newFramePkgNameTestCase("empty frame", &Frame{name: ""}, ""),
 		newFramePkgNameTestCase("no package frame", &Frame{name: "func"}, ""),
 		newFramePkgNameTestCase("dot separator", &Frame{name: "pkg.func"}, "pkg"),
 		newFramePkgNameTestCase("slash separator", &Frame{name: "pkg/module.func"}, "pkg/module"),
-	}
+	)
 }
 
 // Test Frame.PkgName method (0% coverage)
 func TestFramePkgName(t *testing.T) {
-	RunTestCases(t, framePkgNameTestCases())
+	RunTestCases(t, makeFramePkgNameTestCases())
 }
 
 // Test Frame.File method (0% coverage)
@@ -339,7 +339,7 @@ func (tc framePkgFileTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, tc.frame.PkgFile(), "PkgFile output mismatch")
 }
 
-func newFramePkgFileTestCase(name string, frame Frame, expected string) framePkgFileTestCase {
+func newFramePkgFileTestCase(name string, frame Frame, expected string) TestCase {
 	return framePkgFileTestCase{
 		name:     name,
 		frame:    frame,
@@ -348,8 +348,8 @@ func newFramePkgFileTestCase(name string, frame Frame, expected string) framePkg
 }
 
 // Test Frame.PkgFile method
-func TestFramePkgFile(t *testing.T) {
-	tests := []framePkgFileTestCase{
+func makeFramePkgFilePathHandlingTestCases() []TestCase {
+	return []TestCase{
 		newFramePkgFileTestCase(
 			"empty frame",
 			Frame{},
@@ -391,8 +391,12 @@ func TestFramePkgFile(t *testing.T) {
 			"darvaza.org/core/stack_test.go",
 		),
 	}
+}
 
-	RunTestCases(t, tests)
+func TestFramePkgFile(t *testing.T) {
+	t.Run("path handling", func(t *testing.T) {
+		RunTestCases(t, makeFramePkgFilePathHandlingTestCases())
+	})
 }
 
 // Test Frame.Line method (0% coverage)
@@ -430,7 +434,7 @@ func (tc frameFileLineTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, tc.frame.FileLine(), "FileLine output mismatch")
 }
 
-func newFrameFileLineTestCase(name string, frame Frame, expected string) frameFileLineTestCase {
+func newFrameFileLineTestCase(name string, frame Frame, expected string) TestCase {
 	return frameFileLineTestCase{
 		name:     name,
 		frame:    frame,
@@ -438,7 +442,7 @@ func newFrameFileLineTestCase(name string, frame Frame, expected string) frameFi
 	}
 }
 
-func frameFileLineTestCases() []frameFileLineTestCase {
+func makeFrameFileLineTestCases() []TestCase {
 	return S(
 		newFrameFileLineTestCase("frame with line", Frame{file: "test.go", line: 42}, "test.go:42"),
 		newFrameFileLineTestCase("frame without line", Frame{file: "test.go", line: 0}, "test.go"),
@@ -449,7 +453,7 @@ func frameFileLineTestCases() []frameFileLineTestCase {
 
 // Test Frame.FileLine method (0% coverage)
 func TestFrameFileLine(t *testing.T) {
-	RunTestCases(t, frameFileLineTestCases())
+	RunTestCases(t, makeFrameFileLineTestCases())
 }
 
 // Test Frame.String method (implements fmt.Stringer)
@@ -492,7 +496,7 @@ func (tc frameFormatTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "format output mismatch")
 }
 
-func newFrameFormatTestCase(name string, frame *Frame, format, expected string) frameFormatTestCase {
+func newFrameFormatTestCase(name string, frame *Frame, format, expected string) TestCase {
 	return frameFormatTestCase{
 		name:     name,
 		frame:    frame,
@@ -501,7 +505,7 @@ func newFrameFormatTestCase(name string, frame *Frame, format, expected string) 
 	}
 }
 
-func frameFormatTestCases() []frameFormatTestCase {
+func makeFrameFormatTestCases() []TestCase {
 	frame := &Frame{
 		name: "darvaza.org/core.TestFunction",
 		file: "/path/to/test.go",
@@ -532,7 +536,7 @@ func frameFormatTestCases() []frameFormatTestCase {
 
 // Test Frame.Format method and helper functions (0% coverage)
 func TestFrameFormat(t *testing.T) {
-	RunTestCases(t, frameFormatTestCases())
+	RunTestCases(t, makeFrameFormatTestCases())
 }
 
 // Test case for Stack.Format method
@@ -564,7 +568,7 @@ func (tc stackFormatTestCase) Test(t *testing.T) {
 	}
 }
 
-func newStackFormatTestCase(name string, stack Stack, format string, contains []string) stackFormatTestCase {
+func newStackFormatTestCase(name string, stack Stack, format string, contains []string) TestCase {
 	return stackFormatTestCase{
 		name:     name,
 		stack:    stack,
@@ -573,7 +577,7 @@ func newStackFormatTestCase(name string, stack Stack, format string, contains []
 	}
 }
 
-func stackFormatTestCases() []stackFormatTestCase {
+func makeStackFormatTestCases() []TestCase {
 	stack := Stack{
 		{name: "darvaza.org/core.func1", file: "/path/to/file1.go", line: 10},
 		{name: "darvaza.org/core.func2", file: "/path/to/file2.go", line: 20},
@@ -581,22 +585,22 @@ func stackFormatTestCases() []stackFormatTestCase {
 	emptyStack := Stack{}
 
 	return S(
-		newStackFormatTestCase("basic format %s", stack, "%s", S("\nfile1.go", "\nfile2.go")),
+		newStackFormatTestCase("basic format %s", stack, "%s", S[string]("\nfile1.go", "\nfile2.go")),
 		newStackFormatTestCase("verbose format %+v", stack, "%+v",
-			S("\ndarvaza.org/core.func1\n\t/path/to/file1.go:10",
+			S[string]("\ndarvaza.org/core.func1\n\t/path/to/file1.go:10",
 				"\ndarvaza.org/core.func2\n\t/path/to/file2.go:20")),
 		newStackFormatTestCase("numbered format %#+v", stack, "%#+v",
-			S("\n[0/2] darvaza.org/core.func1\n\t/path/to/file1.go:10",
+			S[string]("\n[0/2] darvaza.org/core.func1\n\t/path/to/file1.go:10",
 				"\n[1/2] darvaza.org/core.func2\n\t/path/to/file2.go:20")),
 		newStackFormatTestCase("numbered name format %#+n", stack, "%#+n",
-			S("\n[0/2] darvaza.org/core.func1", "\n[1/2] darvaza.org/core.func2")),
-		newStackFormatTestCase("empty stack", emptyStack, "%+v", S("")),
+			S[string]("\n[0/2] darvaza.org/core.func1", "\n[1/2] darvaza.org/core.func2")),
+		newStackFormatTestCase("empty stack", emptyStack, "%+v", S[string]("")),
 	)
 }
 
 // Test Stack.Format method (0% coverage)
 func TestStackFormat(t *testing.T) {
-	RunTestCases(t, stackFormatTestCases())
+	RunTestCases(t, makeStackFormatTestCases())
 }
 
 // Test Stack.String method (implements fmt.Stringer)
@@ -637,7 +641,7 @@ func (tc formatLineTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "formatted line")
 }
 
-func newFormatLineTestCase(name string, frame *Frame, expected string) formatLineTestCase {
+func newFormatLineTestCase(name string, frame *Frame, expected string) TestCase {
 	return formatLineTestCase{
 		name:     name,
 		frame:    frame,
@@ -645,7 +649,7 @@ func newFormatLineTestCase(name string, frame *Frame, expected string) formatLin
 	}
 }
 
-func formatLineTestCases() []formatLineTestCase {
+func makeFormatLineTestCases() []TestCase {
 	return S(
 		newFormatLineTestCase("positive line", &Frame{line: 123}, "123"),
 		newFormatLineTestCase("zero line", &Frame{line: 0}, "0"),
@@ -654,7 +658,7 @@ func formatLineTestCases() []formatLineTestCase {
 
 // Test formatLine function directly (0% coverage)
 func TestFormatLineMethod(t *testing.T) {
-	RunTestCases(t, formatLineTestCases())
+	RunTestCases(t, makeFormatLineTestCases())
 }
 
 // Test case for writeFormat edge cases
@@ -677,14 +681,14 @@ func (tc writeFormatTestCase) Test(t *testing.T) {
 	}
 }
 
-func newWriteFormatTestCase(name, format string) writeFormatTestCase {
+func newWriteFormatTestCase(name, format string) TestCase {
 	return writeFormatTestCase{
 		name:   name,
 		format: format,
 	}
 }
 
-func writeFormatTestCases() []writeFormatTestCase {
+func makeWriteFormatTestCases() []TestCase {
 	return S(
 		newWriteFormatTestCase("basic file", "%s"),
 		newWriteFormatTestCase("basic line", "%d"),
@@ -698,5 +702,5 @@ func writeFormatTestCases() []writeFormatTestCase {
 
 // Test writeFormat error conditions for better coverage (60% -> higher)
 func TestWriteFormatEdgeCases(t *testing.T) {
-	RunTestCases(t, writeFormatTestCases())
+	RunTestCases(t, makeWriteFormatTestCases())
 }

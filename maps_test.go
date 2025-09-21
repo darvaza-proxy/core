@@ -24,11 +24,13 @@ type keysTestCase struct {
 	expected int
 }
 
-var keysTestCases = []keysTestCase{
-	newKeysTestCase("empty map", map[string]int{}, 0),
-	newKeysTestCase("single entry", map[string]int{"a": 1}, 1),
-	newKeysTestCase("multiple entries", map[string]int{"a": 1, "b": 2, "c": 3}, 3),
-	newKeysTestCase("nil map", nil, 0),
+func makeKeysTestCases() []TestCase {
+	return S(
+		newKeysTestCase("empty map", map[string]int{}, 0),
+		newKeysTestCase("single entry", map[string]int{"a": 1}, 1),
+		newKeysTestCase("multiple entries", map[string]int{"a": 1, "b": 2, "c": 3}, 3),
+		newKeysTestCase("nil map", nil, 0),
+	)
 }
 
 func (tc keysTestCase) Name() string {
@@ -52,7 +54,7 @@ func (tc keysTestCase) verifyAllKeysPresent(t *testing.T, got []string) {
 }
 
 // Factory function for keysTestCase
-func newKeysTestCase(name string, input map[string]int, expected int) keysTestCase {
+func newKeysTestCase(name string, input map[string]int, expected int) TestCase {
 	return keysTestCase{
 		name:     name,
 		input:    input,
@@ -61,7 +63,7 @@ func newKeysTestCase(name string, input map[string]int, expected int) keysTestCa
 }
 
 func TestKeys(t *testing.T) {
-	RunTestCases(t, keysTestCases)
+	RunTestCases(t, makeKeysTestCases())
 }
 
 // sortedKeysTestCase tests SortedKeys function
@@ -71,14 +73,16 @@ type sortedKeysTestCase struct {
 	expected []string
 }
 
-var sortedKeysTestCases = []sortedKeysTestCase{
-	newSortedKeysTestCase("empty map", map[string]int{}, S[string]()),
-	newSortedKeysTestCase("single entry", map[string]int{"a": 1}, S("a")),
-	newSortedKeysTestCase("multiple entries", map[string]int{"c": 3, "a": 1, "b": 2}, S("a", "b", "c")),
-	newSortedKeysTestCase("numeric string keys",
-		map[string]int{"10": 10, "2": 2, "1": 1, "20": 20},
-		S("1", "10", "2", "20")),
-	newSortedKeysTestCase("nil map", nil, S[string]()),
+func makeSortedKeysTestCases() []TestCase {
+	return S(
+		newSortedKeysTestCase("empty map", map[string]int{}, S[string]()),
+		newSortedKeysTestCase("single entry", map[string]int{"a": 1}, S("a")),
+		newSortedKeysTestCase("multiple entries", map[string]int{"c": 3, "a": 1, "b": 2}, S("a", "b", "c")),
+		newSortedKeysTestCase("numeric string keys",
+			map[string]int{"10": 10, "2": 2, "1": 1, "20": 20},
+			S("1", "10", "2", "20")),
+		newSortedKeysTestCase("nil map", nil, S[string]()),
+	)
 }
 
 func (tc sortedKeysTestCase) Name() string {
@@ -93,7 +97,7 @@ func (tc sortedKeysTestCase) Test(t *testing.T) {
 }
 
 // Factory function for sortedKeysTestCase
-func newSortedKeysTestCase(name string, input map[string]int, expected []string) sortedKeysTestCase {
+func newSortedKeysTestCase(name string, input map[string]int, expected []string) TestCase {
 	return sortedKeysTestCase{
 		name:     name,
 		input:    input,
@@ -102,16 +106,16 @@ func newSortedKeysTestCase(name string, input map[string]int, expected []string)
 }
 
 func TestSortedKeys(t *testing.T) {
-	RunTestCases(t, sortedKeysTestCases)
-}
+	t.Run("string keys", func(t *testing.T) {
+		RunTestCases(t, makeSortedKeysTestCases())
+	})
+	t.Run("int keys", func(t *testing.T) {
+		input := map[int]string{10: "ten", 2: "two", 1: "one", 20: "twenty"}
+		expected := S(1, 2, 10, 20)
 
-// Test SortedKeys with int keys
-func TestSortedKeysInt(t *testing.T) {
-	input := map[int]string{10: "ten", 2: "two", 1: "one", 20: "twenty"}
-	expected := S(1, 2, 10, 20)
-
-	got := SortedKeys(input)
-	AssertSliceEqual(t, expected, got, "SortedKeys[int]")
+		got := SortedKeys(input)
+		AssertSliceEqual(t, expected, got, "SortedKeys[int]")
+	})
 }
 
 // sortedValuesTestCase tests SortedValues functions
@@ -121,11 +125,13 @@ type sortedValuesTestCase struct {
 	expected []int
 }
 
-var sortedValuesTestCases = []sortedValuesTestCase{
-	newSortedValuesTestCase("empty map", map[string]int{}, nil),
-	newSortedValuesTestCase("single entry", map[string]int{"a": 1}, S(1)),
-	newSortedValuesTestCase("multiple entries", map[string]int{"c": 3, "a": 1, "b": 2}, S(1, 2, 3)),
-	newSortedValuesTestCase("nil map", nil, nil),
+func makeSortedValuesTestCases() []TestCase {
+	return S(
+		newSortedValuesTestCase("empty map", map[string]int{}, nil),
+		newSortedValuesTestCase("single entry", map[string]int{"a": 1}, S(1)),
+		newSortedValuesTestCase("multiple entries", map[string]int{"c": 3, "a": 1, "b": 2}, S(1, 2, 3)),
+		newSortedValuesTestCase("nil map", nil, nil),
+	)
 }
 
 func (tc sortedValuesTestCase) Name() string {
@@ -140,7 +146,7 @@ func (tc sortedValuesTestCase) Test(t *testing.T) {
 }
 
 // Factory function for sortedValuesTestCase
-func newSortedValuesTestCase(name string, input map[string]int, expected []int) sortedValuesTestCase {
+func newSortedValuesTestCase(name string, input map[string]int, expected []int) TestCase {
 	return sortedValuesTestCase{
 		name:     name,
 		input:    input,
@@ -149,7 +155,7 @@ func newSortedValuesTestCase(name string, input map[string]int, expected []int) 
 }
 
 func TestSortedValues(t *testing.T) {
-	RunTestCases(t, sortedValuesTestCases)
+	RunTestCases(t, makeSortedValuesTestCases())
 }
 
 // sortedValuesCondTestCase tests SortedValuesCond function
@@ -160,19 +166,21 @@ type sortedValuesCondTestCase struct {
 	expected  []int
 }
 
-var sortedValuesCondTestCases = []sortedValuesCondTestCase{
-	newSortedValuesCondTestCase("empty map", map[string]int{}, func(v int) bool { return v > 0 }, nil),
-	newSortedValuesCondTestCase("filter even values",
-		map[string]int{"a": 1, "b": 2, "c": 3, "d": 4},
-		func(v int) bool { return v%2 == 0 }, S(2, 4)),
-	newSortedValuesCondTestCase("filter greater than 2",
-		map[string]int{"a": 1, "b": 2, "c": 3, "d": 4},
-		func(v int) bool { return v > 2 }, S(3, 4)),
-	newSortedValuesCondTestCase("filter none",
-		map[string]int{"a": 1, "b": 2, "c": 3},
-		func(v int) bool { return v > 10 }, S[int]()),
-	newSortedValuesCondTestCase("nil predicate", map[string]int{"a": 1, "b": 2, "c": 3}, nil, S(1, 2, 3)),
-	newSortedValuesCondTestCase("nil map", nil, func(v int) bool { return v > 0 }, nil),
+func makeSortedValuesCondTestCases() []TestCase {
+	return S(
+		newSortedValuesCondTestCase("empty map", map[string]int{}, func(v int) bool { return v > 0 }, nil),
+		newSortedValuesCondTestCase("filter even values",
+			map[string]int{"a": 1, "b": 2, "c": 3, "d": 4},
+			func(v int) bool { return v%2 == 0 }, S(2, 4)),
+		newSortedValuesCondTestCase("filter greater than 2",
+			map[string]int{"a": 1, "b": 2, "c": 3, "d": 4},
+			func(v int) bool { return v > 2 }, S(3, 4)),
+		newSortedValuesCondTestCase("filter none",
+			map[string]int{"a": 1, "b": 2, "c": 3},
+			func(v int) bool { return v > 10 }, S[int]()),
+		newSortedValuesCondTestCase("nil predicate", map[string]int{"a": 1, "b": 2, "c": 3}, nil, S(1, 2, 3)),
+		newSortedValuesCondTestCase("nil map", nil, func(v int) bool { return v > 0 }, nil),
+	)
 }
 
 func (tc sortedValuesCondTestCase) Name() string {
@@ -188,7 +196,7 @@ func (tc sortedValuesCondTestCase) Test(t *testing.T) {
 
 // Factory function for sortedValuesCondTestCase
 func newSortedValuesCondTestCase(name string, input map[string]int,
-	predicate func(int) bool, expected []int) sortedValuesCondTestCase {
+	predicate func(int) bool, expected []int) TestCase {
 	return sortedValuesCondTestCase{
 		name:      name,
 		input:     input,
@@ -198,7 +206,7 @@ func newSortedValuesCondTestCase(name string, input map[string]int,
 }
 
 func TestSortedValuesCond(t *testing.T) {
-	RunTestCases(t, sortedValuesCondTestCases)
+	RunTestCases(t, makeSortedValuesCondTestCases())
 }
 
 // Test SortedValuesUnlikelyCond
@@ -235,11 +243,13 @@ type mapValueTestCase struct {
 	found    bool
 }
 
-var mapValueTestCases = []mapValueTestCase{
-	newMapValueTestCase("existing key", map[string]int{"a": 1, "b": 2}, "a", 99, 1),
-	newMapValueTestCase("missing key", map[string]int{"a": 1, "b": 2}, "c", 88, 88),
-	newMapValueTestCase("nil map", nil, "a", 77, 77),
-	newMapValueTestCase("zero value exists", map[string]int{"a": 0}, "a", 66, 0),
+func makeMapValueTestCases() []TestCase {
+	return S(
+		newMapValueTestCase("existing key", map[string]int{"a": 1, "b": 2}, "a", 99, 1),
+		newMapValueTestCase("missing key", map[string]int{"a": 1, "b": 2}, "c", 88, 88),
+		newMapValueTestCase("nil map", nil, "a", 77, 77),
+		newMapValueTestCase("zero value exists", map[string]int{"a": 0}, "a", 66, 0),
+	)
 }
 
 func (tc mapValueTestCase) Name() string {
@@ -256,7 +266,7 @@ func (tc mapValueTestCase) Test(t *testing.T) {
 
 // Factory function for mapValueTestCase
 func newMapValueTestCase(name string, m map[string]int, key string,
-	def int, expected int) mapValueTestCase {
+	def int, expected int) TestCase {
 	return mapValueTestCase{
 		name:     name,
 		m:        m,
@@ -268,7 +278,7 @@ func newMapValueTestCase(name string, m map[string]int, key string,
 }
 
 func TestMapValue(t *testing.T) {
-	RunTestCases(t, mapValueTestCases)
+	RunTestCases(t, makeMapValueTestCases())
 }
 
 // mapContainsTestCase tests MapContains function
@@ -279,14 +289,16 @@ type mapContainsTestCase struct {
 	expected bool
 }
 
-var mapContainsTestCases = []mapContainsTestCase{
-	newMapContainsTestCase("existing key", map[string]any{"a": 1, "b": "two"}, "a", true),
-	newMapContainsTestCase("missing key", map[string]any{"a": 1, "b": "two"}, "c", false),
-	newMapContainsTestCase("nil map", nil, "a", false),
-	newMapContainsTestCase("nil value exists", map[string]any{"a": nil}, "a", true),
+func makeMapContainsTestCases() []TestCase {
+	return S(
+		newMapContainsTestCase("existing key", map[string]any{"a": 1, "b": "two"}, "a", true),
+		newMapContainsTestCase("missing key", map[string]any{"a": 1, "b": "two"}, "c", false),
+		newMapContainsTestCase("nil map", nil, "a", false),
+		newMapContainsTestCase("nil value exists", map[string]any{"a": nil}, "a", true),
+	)
 }
 
-func newMapContainsTestCase(name string, m map[string]any, key string, expected bool) mapContainsTestCase {
+func newMapContainsTestCase(name string, m map[string]any, key string, expected bool) TestCase {
 	return mapContainsTestCase{
 		name:     name,
 		m:        m,
@@ -307,7 +319,7 @@ func (tc mapContainsTestCase) Test(t *testing.T) {
 }
 
 func TestMapContains(t *testing.T) {
-	RunTestCases(t, mapContainsTestCases)
+	RunTestCases(t, makeMapContainsTestCases())
 }
 
 func TestMapListInsert(t *testing.T) {
@@ -353,7 +365,7 @@ type mapListContainsTestCase struct {
 }
 
 func newMapListContainsTestCase(name string, m map[string]*list.List, key, value string,
-	expected bool) mapListContainsTestCase {
+	expected bool) TestCase {
 	return mapListContainsTestCase{
 		name:     name,
 		m:        m,
@@ -379,14 +391,14 @@ func TestMapListContains(t *testing.T) {
 	MapListAppend(m, "key1", "value2")
 	MapListAppend(m, "key2", "value3")
 
-	tests := []mapListContainsTestCase{
+	tests := S(
 		newMapListContainsTestCase("existing value", m, "key1", "value1", true),
 		newMapListContainsTestCase("existing value 2", m, "key1", "value2", true),
 		newMapListContainsTestCase("wrong key", m, "key2", "value1", false),
 		newMapListContainsTestCase("missing key", m, "key3", "value1", false),
 		newMapListContainsTestCase("missing value", m, "key1", "value3", false),
 		newMapListContainsTestCase("nil map", nil, "key", "value", false),
-	}
+	)
 
 	RunTestCases(t, tests)
 }
@@ -495,13 +507,13 @@ type mapListForEachElementTestCase struct {
 	expected []string
 }
 
-func createMapListForEachElementTestCases() []mapListForEachElementTestCase {
+func makeMapListForEachElementTestCases() []TestCase {
 	m := make(map[string]*list.List)
 	MapListAppend(m, "key1", "a")
 	MapListAppend(m, "key1", "b")
 	MapListAppend(m, "key2", "c")
 
-	return []mapListForEachElementTestCase{
+	return S(
 		newMapListForEachElementTestCase("iterate all elements", m, "key1", func(_ *list.Element) bool {
 			return false // continue
 		}, S("a", "b")),
@@ -513,7 +525,7 @@ func createMapListForEachElementTestCases() []mapListForEachElementTestCase {
 		newMapListForEachElementTestCase("nil map", nil, "key",
 			func(_ *list.Element) bool { return false }, S[string]()),
 		newMapListForEachElementTestCase("nil function", m, "key1", nil, S[string]()),
-	}
+	)
 }
 
 func (tc mapListForEachElementTestCase) Name() string {
@@ -541,7 +553,7 @@ func (tc mapListForEachElementTestCase) Test(t *testing.T) {
 
 // Factory function for mapListForEachElementTestCase
 func newMapListForEachElementTestCase(name string, m map[string]*list.List,
-	key string, fn func(*list.Element) bool, expected []string) mapListForEachElementTestCase {
+	key string, fn func(*list.Element) bool, expected []string) TestCase {
 	return mapListForEachElementTestCase{
 		name:     name,
 		m:        m,
@@ -552,7 +564,7 @@ func newMapListForEachElementTestCase(name string, m map[string]*list.List,
 }
 
 func TestMapListForEachElement(t *testing.T) {
-	testCases := createMapListForEachElementTestCases()
+	testCases := makeMapListForEachElementTestCases()
 
 	RunTestCases(t, testCases)
 }
@@ -631,7 +643,7 @@ func (tc mapAllListContainsTestCase) Test(t *testing.T) {
 
 // Factory function for mapAllListContainsTestCase
 func newMapAllListContainsTestCase(name string, m map[string]*list.List,
-	value string, expected bool) mapAllListContainsTestCase {
+	value string, expected bool) TestCase {
 	return mapAllListContainsTestCase{
 		name:     name,
 		m:        m,
@@ -646,12 +658,12 @@ func TestMapAllListContains(t *testing.T) {
 	MapListAppend(m, "key2", "value2")
 	MapListAppend(m, "key3", "value1") // duplicate value in different key
 
-	tests := []mapAllListContainsTestCase{
+	tests := S(
 		newMapAllListContainsTestCase("existing value in key1", m, "value1", true),
 		newMapAllListContainsTestCase("existing value in key2", m, "value2", true),
 		newMapAllListContainsTestCase("missing value", m, "value3", false),
 		newMapAllListContainsTestCase("nil map", nil, "value", false),
-	}
+	)
 
 	RunTestCases(t, tests)
 }

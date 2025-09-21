@@ -23,7 +23,7 @@ type waitGroupGoTestCase struct {
 }
 
 // Factory function for waitGroupGoTestCase
-func newWaitGroupGoTestCase(name string, fn func() error, expectError bool, errorMsg string) waitGroupGoTestCase {
+func newWaitGroupGoTestCase(name string, fn func() error, expectError bool, errorMsg string) TestCase {
 	return waitGroupGoTestCase{
 		name:        name,
 		fn:          fn,
@@ -32,17 +32,19 @@ func newWaitGroupGoTestCase(name string, fn func() error, expectError bool, erro
 	}
 }
 
-var waitGroupGoTestCases = []waitGroupGoTestCase{
-	newWaitGroupGoTestCase("successful worker", func() error {
-		return nil
-	}, false, ""),
-	newWaitGroupGoTestCase("worker with error", func() error {
-		return errors.New("worker error")
-	}, true, "worker error"),
-	newWaitGroupGoTestCase("worker with panic", func() error {
-		panic("worker panic")
-	}, true, ""), // Panic should be caught and converted to error
-	newWaitGroupGoTestCase("nil function", nil, false, ""),
+func makeWaitGroupGoTestCases() []TestCase {
+	return S(
+		newWaitGroupGoTestCase("successful worker", func() error {
+			return nil
+		}, false, ""),
+		newWaitGroupGoTestCase("worker with error", func() error {
+			return errors.New("worker error")
+		}, true, "worker error"),
+		newWaitGroupGoTestCase("worker with panic", func() error {
+			panic("worker panic")
+		}, true, ""), // Panic should be caught and converted to error
+		newWaitGroupGoTestCase("nil function", nil, false, ""),
+	)
 }
 
 func (tc waitGroupGoTestCase) Name() string {
@@ -82,7 +84,7 @@ func (tc waitGroupGoTestCase) validateResult(t *testing.T, err error) {
 }
 
 func TestWaitGroupGo(t *testing.T) {
-	RunTestCases(t, waitGroupGoTestCases)
+	RunTestCases(t, makeWaitGroupGoTestCases())
 }
 
 type waitGroupGoCatchTestCase struct {
@@ -95,7 +97,7 @@ type waitGroupGoCatchTestCase struct {
 
 // Factory function for waitGroupGoCatchTestCase
 func newWaitGroupGoCatchTestCase(name string, fn func() error, catch func(error) error,
-	expectError bool, errorMsg string) waitGroupGoCatchTestCase {
+	expectError bool, errorMsg string) TestCase {
 	return waitGroupGoCatchTestCase{
 		name:        name,
 		fn:          fn,
@@ -105,33 +107,35 @@ func newWaitGroupGoCatchTestCase(name string, fn func() error, catch func(error)
 	}
 }
 
-var waitGroupGoCatchTestCases = []waitGroupGoCatchTestCase{
-	newWaitGroupGoCatchTestCase("successful worker with catch", func() error {
-		return nil
-	}, func(_ error) error {
-		return nil
-	}, false, ""),
-	newWaitGroupGoCatchTestCase("worker error handled by catch", func() error {
-		return errors.New("worker error")
-	}, func(_ error) error {
-		return nil // catch dismisses the error
-	}, false, ""),
-	newWaitGroupGoCatchTestCase("worker error transformed by catch", func() error {
-		return errors.New("original error")
-	}, func(_ error) error {
-		return errors.New("transformed error")
-	}, true, "transformed error"),
-	newWaitGroupGoCatchTestCase("catch function panics", func() error {
-		return errors.New("worker error")
-	}, func(_ error) error {
-		panic("catch panic")
-	}, true, ""), // Don't check exact message as panic handling may vary
-	newWaitGroupGoCatchTestCase("nil function with catch", nil, func(err error) error {
-		return err
-	}, false, ""),
-	newWaitGroupGoCatchTestCase("worker error with nil catch", func() error {
-		return errors.New("worker error")
-	}, nil, true, "worker error"),
+func makeWaitGroupGoCatchTestCases() []TestCase {
+	return S(
+		newWaitGroupGoCatchTestCase("successful worker with catch", func() error {
+			return nil
+		}, func(_ error) error {
+			return nil
+		}, false, ""),
+		newWaitGroupGoCatchTestCase("worker error handled by catch", func() error {
+			return errors.New("worker error")
+		}, func(_ error) error {
+			return nil // catch dismisses the error
+		}, false, ""),
+		newWaitGroupGoCatchTestCase("worker error transformed by catch", func() error {
+			return errors.New("original error")
+		}, func(_ error) error {
+			return errors.New("transformed error")
+		}, true, "transformed error"),
+		newWaitGroupGoCatchTestCase("catch function panics", func() error {
+			return errors.New("worker error")
+		}, func(_ error) error {
+			panic("catch panic")
+		}, true, ""), // Don't check exact message as panic handling may vary
+		newWaitGroupGoCatchTestCase("nil function with catch", nil, func(err error) error {
+			return err
+		}, false, ""),
+		newWaitGroupGoCatchTestCase("worker error with nil catch", func() error {
+			return errors.New("worker error")
+		}, nil, true, "worker error"),
+	)
 }
 
 func (tc waitGroupGoCatchTestCase) Name() string {
@@ -161,7 +165,7 @@ func (tc waitGroupGoCatchTestCase) validateGoCatchResult(t *testing.T, err error
 }
 
 func TestWaitGroupGoCatch(t *testing.T) {
-	RunTestCases(t, waitGroupGoCatchTestCases)
+	RunTestCases(t, makeWaitGroupGoCatchTestCases())
 }
 
 type waitGroupOnErrorTestCase struct {
@@ -174,7 +178,7 @@ type waitGroupOnErrorTestCase struct {
 
 // Factory function for waitGroupOnErrorTestCase
 func newWaitGroupOnErrorTestCase(name string, workers []func() error,
-	onErrorHandler func(error) error, expectError bool, errorMsg string) waitGroupOnErrorTestCase {
+	onErrorHandler func(error) error, expectError bool, errorMsg string) TestCase {
 	return waitGroupOnErrorTestCase{
 		name:           name,
 		workers:        workers,
@@ -184,23 +188,25 @@ func newWaitGroupOnErrorTestCase(name string, workers []func() error,
 	}
 }
 
-var waitGroupOnErrorTestCases = []waitGroupOnErrorTestCase{
-	newWaitGroupOnErrorTestCase("successful workers with onError", []func() error{
-		func() error { return nil },
-		func() error { return nil },
-	}, func(err error) error {
-		return err
-	}, false, ""),
-	newWaitGroupOnErrorTestCase("error dismissed by onError filter", []func() error{
-		func() error { return errors.New("worker error") },
-	}, func(_ error) error {
-		return nil // onError filter dismisses the error
-	}, false, ""),
-	newWaitGroupOnErrorTestCase("error transformed by onError filter", []func() error{
-		func() error { return errors.New("original error") },
-	}, func(_ error) error {
-		return errors.New("filtered error")
-	}, true, "filtered error"),
+func makeWaitGroupOnErrorTestCases() []TestCase {
+	return S(
+		newWaitGroupOnErrorTestCase("successful workers with onError", []func() error{
+			func() error { return nil },
+			func() error { return nil },
+		}, func(err error) error {
+			return err
+		}, false, ""),
+		newWaitGroupOnErrorTestCase("error dismissed by onError filter", []func() error{
+			func() error { return errors.New("worker error") },
+		}, func(_ error) error {
+			return nil // onError filter dismisses the error
+		}, false, ""),
+		newWaitGroupOnErrorTestCase("error transformed by onError filter", []func() error{
+			func() error { return errors.New("original error") },
+		}, func(_ error) error {
+			return errors.New("filtered error")
+		}, true, "filtered error"),
+	)
 }
 
 func (tc waitGroupOnErrorTestCase) Name() string {
@@ -248,7 +254,7 @@ func (tc waitGroupOnErrorTestCase) validateOnErrorResult(t *testing.T, err error
 }
 
 func TestWaitGroupOnError(t *testing.T) {
-	RunTestCases(t, waitGroupOnErrorTestCases)
+	RunTestCases(t, makeWaitGroupOnErrorTestCases())
 }
 
 func TestWaitGroupDone(t *testing.T) {
@@ -288,7 +294,7 @@ func TestWaitGroupDone(t *testing.T) {
 	}
 }
 
-func testWaitGroupErrNoError(t *testing.T) {
+func runTestWaitGroupErrNoError(t *testing.T) {
 	t.Helper()
 	var wg WaitGroup
 	wg.Go(func() error { return nil })
@@ -296,7 +302,7 @@ func testWaitGroupErrNoError(t *testing.T) {
 	AssertNil(t, wg.Err(), "error")
 }
 
-func testWaitGroupErrWithError(t *testing.T) {
+func runTestWaitGroupErrWithError(t *testing.T) {
 	t.Helper()
 	var wg WaitGroup
 	expectedErr := errors.New("test error")
@@ -307,8 +313,8 @@ func testWaitGroupErrWithError(t *testing.T) {
 }
 
 func TestWaitGroupErr(t *testing.T) {
-	t.Run("no error", testWaitGroupErrNoError)
-	t.Run("with error", testWaitGroupErrWithError)
+	t.Run("no error", runTestWaitGroupErrNoError)
+	t.Run("with error", runTestWaitGroupErrWithError)
 }
 
 func TestWaitGroupConcurrency(t *testing.T) {

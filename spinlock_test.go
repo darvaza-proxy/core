@@ -21,7 +21,7 @@ type spinLockTryLockTestCase struct {
 }
 
 // Factory function for spinLockTryLockTestCase
-func newSpinLockTryLockTestCase(name string, setup func() *SpinLock, expected bool) spinLockTryLockTestCase {
+func newSpinLockTryLockTestCase(name string, setup func() *SpinLock, expected bool) TestCase {
 	return spinLockTryLockTestCase{
 		name:     name,
 		setup:    setup,
@@ -29,15 +29,17 @@ func newSpinLockTryLockTestCase(name string, setup func() *SpinLock, expected bo
 	}
 }
 
-var spinLockTryLockTestCases = []spinLockTryLockTestCase{
-	newSpinLockTryLockTestCase("unlocked spinlock", func() *SpinLock {
-		return new(SpinLock)
-	}, true),
-	newSpinLockTryLockTestCase("already locked spinlock", func() *SpinLock {
-		sl := new(SpinLock)
-		sl.TryLock()
-		return sl
-	}, false),
+func makeSpinLockTryLockTestCases() []TestCase {
+	return S(
+		newSpinLockTryLockTestCase("unlocked spinlock", func() *SpinLock {
+			return new(SpinLock)
+		}, true),
+		newSpinLockTryLockTestCase("already locked spinlock", func() *SpinLock {
+			sl := new(SpinLock)
+			sl.TryLock()
+			return sl
+		}, false),
+	)
 }
 
 func (tc spinLockTryLockTestCase) Name() string {
@@ -54,7 +56,7 @@ func (tc spinLockTryLockTestCase) Test(t *testing.T) {
 }
 
 func TestSpinLockTryLock(t *testing.T) {
-	RunTestCases(t, spinLockTryLockTestCases)
+	RunTestCases(t, makeSpinLockTryLockTestCases())
 }
 
 type spinLockLockTestCase struct {
@@ -63,20 +65,22 @@ type spinLockLockTestCase struct {
 }
 
 // Factory function for spinLockLockTestCase
-func newSpinLockLockTestCase(name string, setup func() *SpinLock) spinLockLockTestCase {
+func newSpinLockLockTestCase(name string, setup func() *SpinLock) TestCase {
 	return spinLockLockTestCase{
 		name:  name,
 		setup: setup,
 	}
 }
 
-var spinLockLockTestCases = []spinLockLockTestCase{
-	newSpinLockLockTestCase("unlocked spinlock", func() *SpinLock {
-		return new(SpinLock)
-	}),
-	newSpinLockLockTestCase("contended spinlock", func() *SpinLock {
-		return new(SpinLock)
-	}),
+func makeSpinLockLockTestCases() []TestCase {
+	return S(
+		newSpinLockLockTestCase("unlocked spinlock", func() *SpinLock {
+			return new(SpinLock)
+		}),
+		newSpinLockLockTestCase("contended spinlock", func() *SpinLock {
+			return new(SpinLock)
+		}),
+	)
 }
 
 func (tc spinLockLockTestCase) Name() string {
@@ -128,7 +132,7 @@ func (tc spinLockLockTestCase) Test(t *testing.T) {
 }
 
 func TestSpinLockLock(t *testing.T) {
-	RunTestCases(t, spinLockLockTestCases)
+	RunTestCases(t, makeSpinLockLockTestCases())
 }
 
 type spinLockUnlockTestCase struct {
@@ -138,7 +142,7 @@ type spinLockUnlockTestCase struct {
 }
 
 // Factory function for spinLockUnlockTestCase
-func newSpinLockUnlockTestCase(name string, setup func() *SpinLock, shouldPanic bool) spinLockUnlockTestCase {
+func newSpinLockUnlockTestCase(name string, setup func() *SpinLock, shouldPanic bool) TestCase {
 	return spinLockUnlockTestCase{
 		name:        name,
 		setup:       setup,
@@ -146,15 +150,17 @@ func newSpinLockUnlockTestCase(name string, setup func() *SpinLock, shouldPanic 
 	}
 }
 
-var spinLockUnlockTestCases = []spinLockUnlockTestCase{
-	newSpinLockUnlockTestCase("locked spinlock", func() *SpinLock {
-		sl := new(SpinLock)
-		sl.Lock()
-		return sl
-	}, false),
-	newSpinLockUnlockTestCase("unlocked spinlock", func() *SpinLock {
-		return new(SpinLock)
-	}, true),
+func makeSpinLockUnlockTestCases() []TestCase {
+	return S(
+		newSpinLockUnlockTestCase("locked spinlock", func() *SpinLock {
+			sl := new(SpinLock)
+			sl.Lock()
+			return sl
+		}, false),
+		newSpinLockUnlockTestCase("unlocked spinlock", func() *SpinLock {
+			return new(SpinLock)
+		}, true),
+	)
 }
 
 func (tc spinLockUnlockTestCase) Name() string {
@@ -174,32 +180,32 @@ func (tc spinLockUnlockTestCase) Test(t *testing.T) {
 }
 
 func TestSpinLockUnlock(t *testing.T) {
-	RunTestCases(t, spinLockUnlockTestCases)
+	RunTestCases(t, makeSpinLockUnlockTestCases())
 }
 
-func testSpinLockNilPtr(t *testing.T) {
+func runTestSpinLockNilPtr(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
 	ptr := sl.ptr()
 	AssertEqual(t, (*uint32)(nil), ptr, "nil ptr")
 }
 
-func testSpinLockNilTryLock(t *testing.T) {
+func runTestSpinLockNilTryLock(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
 	AssertPanic(t, func() { sl.TryLock() }, nil, "nil TryLock")
 }
 
-func testSpinLockNilUnlock(t *testing.T) {
+func runTestSpinLockNilUnlock(t *testing.T) {
 	t.Helper()
 	var sl *SpinLock
 	AssertPanic(t, func() { sl.Unlock() }, nil, "nil Unlock")
 }
 
 func TestSpinLockNilReceiver(t *testing.T) {
-	t.Run("nil ptr() method", testSpinLockNilPtr)
-	t.Run("nil TryLock", testSpinLockNilTryLock)
-	t.Run("nil Unlock panic", testSpinLockNilUnlock)
+	t.Run("nil ptr() method", runTestSpinLockNilPtr)
+	t.Run("nil TryLock", runTestSpinLockNilTryLock)
+	t.Run("nil Unlock panic", runTestSpinLockNilUnlock)
 }
 
 func TestSpinLockConcurrency(t *testing.T) {
