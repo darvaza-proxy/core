@@ -20,6 +20,7 @@ Independent Base Functions:
 ├── AssertNotEqual[T]      (standalone implementation)
 ├── AssertSliceEqual[T]    (uses reflect.DeepEqual)
 ├── AssertContains         (uses strings.Contains)
+├── AssertNotContain       (uses strings.Contains)
 ├── AssertNil              (uses IsNil utility)
 ├── AssertNotNil           (uses IsNil utility)
 ├── AssertError            (standalone implementation)

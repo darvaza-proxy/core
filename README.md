@@ -525,6 +525,7 @@ both `*testing.T` and `MockT`:
 * `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - nil
   checking.
 * `AssertContains(t, text, substring, msg...)` - string containment.
+* `AssertNotContain(t, text, substring, msg...)` - string exclusion.
 
 #### Error and Type Assertions
 
@@ -561,6 +562,8 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
 * `AssertMustNil(t, value, msg...)` / `AssertMustNotNil(t, value, msg...)` -
   terminate on nil check failure.
 * `AssertMustContains(t, text, substring, msg...)` - terminate if substring not
+  found.
+* `AssertMustNotContain(t, text, substring, msg...)` - terminate if substring
   found.
 * `AssertMustError(t, err, msg...)` / `AssertMustNoError(t, err, msg...)` -
   terminate on error expectation mismatch.

@@ -170,6 +170,7 @@ core.AssertErrorIs(t, err, target, "error chain")
 ```go
 result, ok := core.AssertTypeIs[MyType](t, value, "type cast")
 core.AssertContains(t, text, substring, "text content")
+core.AssertNotContain(t, text, substring, "text exclusion")
 core.AssertPanic(t, func() { panic("test") }, "panic")
 core.AssertNoPanic(t, func() { /* safe code */ }, "no panic")
 ```
