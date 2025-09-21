@@ -36,7 +36,7 @@ Generic type constraints for use with Go generics:
   type and friendly name.
 * `ContextKey[T].WithValue(ctx, value)` - safely attach value to context,
   comparable to standard `context.WithValue()`.
-* `ContextKey[T].Get(ctx)` - extract value bound to this key in context,
+* `ContextKey[T].Get(ctx)` - extracts value bound to this key in context,
   returns (value, found) with nil receiver safety.
 
 ### Timeout Utilities
@@ -78,7 +78,8 @@ Generic type constraints for use with Go generics:
 * `MakeHostPort(hostport, defaultPort)` - constructs validated host:port
   string from input with optional default port. Rejects port 0 in input,
   supports portless output when default is 0.
-* `AddrPort(addr, port)` - creates `netip.AddrPort` from components.
+* `AddrPort(v)` - extracts `netip.AddrPort` from various network types
+  (`*net.TCPAddr`, `*net.UDPAddr`, etc.), returns `(AddrPort, bool)`.
 
 ### Interface Functions
 
@@ -90,9 +91,9 @@ Generic type constraints for use with Go generics:
 
 #### Zero Value Creation
 
-* `Zero[T]()` - returns the zero value for type T using reflection when
-  needed. Supports all Go types including complex generics, interfaces, and
-  custom types.
+* `Zero[T](_ *T)` - returns the zero value for type T using a typed nil
+  pointer for type inference. Supports all Go types including complex generics,
+  interfaces, and custom types.
 
 #### Zero Value Detection
 
@@ -384,8 +385,9 @@ Special error types for network-style temporary and timeout conditions:
 
 ### Error Testing and Utilities
 
-* `IsError[T](err)` / `IsErrorFn[T](err, fn)` / `IsErrorFn2[T](err, fn)` -
-  type-safe error testing with generic constraints and custom checker functions.
+* `IsError(err, errs...)` / `IsErrorFn(check, errs...)` /
+  `IsErrorFn2(check, errs...)` - error testing with custom checker functions
+  and multiple error comparison.
 * `CoalesceError(errs...)` - return first non-nil error from argument list.
 
 ## Stack Tracing
@@ -443,7 +445,7 @@ Stack tracing utilities for debugging, error reporting, and call context:
   * `%+n` - full qualified function name.
   * `%+v` - equivalent to `%+s:%d`.
 
-* `Stack.Format(fmt.State, rune)` - format entire stack with same verbs as
+* `Stack.Format(fmt.State, rune)` - formats entire stack with same verbs as
   Frame plus '#' flag support:
   * `%#s`, `%#n`, `%#v` - each frame on new line.
   * `%#+s`, `%#+n`, `%#+v` - numbered frames with [index/total] prefix.
@@ -511,32 +513,32 @@ both `*testing.T` and `MockT`:
 
 #### Basic Assertions
 
-* `AssertEqual[T](t, expected, actual, msg...)` - generic value comparison.
-* `AssertNotEqual[T](t, expected, actual, msg...)` - generic inequality
+* `AssertEqual[T](t, expected, actual, name...)` - generic value comparison.
+* `AssertNotEqual[T](t, expected, actual, name...)` - generic inequality
   comparison.
-* `AssertSliceEqual[T](t, expected, actual, msg...)` - slice comparison using
+* `AssertSliceEqual[T](t, expected, actual, name...)` - slice comparison using
   `reflect.DeepEqual`.
-* `AssertSame(t, expected, actual, msg...)` - same value/reference comparison
+* `AssertSame(t, expected, actual, name...)` - same value/reference comparison
   using pointer equality for reference types, value equality for basic types.
-* `AssertNotSame(t, expected, actual, msg...)` - different value/reference
+* `AssertNotSame(t, expected, actual, name...)` - different value/reference
   comparison.
-* `AssertTrue(t, condition, msg...)` / `AssertFalse(t, condition, msg...)` -
+* `AssertTrue(t, condition, name...)` / `AssertFalse(t, condition, name...)` -
   boolean assertions.
-* `AssertNil(t, value, msg...)` / `AssertNotNil(t, value, msg...)` - nil
+* `AssertNil(t, value, name...)` / `AssertNotNil(t, value, name...)` - nil
   checking.
-* `AssertContains(t, text, substring, msg...)` - string containment.
-* `AssertNotContain(t, text, substring, msg...)` - string exclusion.
+* `AssertContains(t, text, substring, name...)` - string containment.
+* `AssertNotContain(t, text, substring, name...)` - string exclusion.
 
 #### Error and Type Assertions
 
-* `AssertError(t, err, msg...)` / `AssertNoError(t, err, msg...)` - error
+* `AssertError(t, err, name...)` / `AssertNoError(t, err, name...)` - error
   presence/absence.
-* `AssertErrorIs(t, err, target, msg...)` - error chain checking with
+* `AssertErrorIs(t, err, target, name...)` - error chain checking with
   `errors.Is`.
-* `AssertTypeIs[T](t, value, msg...)` - type assertion with casting, returns
+* `AssertTypeIs[T](t, value, name...)` - type assertion with casting, returns
   (value, ok).
-* `AssertPanic(t, fn, expectedPanic, msg...)` / `AssertNoPanic(t, fn, msg...)` -
-  panic testing with type-aware matching.
+* `AssertPanic(t, fn, expectedPanic, name...)` /
+  `AssertNoPanic(t, fn, name...)` - panic testing with type-aware matching.
 
 #### Fatal Assertions
 
@@ -553,28 +555,28 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
 
 **Fatal Assertion Functions:**
 
-* `AssertMustEqual[T](t, expected, actual, msg...)` - terminate on inequality.
-* `AssertMustNotEqual[T](t, expected, actual, msg...)` - terminate on equality.
-* `AssertMustSliceEqual[T](t, expected, actual, msg...)` - terminate on slice
+* `AssertMustEqual[T](t, expected, actual, name...)` - terminate on inequality.
+* `AssertMustNotEqual[T](t, expected, actual, name...)` - terminate on equality.
+* `AssertMustSliceEqual[T](t, expected, actual, name...)` - terminate on slice
   inequality.
-* `AssertMustTrue(t, condition, msg...)` /
-  `AssertMustFalse(t, condition, msg...)` - terminate on boolean mismatch.
-* `AssertMustNil(t, value, msg...)` / `AssertMustNotNil(t, value, msg...)` -
+* `AssertMustTrue(t, condition, name...)` /
+  `AssertMustFalse(t, condition, name...)` - terminate on boolean mismatch.
+* `AssertMustNil(t, value, name...)` / `AssertMustNotNil(t, value, name...)` -
   terminate on nil check failure.
-* `AssertMustContains(t, text, substring, msg...)` - terminate if substring not
+* `AssertMustContains(t, text, substring, name...)` - terminate if substring not
   found.
-* `AssertMustNotContain(t, text, substring, msg...)` - terminate if substring
+* `AssertMustNotContain(t, text, substring, name...)` - terminate if substring
   found.
-* `AssertMustError(t, err, msg...)` / `AssertMustNoError(t, err, msg...)` -
+* `AssertMustError(t, err, name...)` / `AssertMustNoError(t, err, name...)` -
   terminate on error expectation mismatch.
-* `AssertMustErrorIs(t, err, target, msg...)` - terminate on error chain
+* `AssertMustErrorIs(t, err, target, name...)` - terminate on error chain
   mismatch.
-* `AssertMustTypeIs[T](t, value, msg...) T` - terminate on type assertion
+* `AssertMustTypeIs[T](t, value, name...) T` - terminate on type assertion
   failure, returns cast value.
-* `AssertMustPanic(t, fn, expectedPanic, msg...)` /
-  `AssertMustNoPanic(t, fn, msg...)` - terminate on panic expectation mismatch.
-* `AssertMustSame(t, expected, actual, msg...)` /
-  `AssertMustNotSame(t, expected, actual, msg...)` - terminate on same-ness
+* `AssertMustPanic(t, fn, expectedPanic, name...)` /
+  `AssertMustNoPanic(t, fn, name...)` - terminate on panic expectation mismatch.
+* `AssertMustSame(t, expected, actual, name...)` /
+  `AssertMustNotSame(t, expected, actual, name...)` - terminate on same-ness
   mismatch.
 
 **Usage Examples:**
