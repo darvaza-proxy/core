@@ -22,6 +22,8 @@ Independent Base Functions:
 ├── AssertContains         (uses strings.Contains)
 ├── AssertNil              (uses IsNil utility)
 ├── AssertNotNil           (uses IsNil utility)
+├── AssertError            (standalone implementation)
+├── AssertNoError          (standalone implementation)
 ├── AssertErrorIs          (uses errors.Is)
 ├── AssertTypeIs[T]        (uses type assertion)
 ├── AssertPanic            (uses recover mechanism)
@@ -29,9 +31,7 @@ Independent Base Functions:
 
 Derived Functions (depend on base functions):
 ├── AssertTrue             → calls AssertEqual(t, true, value, ...)
-├── AssertFalse            → calls AssertEqual(t, false, value, ...)
-├── AssertError            → calls AssertNotNil(t, err, ...)
-└── AssertNoError          → calls AssertNil(t, err, ...)
+└── AssertFalse            → calls AssertEqual(t, false, value, ...)
 ```
 
 ### Testing Implications
@@ -85,11 +85,9 @@ The hierarchy exists for consistency and code reuse:
 1. **AssertTrue/AssertFalse → AssertEqual**: Ensures consistent formatting
    and logging behaviour for boolean assertions.
 
-2. **AssertError/AssertNoError → AssertNil/AssertNotNil**: Treats errors as
-   special cases of nil checking with appropriate naming.
-
-3. **Independent Base Functions**: Provide fundamental comparison logic
-   without dependencies on other assertion functions.
+2. **Independent Base Functions**: Provide fundamental comparison logic
+   without dependencies on other assertion functions. Each base function
+   is responsible for its own domain-specific validation and messaging.
 
 This design allows for:
 

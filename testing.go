@@ -355,7 +355,13 @@ func AssertContains(t T, s, substr, name string, args ...any) bool {
 //	AssertError(t, err, "operation %s", "save")
 func AssertError(t T, err error, name string, args ...any) bool {
 	t.Helper()
-	return AssertNotNil(t, err, name, args...)
+	ok := err != nil
+	if !ok {
+		doError(t, name, args, "expected error, got nil")
+	} else {
+		doLog(t, name, args, "error: %v", err)
+	}
+	return ok
 }
 
 // AssertNoError fails the test if error is not nil.
@@ -368,7 +374,13 @@ func AssertError(t T, err error, name string, args ...any) bool {
 //	AssertNoError(t, err, "loading %s", filename)
 func AssertNoError(t T, err error, name string, args ...any) bool {
 	t.Helper()
-	return AssertNil(t, err, name, args...)
+	ok := err == nil
+	if !ok {
+		doError(t, name, args, "unexpected error: %v", err)
+	} else {
+		doLog(t, name, args, "no error")
+	}
+	return ok
 }
 
 // AssertPanic runs a function expecting it to panic and optionally validates the panic value.
