@@ -651,7 +651,7 @@ Context-aware error group with cancellation:
 
 For detailed development setup, build commands, and AI agent guidance:
 
-* [AGENT.md](./AGENT.md) - Development guidelines, build system, and testing
+* [AGENTS.md](./AGENTS.md) - Development guidelines, build system, and testing
   patterns.
 
 ### Quick Start
