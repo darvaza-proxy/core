@@ -9,91 +9,20 @@ compliant test code that meets our strict linting requirements.
 
 ## Core Testing Principles
 
-1. **Consistency**: All projects follow the same testing patterns.
-2. **Simplicity**: Tests should be easy to read and understand.
-3. **Compliance**: Tests must meet linting requirements (cognitive
+1. **Clarity First**: The primary goal is clear, understandable tests.
+   Patterns serve clarity, not compliance.
+2. **Simplicity**: Tests should be easy to read and understand. Start
+   simple and only add complexity when justified.
+3. **Consistency**: All projects follow the same testing patterns when
+   patterns are appropriate.
+4. **Compliance**: Tests must meet linting requirements (cognitive
    complexity ≤7, cyclomatic complexity ≤10).
-4. **Reliability**: Tests should be deterministic and fast.
-5. **Maintainability**: Tests should be easy to modify and extend.
+5. **Reliability**: Tests should be deterministic and fast.
+6. **Maintainability**: Tests should be easy to modify and extend.
 
-## Testing Patterns Overview
-
-**Two complementary testing patterns are used across all darvaza.org projects:**
-
-1. **Table-driven tests with TestCase interface**: For testing the same
-   function with multiple input/output combinations.
-2. **Standard t.Run() with named functions**: For different test scenarios
-   and behaviours.
-
-## When to Use TestCase Interface
-
-**ONLY use TestCase for table-driven tests with multiple data cases testing
-the same function logic.**
-
-**Use TestCase when:**
-
-- Testing a single function with multiple input/output combinations.
-- All test cases share identical test logic.
-- You have 2 or more data variations for the same test behaviour.
-
-**Examples of appropriate TestCase usage:**
-
-- URL parsing with different input formats.
-- Mathematical functions with various numeric inputs.
-- Validation functions with different valid/invalid inputs.
-- String processing with multiple text variations.
-
-**Do NOT use TestCase when:**
-
-- Testing different functions or methods.
-- Test cases require different validation logic.
-- Testing different behaviours or scenarios.
-- You only have one test case.
-
-## When to Use t.Run() with Named Functions
-
-**Use `TestFoo() { t.Run("scenario", runTestFooScenario) }` for different
-test scenarios and behaviours.**
-
-**This is the standard and recommended pattern for:**
-
-- Testing different functions or methods.
-- Different test scenarios requiring different logic.
-- Setup/tear-down that varies between tests.
-- Integration tests with different configurations.
-- Error handling tests with different error conditions.
-
-**Example structure:**
-
-```go
-func TestUserManager(t *testing.T) {
-    t.Run("create user", runTestCreateUser)
-    t.Run("update user", runTestUpdateUser)
-    t.Run("delete user", runTestDeleteUser)
-    t.Run("validation errors", runTestUserValidation)
-}
-```
-
-## MANDATORY TestCase Compliance Requirements
-
-**When using TestCase interface for table-driven tests, ALL files must meet
-these 6 requirements:**
-
-1. **TestCase Interface Validations**: `var _ TestCase = ...` declarations
-   for all test case types.
-2. **Factory Functions**: All TestCase types have `newTestCaseTypeName()`
-   functions (enables field alignment + logical parameters).
-3. **Factory Usage**: All test case declarations use factory functions
-   (no naked struct literals).
-4. **RunTestCases Usage**: Test functions use `RunTestCases(t, cases)`
-   instead of manual loops.
-5. **Anonymous Functions**: No `t.Run("name", func(t *testing.T) { ... })`
-   patterns longer than 3 lines.
-6. **Test Case List Factories**: Complex test case lists use
-   `myFooTestCases()` factory functions.
-
-These requirements apply **ONLY** to table-driven tests using TestCase, not
-to standard t.Run() patterns.
+**⚠️ WARNING**: If you find yourself contorting your tests to fit patterns,
+STOP. Write a simple test instead. Clear, straightforward tests are always
+better than forced abstractions.
 
 ## Testing Utilities
 
@@ -267,6 +196,297 @@ core.AssertTrue(t, SliceContains(got, k), "key %q present", k)
 - For formatted messages, use printf-style formatting: `"contains %v", key`.
 - Avoid complete sentences - they become redundant with the logged value.
 
+## Testing Patterns Overview
+
+**Two complementary testing patterns are used across all darvaza.org projects:**
+
+1. **Table-driven tests with TestCase interface**: For testing the same
+   function with multiple input/output combinations.
+2. **Standard t.Run() with named functions**: For different test scenarios
+   and behaviours.
+
+## Testing Pattern Decision Framework
+
+**CRITICAL PRINCIPLE**: Always start with the simplest approach that achieves
+your testing goals. Patterns serve clarity, not compliance.
+
+### Decision Checklist
+
+**Use this checklist to choose the right testing pattern:**
+
+```text
+❓ Is this a single, straightforward test?
+   YES → Use simple test function
+   NO  → Continue checking
+
+❓ Do I have different test scenarios or behaviours?
+   YES → Use t.Run() with named functions
+   NO  → Continue checking
+
+❓ Do I have 2+ scenarios with identical test logic?
+   NO  → Use simple test function
+   YES → Continue checking
+
+❓ Do scenarios differ only in input/output data?
+   NO  → Use t.Run() with named functions
+   YES → Consider TestCase interface
+
+❓ Does TestCase make the test CLEARER than simple assertions?
+   NO  → Use simple test function
+   YES → Use TestCase interface
+```
+
+### Testing Pattern Priority
+
+**Always start with the simplest approach:**
+
+1. **Simple test functions** - Default choice for most tests.
+2. **t.Run() with named functions** - When you have different test behaviours.
+3. **TestCase interface** - ONLY when you have 2+ scenarios with
+   identical Test logic.
+4. **Custom TestCase implementations** - ONLY when complexity is justified.
+
+**Golden Rule**: Start with simple tests. Only move to more complex
+patterns when the simple approach becomes genuinely insufficient.
+
+## When to Use TestCase Interface
+
+**ONLY use TestCase for table-driven tests with multiple data cases
+testing the same function logic.**
+
+**Use TestCase when:**
+
+- Testing a single function with multiple input/output combinations.
+- All test cases share identical test logic.
+- You have 2 or more data variations for the same test behaviour.
+
+**Examples of appropriate TestCase usage:**
+
+- URL parsing with different input formats.
+- Mathematical functions with various numeric inputs.
+- Validation functions with different valid/invalid inputs.
+- String processing with multiple text variations.
+
+## When NOT to Use TestCase Interface
+
+**TestCase is inappropriate for these scenarios:**
+
+### 1. Single or Minimal Test Cases
+
+**Problem**: TestCase overhead for 1-2 scenarios adds complexity without
+benefit.
+
+```go
+// ❌ WRONG - TestCase overkill for single test
+func TestSingleCase(t *testing.T) {
+    testCases := []myTestCase{
+        newMyTestCase("single test", input, expected),
+    }
+    RunTestCases(t, testCases)
+}
+
+// ✅ RIGHT - Simple and clear
+func TestSingleCase(t *testing.T) {
+    result := ProcessInput(input)
+    AssertEqual(t, expected, result, "result")
+}
+```
+
+### 2. Different Functions or Behaviours
+
+**Problem**: TestCase is for testing the SAME function with different
+data, not different functions.
+
+```go
+// ❌ WRONG - Different behaviours forced into TestCase
+func TestDifferentBehaviours(t *testing.T) {
+    testCases := []TestCase{
+        newGetNameTestCase("get name", user, "Alice"),
+        newIsAdminTestCase("is admin", user, true),
+        newLastLoginTestCase("last login", user, timestamp),
+    }
+}
+
+// ✅ RIGHT - Different behaviours in separate tests or t.Run()
+func TestUserProperties(t *testing.T) {
+    user := &User{Name: "Alice", Role: "admin", LastLogin: timestamp}
+    AssertEqual(t, "Alice", user.GetName(), "name")
+    AssertTrue(t, user.IsAdmin(), "admin status")
+    AssertEqual(t, timestamp, user.LastLogin(), "last login")
+}
+```
+
+### 3. Unique Validation Logic Per Test
+
+**Problem**: Each test needs different validation approaches.
+
+```go
+// ❌ WRONG - Forcing TestCase when validation differs
+func TestDifferentValidations(t *testing.T) {
+    testCases := []TestCase{
+        newParseTestCase("parse JSON", jsonInput, complexJSONResult),
+        newParseTestCase("parse XML", xmlInput, xmlResult),
+    }
+}
+
+// ✅ RIGHT - Each test handles its unique validation
+func TestDifferentValidations(t *testing.T) {
+    t.Run("parse JSON", func(t *testing.T) {
+        result := parser.Parse(jsonInput)
+        AssertEqual(t, "value", result.Data["key"], "JSON key")
+    })
+    t.Run("parse XML", func(t *testing.T) {
+        result := parser.Parse(xmlInput)
+        AssertEqual(t, "namespace", result.Namespace, "XML namespace")
+    })
+}
+```
+
+### 4. Integration or Workflow Tests
+
+**Problem**: TestCase patterns do not fit complex workflows.
+
+```go
+// ✅ RIGHT - Simple test models workflow naturally
+func TestUserWorkflow(t *testing.T) {
+    user, err := CreateUser("test@example.com")
+    AssertNoError(t, err, "create user")
+    defer DeleteUser(user.ID)
+
+    token, err := Authenticate(user.Email, "password")
+    AssertNoError(t, err, "authenticate")
+
+    result, err := ProcessData(token, testData)
+    AssertNoError(t, err, "process data")
+    AssertEqual(t, "processed", result.Status, "process status")
+}
+```
+
+### 5. Performance or Benchmark Tests
+
+**Problem**: TestCase adds overhead to performance measurements.
+
+```go
+// ❌ WRONG - TestCase overhead affects benchmarks
+func BenchmarkWithTestCase(b *testing.B) {
+    testCases := []TestCase{...}
+    // TestCase overhead skews benchmark results
+}
+
+// ✅ RIGHT - Direct function calls for accurate benchmarks
+func BenchmarkCalculate(b *testing.B) {
+    for range b.N {
+        result := Calculate(inputData)
+        _ = result // Prevent compiler optimisation
+    }
+}
+```
+
+## When to Use t.Run() with Named Functions
+
+**Use `TestFoo() { t.Run("scenario", runTestFooScenario) }` for different
+test scenarios and behaviours.**
+
+**This is the standard and recommended pattern for:**
+
+- Testing different functions or methods.
+- Different test scenarios requiring different logic.
+- Setup/tear-down that varies between tests.
+- Integration tests with different configurations.
+- Error handling tests with different error conditions.
+
+**Test Function Consolidation Guidelines:**
+
+- **Same function/type being tested** → Consolidate into `TestFoo` with
+  subtests.
+- **Different functions being tested** → Keep separate Test functions.
+- **TestFooBar + TestFooBaz** → Consolidate to `TestFoo` with
+  `t.Run("bar")` and `t.Run("baz")`.
+
+**Example consolidation:**
+
+```go
+// ❌ AVOID - Multiple functions testing same type
+func TestUserCreate(t *testing.T) { /* ... */ }
+func TestUserUpdate(t *testing.T) { /* ... */ }
+func TestUserDelete(t *testing.T) { /* ... */ }
+
+// ✅ PREFERRED - Consolidated with subtests using named functions
+func TestUser(t *testing.T) {
+    t.Run("create", runTestUserCreate)
+    t.Run("update", runTestUserUpdate)
+    t.Run("delete", runTestUserDelete)
+}
+
+func runTestUserCreate(t *testing.T) {
+    // Test logic here (>3 lines)
+}
+```
+
+## MANDATORY Test Requirements
+
+### General Requirements (ALL tests)
+
+**These requirements apply to ALL test code, regardless of pattern:**
+
+1. **Anonymous Functions**: No `t.Run("name", func(t *testing.T) { ... })`
+   patterns longer than 3 lines. Use named `runTestFooBar` functions instead.
+
+2. **Test Object Factories**: For complex test object creation, use
+   `newTestObject()` factory functions to keep t.Run calls readable.
+
+```go
+// ❌ CLUTTERED - Complex setup in t.Run
+func TestUser(t *testing.T) {
+    t.Run("create admin", func(t *testing.T) {
+        user := &User{
+            Name: "Alice",
+            Email: "alice@example.com",
+            Settings: &UserSettings{Theme: "dark", Lang: "en"},
+            Permissions: []Permission{AdminRead, AdminWrite},
+        }
+        // test logic...
+    })
+}
+
+// ✅ READABLE - Factory function for complex setup
+func TestUser(t *testing.T) {
+    t.Run("create admin", func(t *testing.T) {
+        user := newTestUser("Alice", "alice@example.com", "admin")
+        // test logic...
+    })
+}
+
+func newTestUser(name, email, role string) *User {
+    return &User{
+        Name: name,
+        Email: email,
+        Role: role,
+        Settings: &UserSettings{Theme: "dark", Lang: "en"},
+        Permissions: getPermissionsForRole(role),
+    }
+}
+```
+
+### TestCase-Specific Requirements (table-driven tests only)
+
+**When using TestCase interface for table-driven tests, ALL files must meet
+these 5 additional requirements:**
+
+1. **TestCase Interface Validations**: `var _ TestCase = ...` declarations
+   for all test case types.
+2. **Factory Functions**: All TestCase types have `new{TestContext}TestCase()`
+   functions (enables field alignment + logical parameters).
+3. **Factory Usage**: All test case declarations use factory functions
+   (no naked struct literals).
+4. **RunTestCases Usage**: Test functions use `RunTestCases(t, cases)`
+   instead of manual loops.
+5. **Test Case List Factories**: Complex test case lists use
+   `makeTestFunctionTestCases()` factory functions.
+
+These requirements apply **ONLY** to table-driven tests using TestCase, not
+to standard t.Run() patterns.
+
 ## Table-driven Test Structure Patterns (TestCase)
 
 ### Step 1: TestCase Interface Validation (MANDATORY for table-driven tests)
@@ -322,6 +542,11 @@ func (tc parseURLTestCase) Test(t *testing.T) {
 memory-optimised field alignment. This allows structs to be field-aligned for
 performance while maintaining readable, logical function signatures.
 
+#### Factory Naming Conventions (MANDATORY)
+
+**Individual TestCase Factories**: Named after object type/variant, NOT Test
+function
+
 ```go
 func newParseURLTestCase(name, input string, expected *url.URL,
     wantErr bool) parseURLTestCase {
@@ -332,7 +557,29 @@ func newParseURLTestCase(name, input string, expected *url.URL,
         wantErr:  wantErr,
     }
 }
+
+func newValidationTestCase(name, input string,
+    wantErr bool) validationTestCase {
+    return validationTestCase{
+        name:    name,
+        input:   input,
+        wantErr: wantErr,
+    }
+}
 ```
+
+**Context Definition Varies (Object Type/Variant):**
+
+- **Function being tested**: `newParseURLTestCase` (creates parseURL
+  test case).
+- **Behaviour being tested**: `newValidationTestCase` (creates validation
+  test case).
+- **Component being tested**: `newHTTPClientTestCase` (creates HTTP client
+  test case).
+- **Type + Method**: `newUserGetNameTestCase` (creates User.GetName test case).
+
+**Key Distinction**: `newFoo` factories are named after the TEST CASE TYPE,
+not the Test function name.
 
 ### Step 4: Factory Usage (MANDATORY)
 
@@ -357,9 +604,19 @@ func TestParseURL(t *testing.T) {
 **ALWAYS** use the `RunTestCases` helper. **NEVER** use manual loops:
 
 ```go
-// ✅ CORRECT - Use RunTestCases
+// ✅ CORRECT - Single test group, direct call acceptable
 func TestParseURL(t *testing.T) {
-    core.RunTestCases(t, testCases)
+    core.RunTestCases(t, makeParseURLTestCases())
+}
+
+// ✅ PREFERRED - Multiple scenarios, use subtests
+func TestParseURL(t *testing.T) {
+    t.Run("valid", func(t *testing.T) {
+        core.RunTestCases(t, makeParseURLValidTestCases())
+    })
+    t.Run("invalid", func(t *testing.T) {
+        core.RunTestCases(t, makeParseURLInvalidTestCases())
+    })
 }
 
 // ❌ FORBIDDEN - Manual loops
@@ -374,9 +631,41 @@ func TestParseURL(t *testing.T) {
 
 **Use factory functions for complex TestCase generation:**
 
+#### Test Set Factory Naming Conventions
+
+**Test Set Factories**: Named after `make{TestFunction}{Subtest}TestCases`,
+return `[]core.TestCase` for composability
+
+```go
+// Pattern: make{TestFunction}{Subtest}TestCases() []core.TestCase
+func makeHTTPClientBasicTestCases() []core.TestCase
+func makeParseURLValidationTestCases() []core.TestCase
+func makeValidationFieldTestCases() []core.TestCase
+```
+
+**Parameterised Test Set Factories**: Include parameter context
+
+```go
+func makeValidationTestCases(fieldName string) []core.TestCase
+func makeUserTestCases(userType string) []core.TestCase
+```
+
+**Optional Composability:**
+
+```go
+// Test sets can be combined when useful
+func TestCompleteAPI(t *testing.T) {
+    var allTests []core.TestCase
+    allTests = append(allTests, makeHTTPClientTestCases()...)
+    allTests = append(allTests, makeValidationTestCases()...)
+    allTests = append(allTests, makeAuthTestCases()...)
+    core.RunTestCases(t, allTests)
+}
+```
+
 ```go
 // ✅ CORRECT - Use factory function for complex lists
-func httpClientTestCases() []httpClientTestCase {
+func makeHTTPClientTestCases() []core.TestCase {
     return []httpClientTestCase{
         newHTTPClientTestCase("GET request", "GET", "/api/users", 200, nil),
         newHTTPClientTestCase("POST request", "POST", "/api/users", 201,
@@ -391,11 +680,11 @@ func httpClientTestCases() []httpClientTestCase {
 }
 
 func TestHTTPClient(t *testing.T) {
-    core.RunTestCases(t, httpClientTestCases())
+    core.RunTestCases(t, makeHTTPClientTestCases())
 }
 
 // ❌ FORBIDDEN - Variable declaration for complex lists
-var httpClientTestCases = []httpClientTestCase{
+var makeHTTPClientTestCases = []httpClientTestCase{
     newHTTPClientTestCase("GET request", "GET", "/api/users", 200, nil),
     newHTTPClientTestCase("POST request", "POST", "/api/users", 201,
         userPayload),
@@ -406,7 +695,7 @@ var httpClientTestCases = []httpClientTestCase{
 ## Anonymous Functions in t.Run
 
 **Rule: Anonymous functions in `t.Run` are allowed ONLY if they are 3 lines
-or shorter.**
+or shorter. For longer logic, use named `runTestFooBar` functions.**
 
 ```go
 // ✅ ALLOWED - Short anonymous function (≤3 lines)
@@ -501,7 +790,7 @@ func TestParseURL(t *testing.T) {
 logic, parameterisation, or reuse):**
 
 ```go
-func httpClientTestCases() []httpClientTestCase {
+func makeHTTPClientTestCases() []httpClientTestCase {
     return []httpClientTestCase{
         newHTTPClientTestCase("GET request", "GET", "/api/users", 200, nil),
         newHTTPClientTestCase("POST request", "POST", "/api/users", 201,
@@ -519,7 +808,7 @@ func httpClientTestCases() []httpClientTestCase {
 }
 
 func TestHTTPClient(t *testing.T) {
-    core.RunTestCases(t, httpClientTestCases())
+    core.RunTestCases(t, makeHTTPClientTestCases())
 }
 ```
 
@@ -838,7 +1127,8 @@ func TestUserCRUD(t *testing.T) {
 
 ## Field Alignment in Test Structs
 
-Order struct fields to minimise memory padding:
+Order struct fields to minimise memory padding. Place larger fields first,
+smaller fields last:
 
 ```go
 type testCase struct {
@@ -856,12 +1146,16 @@ type testCase struct {
 }
 ```
 
-Use the field alignment tool to verify:
+To verify optimal field ordering, create a separate sample file with just the
+struct definition (no external dependencies), then use the
+`fieldalignment` tool:
 
+<!-- markdownlint-disable MD013 -->
 ```bash
-go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/\
- fieldalignment@latest -fix ./...
+go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest \\
+  -fix sample_file.go
 ```
+<!-- markdownlint-enable MD013 -->
 
 ## Concurrent Testing
 
@@ -977,12 +1271,8 @@ func TestErrorTypes(t *testing.T) {
 Tests should maintain high coverage. Use with CI:
 
 ```bash
-# Generate coverage
-make test GOTEST_FLAGS="-coverprofile=coverage.out"
-
-# Check coverage threshold
-go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | \
-  sed 's/%//' | awk '{if($1<80) exit 1}'
+# Generate coverage reports (.prof, .func, .html) with sub-module support
+make coverage
 ```
 
 ### Test Tags
@@ -1161,8 +1451,8 @@ func (tc myTestCase) Test(t *testing.T) {
 core.AssertNoError(t, err, "operation")
 
 // DO: Use TestCase list factories for complex table-driven tests
-func myComplexTestCases() []myTestCase {
-    return []myTestCase{
+func makeMyFunctionTestCases() []core.TestCase {
+    return []core.TestCase{
         newMyTestCase("test1", expectedResult1),
         newMyTestCase("test2", expectedResult2),
         newMyTestCase("test3", expectedResult3),
@@ -1173,12 +1463,12 @@ func myComplexTestCases() []myTestCase {
 }
 
 func TestMyFunction(t *testing.T) {
-    core.RunTestCases(t, myComplexTestCases())
+    core.RunTestCases(t, makeMyFunctionTestCases())
 }
 
 // DO: Use parameterised TestCase list factories when needed
-func validationTestCases(fieldName string) []validationTestCase {
-    return []validationTestCase{
+func makeValidationTestCases(fieldName string) []core.TestCase {
+    return []core.TestCase{
         newValidationTestCase("valid "+fieldName, "valid-value", false),
         newValidationTestCase("empty "+fieldName, "", true),
     }
@@ -1187,13 +1477,13 @@ func validationTestCases(fieldName string) []validationTestCase {
 
 ## TestCase Compliance Checklist
 
-Before committing table-driven test code using TestCase, verify ALL 6
+Before committing table-driven test code using TestCase, verify ALL 5
 requirements:
 
 - [ ] **TestCase Interface Validations**: Added `var _ TestCase = ...` for
       all TestCase types.
-- [ ] **Factory Functions**: Created `newTestCaseTypeName()` for all TestCase
-      types.
+- [ ] **Factory Functions**: Created `new{TestContext}TestCase()` for all
+      TestCase types.
 - [ ] **Factory Usage**: All TestCase declarations use factory functions
       (no naked struct literals).
 - [ ] **RunTestCases Usage**: All table-driven test functions use
@@ -1201,7 +1491,7 @@ requirements:
 - [ ] **Anonymous Functions**: No `t.Run()` anonymous functions longer than
       3 lines.
 - [ ] **TestCase List Factories**: Complex TestCase generation uses
-      `myFooTestCases()` factory functions.
+      `makeTestFunctionTestCases()` factory functions.
 
 ## Summary
 
