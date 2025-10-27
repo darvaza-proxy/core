@@ -65,9 +65,7 @@ func TestAssertEqual(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 	AssertFalse(t, mock.HasLogs(), "no logs on failure")
 
-	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok on failure")
-	AssertTrue(t, strings.Contains(lastErr, "expected 42, got 24"), "error message contains values")
+	assertErrorContains(t, mock, "expected 42, got 24", "error message contains values")
 }
 
 // Test AssertNotEqual
@@ -92,9 +90,7 @@ func TestAssertNotEqual(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 	AssertFalse(t, mock.HasLogs(), "no logs on failure")
 
-	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok on failure")
-	AssertTrue(t, strings.Contains(lastErr, "expected not 42, got 42"), "error message contains values")
+	assertErrorContains(t, mock, "expected not 42, got 42", "error message contains values")
 }
 
 // Test AssertSliceEqual
@@ -138,9 +134,42 @@ func TestAssertContains(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 	AssertFalse(t, mock.HasLogs(), "no logs on failure")
 
-	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok on failure")
-	AssertTrue(t, strings.Contains(lastErr, "expected \"hello world\" to contain \"xyz\""), "error message")
+	assertErrorContains(t, mock, "expected \"hello world\" to contain \"xyz\"", "error message")
+}
+
+// Test AssertNotContain
+func TestAssertNotContain(t *testing.T) {
+	mock := &MockT{}
+
+	// Test successful assertion (substring not present)
+	result := AssertNotContain(mock, "hello world", "xyz", "not contains test")
+	AssertTrue(t, result, "AssertNotContain result when not contains")
+	AssertFalse(t, mock.HasErrors(), "no errors on success")
+	AssertTrue(t, mock.HasLogs(), "has logs on success")
+
+	lastLog, ok := mock.LastLog()
+	AssertTrue(t, ok, "LastLog ok on success")
+	AssertEqual(t, "not contains test: does not contain \"xyz\"", lastLog, "log message on success")
+
+	mock.Reset()
+
+	// Test failed assertion (substring present)
+	result = AssertNotContain(mock, "hello world", "world", "contains test")
+	AssertFalse(t, result, "AssertNotContain result when contains")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	AssertFalse(t, mock.HasLogs(), "no logs on failure")
+
+	assertErrorContains(t, mock, "expected \"hello world\" not to contain \"world\"", "error message")
+
+	mock.Reset()
+
+	// Test empty substring assertion (should fail)
+	result = AssertNotContain(mock, "hello world", "", "empty substring test")
+	AssertFalse(t, result, "AssertNotContain result with empty substring")
+	AssertTrue(t, mock.HasErrors(), "has errors on empty substring")
+	AssertFalse(t, mock.HasLogs(), "no logs on empty substring")
+
+	assertErrorContains(t, mock, "substring cannot be empty for AssertNotContain", "empty substring error message")
 }
 
 // Test AssertError and AssertNoError
@@ -731,10 +760,7 @@ func TestAssertSame(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 	AssertFalse(t, mock.HasLogs(), "no logs on failure")
 
-	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok on failure")
-	AssertTrue(t, strings.Contains(lastErr, "expected same value or reference, got different"),
-		"error message on failure")
+	assertErrorContains(t, mock, "expected same value or reference, got different", "error message on failure")
 
 	mock.Reset()
 
@@ -778,10 +804,7 @@ func TestAssertNotSame(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 	AssertFalse(t, mock.HasLogs(), "no logs on failure")
 
-	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok on failure")
-	AssertTrue(t, strings.Contains(lastErr, "expected different values or references, got same"),
-		"error message on failure")
+	assertErrorContains(t, mock, "expected different values or references, got same", "error message on failure")
 
 	mock.Reset()
 
@@ -997,6 +1020,7 @@ func TestAssertMustFunctions(t *testing.T) {
 	t.Run("AssertMustNotEqual", testAssertMustNotEqual)
 	t.Run("AssertMustSliceEqual", testAssertMustSliceEqual)
 	t.Run("AssertMustContains", testAssertMustContains)
+	t.Run("AssertMustNotContain", testAssertMustNotContain)
 	t.Run("AssertMustError", testAssertMustError)
 	t.Run("AssertMustNoError", testAssertMustNoError)
 	t.Run("AssertMustPanic", testAssertMustPanic)
@@ -1099,6 +1123,29 @@ func testAssertMustContains(t *testing.T) {
 	// Test failure case
 	ok = mock.Run("failure", func(mt T) {
 		AssertMustContains(mt, "hello world", "xyz", "missing substring")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustNotContain(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	// Test success case (substring not present)
+	ok := mock.Run("success", func(mt T) {
+		AssertMustNotContain(mt, "hello world", "xyz", "no substring")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case (substring present)
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustNotContain(mt, "hello world", "world", "has substring")
 		mt.Log("should not reach here")
 	})
 	AssertFalse(t, ok, "Failure case should abort")
@@ -1396,4 +1443,12 @@ func testAssertMustNotSame(t *testing.T) {
 	AssertFalse(t, ok, "Failure case should abort")
 	AssertTrue(t, mock.Failed(), "Should be marked as failed")
 	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+// assertErrorContains checks that the last error from MockT contains the expected substring
+func assertErrorContains(t *testing.T, mock *MockT, expected, desc string) {
+	t.Helper()
+	lastErr, ok := mock.LastError()
+	AssertTrue(t, ok, "LastError ok for "+desc)
+	AssertTrue(t, strings.Contains(lastErr, expected), desc)
 }

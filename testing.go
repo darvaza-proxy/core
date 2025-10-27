@@ -345,6 +345,29 @@ func AssertContains(t T, s, substr, name string, args ...any) bool {
 	return ok
 }
 
+// AssertNotContain fails the test if the string contains the substring.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	AssertNotContain(t, "hello world", "goodbye", "substring absence check")
+//	AssertNotContain(t, output, "error", "command output for %s", cmd)
+func AssertNotContain(t T, s, substr, name string, args ...any) bool {
+	t.Helper()
+	if substr == "" {
+		doError(t, name, args, "substring cannot be empty for AssertNotContain")
+		return false
+	}
+	ok := !strings.Contains(s, substr)
+	if !ok {
+		doError(t, name, args, "expected %q not to contain %q", s, substr)
+	} else {
+		doLog(t, name, args, "does not contain %q", substr)
+	}
+	return ok
+}
+
 // AssertError fails the test if error is nil.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
@@ -355,7 +378,13 @@ func AssertContains(t T, s, substr, name string, args ...any) bool {
 //	AssertError(t, err, "operation %s", "save")
 func AssertError(t T, err error, name string, args ...any) bool {
 	t.Helper()
-	return AssertNotNil(t, err, name, args...)
+	ok := err != nil
+	if !ok {
+		doError(t, name, args, "expected error, got nil")
+	} else {
+		doLog(t, name, args, "error: %v", err)
+	}
+	return ok
 }
 
 // AssertNoError fails the test if error is not nil.
@@ -368,7 +397,13 @@ func AssertError(t T, err error, name string, args ...any) bool {
 //	AssertNoError(t, err, "loading %s", filename)
 func AssertNoError(t T, err error, name string, args ...any) bool {
 	t.Helper()
-	return AssertNil(t, err, name, args...)
+	ok := err == nil
+	if !ok {
+		doError(t, name, args, "unexpected error: %v", err)
+	} else {
+		doLog(t, name, args, "no error")
+	}
+	return ok
 }
 
 // AssertPanic runs a function expecting it to panic and optionally validates the panic value.
@@ -825,6 +860,20 @@ func AssertMustSliceEqual[U any](t T, expected, actual []U, name string, args ..
 func AssertMustContains(t T, s, substr, name string, args ...any) {
 	t.Helper()
 	if !AssertContains(t, s, substr, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNotContain calls AssertNotContain and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNotContain(t, "hello world", "goodbye", "substring absence check")
+//	AssertMustNotContain(t, output, "error", "no errors in %s", cmd)
+func AssertMustNotContain(t T, s, substr, name string, args ...any) {
+	t.Helper()
+	if !AssertNotContain(t, s, substr, name, args...) {
 		t.FailNow()
 	}
 }
