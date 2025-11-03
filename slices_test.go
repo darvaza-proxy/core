@@ -18,6 +18,9 @@ var (
 	_ TestCase = sliceMinusTestCase{}
 	_ TestCase = sliceMinusFnTestCase{}
 	_ TestCase = sliceRandomTestCase{}
+	_ TestCase = slicePIntTestCase{}
+	_ TestCase = slicePFloatTestCase{}
+	_ TestCase = slicePStringTestCase{}
 )
 
 type sliceReverseTestCase struct {
@@ -604,4 +607,127 @@ func TestSliceSortOrdered(t *testing.T) {
 	}
 
 	RunTestCases(t, floatTestCases)
+}
+
+// Test cases for SliceP function with int
+type slicePIntTestCase struct {
+	name     string
+	input    []int
+	p        float64
+	expected int
+}
+
+func (tc slicePIntTestCase) Name() string {
+	return tc.name
+}
+
+func (tc slicePIntTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Create a copy to test with unsorted data
+	inputCopy := SliceCopy(tc.input)
+
+	result := SliceP(inputCopy, tc.p)
+	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
+}
+
+// Test cases for SliceP function with float64
+type slicePFloatTestCase struct {
+	name     string
+	input    []float64
+	p        float64
+	expected float64
+}
+
+func (tc slicePFloatTestCase) Name() string {
+	return tc.name
+}
+
+func (tc slicePFloatTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Create a copy to test with unsorted data
+	inputCopy := SliceCopy(tc.input)
+
+	result := SliceP(inputCopy, tc.p)
+	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
+}
+
+// Test cases for SliceP function with string
+type slicePStringTestCase struct {
+	name     string
+	expected string
+	input    []string
+	p        float64
+}
+
+func (tc slicePStringTestCase) Name() string {
+	return tc.name
+}
+
+func (tc slicePStringTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Create a copy to test with unsorted data
+	inputCopy := SliceCopy(tc.input)
+
+	result := SliceP(inputCopy, tc.p)
+	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
+}
+
+func TestSliceP(t *testing.T) {
+	// Test with integers
+	intTestCases := []slicePIntTestCase{
+		// Empty slice
+		{name: "empty slice", input: S[int](), p: 0.5, expected: 0},
+
+		// Single element
+		{name: "single element p=0.0", input: S(42), p: 0.0, expected: 42},
+		{name: "single element p=0.5", input: S(42), p: 0.5, expected: 42},
+		{name: "single element p=1.0", input: S(42), p: 1.0, expected: 42},
+
+		// Common percentiles
+		{name: "P50 (median)", input: S(5, 2, 8, 1, 9), p: 0.50, expected: 5},
+		{name: "P95", input: S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), p: 0.95, expected: 10},
+		{name: "P99", input: S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), p: 0.99, expected: 10},
+
+		// Min and max
+		{name: "P0 (min)", input: S(9, 3, 7, 1, 5), p: 0.0, expected: 1},
+		{name: "P100 (max)", input: S(9, 3, 7, 1, 5), p: 1.0, expected: 9},
+
+		// Unsorted data
+		{name: "unsorted P25", input: S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), p: 0.25, expected: 3},
+		{name: "unsorted P75", input: S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), p: 0.75, expected: 8},
+
+		// Negative numbers
+		{name: "negative P50", input: S(-5, -2, -8, -1, -9), p: 0.5, expected: -5},
+		{name: "mixed signs P50", input: S(-2, 5, -1, 3, 0), p: 0.5, expected: 0},
+
+		// Duplicates
+		{name: "duplicates P50", input: S(3, 1, 3, 1, 3, 1, 3), p: 0.5, expected: 3},
+
+		// Invalid percentiles
+		{name: "invalid p=-0.1", input: S(1, 2, 3, 4, 5), p: -0.1, expected: 0},
+		{name: "invalid p=1.5", input: S(1, 2, 3, 4, 5), p: 1.5, expected: 0},
+	}
+
+	RunTestCases(t, intTestCases)
+
+	// Test with float64
+	floatTestCases := []slicePFloatTestCase{
+		{name: "float P50", input: S(3.14, 1.41, 2.71, 0.5, 4.0), p: 0.5, expected: 2.71},
+		{name: "float P90", input: S(1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0), p: 0.9, expected: 9.9},
+		{name: "float empty", input: S[float64](), p: 0.5, expected: 0.0},
+	}
+
+	RunTestCases(t, floatTestCases)
+
+	// Test with strings
+	stringTestCases := []slicePStringTestCase{
+		{name: "string P50", input: S("cherry", "apple", "banana", "date"), p: 0.5, expected: "banana"},
+		{name: "string P0", input: S("zebra", "alpha", "beta"), p: 0.0, expected: "alpha"},
+		{name: "string P100", input: S("zebra", "alpha", "beta"), p: 1.0, expected: "zebra"},
+	}
+
+	RunTestCases(t, stringTestCases)
 }

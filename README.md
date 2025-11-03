@@ -184,6 +184,7 @@ Key distinctions from `IsZero`:
 #### Utilities
 
 * `SliceRandom[T](slice)` - select random element, returns (value, found).
+* `SliceP[T](slice,p)` - return the p-th percentile of the slice
 
 ### List Operations (container/list)
 
