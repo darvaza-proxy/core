@@ -277,15 +277,18 @@ func doSliceSort[T any](x []T, less func(a, b T) bool) {
 }
 
 // SliceP returns the p-th percentile element from a slice.
-// The slice will be sorted in place before calculating the percentile.
+// The slice is sorted in place (modifying the original slice) before
+// calculating the percentile. p must be between 0.0 (minimum) and 1.0
+// (maximum). Returns the zero value for empty slices or when p is outside
+// the valid range.
 // This is commonly used for performance metrics and latency measurements
 // to identify outliers while excluding the worst values.
-// If the slice is empty, returns the zero value of type T.
 //
 // Example:
 //
 //	responseTimes := []int{100, 150, 120, 450, 89, 2000, 110, 130, 140, 160}
-//	p := SliceP(responseTimes,0.99) // Returns value at 99th percentile
+//	p99 := SliceP(responseTimes, 0.99) // Returns the value at the 99th percentile
+//	// Note: responseTimes is now sorted
 func SliceP[T Ordered](a []T, p float64) T {
 	result := doP(a, p, func(d, e T) bool {
 		return d < e

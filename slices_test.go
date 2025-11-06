@@ -631,6 +631,16 @@ func (tc slicePIntTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
 }
 
+// Factory function for slicePIntTestCase
+func newSlicePIntTestCase(name string, input []int, p float64, expected int) slicePIntTestCase {
+	return slicePIntTestCase{
+		name:     name,
+		input:    input,
+		p:        p,
+		expected: expected,
+	}
+}
+
 // Test cases for SliceP function with float64
 type slicePFloatTestCase struct {
 	name     string
@@ -651,6 +661,16 @@ func (tc slicePFloatTestCase) Test(t *testing.T) {
 
 	result := SliceP(inputCopy, tc.p)
 	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
+}
+
+// Factory function for slicePFloatTestCase
+func newSlicePFloatTestCase(name string, input []float64, p, expected float64) slicePFloatTestCase {
+	return slicePFloatTestCase{
+		name:     name,
+		input:    input,
+		p:        p,
+		expected: expected,
+	}
 }
 
 // Test cases for SliceP function with string
@@ -675,59 +695,70 @@ func (tc slicePStringTestCase) Test(t *testing.T) {
 	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
 }
 
-func TestSliceP(t *testing.T) {
-	// Test with integers
-	intTestCases := []slicePIntTestCase{
+// Factory function for slicePStringTestCase
+func newSlicePStringTestCase(name string, input []string, p float64, expected string) slicePStringTestCase {
+	return slicePStringTestCase{
+		name:     name,
+		input:    input,
+		p:        p,
+		expected: expected,
+	}
+}
+
+func slicePIntTestCases() []TestCase {
+	return []TestCase{
 		// Empty slice
-		{name: "empty slice", input: S[int](), p: 0.5, expected: 0},
+		newSlicePIntTestCase("empty slice", S[int](), 0.5, 0),
 
 		// Single element
-		{name: "single element p=0.0", input: S(42), p: 0.0, expected: 42},
-		{name: "single element p=0.5", input: S(42), p: 0.5, expected: 42},
-		{name: "single element p=1.0", input: S(42), p: 1.0, expected: 42},
+		newSlicePIntTestCase("single element p=0.0", S(42), 0.0, 42),
+		newSlicePIntTestCase("single element p=0.5", S(42), 0.5, 42),
+		newSlicePIntTestCase("single element p=1.0", S(42), 1.0, 42),
 
 		// Common percentiles
-		{name: "P50 (median)", input: S(5, 2, 8, 1, 9), p: 0.50, expected: 5},
-		{name: "P95", input: S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), p: 0.95, expected: 10},
-		{name: "P99", input: S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), p: 0.99, expected: 10},
+		newSlicePIntTestCase("P50 (median)", S(5, 2, 8, 1, 9), 0.50, 5),
+		newSlicePIntTestCase("P95", S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 0.95, 10),
+		newSlicePIntTestCase("P99", S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 0.99, 10),
 
 		// Min and max
-		{name: "P0 (min)", input: S(9, 3, 7, 1, 5), p: 0.0, expected: 1},
-		{name: "P100 (max)", input: S(9, 3, 7, 1, 5), p: 1.0, expected: 9},
+		newSlicePIntTestCase("P0 (min)", S(9, 3, 7, 1, 5), 0.0, 1),
+		newSlicePIntTestCase("P100 (max)", S(9, 3, 7, 1, 5), 1.0, 9),
 
 		// Unsorted data
-		{name: "unsorted P25", input: S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), p: 0.25, expected: 3},
-		{name: "unsorted P75", input: S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), p: 0.75, expected: 8},
+		newSlicePIntTestCase("unsorted P25", S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), 0.25, 3),
+		newSlicePIntTestCase("unsorted P75", S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), 0.75, 8),
 
 		// Negative numbers
-		{name: "negative P50", input: S(-5, -2, -8, -1, -9), p: 0.5, expected: -5},
-		{name: "mixed signs P50", input: S(-2, 5, -1, 3, 0), p: 0.5, expected: 0},
+		newSlicePIntTestCase("negative P50", S(-5, -2, -8, -1, -9), 0.5, -5),
+		newSlicePIntTestCase("mixed signs P50", S(-2, 5, -1, 3, 0), 0.5, 0),
 
 		// Duplicates
-		{name: "duplicates P50", input: S(3, 1, 3, 1, 3, 1, 3), p: 0.5, expected: 3},
+		newSlicePIntTestCase("duplicates P50", S(3, 1, 3, 1, 3, 1, 3), 0.5, 3),
 
 		// Invalid percentiles
-		{name: "invalid p=-0.1", input: S(1, 2, 3, 4, 5), p: -0.1, expected: 0},
-		{name: "invalid p=1.5", input: S(1, 2, 3, 4, 5), p: 1.5, expected: 0},
+		newSlicePIntTestCase("invalid p=-0.1", S(1, 2, 3, 4, 5), -0.1, 0),
+		newSlicePIntTestCase("invalid p=1.5", S(1, 2, 3, 4, 5), 1.5, 0),
 	}
+}
 
-	RunTestCases(t, intTestCases)
-
-	// Test with float64
-	floatTestCases := []slicePFloatTestCase{
-		{name: "float P50", input: S(3.14, 1.41, 2.71, 0.5, 4.0), p: 0.5, expected: 2.71},
-		{name: "float P90", input: S(1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0), p: 0.9, expected: 9.9},
-		{name: "float empty", input: S[float64](), p: 0.5, expected: 0.0},
+func slicePFloatTestCases() []TestCase {
+	return []TestCase{
+		newSlicePFloatTestCase("float P50", S(3.14, 1.41, 2.71, 0.5, 4.0), 0.5, 2.71),
+		newSlicePFloatTestCase("float P90", S(1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0), 0.9, 9.9),
+		newSlicePFloatTestCase("float empty", S[float64](), 0.5, 0.0),
 	}
+}
 
-	RunTestCases(t, floatTestCases)
-
-	// Test with strings
-	stringTestCases := []slicePStringTestCase{
-		{name: "string P50", input: S("cherry", "apple", "banana", "date"), p: 0.5, expected: "banana"},
-		{name: "string P0", input: S("zebra", "alpha", "beta"), p: 0.0, expected: "alpha"},
-		{name: "string P100", input: S("zebra", "alpha", "beta"), p: 1.0, expected: "zebra"},
+func slicePStringTestCases() []TestCase {
+	return []TestCase{
+		newSlicePStringTestCase("string P50", S("cherry", "apple", "banana", "date"), 0.5, "banana"),
+		newSlicePStringTestCase("string P0", S("zebra", "alpha", "beta"), 0.0, "alpha"),
+		newSlicePStringTestCase("string P100", S("zebra", "alpha", "beta"), 1.0, "zebra"),
 	}
+}
 
-	RunTestCases(t, stringTestCases)
+func TestSliceP(t *testing.T) {
+	RunTestCases(t, slicePIntTestCases())
+	RunTestCases(t, slicePFloatTestCases())
+	RunTestCases(t, slicePStringTestCases())
 }
