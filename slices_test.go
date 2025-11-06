@@ -18,6 +18,9 @@ var (
 	_ TestCase = sliceMinusTestCase{}
 	_ TestCase = sliceMinusFnTestCase{}
 	_ TestCase = sliceRandomTestCase{}
+	_ TestCase = slicePIntTestCase{}
+	_ TestCase = slicePFloatTestCase{}
+	_ TestCase = slicePStringTestCase{}
 )
 
 type sliceReverseTestCase struct {
@@ -604,4 +607,158 @@ func TestSliceSortOrdered(t *testing.T) {
 	}
 
 	RunTestCases(t, floatTestCases)
+}
+
+// Test cases for SliceP function with int
+type slicePIntTestCase struct {
+	name     string
+	input    []int
+	p        float64
+	expected int
+}
+
+func (tc slicePIntTestCase) Name() string {
+	return tc.name
+}
+
+func (tc slicePIntTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Create a copy to test with unsorted data
+	inputCopy := SliceCopy(tc.input)
+
+	result := SliceP(inputCopy, tc.p)
+	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
+}
+
+// Factory function for slicePIntTestCase
+func newSlicePIntTestCase(name string, input []int, p float64, expected int) slicePIntTestCase {
+	return slicePIntTestCase{
+		name:     name,
+		input:    input,
+		p:        p,
+		expected: expected,
+	}
+}
+
+// Test cases for SliceP function with float64
+type slicePFloatTestCase struct {
+	name     string
+	input    []float64
+	p        float64
+	expected float64
+}
+
+func (tc slicePFloatTestCase) Name() string {
+	return tc.name
+}
+
+func (tc slicePFloatTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Create a copy to test with unsorted data
+	inputCopy := SliceCopy(tc.input)
+
+	result := SliceP(inputCopy, tc.p)
+	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
+}
+
+// Factory function for slicePFloatTestCase
+func newSlicePFloatTestCase(name string, input []float64, p, expected float64) slicePFloatTestCase {
+	return slicePFloatTestCase{
+		name:     name,
+		input:    input,
+		p:        p,
+		expected: expected,
+	}
+}
+
+// Test cases for SliceP function with string
+type slicePStringTestCase struct {
+	name     string
+	expected string
+	input    []string
+	p        float64
+}
+
+func (tc slicePStringTestCase) Name() string {
+	return tc.name
+}
+
+func (tc slicePStringTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	// Create a copy to test with unsorted data
+	inputCopy := SliceCopy(tc.input)
+
+	result := SliceP(inputCopy, tc.p)
+	AssertEqual(t, tc.expected, result, "SliceP(%v, %.2f)", tc.input, tc.p)
+}
+
+// Factory function for slicePStringTestCase
+func newSlicePStringTestCase(name string, input []string, p float64, expected string) slicePStringTestCase {
+	return slicePStringTestCase{
+		name:     name,
+		input:    input,
+		p:        p,
+		expected: expected,
+	}
+}
+
+func slicePIntTestCases() []TestCase {
+	return []TestCase{
+		// Empty slice
+		newSlicePIntTestCase("empty slice", S[int](), 0.5, 0),
+
+		// Single element
+		newSlicePIntTestCase("single element p=0.0", S(42), 0.0, 42),
+		newSlicePIntTestCase("single element p=0.5", S(42), 0.5, 42),
+		newSlicePIntTestCase("single element p=1.0", S(42), 1.0, 42),
+
+		// Common percentiles
+		newSlicePIntTestCase("P50 (median)", S(5, 2, 8, 1, 9), 0.50, 5),
+		newSlicePIntTestCase("P95", S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 0.95, 10),
+		newSlicePIntTestCase("P99", S(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 0.99, 10),
+
+		// Min and max
+		newSlicePIntTestCase("P0 (min)", S(9, 3, 7, 1, 5), 0.0, 1),
+		newSlicePIntTestCase("P100 (max)", S(9, 3, 7, 1, 5), 1.0, 9),
+
+		// Unsorted data
+		newSlicePIntTestCase("unsorted P25", S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), 0.25, 3),
+		newSlicePIntTestCase("unsorted P75", S(10, 5, 8, 3, 1, 9, 4, 7, 2, 6), 0.75, 8),
+
+		// Negative numbers
+		newSlicePIntTestCase("negative P50", S(-5, -2, -8, -1, -9), 0.5, -5),
+		newSlicePIntTestCase("mixed signs P50", S(-2, 5, -1, 3, 0), 0.5, 0),
+
+		// Duplicates
+		newSlicePIntTestCase("duplicates P50", S(3, 1, 3, 1, 3, 1, 3), 0.5, 3),
+
+		// Invalid percentiles
+		newSlicePIntTestCase("invalid p=-0.1", S(1, 2, 3, 4, 5), -0.1, 0),
+		newSlicePIntTestCase("invalid p=1.5", S(1, 2, 3, 4, 5), 1.5, 0),
+	}
+}
+
+func slicePFloatTestCases() []TestCase {
+	return []TestCase{
+		newSlicePFloatTestCase("float P50", S(3.14, 1.41, 2.71, 0.5, 4.0), 0.5, 2.71),
+		newSlicePFloatTestCase("float P90", S(1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0), 0.9, 9.9),
+		newSlicePFloatTestCase("float empty", S[float64](), 0.5, 0.0),
+	}
+}
+
+func slicePStringTestCases() []TestCase {
+	return []TestCase{
+		newSlicePStringTestCase("string P50", S("cherry", "apple", "banana", "date"), 0.5, "banana"),
+		newSlicePStringTestCase("string P0", S("zebra", "alpha", "beta"), 0.0, "alpha"),
+		newSlicePStringTestCase("string P100", S("zebra", "alpha", "beta"), 1.0, "zebra"),
+	}
+}
+
+func TestSliceP(t *testing.T) {
+	RunTestCases(t, slicePIntTestCases())
+	RunTestCases(t, slicePFloatTestCases())
+	RunTestCases(t, slicePStringTestCases())
 }
