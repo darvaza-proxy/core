@@ -287,9 +287,9 @@ When LanguageTool reports issues:
 
 ### Field Alignment
 
-The project enforces struct field alignment optimization for memory efficiency
+The project enforces struct field alignment optimisation for memory efficiency
 using the `fieldalignment` tool. This helps reduce memory usage by ordering
-struct fields to minimize padding.
+struct fields to minimise padding.
 
 #### Running Field Alignment Fixes
 
@@ -305,7 +305,7 @@ go run "$FA@latest" -fix ./...
 This tool will:
 
 - Analyze all struct definitions in the project.
-- Reorder fields to minimize memory padding.
+- Reorder fields to minimise memory padding.
 - Automatically update source files with optimized field ordering.
 
 #### Field Alignment Notes
@@ -315,7 +315,7 @@ This tool will:
 - Field alignment changes may require updating struct literal initializations.
 - The tool is safe to run repeatedly - it only makes changes when beneficial.
 - Memory savings can be significant for frequently allocated structs.
-- Run field alignment manually as needed for struct optimization.
+- Run field alignment manually as needed for struct optimisation.
 
 ### golangci-lint Configuration
 
