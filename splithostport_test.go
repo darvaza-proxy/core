@@ -74,6 +74,9 @@ func splitAddrPortTestCases() []splitAddrPortCase {
 		newSplitAddrPortCase("incomplete bracketed IPv6", "[::1:1234", "", 0, false),
 		newSplitAddrPortCase("bracketed IPv6 and port", "[::1]:1234", "::1", 1234, true),
 		newSplitAddrPortCase("IPv6 port out of range", "[::1]:123456", "", 0, false),
+		// A valid port but a host that isn't a literal IP forces
+		// ParseAddr to fail, covering the non-IP address branch.
+		newSplitAddrPortCase("hostname not IP", "name:1234", "", 0, false),
 	)
 }
 
@@ -144,6 +147,9 @@ func splitHostPortTestCases() []splitHostPortCase {
 		newSplitHostPortCase("puny code", "hello.xn--rhqv96g", "hello.\u4E16\u754C", "", true),
 		newSplitHostPortCase("good name", "good.name", "good.name", "", true),
 		newSplitHostPortCase("no host bad port", ":port", "", "", false),
+		// Trailing garbage after `]` exercises the default branch of
+		// splitHostPortBracketed.
+		newSplitHostPortCase("bracketed IPv6 trailing garbage", "[::1]x", "", "", false),
 	)
 }
 

@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ var _ TestCase = frameFormatTestCase{}
 var _ TestCase = stackFormatTestCase{}
 var _ TestCase = formatLineTestCase{}
 var _ TestCase = writeFormatTestCase{}
+var _ TestCase = writeFormatPanicsTestCase{}
 
 const (
 	MaxTestDepth = 16
@@ -528,6 +530,8 @@ func frameFormatTestCases() []frameFormatTestCase {
 		newFrameFormatTestCase("empty name %n", emptyFrame, "%n", ""),
 		newFrameFormatTestCase("empty file:line %v", emptyFrame, "%v", ":0"),
 		newFrameFormatTestCase("empty file:line with # flag %#v", emptyFrame, "%#v", ":0"),
+		// Unknown verbs fall through to the empty default branch.
+		newFrameFormatTestCase("unknown verb %x", frame, "%x", ""),
 	)
 }
 
@@ -700,4 +704,61 @@ func writeFormatTestCases() []writeFormatTestCase {
 // Test writeFormat error conditions for better coverage (60% -> higher)
 func TestWriteFormatEdgeCases(t *testing.T) {
 	RunTestCases(t, writeFormatTestCases())
+}
+
+// failingWriter returns a fixed (n, err) from every Write.
+type failingWriter struct {
+	err error
+	n   int
+}
+
+func (w failingWriter) Write(_ []byte) (int, error) { return w.n, w.err }
+
+// writeFormatPanicsTestCase exercises the two panic paths in writeFormat:
+// Write error and short write. The wantPanic substring identifies which
+// branch triggered the panic.
+type writeFormatPanicsTestCase struct {
+	w         io.Writer
+	name      string
+	wantPanic string
+}
+
+func newWriteFormatPanicsTestCase(name string, w io.Writer,
+	wantPanic string) writeFormatPanicsTestCase {
+	return writeFormatPanicsTestCase{name: name, w: w, wantPanic: wantPanic}
+}
+
+func (tc writeFormatPanicsTestCase) Name() string { return tc.name }
+
+func (tc writeFormatPanicsTestCase) Test(t *testing.T) {
+	t.Helper()
+	AssertPanic(t, func() { writeFormat(tc.w, "payload") }, tc.wantPanic, tc.name)
+}
+
+func writeFormatPanicsTestCases() []writeFormatPanicsTestCase {
+	return S(
+		newWriteFormatPanicsTestCase("write error",
+			failingWriter{err: io.ErrShortWrite}, `Frame: failed to write "payload"`),
+		// len("payload") == 7, so n=3 is a short write.
+		newWriteFormatPanicsTestCase("short write",
+			failingWriter{n: 3}, "Frame: incomplete write (3/7)"),
+	)
+}
+
+func TestWriteFormatPanics(t *testing.T) {
+	RunTestCases(t, writeFormatPanicsTestCases())
+}
+
+// Cover the unknown-PC branch of frameForPC: passing pc=0 makes
+// frameForPC call runtime.FuncForPC(pc - 1), which returns nil and
+// forces the "unknown" fallback.
+func TestFrameForPCUnknown(t *testing.T) {
+	f := frameForPC(0)
+	AssertEqual(t, "unknown", f.Name(), "unknown PC name")
+	AssertEqual(t, "unknown", f.File(), "unknown PC file")
+}
+
+// Cover the early-return branch of StackFrame when skip exceeds depth.
+func TestStackFrameSkipExceeds(t *testing.T) {
+	AssertNil(t, StackFrame(10000), "StackFrame returns nil when skip > depth")
 }

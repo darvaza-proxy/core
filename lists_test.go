@@ -9,6 +9,7 @@ import (
 var (
 	_ TestCase = listContainsTestCase{}
 	_ TestCase = listCopyTestCase{}
+	_ TestCase = listForEachTypeMismatchTestCase{}
 )
 
 func testListIteration(t *testing.T, name string, iterFn func(*list.List, func(int) bool), values, expected []int) {
@@ -481,4 +482,48 @@ func testListForEachBackwardElementNilAndEarlyReturn(t *testing.T, name string,
 	iterFn func(*list.List, func(*list.Element) bool)) {
 	t.Helper()
 	testListForEachElementNilAndEarlyReturn(t, name, iterFn)
+}
+
+type listForEachTypeMismatchTestCase struct {
+	list *list.List
+	iter func(*list.List, func(int) bool)
+	name string
+	want []int
+}
+
+func (tc listForEachTypeMismatchTestCase) Name() string { return tc.name }
+
+func (tc listForEachTypeMismatchTestCase) Test(t *testing.T) {
+	t.Helper()
+	collected := make([]int, 0, len(tc.want))
+	tc.iter(tc.list, func(v int) bool {
+		collected = append(collected, v)
+		return false
+	})
+	AssertSliceEqual(t, tc.want, collected, tc.name)
+}
+
+func newListForEachTypeMismatchTestCase(name string, l *list.List,
+	iter func(*list.List, func(int) bool), want []int) listForEachTypeMismatchTestCase {
+	return listForEachTypeMismatchTestCase{
+		name: name,
+		list: l,
+		iter: iter,
+		want: want,
+	}
+}
+
+// Cover the type-mismatch branch in ListForEach/Backward: elements whose
+// Value is not of type T are silently skipped (inner closure returns false
+// to continue iteration).
+func TestListForEachTypeMismatch(t *testing.T) {
+	l := list.New()
+	l.PushBack(1)
+	l.PushBack("not-an-int")
+	l.PushBack(3)
+
+	RunTestCases(t, []listForEachTypeMismatchTestCase{
+		newListForEachTypeMismatchTestCase("forward", l, ListForEach[int], S(1, 3)),
+		newListForEachTypeMismatchTestCase("backward", l, ListForEachBackward[int], S(3, 1)),
+	})
 }

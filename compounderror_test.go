@@ -470,3 +470,9 @@ func TestCompoundErrorIsInterface(t *testing.T) {
 		return
 	}
 }
+
+// Test OK() on a nil receiver — should report true.
+func TestCompoundErrorNilOK(t *testing.T) {
+	var ce *CompoundError
+	AssertTrue(t, ce.OK(), "nil CompoundError.OK")
+}

@@ -17,6 +17,8 @@ var _ TestCase = checkIsTemporaryTestCase{}
 var _ TestCase = isTemporaryTestCase{}
 var _ TestCase = checkIsTimeoutTestCase{}
 var _ TestCase = isTimeoutTestCase{}
+var _ TestCase = wrappedErrorTestCase{}
+var _ TestCase = unwrapBranchesTestCase{}
 
 const emptyString = ""
 
@@ -395,6 +397,8 @@ func checkIsTemporaryTestCases() []checkIsTemporaryTestCase {
 		newCheckIsTemporaryTestCase("temporary error", tempErr, true, true),
 		newCheckIsTemporaryTestCase("timeout error", timeoutErr, true, true),
 		newCheckIsTemporaryTestCase("regular error", regularErr, false, false),
+		newCheckIsTemporaryTestCase("IsTemporary-only interface",
+			&isTemporaryOnlyError{}, true, true),
 	)
 }
 
@@ -486,6 +490,8 @@ func checkIsTimeoutTestCases() []checkIsTimeoutTestCase {
 		newCheckIsTimeoutTestCase("temporary error", tempErr, false, true),
 		newCheckIsTimeoutTestCase("timeout error", timeoutErr, true, true),
 		newCheckIsTimeoutTestCase("regular error", regularErr, false, false),
+		newCheckIsTimeoutTestCase("IsTimeout-only interface",
+			&isTimeoutOnlyError{}, true, true),
 	)
 }
 
@@ -537,4 +543,118 @@ func isTimeoutTestCases() []isTimeoutTestCase {
 // Test IsTimeout function (0% coverage)
 func TestIsTimeout(t *testing.T) {
 	RunTestCases(t, isTimeoutTestCases())
+}
+
+// emptyMessageError returns "" from Error() so that WrappedError.Error()
+// takes the `s == ""` branch and falls back to the wrapper's note.
+type emptyMessageError struct{}
+
+func (emptyMessageError) Error() string { return "" }
+
+// Types that implement only one of Unwrap/Errors/IsTemporary/IsTimeout
+// to exercise the non-first branches of the type switches.
+type errorsOnlyError struct{ errs []error }
+
+func (*errorsOnlyError) Error() string     { return "errors-only" }
+func (e *errorsOnlyError) Errors() []error { return e.errs }
+
+type singleUnwrapError struct{ inner error }
+
+func (*singleUnwrapError) Error() string   { return "single-unwrap" }
+func (e *singleUnwrapError) Unwrap() error { return e.inner }
+
+type isTemporaryOnlyError struct{}
+
+func (*isTemporaryOnlyError) Error() string     { return "is-temporary-only" }
+func (*isTemporaryOnlyError) IsTemporary() bool { return true }
+
+type isTimeoutOnlyError struct{}
+
+func (*isTimeoutOnlyError) Error() string   { return "is-timeout-only" }
+func (*isTimeoutOnlyError) IsTimeout() bool { return true }
+
+// wrappedErrorTestCase exercises WrappedError.Error and Unwrap,
+// including the typed-nil receiver and empty-cause fallback branches.
+type wrappedErrorTestCase struct {
+	err        *WrappedError
+	wantUnwrap error
+	name       string
+	wantError  string
+}
+
+func newWrappedErrorTestCase(name string, err *WrappedError,
+	wantError string, wantUnwrap error) wrappedErrorTestCase {
+	return wrappedErrorTestCase{
+		err:        err,
+		name:       name,
+		wantError:  wantError,
+		wantUnwrap: wantUnwrap,
+	}
+}
+
+func (tc wrappedErrorTestCase) Name() string { return tc.name }
+
+func (tc wrappedErrorTestCase) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.wantError, tc.err.Error(), "WrappedError.Error")
+	if tc.wantUnwrap == nil {
+		AssertNil(t, tc.err.Unwrap(), "WrappedError.Unwrap")
+		return
+	}
+	AssertErrorIs(t, tc.err.Unwrap(), tc.wantUnwrap, "WrappedError.Unwrap")
+}
+
+func wrappedErrorTestCases() []wrappedErrorTestCase {
+	empty := emptyMessageError{}
+	return S(
+		newWrappedErrorTestCase("nil receiver", nil, "", nil),
+		newWrappedErrorTestCase("empty cause",
+			&WrappedError{cause: empty, note: "note"}, "note", empty),
+	)
+}
+
+// Cover WrappedError method behaviour across its main branches.
+func TestWrappedError(t *testing.T) {
+	RunTestCases(t, wrappedErrorTestCases())
+}
+
+// unwrapBranchesTestCase covers the three Unwrap type-switch arms plus
+// the default branch, asserting that the returned slice contains the
+// expected inner error(s).
+type unwrapBranchesTestCase struct {
+	err       error
+	name      string
+	wantInner []error
+}
+
+func newUnwrapBranchesTestCase(name string, err error,
+	wantInner []error) unwrapBranchesTestCase {
+	return unwrapBranchesTestCase{err: err, name: name, wantInner: wantInner}
+}
+
+func (tc unwrapBranchesTestCase) Name() string { return tc.name }
+
+func (tc unwrapBranchesTestCase) Test(t *testing.T) {
+	t.Helper()
+	got := Unwrap(tc.err)
+	AssertSliceEqual(t, tc.wantInner, got, "Unwrap")
+}
+
+func unwrapBranchesTestCases() []unwrapBranchesTestCase {
+	inner := errors.New("inner")
+	return S(
+		newUnwrapBranchesTestCase("Unwrap []error branch",
+			&CompoundError{Errs: []error{inner}}, []error{inner}),
+		newUnwrapBranchesTestCase("Errors() branch",
+			&errorsOnlyError{errs: []error{inner}}, []error{inner}),
+		newUnwrapBranchesTestCase("Unwrap error branch",
+			&singleUnwrapError{inner: inner}, []error{inner}),
+		newUnwrapBranchesTestCase("default branch",
+			errors.New("plain"), nil),
+	)
+}
+
+// Test Unwrap(err) hits all three type-switch branches and the default.
+func TestUnwrapBranches(t *testing.T) {
+	RunTestCases(t, unwrapBranchesTestCases())
 }

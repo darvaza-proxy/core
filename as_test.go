@@ -378,6 +378,8 @@ func TestSliceAsFn(t *testing.T) {
 }
 
 func TestAsError(t *testing.T) {
+	var typedNil *typedNilError
+
 	testCases := []asErrorTestCase{
 		newAsErrorTestCase("standard error", errors.New("standard error"), "standard error", true),
 		newAsErrorTestCase("nil error", error(nil), "", false),
@@ -391,6 +393,7 @@ func TestAsError(t *testing.T) {
 		newAsErrorTestCase("non-error type", "not an error", "", false),
 		newAsErrorTestCase("nil value", nil, "", false),
 		newAsErrorTestCase("integer", 42, "", false),
+		newAsErrorTestCase("typed-nil error", error(typedNil), "", false),
 	}
 
 	RunTestCases(t, testCases)
@@ -497,3 +500,8 @@ func TestSliceAsFnEdgeCases(t *testing.T) {
 
 	_ = SliceAsFn(panicFn, S[any]("will panic"))
 }
+
+// Custom error type used by the typed-nil AsError case in TestAsError.
+type typedNilError struct{}
+
+func (*typedNilError) Error() string { return "typed-nil" }
