@@ -169,7 +169,9 @@ Always run `make tidy` before committing to ensure proper formatting.
 
 ### Testing Patterns
 
-- Table-driven tests are preferred.
+- Table-driven tests via `TestCase` apply when ≥2 rows of shared-shape
+  data feed one assertion path; otherwise write plain test functions.
+  See [TESTING.md](./TESTING.md) for the full decision rule.
 - All testing utilities are public in `testing.go` for external use.
 - Comprehensive coverage for generic functions is expected.
 - Testing utilities log successful assertions for better debugging.
