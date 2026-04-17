@@ -18,8 +18,8 @@ COVERAGE_DIR ?= $(TMPDIR)/coverage
 
 # Dynamic version selection based on Go version
 # Format: $(TOOLSDIR)/get_version.sh <go_version> <tool_version1> <tool_version2> ..
-GOLANGCI_LINT_VERSION ?= $(shell $(TOOLSDIR)/get_version.sh 1.23 v2.3.0)
-REVIVE_VERSION ?= $(shell $(TOOLSDIR)/get_version.sh 1.23 v1.7)
+GOLANGCI_LINT_VERSION ?= $(shell $(TOOLSDIR)/get_version.sh 1.24 v2.8.0 v2.11.4)
+REVIVE_VERSION ?= $(shell $(TOOLSDIR)/get_version.sh 1.24 v1.14.0 v1.15.0)
 
 GOLANGCI_LINT_URL ?= github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 GOLANGCI_LINT_RUN_ARGS ?= --show-stats=false

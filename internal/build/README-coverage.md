@@ -2,6 +2,12 @@
 
 This document explains the coverage testing setup for monorepos.
 
+## Related Documentation
+
+- [BUILDING.md](../../BUILDING.md) - Shared build system architecture and
+  usage.
+- [AGENTS.md](../../AGENTS.md) - Development workflow and tooling guidance.
+
 ## Overview
 
 The coverage system is designed to handle multiple Go modules in a monorepo,
@@ -30,9 +36,8 @@ This script:
 
 - Reads the module index.
 - Runs `go test -coverprofile -coverpkg=./... ./...` for each module using
-  `go -C` to change directory (requires Go 1.23+). This tests all packages
-  recursively and instruments all packages for coverage, not just those with
-  test files.
+  `go -C` to change directory. This tests all packages recursively and
+  instruments all packages for coverage, not just those with test files.
 - Shows progress with module name and directory.
 - Generates individual coverage files with pattern `coverage_${name}.prof`.
 - Creates multiple output formats: `.prof`, `.func`, `.html`, and `.stdout`.

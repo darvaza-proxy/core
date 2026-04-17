@@ -225,7 +225,7 @@ trim_trailing_whitespace = false
 
 Comprehensive Go code analysis:
 
-- Uses golangci-lint v2.3.0+ with v2 configuration format.
+- Uses golangci-lint v2.8.0+ with v2 configuration format.
 - Enables 15+ linters including `fieldalignment`, `revive`, `staticcheck`.
 - Configures revive with 20+ specific rules.
 - Excludes generated code and common false positives.
@@ -282,7 +282,7 @@ Tools are auto-detected and replaced with `true` (no-op) if unavailable.
 
 #### Required Tools
 
-- **Go 1.23+**: Required for `go -C` directory changes.
+- **Go 1.24+**: Required minimum (bumped for golang.org/x/net v0.50.0).
 - **golangci-lint**: Go code linting (version selected by Go version).
 - **revive**: Additional Go linting rules.
 - **make**: Build orchestration.
@@ -304,7 +304,7 @@ The coverage system provides comprehensive testing:
 
 GitHub Actions workflows provide:
 
-- **Build Testing**: Tests across Go 1.23 and 1.24.
+- **Build Testing**: Tests across Go 1.24, 1.25 and 1.26.
 - **Race Detection**: Dedicated workflow for race condition testing.
 - **Coverage Reporting**: Automatic Codecov uploads.
 - **Dependency Updates**: Automated Renovate PRs.
@@ -478,7 +478,7 @@ The build system integrates with development environments:
 
 GitHub Actions workflows provide:
 
-- **Multi-version Testing**: Go 1.23 and 1.24.
+- **Multi-version Testing**: Go 1.24, 1.25 and 1.26.
 - **Coverage Reporting**: Automatic Codecov uploads.
 - **Dependency Management**: Renovate integration.
 - **Branch Protection**: WIP branch exclusion.
