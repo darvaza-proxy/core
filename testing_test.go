@@ -704,6 +704,7 @@ func testMockTConcurrent(t *testing.T) {
 			mock.Errorf("concurrent error %d", id)
 		case 4:
 			mock.Logf("concurrent log %d", id)
+		default:
 		}
 		return nil
 	})

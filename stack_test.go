@@ -166,6 +166,7 @@ func analyzeFrame(analysis *stackAnalysis, frame Frame, position int, expectatio
 		}
 	case expectation.recurringFunc:
 		analysis.recurringCount++
+	default:
 	}
 }
 

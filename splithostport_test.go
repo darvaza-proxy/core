@@ -2,6 +2,7 @@ package core
 
 import (
 	"net"
+	"net/netip"
 	"testing"
 )
 
@@ -27,14 +28,18 @@ func (tc splitAddrPortCase) Name() string {
 	return tc.name
 }
 
+func (tc splitAddrPortCase) matches(a netip.Addr, p uint16, err error) bool {
+	if err != nil {
+		return !tc.ok && !a.IsValid() && p == 0
+	}
+	return tc.ok && a.String() == tc.addr && p == tc.port
+}
+
 func (tc splitAddrPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	a, p, err := SplitAddrPort(tc.addrPort)
-	if err != nil && !tc.ok {
-		// failed as expected
-		t.Logf("SplitAddrPort(%q) -> %q, %q, %#v", tc.addrPort, a.String(), p, err)
-	} else if a.String() != tc.addr || p != tc.port || (err == nil) != tc.ok {
+	if !tc.matches(a, p, err) {
 		// unexpected result
 		t.Errorf("SplitAddrPort(%q) -> %q, %q, %#v", tc.addrPort, a.String(), p, err)
 	} else {

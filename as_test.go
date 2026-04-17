@@ -492,7 +492,7 @@ func TestSliceAsFnEdgeCases(t *testing.T) {
 	// Verify panic propagates
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("SliceAsFn with panic function should panic")
+			t.Error("SliceAsFn with panic function should panic")
 		}
 	}()
 

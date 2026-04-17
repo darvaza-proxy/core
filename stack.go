@@ -192,6 +192,7 @@ func (f Frame) Format(s fmt.State, verb rune) {
 		f.formatFile(s)
 		writeFormat(s, ":")
 		f.formatLine(s)
+	default:
 	}
 }
 

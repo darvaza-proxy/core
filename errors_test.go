@@ -150,12 +150,7 @@ func (tc quietWrapTestCase) Name() string {
 func (tc quietWrapTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var result error
-	if len(tc.args) > 0 {
-		result = QuietWrap(tc.err, tc.format, tc.args...)
-	} else {
-		result = QuietWrap(tc.err, tc.format)
-	}
+	result := QuietWrap(tc.err, tc.format, tc.args...)
 
 	if tc.expected == "" {
 		AssertEqual(t, tc.err, result, "QuietWrap original")

@@ -117,6 +117,7 @@ func (w *CompoundError) Append(err error, note string, args ...any) *CompoundErr
 	case note != "":
 		// wrap
 		err = Wrap(err, note)
+	default:
 	}
 
 	w.Errs = append(w.Errs, err)

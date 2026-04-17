@@ -3,7 +3,7 @@ package core
 import (
 	"crypto/rand"
 	"math/big"
-	"sort"
+	"slices"
 )
 
 // SliceMinus returns a new slice containing only the
@@ -252,28 +252,28 @@ func SliceSortFn[T any](x []T, less func(a, b T) bool) {
 // a > b and zero when a == b.
 func SliceSort[T any](x []T, cmp func(a, b T) int) {
 	if cmp != nil && len(x) > 0 {
-		doSliceSort(x, func(a, b T) bool {
-			return cmp(a, b) < 0
-		})
+		slices.SortFunc(x, cmp)
 	}
 }
 
 // SliceSortOrdered sorts the slice x of an [Ordered] type in ascending order.
 func SliceSortOrdered[T Ordered](x []T) {
 	if len(x) > 0 {
-		doSliceSort(x, func(a, b T) bool {
-			return a < b
-		})
+		slices.Sort(x)
 	}
 }
 
 func doSliceSort[T any](x []T, less func(a, b T) bool) {
-	s := sortable[T]{
-		x:    x,
-		less: less,
-	}
-
-	sort.Sort(s)
+	slices.SortFunc(x, func(a, b T) int {
+		switch {
+		case less(a, b):
+			return -1
+		case less(b, a):
+			return 1
+		default:
+			return 0
+		}
+	})
 }
 
 // SliceP returns the p-th percentile element from a slice.
@@ -316,32 +316,6 @@ func doP[T any](x []T, p float64, less func(a, b T) bool) T {
 	idx := max(int(float64(n)*p+0.5)-1, 0)
 
 	return x[idx]
-}
-
-var _ sort.Interface = sortable[any]{}
-
-type sortable[T any] struct {
-	// Function pointer - ordered alphabetically
-	less func(a, b T) bool
-
-	// Slice - ordered alphabetically
-	x []T
-}
-
-func (s sortable[T]) Len() int {
-	return len(s.x)
-}
-
-func (s sortable[T]) Less(i, j int) bool {
-	// this is only accessible from sort.Sort() so
-	// we can trust the indexes
-	return s.less(s.x[i], s.x[j])
-}
-
-func (s sortable[T]) Swap(i, j int) {
-	// this is only accessible from sort.Sort() so
-	// we can trust the indexes
-	s.x[j], s.x[i] = s.x[i], s.x[j]
 }
 
 // SliceReverse modifies a slice reversing the order of its

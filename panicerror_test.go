@@ -120,7 +120,7 @@ func (tc panicErrorUnwrapTestCase) Test(t *testing.T) {
 
 	if tc.expectUnwrap {
 		if unwrapped == nil {
-			t.Fatalf("expected unwrapped error, got nil")
+			t.Fatal("expected unwrapped error, got nil")
 		}
 		if unwrapped.Error() != tc.expectedError {
 			t.Fatalf("expected unwrapped error '%s', got '%s'", tc.expectedError, unwrapped.Error())
@@ -194,7 +194,7 @@ func runNewPanicWrapTest(t *testing.T) {
 	// Test that it wraps the error
 	unwrapped := pe.Unwrap()
 	if unwrapped == nil {
-		t.Fatalf("expected unwrapped error, got nil")
+		t.Fatal("expected unwrapped error, got nil")
 	}
 
 	// Test error message contains both note and original
@@ -217,7 +217,7 @@ func runNewPanicWrapfTest(t *testing.T) {
 	// Test that it wraps the error
 	unwrapped := pe.Unwrap()
 	if unwrapped == nil {
-		t.Fatalf("expected unwrapped error, got nil")
+		t.Fatal("expected unwrapped error, got nil")
 	}
 
 	// Test error message contains formatted note and original
@@ -389,7 +389,7 @@ func (tc newUnreachableErrorTestCase) Test(t *testing.T) {
 	result := NewUnreachableError(0, tc.err, tc.note)
 
 	if result == nil {
-		t.Fatalf("expected non-nil error, got nil")
+		t.Fatal("expected non-nil error, got nil")
 	}
 
 	// Test that it's a PanicError
@@ -400,19 +400,19 @@ func (tc newUnreachableErrorTestCase) Test(t *testing.T) {
 
 	// Test that ErrUnreachable is somewhere in the chain
 	if !errors.Is(result, ErrUnreachable) {
-		t.Fatalf("expected ErrUnreachable in error chain")
+		t.Fatal("expected ErrUnreachable in error chain")
 	}
 
 	// Test error message
 	errorStr := result.Error()
 	if errorStr == "" {
-		t.Fatalf("expected non-empty error message")
+		t.Fatal("expected non-empty error message")
 	}
 
 	// Test stack trace
 	stack := pe.CallStack()
 	if len(stack) == 0 {
-		t.Fatalf("expected non-empty stack trace")
+		t.Fatal("expected non-empty stack trace")
 	}
 }
 
@@ -434,7 +434,7 @@ func runNewUnreachableErrorfTest(t *testing.T) {
 	result := NewUnreachableErrorf(0, err, format, args...)
 
 	if result == nil {
-		t.Fatalf("expected non-nil error, got nil")
+		t.Fatal("expected non-nil error, got nil")
 	}
 
 	// Test that it's a PanicError
@@ -445,12 +445,12 @@ func runNewUnreachableErrorfTest(t *testing.T) {
 
 	// Test that ErrUnreachable is in the chain
 	if !errors.Is(result, ErrUnreachable) {
-		t.Fatalf("expected ErrUnreachable in error chain")
+		t.Fatal("expected ErrUnreachable in error chain")
 	}
 
 	// Test that original error is in the chain
 	if !errors.Is(result, err) {
-		t.Fatalf("expected original error in error chain")
+		t.Fatal("expected original error in error chain")
 	}
 
 	// Test formatted message
@@ -462,7 +462,7 @@ func runNewUnreachableErrorfTest(t *testing.T) {
 	// Test stack trace
 	stack := pe.CallStack()
 	if len(stack) == 0 {
-		t.Fatalf("expected non-empty stack trace")
+		t.Fatal("expected non-empty stack trace")
 	}
 }
 

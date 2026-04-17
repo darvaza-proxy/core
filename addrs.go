@@ -105,6 +105,7 @@ func AddrFromNetIP(addr net.Addr) (netip.Addr, bool) {
 		s = v.IP
 	case *net.IPNet:
 		s = v.IP
+	default:
 	}
 
 	ipAddr, ok := netip.AddrFromSlice(s)

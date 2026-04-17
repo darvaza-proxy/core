@@ -602,7 +602,7 @@ func testIsNilSlices(t *testing.T) {
 	AssertTrue(t, IsNil(vi), "interface containing typed nil")
 
 	// Slice of pointers with nil elements
-	var ptrSlice []*int
+	ptrSlice := make([]*int, 0, 1)
 	ptrSlice = append(ptrSlice, nil)
 	AssertFalse(t, IsNil(ptrSlice), "slice containing nil elements")
 	AssertTrue(t, IsNil(ptrSlice[0]), "nil element in slice")

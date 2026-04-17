@@ -21,6 +21,7 @@ func (ck *ContextKey[T]) WithValue(ctx context.Context, v T) context.Context {
 	switch ctx {
 	case nil, context.TODO():
 		ctx = context.Background()
+	default:
 	}
 
 	return context.WithValue(ctx, ck, v)
