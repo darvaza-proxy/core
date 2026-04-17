@@ -427,7 +427,7 @@ func TestAsErrors(t *testing.T) {
 // Benchmark tests
 func BenchmarkAs(b *testing.B) {
 	input := "test string"
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = As[any, string](input)
 	}
 }
@@ -439,7 +439,7 @@ func BenchmarkAsFn(b *testing.B) {
 	}
 	var input any = "test string"
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AsFn(fn, input)
 	}
 }
@@ -447,8 +447,7 @@ func BenchmarkAsFn(b *testing.B) {
 func BenchmarkSliceAs(b *testing.B) {
 	input := S[any]("a", 1, "b", 2, "c", 3, "d", 4, "e", 5)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = SliceAs[any, string](input)
 	}
 }
@@ -456,7 +455,7 @@ func BenchmarkSliceAs(b *testing.B) {
 func BenchmarkAsError(b *testing.B) {
 	err := errors.New("test error")
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = AsError(err)
 	}
 }

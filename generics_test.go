@@ -429,30 +429,30 @@ func evaluateNoFunction(called *bool) int {
 // Benchmark tests
 func BenchmarkCoalesceInt(b *testing.B) {
 	inputs := S(0, 0, 0, 42, 0, 100)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = Coalesce(inputs...)
 	}
 }
 
 func BenchmarkCoalesceString(b *testing.B) {
 	inputs := S("", "", "", "hello", "", "world")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = Coalesce(inputs...)
 	}
 }
 
 func BenchmarkIIfInt(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	i := 0
+	for b.Loop() {
 		_ = IIf(i%2 == 0, 42, 100)
+		i++
 	}
 }
 
 func BenchmarkIIfString(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	i := 0
+	for b.Loop() {
 		_ = IIf(i%2 == 0, "hello", "world")
+		i++
 	}
 }

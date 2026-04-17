@@ -27,7 +27,7 @@ func TestHere(t *testing.T) {
 	if s := fmt.Sprintf("%n", Here()); s != "TestHere" {
 		t.FailNow()
 	}
-	for i := 0; i < MaxDepth; i++ {
+	for i := range MaxDepth {
 		f := deepHere(i)
 		if s := fmt.Sprintf("%n", f); s != "hereHere" {
 			t.FailNow()
@@ -52,8 +52,8 @@ func TestStackFrame(t *testing.T) {
 		t.FailNow()
 	}
 
-	for i := 0; i < MaxTestDepth; i++ {
-		for j := 0; j < MaxTestSpace; j++ {
+	for i := range MaxTestDepth {
+		for j := range MaxTestSpace {
 			f := deepStackFrame(i, j)
 			if s := fmt.Sprintf("%n", f); s != "hereStackFrame" {
 				log.Print(s)

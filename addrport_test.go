@@ -255,32 +255,28 @@ func TestAddrPortIPv4Handling(t *testing.T) {
 // Benchmarks
 func BenchmarkAddrPortDirect(b *testing.B) {
 	ap := netip.MustParseAddrPort("192.168.1.1:8080")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AddrPort(ap)
 	}
 }
 
 func BenchmarkAddrPortPointer(b *testing.B) {
 	ap := addrPortPtr(netip.MustParseAddrPort("192.168.1.1:8080"))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AddrPort(ap)
 	}
 }
 
 func BenchmarkAddrPortTCPAddr(b *testing.B) {
 	addr := &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AddrPort(addr)
 	}
 }
 
 func BenchmarkAddrPortInterface(b *testing.B) {
 	provider := addrPortProvider{netip.MustParseAddrPort("192.168.1.1:8080")}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AddrPort(provider)
 	}
 }

@@ -1284,13 +1284,13 @@ func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
 		// Deeply nested interfaces
 		newIsSameStackOverflowTestCase("different deep nested chains", func() (any, any) {
 			var current1 any = 42
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				next := current1
 				current1 = &next
 			}
 
 			var current2 any = 42
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				next := current2
 				current2 = &next
 			}
@@ -1300,7 +1300,7 @@ func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
 
 		newIsSameStackOverflowTestCase("same deep nested chain", func() (any, any) {
 			var current any = 42
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				next := current
 				current = &next
 			}

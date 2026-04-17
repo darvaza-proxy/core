@@ -451,8 +451,7 @@ func TestErrGroupConcurrency(t *testing.T) {
 
 func startConcurrentWorkers(t *testing.T, eg *ErrGroup, numWorkers int) {
 	t.Helper()
-	for i := 0; i < numWorkers; i++ {
-		worker := i
+	for worker := range numWorkers {
 		eg.Go(createConcurrentWorker(worker), nil)
 	}
 }

@@ -319,9 +319,9 @@ func TestWaitGroupConcurrency(t *testing.T) {
 	var counter int64
 	var mu sync.Mutex
 
-	for i := 0; i < numWorkers; i++ {
+	for range numWorkers {
 		wg.Go(func() error {
-			for j := 0; j < numIterations; j++ {
+			for range numIterations {
 				mu.Lock()
 				counter++
 				mu.Unlock()

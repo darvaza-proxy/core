@@ -443,15 +443,15 @@ func TestAssertNoPanic(t *testing.T) {
 // Test RunConcurrentTest
 func TestRunConcurrentTest(t *testing.T) {
 	mock := &MockT{}
-	var counter int64
+	var counter atomic.Int64
 
 	// Test successful concurrent execution
 	err := RunConcurrentTest(mock, 5, func(_ int) error {
-		atomic.AddInt64(&counter, 1)
+		counter.Add(1)
 		return nil
 	})
 	AssertNoError(t, err, "RunConcurrentTest successful")
-	AssertEqual(t, int64(5), atomic.LoadInt64(&counter), "all workers executed")
+	AssertEqual(t, int64(5), counter.Load(), "all workers executed")
 
 	// Test concurrent execution with error
 	err = RunConcurrentTest(mock, 3, func(id int) error {
