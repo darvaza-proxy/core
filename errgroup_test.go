@@ -12,6 +12,7 @@ var (
 	_ TestCase = errGroupSetDefaultsTestCase{}
 	_ TestCase = errGroupGoTestCase{}
 	_ TestCase = errGroupGoCatchTestCase{}
+	_ TestCase = errGroupErrTestCase{}
 )
 
 type errGroupSetDefaultsTestCase struct {
@@ -451,8 +452,7 @@ func TestErrGroupConcurrency(t *testing.T) {
 
 func startConcurrentWorkers(t *testing.T, eg *ErrGroup, numWorkers int) {
 	t.Helper()
-	for i := 0; i < numWorkers; i++ {
-		worker := i
+	for worker := range numWorkers {
 		eg.Go(createConcurrentWorker(worker), nil)
 	}
 }
@@ -541,4 +541,44 @@ func TestErrGroupWithCustomParent(t *testing.T) {
 	if err == nil {
 		t.Error("Expected timeout error from parent context")
 	}
+}
+
+// errGroupErrTestCase covers ErrGroup.Err() across the pristine and
+// worker-error branches. A nil workerErr means no worker is launched
+// and Err() should return nil; a non-nil workerErr is returned by the
+// launched worker and Err() should propagate it.
+type errGroupErrTestCase struct {
+	workerErr error
+	name      string
+}
+
+func newErrGroupErrTestCase(name string, workerErr error) errGroupErrTestCase {
+	return errGroupErrTestCase{name: name, workerErr: workerErr}
+}
+
+func (tc errGroupErrTestCase) Name() string { return tc.name }
+
+func (tc errGroupErrTestCase) Test(t *testing.T) {
+	t.Helper()
+	var eg ErrGroup
+	if tc.workerErr != nil {
+		eg.Go(func(_ context.Context) error { return tc.workerErr }, nil)
+		_ = eg.Wait()
+	}
+	if tc.workerErr == nil {
+		AssertNil(t, eg.Err(), tc.name)
+		return
+	}
+	AssertSame(t, tc.workerErr, eg.Err(), tc.name)
+}
+
+func errGroupErrTestCases() []errGroupErrTestCase {
+	return []errGroupErrTestCase{
+		newErrGroupErrTestCase("pristine", nil),
+		newErrGroupErrTestCase("worker error", errors.New("worker")),
+	}
+}
+
+func TestErrGroupErr(t *testing.T) {
+	RunTestCases(t, errGroupErrTestCases())
 }

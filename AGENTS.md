@@ -22,7 +22,7 @@ It serves as the base for other darvaza.org projects.
 
 Before starting development, ensure you have:
 
-- Go 1.23 or later installed (check with `go version`).
+- Go 1.24 or later installed (check with `go version`).
 - `make` command available (usually pre-installed on Unix systems).
 - `$GOPATH` configured correctly (typically `~/go`).
 - Git configured for proper line endings.
@@ -138,7 +138,7 @@ Enhanced coverage reporting with monorepo support:
 
 - **Zero dependencies**: Only the Go standard library and minimal golang.org/x
   packages.
-- **Generic programming**: Extensive use of Go 1.23+ generics for type-safe
+- **Generic programming**: Extensive use of Go generics for type-safe
   utilities.
 - **Single package**: Everything is in the `core` package, no subpackages.
 
@@ -169,7 +169,9 @@ Always run `make tidy` before committing to ensure proper formatting.
 
 ### Testing Patterns
 
-- Table-driven tests are preferred.
+- Table-driven tests via `TestCase` apply when ≥2 rows of shared-shape
+  data feed one assertion path; otherwise write plain test functions.
+  See [TESTING.md](./TESTING.md) for the full decision rule.
 - All testing utilities are public in `testing.go` for external use.
 - Comprehensive coverage for generic functions is expected.
 - Testing utilities log successful assertions for better debugging.
@@ -185,7 +187,7 @@ For comprehensive testing patterns and assertion function usage, see:
 
 ## Important Notes
 
-- Go 1.23 is the minimum required version.
+- Go 1.24 is the minimum required version.
 - The Makefile dynamically generates rules for subprojects.
 - Tool versions (golangci-lint, revive) are selected based on Go version.
 - This is a utility library - no business logic, only reusable helpers.
@@ -270,7 +272,7 @@ The project uses DeepSource for static code analysis. Configuration is in the
 
 - **Codecov workflow**: Automatically runs on push/PR to generate coverage
   reports.
-- **Make workflow**: Tests across Go versions 1.23 and 1.24.
+- **Make workflow**: Tests across Go versions 1.24, 1.25 and 1.26.
 - All CI checks must pass before merging PRs.
 
 ### Working with Build Tools
@@ -324,7 +326,7 @@ Configuration is stored in `.golangci.yml` in the project root.
 
 #### Current Configuration Status
 
-The project uses golangci-lint v2.3.0 with full Go 1.23 support.
+The project uses golangci-lint v2.8.0 (Go 1.24) and v2.11.4 (Go 1.25+).
 The current `.golangci.yml` uses the v2 format:
 
 - ✅ **Functionally works**: All linters and settings are properly applied.
@@ -436,6 +438,6 @@ When creating or editing documentation files:
    - Install tools globally with `pnpm install -g <tool>` if needed.
 
 5. **golangci-lint configuration**:
-   - Configuration uses v2.3.0 with proper v2 format.
+   - Configuration uses v2.8.0+ with proper v2 format.
    - System uses pinned version via Makefile `GOLANGCI_LINT_VERSION`.
    - Technical linter names are added to `internal/build/cspell.json`.

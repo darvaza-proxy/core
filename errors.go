@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"slices"
 )
 
 var (
@@ -118,6 +119,7 @@ func (w *TemporaryError) Error() string {
 		return ""
 	case w.cause != nil:
 		cause = w.cause.Error()
+	default:
 	}
 
 	switch {
@@ -198,6 +200,7 @@ func Unwrap(err error) []error {
 		Unwrap() error
 	}:
 		errs = append(errs, w.Unwrap())
+	default:
 	}
 
 	return SliceReplaceFn(errs, func(_ []error, err error) (error, bool) {
@@ -216,12 +219,7 @@ func IsError(err error, errs ...error) bool {
 	}
 
 	fn := func(err error) bool {
-		for _, e := range errs {
-			if err == e {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(errs, err)
 	}
 
 	return IsErrorFn(fn, err)

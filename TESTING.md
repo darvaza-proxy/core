@@ -27,28 +27,22 @@ compliant test code that meets our strict linting requirements.
 
 ## When to Use TestCase Interface
 
-**ONLY use TestCase for table-driven tests with multiple data cases testing
-the same function logic.**
+A TestCase exists when you have **≥2 rows of shared-shape data feeding one
+assertion path**. Each row differs only in its field values; every row runs
+through the same `Test` body.
 
-**Use TestCase when:**
+Anything else is a plain `func TestFoo(t *testing.T)`:
 
-- Testing a single function with multiple input/output combinations.
-- All test cases share identical test logic.
-- You have 2 or more data variations for the same test behaviour.
+- Single case — not a table.
+- Per-row custom logic — use `t.Run` with named helper functions instead.
+- Differing assertions between rows — split into separate tests.
+- Test operation held inside a struct field (e.g. `fn func() bool`) —
+  that is the test body, not data. Closure fields are acceptable only
+  when they represent fixtures or expected-value computation consumed
+  by a shared `Test` body.
 
-**Examples of appropriate TestCase usage:**
-
-- URL parsing with different input formats.
-- Mathematical functions with various numeric inputs.
-- Validation functions with different valid/invalid inputs.
-- String processing with multiple text variations.
-
-**Do NOT use TestCase when:**
-
-- Testing different functions or methods.
-- Test cases require different validation logic.
-- Testing different behaviours or scenarios.
-- You only have one test case.
+If unsure, write the plain test function first; promote to TestCase only
+when a second row with the same shape forces the question.
 
 ## When to Use t.Run() with Named Functions
 
@@ -74,26 +68,29 @@ func TestUserManager(t *testing.T) {
 }
 ```
 
-## MANDATORY TestCase Compliance Requirements
+## Structure Once You've Chosen TestCase
 
-**When using TestCase interface for table-driven tests, ALL files must meet
-these 6 requirements:**
+Once the decision above qualifies the test as a genuine TestCase, the
+following structural requirements apply:
 
-1. **TestCase Interface Validations**: `var _ TestCase = ...` declarations
-   for all test case types.
-2. **Factory Functions**: All TestCase types have `newTestCaseTypeName()`
-   functions (enables field alignment + logical parameters).
-3. **Factory Usage**: All test case declarations use factory functions
-   (no naked struct literals).
-4. **RunTestCases Usage**: Test functions use `RunTestCases(t, cases)`
-   instead of manual loops.
-5. **Anonymous Functions**: No `t.Run("name", func(t *testing.T) { ... })`
-   patterns longer than 3 lines.
-6. **Test Case List Factories**: Complex test case lists use
-   `myFooTestCases()` factory functions.
+1. **Interface Validation**: `var _ TestCase = ...` declarations for every
+   test case type.
+2. **Factory Functions**: `newTestCaseTypeName()` for every TestCase type
+   (decouples logical parameter order from memory-optimised field
+   alignment).
+3. **Factory Usage**: Declare cases via factories, never naked struct
+   literals.
+4. **RunTestCases**: Invoke the suite through `RunTestCases(t, cases)`; no
+   manual `for _, tc := range ...` loops.
+5. **Anonymous Functions**: Keep `t.Run` bodies to ≤3 lines; extract
+   longer ones into named helper functions.
+6. **List Factories**: Use `myFooTestCases()` factory functions for
+   complex list generation.
 
-These requirements apply **ONLY** to table-driven tests using TestCase, not
-to standard t.Run() patterns.
+These are structural, not decisive: they tell you how to shape a TestCase,
+not whether to use one. Passing this checklist on a single-case TestCase
+or a TestCase whose `fn` field holds the operation under test still means
+the wrong tool was picked.
 
 ## Testing Utilities
 
@@ -1061,6 +1058,13 @@ var testUsers = []User{
 ### ❌ Never Use These Patterns
 
 ```go
+// DON'T: Single-case TestCase — write a plain test function instead.
+
+// DON'T: Hold the operation under test inside a struct field
+// (e.g. fn func() bool with Test: AssertFalse(t, tc.fn(), ...)).
+// Closure fields are data only when they produce a fixture or
+// expected value consumed by a shared Test body.
+
 // DON'T: Anonymous functions >3 lines
 t.Run("test", func(t *testing.T) {
     setup()

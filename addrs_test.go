@@ -425,7 +425,7 @@ func testExclusionRemovesInterfaces(t *testing.T) {
 
 // Test internal helper functions
 func TestAsStringIPAddresses(t *testing.T) {
-	addrs := S[netip.Addr](
+	addrs := S(
 		netip.MustParseAddr("192.168.1.1"),
 		netip.MustParseAddr("2001:db8::1"),
 		netip.Addr{}, // Invalid address
@@ -441,7 +441,7 @@ func TestAsStringIPAddresses(t *testing.T) {
 }
 
 func TestAsNetIPAddresses(t *testing.T) {
-	addrs := S[netip.Addr](
+	addrs := S(
 		netip.MustParseAddr("192.168.1.1"),
 		netip.MustParseAddr("2001:db8::1"),
 		netip.Addr{},                              // Invalid address
@@ -523,27 +523,26 @@ func TestAppendNetIPAsIP(t *testing.T) {
 
 // Benchmarks
 func BenchmarkParseAddr(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseAddr("192.168.1.1")
 	}
 }
 
 func BenchmarkParseNetIP(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = ParseNetIP("192.168.1.1")
 	}
 }
 
 func BenchmarkGetStringIPAddresses(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = GetStringIPAddresses()
 	}
 }
 
 func BenchmarkAddrFromNetIP(b *testing.B) {
 	addr := &net.IPAddr{IP: net.ParseIP("192.168.1.1")}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AddrFromNetIP(addr)
 	}
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"net"
+	"net/netip"
 	"testing"
 )
 
@@ -27,14 +28,18 @@ func (tc splitAddrPortCase) Name() string {
 	return tc.name
 }
 
+func (tc splitAddrPortCase) matches(a netip.Addr, p uint16, err error) bool {
+	if err != nil {
+		return !tc.ok && !a.IsValid() && p == 0
+	}
+	return tc.ok && a.String() == tc.addr && p == tc.port
+}
+
 func (tc splitAddrPortCase) Test(t *testing.T) {
 	t.Helper()
 
 	a, p, err := SplitAddrPort(tc.addrPort)
-	if err != nil && !tc.ok {
-		// failed as expected
-		t.Logf("SplitAddrPort(%q) -> %q, %q, %#v", tc.addrPort, a.String(), p, err)
-	} else if a.String() != tc.addr || p != tc.port || (err == nil) != tc.ok {
+	if !tc.matches(a, p, err) {
 		// unexpected result
 		t.Errorf("SplitAddrPort(%q) -> %q, %q, %#v", tc.addrPort, a.String(), p, err)
 	} else {
@@ -69,6 +74,9 @@ func splitAddrPortTestCases() []splitAddrPortCase {
 		newSplitAddrPortCase("incomplete bracketed IPv6", "[::1:1234", "", 0, false),
 		newSplitAddrPortCase("bracketed IPv6 and port", "[::1]:1234", "::1", 1234, true),
 		newSplitAddrPortCase("IPv6 port out of range", "[::1]:123456", "", 0, false),
+		// A valid port but a host that isn't a literal IP forces
+		// ParseAddr to fail, covering the non-IP address branch.
+		newSplitAddrPortCase("hostname not IP", "name:1234", "", 0, false),
 	)
 }
 
@@ -139,6 +147,9 @@ func splitHostPortTestCases() []splitHostPortCase {
 		newSplitHostPortCase("puny code", "hello.xn--rhqv96g", "hello.\u4E16\u754C", "", true),
 		newSplitHostPortCase("good name", "good.name", "good.name", "", true),
 		newSplitHostPortCase("no host bad port", ":port", "", "", false),
+		// Trailing garbage after `]` exercises the default branch of
+		// splitHostPortBracketed.
+		newSplitHostPortCase("bracketed IPv6 trailing garbage", "[::1]x", "", "", false),
 	)
 }
 

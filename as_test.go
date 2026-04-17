@@ -378,6 +378,8 @@ func TestSliceAsFn(t *testing.T) {
 }
 
 func TestAsError(t *testing.T) {
+	var typedNil *typedNilError
+
 	testCases := []asErrorTestCase{
 		newAsErrorTestCase("standard error", errors.New("standard error"), "standard error", true),
 		newAsErrorTestCase("nil error", error(nil), "", false),
@@ -391,6 +393,7 @@ func TestAsError(t *testing.T) {
 		newAsErrorTestCase("non-error type", "not an error", "", false),
 		newAsErrorTestCase("nil value", nil, "", false),
 		newAsErrorTestCase("integer", 42, "", false),
+		newAsErrorTestCase("typed-nil error", error(typedNil), "", false),
 	}
 
 	RunTestCases(t, testCases)
@@ -427,7 +430,7 @@ func TestAsErrors(t *testing.T) {
 // Benchmark tests
 func BenchmarkAs(b *testing.B) {
 	input := "test string"
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = As[any, string](input)
 	}
 }
@@ -439,7 +442,7 @@ func BenchmarkAsFn(b *testing.B) {
 	}
 	var input any = "test string"
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AsFn(fn, input)
 	}
 }
@@ -447,8 +450,7 @@ func BenchmarkAsFn(b *testing.B) {
 func BenchmarkSliceAs(b *testing.B) {
 	input := S[any]("a", 1, "b", 2, "c", 3, "d", 4, "e", 5)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = SliceAs[any, string](input)
 	}
 }
@@ -456,7 +458,7 @@ func BenchmarkSliceAs(b *testing.B) {
 func BenchmarkAsError(b *testing.B) {
 	err := errors.New("test error")
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = AsError(err)
 	}
 }
@@ -492,9 +494,14 @@ func TestSliceAsFnEdgeCases(t *testing.T) {
 	// Verify panic propagates
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("SliceAsFn with panic function should panic")
+			t.Error("SliceAsFn with panic function should panic")
 		}
 	}()
 
 	_ = SliceAsFn(panicFn, S[any]("will panic"))
 }
+
+// Custom error type used by the typed-nil AsError case in TestAsError.
+type typedNilError struct{}
+
+func (*typedNilError) Error() string { return "typed-nil" }

@@ -210,7 +210,7 @@ func TestSpinLockConcurrency(t *testing.T) {
 	var counter int64
 
 	err := RunConcurrentTest(t, numGoroutines, func(_ int) error {
-		for j := 0; j < numIterations; j++ {
+		for range numIterations {
 			sl.Lock()
 			counter++
 			sl.Unlock()
@@ -233,7 +233,7 @@ func BenchmarkSpinLockUncontended(b *testing.B) {
 		if !ok {
 			b.Fatal("invalid data type")
 		}
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			sl.Lock()
 			// Do minimal work while holding the lock
 			_ = runtime.NumGoroutine()
@@ -259,11 +259,11 @@ func runContentionBenchmark(b *testing.B, sl *SpinLock) {
 	numWorkers := runtime.NumCPU()
 	iterations := b.N / numWorkers
 
-	for i := 0; i < numWorkers; i++ {
+	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				sl.Lock()
 				_ = runtime.NumGoroutine()
 				sl.Unlock()

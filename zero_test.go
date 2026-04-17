@@ -18,6 +18,7 @@ var _ TestCase = isNilVsIsZeroTestCase{}
 var _ TestCase = initializationSemanticsTestCase{}
 var _ TestCase = isSameTestCase{}
 var _ TestCase = isSameStackOverflowTestCase{}
+var _ TestCase = isZeroCustomInterfaceTestCase{}
 
 type zeroTestCase[T comparable] struct {
 	expected T
@@ -602,7 +603,7 @@ func testIsNilSlices(t *testing.T) {
 	AssertTrue(t, IsNil(vi), "interface containing typed nil")
 
 	// Slice of pointers with nil elements
-	var ptrSlice []*int
+	ptrSlice := make([]*int, 0, 1)
 	ptrSlice = append(ptrSlice, nil)
 	AssertFalse(t, IsNil(ptrSlice), "slice containing nil elements")
 	AssertTrue(t, IsNil(ptrSlice[0]), "nil element in slice")
@@ -934,6 +935,13 @@ func isSameValueTypeTestCases() []isSameTestCase {
 			"same floats should be same"),
 		newIsSameTestCase("different floats", 3.14, 2.71, false,
 			"different floats should not be same"),
+		// Arrays and structs have no pointer-based sameness; both fall
+		// through to the empty default branch of isSamePointer.
+		newIsSameTestCase("same arrays", [2]int{1, 2}, [2]int{1, 2}, false,
+			"arrays fall through to the default branch"),
+		newIsSameTestCase("same structs",
+			struct{ X int }{X: 1}, struct{ X int }{X: 1}, false,
+			"structs fall through to the default branch"),
 	)
 }
 
@@ -1284,13 +1292,13 @@ func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
 		// Deeply nested interfaces
 		newIsSameStackOverflowTestCase("different deep nested chains", func() (any, any) {
 			var current1 any = 42
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				next := current1
 				current1 = &next
 			}
 
 			var current2 any = 42
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				next := current2
 				current2 = &next
 			}
@@ -1300,7 +1308,7 @@ func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
 
 		newIsSameStackOverflowTestCase("same deep nested chain", func() (any, any) {
 			var current any = 42
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				next := current
 				current = &next
 			}
@@ -1416,4 +1424,39 @@ func isSameComplexTestCases() []isSameTestCase {
 
 func TestIsSameStackOverflow(t *testing.T) {
 	RunTestCases(t, isSameStackOverflowTestCases())
+}
+
+// Custom type that implements IsZero() bool for the interface branch.
+type hasIsZeroType struct {
+	zero bool
+}
+
+func (h hasIsZeroType) IsZero() bool { return h.zero }
+
+type isZeroCustomInterfaceTestCase struct {
+	name string
+	in   hasIsZeroType
+	want bool
+}
+
+func (tc isZeroCustomInterfaceTestCase) Name() string { return tc.name }
+
+func (tc isZeroCustomInterfaceTestCase) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.want, IsZero(tc.in), tc.name)
+}
+
+func newIsZeroCustomInterfaceTestCase(name string, in hasIsZeroType,
+	want bool) isZeroCustomInterfaceTestCase {
+	return isZeroCustomInterfaceTestCase{name: name, in: in, want: want}
+}
+
+// Cover the `interface{ IsZero() bool }` branch of IsZero.
+func TestIsZeroCustomInterface(t *testing.T) {
+	RunTestCases(t, []isZeroCustomInterfaceTestCase{
+		newIsZeroCustomInterfaceTestCase("custom IsZero returns true",
+			hasIsZeroType{zero: true}, true),
+		newIsZeroCustomInterfaceTestCase("custom IsZero returns false",
+			hasIsZeroType{zero: false}, false),
+	})
 }

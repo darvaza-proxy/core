@@ -650,7 +650,7 @@ Context-aware error group with cancellation:
 
 ## Development
 
-**Requirements:** Go 1.23 or later
+**Requirements:** Go 1.24 or later
 
 For detailed development setup, build commands, and AI agent guidance:
 

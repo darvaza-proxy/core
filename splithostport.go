@@ -59,6 +59,7 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, error) {
 		ok = true
 	case port != "0":
 		ok = true
+	default:
 	}
 
 	hostPort := host + ":" + port
@@ -252,6 +253,7 @@ func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 	case host == "":
 		// :port
 		host = "::" // use undetermined host
+	default:
 	}
 
 	return host, port, err

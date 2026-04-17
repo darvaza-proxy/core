@@ -125,6 +125,7 @@ func NewUnreachableError(skip int, err error, note string) error {
 		return NewPanicWrap(skip+1, ErrUnreachable, note)
 	case note != "":
 		err = Wrap(err, note)
+	default:
 	}
 
 	return NewPanicError(skip+1, &CompoundError{

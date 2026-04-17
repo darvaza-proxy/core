@@ -216,7 +216,7 @@ func TestSortedValuesUnlikelyCond(t *testing.T) {
 	AssertEqual(t, 0, len(got2), "SortedValuesUnlikelyCond empty")
 
 	// Test nil map
-	got3 := SortedValuesUnlikelyCond[string, int](nil, predicate)
+	got3 := SortedValuesUnlikelyCond[string](nil, predicate)
 	AssertNil(t, got3, "SortedValuesUnlikelyCond(nil)")
 
 	// Test nil predicate
@@ -753,26 +753,24 @@ func TestMapListEdgeCases(t *testing.T) {
 // Benchmark tests
 func BenchmarkKeys(b *testing.B) {
 	m := make(map[string]int)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		key := fmt.Sprintf("key%d", i)
 		m[key] = i
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = Keys(m)
 	}
 }
 
 func BenchmarkSortedKeys(b *testing.B) {
 	m := make(map[string]int)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		key := fmt.Sprintf("key%d", i)
 		m[key] = i
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = SortedKeys(m)
 	}
 }
@@ -780,20 +778,20 @@ func BenchmarkSortedKeys(b *testing.B) {
 func BenchmarkMapListAppend(b *testing.B) {
 	m := make(map[string]*list.List)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	i := 0
+	for b.Loop() {
 		MapListAppend(m, "key", i)
+		i++
 	}
 }
 
 func BenchmarkMapListContains(b *testing.B) {
 	m := make(map[string]*list.List)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		MapListAppend(m, "key", i)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = MapListContains(m, "key", 50)
 	}
 }

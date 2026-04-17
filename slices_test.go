@@ -21,6 +21,7 @@ var (
 	_ TestCase = slicePIntTestCase{}
 	_ TestCase = slicePFloatTestCase{}
 	_ TestCase = slicePStringTestCase{}
+	_ TestCase = sliceReplaceFnNilFnTestCase{}
 )
 
 type sliceReverseTestCase struct {
@@ -761,4 +762,48 @@ func TestSliceP(t *testing.T) {
 	RunTestCases(t, slicePIntTestCases())
 	RunTestCases(t, slicePFloatTestCases())
 	RunTestCases(t, slicePStringTestCases())
+}
+
+// Cover the short-circuit branches of SliceEqual/SliceEqualFn.
+func TestSliceEqualShortCircuits(t *testing.T) {
+	a := S(1, 2, 3)
+	b := S(1, 2)
+	AssertFalse(t, SliceEqual(a, b), "different lengths")
+	AssertFalse(t, SliceEqualFn(a, b, func(x, y int) bool { return x == y }),
+		"SliceEqualFn different lengths")
+	AssertFalse(t, SliceEqualFn(a, a, nil), "SliceEqualFn nil comparator")
+	AssertFalse(t, SliceEqual(S(1, 2, 3), S(1, 2, 4)), "values differ")
+}
+
+// Cover nil-pointer early-returns and nil-fn NO-OP in slice helpers.
+func TestSliceUniquifyNilPtr(t *testing.T) {
+	result := SliceUniquify[int](nil)
+	AssertEqual(t, 0, len(result), "SliceUniquify nil ptr returns empty slice")
+
+	result = SliceUniquifyFn[int](nil, func(x, y int) bool { return x == y })
+	AssertEqual(t, 0, len(result), "SliceUniquifyFn nil ptr returns empty slice")
+}
+
+type sliceReplaceFnNilFnTestCase struct {
+	name string
+	in   []int
+}
+
+func (tc sliceReplaceFnNilFnTestCase) Name() string { return tc.name }
+
+func (tc sliceReplaceFnNilFnTestCase) Test(t *testing.T) {
+	t.Helper()
+	result := SliceReplaceFn(tc.in, nil)
+	AssertSliceEqual(t, tc.in, result, "SliceReplaceFn nil fn is NO-OP")
+}
+
+func newSliceReplaceFnNilFnTestCase(name string, in []int) sliceReplaceFnNilFnTestCase {
+	return sliceReplaceFnNilFnTestCase{name: name, in: in}
+}
+
+func TestSliceReplaceFnNilFn(t *testing.T) {
+	RunTestCases(t, []sliceReplaceFnNilFnTestCase{
+		newSliceReplaceFnNilFnTestCase("non-empty", S(1, 2, 3)),
+		newSliceReplaceFnNilFnTestCase("empty", S[int]()),
+	})
 }
