@@ -120,6 +120,20 @@ Selects appropriate tool versions based on Go version:
 - Supports version progression (newer Go = newer tools).
 - Graceful fallback for unknown versions.
 
+**Beyond tool versions:** the script takes a Go-version baseline
+and an ordered list of arbitrary string values, returning the
+one matching the current Go (or the last, for newer Go). The
+values don't have to be version strings — any per-tier value
+works, so the same picker can select per-tier config files when
+a rule set diverges across tool releases. Binary and config then
+move in lock-step per Go tier:
+
+```make
+REVIVE_VERSION   ?= $(shell $(TOOLSDIR)/get_version.sh 1.24 v1.14.0 v1.15.0)
+REVIVE_CONF_FILE ?= $(shell $(TOOLSDIR)/get_version.sh 1.24 revive-v1.14.toml revive.toml)
+REVIVE_CONF      ?= $(TOOLSDIR)/$(REVIVE_CONF_FILE)
+```
+
 ### Coverage System (`make_coverage.sh`)
 
 Enhanced coverage testing for individual modules:
@@ -460,6 +474,9 @@ Each project can customise:
 
 - **`internal/build/cspell.json`**: Project-specific dictionary.
 - **`internal/build/revive.toml`**: Additional linting rules.
+  May be paired with per-tier variants (e.g.
+  `revive-v1.14.toml`) when rules differ across revive releases;
+  `get_version.sh` picks the right one.
 - **`internal/build/markdownlint.json`**: Markdown style rules.
 - **`internal/build/languagetool.cfg`**: Grammar checking rules.
 

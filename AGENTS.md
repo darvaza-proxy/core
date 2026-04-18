@@ -82,7 +82,7 @@ The build system includes automatic Markdown linting:
 
 - Detects markdownlint-cli via pnpx
 - Configuration in `internal/build/markdownlint.json`
-- 80-character line limits and strict formatting rules
+- 80-character prose line limit (120 in code blocks), strict formatting rules
 - Selective HTML allowlist (comments, br, kbd, etc.)
 - Runs automatically with `make fmt` when available
 
@@ -299,9 +299,7 @@ To automatically fix field alignment issues across the codebase:
 
 ```bash
 # Run the fieldalignment tool with automatic fixes
-GOXTOOLS="golang.org/x/tools/go/analysis/passes"
-FA="$GOXTOOLS/fieldalignment/cmd/fieldalignment"
-go run "$FA@latest" -fix ./...
+go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix ./...
 ```
 
 This tool will:
