@@ -856,8 +856,7 @@ type testCase struct {
 Use the field alignment tool to verify:
 
 ```bash
-go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/\
- fieldalignment@latest -fix ./...
+go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix ./...
 ```
 
 ## Concurrent Testing
@@ -978,8 +977,7 @@ Tests should maintain high coverage. Use with CI:
 make test GOTEST_FLAGS="-coverprofile=coverage.out"
 
 # Check coverage threshold
-go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | \
-  sed 's/%//' | awk '{if($1<80) exit 1}'
+go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//' | awk '{if($1<80) exit 1}'
 ```
 
 ### Test Tags
