@@ -289,33 +289,27 @@ When LanguageTool reports issues:
 
 ### Field Alignment
 
-The project enforces struct field alignment optimisation for memory efficiency
-using the `fieldalignment` tool. This helps reduce memory usage by ordering
-struct fields to minimise padding.
+`fieldalignment` orders struct fields for minimum padding. Running
+`-fix` against the source tree is unsafe — it strips every comment
+from every file it touches. Use an isolated probe instead:
 
-#### Running Field Alignment Fixes
+1. Copy the structs you want to optimise into `.tmp/fieldalign.go`
+   as `package probe`. Comments are expendable in the probe.
+2. Run the tool against just the probe file:
 
-To automatically fix field alignment issues across the codebase:
+   ```bash
+   go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix .tmp/fieldalign.go
+   ```
 
-```bash
-# Run the fieldalignment tool with automatic fixes
-go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix ./...
-```
+3. Diff the rewritten probe against your copies to read off the
+   suggested field order.
+4. Apply the new order to the real source by hand, preserving all
+   comments and doc strings.
+5. Delete the probe. Run `make tidy`.
 
-This tool will:
-
-- Analyze all struct definitions in the project.
-- Reorder fields to minimise memory padding.
-- Automatically update source files with optimized field ordering.
-
-#### Field Alignment Notes
-
-- Always run `make tidy` after field alignment fixes to ensure all linting
-  passes.
-- Field alignment changes may require updating struct literal initializations.
-- The tool is safe to run repeatedly - it only makes changes when beneficial.
-- Memory savings can be significant for frequently allocated structs.
-- Run field alignment manually as needed for struct optimisation.
+Reordering may require updating struct literal initialisations
+elsewhere in the tree. CI enforces alignment via `govet.fieldalignment`
+in `.golangci.yml`.
 
 ### golangci-lint Configuration
 

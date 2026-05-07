@@ -853,10 +853,12 @@ type testCase struct {
 }
 ```
 
-Use the field alignment tool to verify:
+Verify struct ordering via the probe-file workflow in `AGENTS.md`.
+Never run `fieldalignment -fix` against `./...` — it strips every
+comment from every touched file.
 
 ```bash
-go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix ./...
+go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix .tmp/fieldalign.go
 ```
 
 ## Concurrent Testing

@@ -24,6 +24,7 @@
     "errgroup",
     "Errorf",
     "Fatalf",
+    "fieldalign",
     "fieldalignment",
     "funcname",
     "gocovmerge",
