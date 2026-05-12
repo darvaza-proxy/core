@@ -56,7 +56,7 @@ DLX = true
 endif
 endif
 
-FIND_FILES_PRUNE_RULES ?= -name vendor -o -name .git -o -name node_modules
+FIND_FILES_PRUNE_RULES ?= -name vendor -o -name .git -o -name node_modules -o -name .tmp
 FIND_FILES_PRUNE_ARGS ?= \( $(FIND_FILES_PRUNE_RULES) \) -prune
 FIND_FILES_GO_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.go'
 FIND_FILES_MARKDOWN_ARGS ?= $(FIND_FILES_PRUNE_ARGS) -o -name '*.md'
@@ -163,7 +163,7 @@ generate: ; $(info $(M) running go:generate…)
 	$Q git grep -l '^//go:generate' | sort -uV | xargs -r -n1 $(GO) generate $(GOGENERATE_FLAGS)
 
 # Prepare for codecov uploading
-codecov: $(COVERAGE_DIR)/coverage.out $(COVERAGE_DIR)/codecov.sh
+codecov: merged-coverage $(COVERAGE_DIR)/codecov.sh
 
 # Generate Codecov upload script
 $(COVERAGE_DIR)/codecov.sh: $(TOOLSDIR)/make_codecov.sh $(TMPDIR)/index ; $(info $(M) generating codecov.sh…)

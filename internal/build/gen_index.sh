@@ -51,7 +51,7 @@ gen_index() {
 }
 
 ROOT_MODULE=$(mod)
-# shellcheck disable=2086 # word splitting intended
+# shellcheck disable=SC2086 # word splitting intended
 INDEX=$(gen_index $MODULES)
 
 echo "$INDEX" | while IFS=: read -r name dir mod; do
