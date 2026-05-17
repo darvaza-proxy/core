@@ -107,7 +107,7 @@ Creates Makefile rules for each discovered module:
 - `coverage` - Run tests with coverage collection
 - `get` - Download module dependencies
 - `race` - Run tests with race detection (CGO_ENABLED=1)
-- `test` - Run unit tests
+- `test` - Run unit tests (no cache reuse)
 - `tidy` - Format, lint, and validate code
 - `up` - Update module dependencies
 
@@ -326,7 +326,9 @@ GitHub Actions workflows provide:
 
 ### Test Execution Options
 
-The `GOTEST_FLAGS` variable allows flexible test execution:
+The generated `test` rule runs
+`$(GO) test -count=1 $(GOTEST_FLAGS) ./...`; any flags you pass via
+`GOTEST_FLAGS` are appended:
 
 ```bash
 # Run with race detection via dedicated target
