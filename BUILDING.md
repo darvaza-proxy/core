@@ -52,7 +52,9 @@ project-root/
 │   ├── test.yml              # Testing (optional)
 │   ├── race.yml              # Race detection testing
 │   ├── codecov.yml           # Coverage reporting
-│   └── renovate.yml          # Dependency updates
+│   ├── renovate.yml          # Dependency updates
+│   ├── claude.yml            # Claude Code workflow
+│   └── claude-code-review.yml # Claude PR review workflow
 ├── .tmp/                      # Generated files (gitignored)
 │   ├── index                 # Module discovery index
 │   ├── gen.mk                # Generated Makefile rules
@@ -65,6 +67,7 @@ project-root/
     ├── make_coverage.sh      # Coverage collection
     ├── make_codecov.sh       # Codecov integration
     ├── fix_whitespace.sh     # Whitespace normalisation
+    ├── merge_coverage.sh     # Coverage profile merging
     ├── cspell.json           # Spell checking configuration
     ├── markdownlint.json     # Markdown linting configuration
     ├── languagetool.cfg      # Grammar checking configuration
@@ -186,6 +189,8 @@ system to cache generated files locally.
 Standardises code formatting across editors:
 
 ```ini
+root = true
+
 [*]
 charset = utf-8
 end_of_line = lf
@@ -193,18 +198,17 @@ indent_style = tab
 indent_size = 8
 insert_final_newline = true
 trim_trailing_whitespace = true
+max_line_length = 80
 
 [*.go]
 indent_size = 4
 
-[*.{json,yaml,yml,js,ts}]
+[*.{json,yaml,yml,md}]
 indent_style = space
 indent_size = 2
 
-[*.md]
-indent_style = space
-indent_size = 2
-trim_trailing_whitespace = false
+[{go.mod,go.sum}]
+max_line_length = off
 ```
 
 ### golangci-lint Configuration
