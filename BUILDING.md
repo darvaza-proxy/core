@@ -26,8 +26,6 @@ The build system consists of these key elements:
 4. **GitHub Workflows** (`/.github/workflows/`) - CI/CD automation.
 5. **Dynamic Rule Generation** - Module discovery and Makefile rule creation.
 6. **Temporary Directory** (`.tmp/`) - Generated files and build artefacts.
-7. **VS Code Integration** (`.vscode/`) - Editor configuration with symlinks
-   to shared settings.
 
 ### Design Philosophy
 
@@ -54,10 +52,9 @@ project-root/
 │   ├── test.yml              # Testing (optional)
 │   ├── race.yml              # Race detection testing
 │   ├── codecov.yml           # Coverage reporting
-│   └── renovate.yml          # Dependency updates
-├── .vscode/                   # VS Code configuration
-│   ├── settings.json         # Editor settings
-│   └── cspell.json           # Symlink to internal/build/cspell.json
+│   ├── renovate.yml          # Dependency updates
+│   ├── claude.yml            # Claude Code workflow
+│   └── claude-code-review.yml # Claude PR review workflow
 ├── .tmp/                      # Generated files (gitignored)
 │   ├── index                 # Module discovery index
 │   ├── gen.mk                # Generated Makefile rules
@@ -70,6 +67,7 @@ project-root/
     ├── make_coverage.sh      # Coverage collection
     ├── make_codecov.sh       # Codecov integration
     ├── fix_whitespace.sh     # Whitespace normalisation
+    ├── merge_coverage.sh     # Coverage profile merging
     ├── cspell.json           # Spell checking configuration
     ├── markdownlint.json     # Markdown linting configuration
     ├── languagetool.cfg      # Grammar checking configuration
@@ -136,13 +134,12 @@ REVIVE_CONF      ?= $(TOOLSDIR)/$(REVIVE_CONF_FILE)
 
 ### Coverage System (`make_coverage.sh`)
 
-Enhanced coverage testing for individual modules:
+Coverage testing for individual modules:
 
 - Tests single module with `-covermode=atomic` for atomic coverage.
-- Generates multiple output formats (.prof, .func, .html, .stdout).
-- Improved error formatting with dedicated format function.
-- Better failure reporting with filtered test output.
+- Generates multiple output formats (`.prof`, `.func`, `.html`, `.stdout`).
 - Uses `go -C` for proper directory handling.
+- Filtered test output on failure.
 
 ### Coverage Merge Utility (`merge_coverage.sh`)
 
@@ -155,13 +152,12 @@ Standalone utility for merging coverage profiles:
 
 ### Codecov Integration (`make_codecov.sh`)
 
-Simplified Codecov integration for monorepo coverage:
+Codecov integration for monorepo coverage:
 
-- Generates only upload script (no complex codecov.yml).
-- Uses separate calls per module with proper flags.
-- Removes `--codecov-yml-path` dependency.
+- Generates the upload script (no `codecov.yml`).
+- One call per module with module-specific flags.
 - Relies on Codecov's automatic configuration detection.
-- Simplified file naming (`coverage_${name}.prof`).
+- File naming: `coverage_${name}.prof`.
 
 ## Temporary Directory (`.tmp/`)
 
@@ -186,27 +182,6 @@ The `.tmp/` directory is excluded from version control via `.gitignore`:
 This prevents build artefacts from being committed whilst allowing the build
 system to cache generated files locally.
 
-## VS Code Integration
-
-### Configuration Sharing
-
-The build system provides VS Code integration through `.vscode/` directories:
-
-- **`settings.json`**: Editor-specific settings for each project.
-- **`cspell.json`**: Symlinked to `internal/build/cspell.json` for consistent
-  spell checking.
-
-### Symlink Structure
-
-The cspell configuration is shared via symbolic links:
-
-```bash
-.vscode/cspell.json -> ../internal/build/cspell.json
-```
-
-This ensures VS Code uses the same spell checking dictionary as the build
-system, maintaining consistency between editor and CI environments.
-
 ## Configuration Files
 
 ### Editor Configuration (`.editorconfig`)
@@ -214,6 +189,8 @@ system, maintaining consistency between editor and CI environments.
 Standardises code formatting across editors:
 
 ```ini
+root = true
+
 [*]
 charset = utf-8
 end_of_line = lf
@@ -221,23 +198,22 @@ indent_style = tab
 indent_size = 8
 insert_final_newline = true
 trim_trailing_whitespace = true
+max_line_length = 80
 
 [*.go]
 indent_size = 4
 
-[*.{json,yaml,yml,js,ts}]
+[*.{json,yaml,yml,md}]
 indent_style = space
 indent_size = 2
 
-[*.md]
-indent_style = space
-indent_size = 2
-trim_trailing_whitespace = false
+[{go.mod,go.sum}]
+max_line_length = off
 ```
 
-### Go Linting (`.golangci.yml`)
+### golangci-lint Configuration
 
-Comprehensive Go code analysis:
+Comprehensive Go code analysis via `.golangci.yml`:
 
 - Uses golangci-lint v2.8.0+ with v2 configuration format.
 - Enables 15+ linters including `fieldalignment`, `revive`, `staticcheck`.
@@ -296,7 +272,7 @@ Tools are auto-detected and replaced with `true` (no-op) if unavailable.
 
 #### Required Tools
 
-- **Go 1.24+**: Required minimum (bumped for golang.org/x/net v0.50.0).
+- **Go 1.24+**: Required minimum.
 - **golangci-lint**: Go code linting (version selected by Go version).
 - **revive**: Additional Go linting rules.
 - **make**: Build orchestration.
@@ -364,11 +340,83 @@ Strict code quality enforcement:
 
 ### Additional Quality Tools
 
-- **Field Alignment**: Struct optimisation for memory efficiency.
+- **Field Alignment**: Struct optimisation for memory efficiency
+  (see [Field Alignment](#field-alignment) for the safe workflow).
 - **Race Detection**: Comprehensive race condition testing with CGO enabled.
 - **Spell Checking**: Documentation and code comments.
 - **Grammar Checking**: Markdown documentation.
 - **Whitespace Normalisation**: Consistent file formatting.
+
+### Field Alignment
+
+`fieldalignment` orders struct fields for minimum padding. Running
+`-fix` against the source tree is unsafe — it strips every comment
+from every file it touches. Use an isolated probe instead:
+
+1. Copy the structs you want to optimise into `.tmp/fieldalign.go`
+   as `package probe`. Comments are expendable in the probe.
+2. Run the tool against just the probe file:
+
+   ```bash
+   go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix .tmp/fieldalign.go
+   ```
+
+3. Diff the rewritten probe against your copies to read off the
+   suggested field order.
+4. Apply the new order to the real source by hand, preserving all
+   comments and doc strings.
+5. Delete the probe. Run `make tidy`.
+
+Reordering may require updating struct literal initialisations
+elsewhere in the tree. CI enforces alignment via `govet.fieldalignment`
+in `.golangci.yml`.
+
+## Documentation Standards
+
+Markdown documentation across darvaza.org projects is checked by three
+tools, all auto-detected (see
+[Optional Tool Detection](#optional-tool-detection)):
+
+- **LanguageTool**: grammar and style. British English configuration in
+  `internal/build/languagetool.cfg`. Run via `make check-grammar` —
+  not integrated into `make tidy` due to false positives. Custom
+  dictionary is auto-generated from CSpell words in
+  `.tmp/languagetool-dict.txt`.
+- **CSpell**: spell checking for both `.md` and `.go` files. British
+  English with project terminology in `internal/build/cspell.json`.
+  Runs as part of `make tidy`.
+- **markdownlint**: Markdown formatting. Configuration in
+  `internal/build/markdownlint.json` — 80-character prose line limit
+  (120 inside code blocks), strict formatting rules, selective HTML
+  allowlist. Runs automatically as part of `make tidy` when available.
+
+### Common Documentation Issues
+
+1. **Missing articles**: ensure proper use of "a", "an", "the".
+   - ❌ "converts value using provided function"
+   - ✅ "converts a value using a provided function"
+2. **Missing punctuation**: end all list items consistently.
+   - ❌ "Comprehensive coverage for generic functions is expected"
+   - ✅ "Comprehensive coverage for generic functions is expected."
+3. **Compound modifiers**: hyphenate when used as modifiers.
+   - ❌ "capture specific stack frame"
+   - ✅ "capture-specific stack frame"
+
+### Writing Documentation Guidelines
+
+1. **File structure**:
+   - Link to related documentation (e.g. an agent guide should link to
+     `README.md`).
+   - Include paths to configuration files when mentioning tools.
+2. **Formatting consistency**:
+   - End all bullet points with periods.
+   - Capitalise proper nouns correctly (JavaScript, TypeScript, Markdown).
+3. **Clarity and context**:
+   - Provide context for AI agents and developers alike.
+   - Include "why" explanations, not just "what" descriptions.
+4. **Maintenance**:
+   - Update documentation when adding new tools or changing workflows.
+   - Keep any pre-commit checklist current with project practices.
 
 ## Monorepo Features
 
@@ -491,7 +539,6 @@ The build system integrates with development environments:
 - **EditorConfig**: Automatic formatting in IDEs.
 - **golangci-lint**: VS Code and GoLand integration.
 - **Coverage Reports**: IDE coverage display.
-- **VS Code Settings**: Shared configuration via symlinks.
 
 ### CI/CD Platforms
 
@@ -506,16 +553,31 @@ GitHub Actions workflows provide:
 
 - **Codecov**: Coverage tracking and PR comments.
 - **Renovate**: Automated dependency updates.
-- **DeepSource**: Additional static analysis (where configured).
+- **DeepSource**: Additional static analysis (where configured) — see
+  [DeepSource Configuration](#deepsource-configuration).
+
+### DeepSource Configuration
+
+When DeepSource static analysis is configured (`.deepsource.toml`):
+
+- Shell analyser typically set to POSIX sh dialect.
+- To ignore specific issues for certain files, use `[[issues]]` blocks
+  with `paths` (not `exclude_patterns`).
+- Common shell findings:
+  - **SH-1091**: "local is undefined in POSIX sh" — usually excluded
+    for all `.sh` files.
+  - **SH-2013**: "Use while read for reading lines" — disable per-line
+    with a ShellCheck directive comment.
 
 ## Best Practices
 
-### Workflow
+### Pre-commit Checklist
 
-1. **Always run `make tidy`** before committing.
-2. **Use `GOTEST_FLAGS`** for flexible test execution.
-3. **Generate coverage reports** for comprehensive testing.
-4. **Check spell and grammar** for documentation changes.
+1. Run `make tidy` until it passes. If it fails, fix the reported
+   issues and re-run.
+2. Verify tests pass with `make test`.
+3. Update the project's agent guide and `README.md` if dev workflow,
+   behaviour, or API changed.
 
 ### Project Setup
 
@@ -523,7 +585,6 @@ GitHub Actions workflows provide:
 2. **Customise `internal/build/`** configurations as needed.
 3. **Set up GitHub workflows** for CI/CD.
 4. **Configure Codecov tokens** for coverage reporting.
-5. **Create VS Code symlinks** for consistent editor experience.
 
 ### Monorepo Management
 
@@ -531,6 +592,41 @@ GitHub Actions workflows provide:
 2. **Use module replacement** for local dependencies.
 3. **Test modules individually** and collectively.
 4. **Monitor coverage per module** for better visibility.
+
+## Troubleshooting
+
+### LanguageTool false positives
+
+- Add technical terms to `internal/build/cspell.json`.
+- The dictionary auto-regenerates on the next `make check-grammar`.
+- For persistent issues, add rules to
+  `internal/build/languagetool.cfg`.
+
+### DeepSource shell issues
+
+- Use ShellCheck disable comments for specific lines.
+- Update `.deepsource.toml` with issue-specific `paths` configurations.
+- DeepSource uses `paths`, not `exclude_patterns`, in `[[issues]]`
+  blocks.
+
+### Coverage collection failures
+
+- Ensure `.tmp/index` exists by running `make .tmp/index`.
+- Check that all modules have test files.
+- Use `GOTEST_FLAGS` to pass additional flags to tests.
+
+### Linting tool not detected
+
+- Tools are auto-detected via `pnpm dlx`.
+- If a tool isn't found, it is replaced with `true` (no-op).
+- Install missing tools globally with `pnpm install -g <tool>` if
+  needed.
+
+### golangci-lint configuration
+
+- Configuration uses v2.8.0+ with the v2 format.
+- System uses a pinned version via Makefile `GOLANGCI_LINT_VERSION`.
+- Technical linter names are added to `internal/build/cspell.json`.
 
 This build system provides a robust foundation for Go projects of any size,
 from single packages to complex monorepos, whilst maintaining consistency and
