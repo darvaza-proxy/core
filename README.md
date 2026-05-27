@@ -359,6 +359,19 @@ if str, ok := As[any, string](value); ok {
 }
 ```
 
+For error-only preconditions (no value to return), the `MustNoError` family
+panics through `ErrUnreachable` rather than returning a value:
+
+* `MustNoError(err error)` - panics with `PanicError` wrapping `ErrUnreachable`
+  if err is not nil. The no-value sibling of `Must`, for guarding a bare error
+  whose non-nil return signals an impossible path.
+* `MustNoErrorExcept(err error, allowed ...error)` - like `MustNoError`, but
+  does not panic when err matches one of the allowed errors (recursive match
+  via `IsError`).
+* `MustNoErrorExceptFn(err error, check func(error) bool)` - like
+  `MustNoErrorExcept`, but matches via a predicate (recursive match via
+  `IsErrorFn`), for allow-lists that aren't a fixed set of sentinels.
+
 ### Unreachable Conditions
 
 For indicating impossible code paths:
