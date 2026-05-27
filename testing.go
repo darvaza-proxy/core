@@ -142,7 +142,20 @@ func (m *MockT) HasErrors() bool {
 	return len(m.Errors) > 0
 }
 
-// LastError returns the last error message and whether one was found.
+// LastError returns the last recorded error message and whether one
+// was found. Returns ("", false) when Errors is empty.
+//
+// Messages recorded through the Assert* family follow the shape
+// "<name>: <body>": the name argument from the assertion call site,
+// a colon, then the body specific to that assertion (for example,
+// "expected true, got false"). Wrapper helpers that thread a name
+// argument through to core.AssertTrue can use this format to verify
+// the name was forwarded:
+//
+//	mock := &MockT{}
+//	wrapper.AssertSomething(mock, value, "my-label")
+//	msg, _ := mock.LastError()
+//	AssertContains(t, msg, "my-label", "name forwarded")
 func (m *MockT) LastError() (string, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -748,7 +761,11 @@ func RunBenchmark(b *testing.B, setup func() any, fn func(any)) {
 	}
 }
 
-// doMessage formats a message with optional prefix and sends it using the provided function
+// doMessage formats a message with optional prefix and sends it using the
+// provided function. When prefixFormat is non-empty, the final message
+// takes the shape "<prefix>: <body>". This shape is part of MockT's
+// observable contract — see MockT.LastError for how downstream tests rely
+// on it to verify name-forwarding through wrapper helpers.
 // revive:disable-next-line:argument-limit
 func doMessage(
 	t T, outputFunc func(...any), prefixFormat string, prefixArgs []any,

@@ -191,3 +191,59 @@ func MaybeT[T any](value any) T {
 	result, _ := value.(T)
 	return result
 }
+
+// MustNoError panics if err is non-nil, wrapping it in [ErrUnreachable].
+// It is the no-value sibling of [Must]: where Must guards a (value, err)
+// pair, MustNoError guards a bare error from a call whose non-nil return
+// signals a path that should be impossible. Routing through ErrUnreachable
+// is the deliberate difference from Must (which annotates the panic with
+// "core.Must"); it lets recovering code match [ErrUnreachable]. The panic
+// value's top stack frame resolves to the caller, not to this helper.
+func MustNoError(err error) {
+	if err != nil {
+		panic(NewUnreachableError(1, err, ""))
+	}
+}
+
+// MustNoErrorExcept panics if err is non-nil and matches none of the
+// allowed errors, wrapping it in [ErrUnreachable] as [MustNoError] does.
+// Matching uses [IsError] for recursive matching across compound and
+// wrapped errors. With an empty allowed list it degenerates to
+// MustNoError; callers with no allowed list should use that form directly.
+// The panic value's top stack frame resolves to the caller, not to this
+// helper.
+func MustNoErrorExcept(err error, allowed ...error) {
+	// IsError(err) with no filter returns true for any non-nil err. The
+	// len(allowed) > 0 guard below blocks that degenerate shape from
+	// silently swallowing the panic.
+	switch {
+	case err == nil:
+		return
+	case len(allowed) > 0 && IsError(err, allowed...):
+		return
+	default:
+		panic(NewUnreachableError(1, err, ""))
+	}
+}
+
+// MustNoErrorExceptFn panics if err is non-nil and check accepts none of
+// the errors in its chain, wrapping it in [ErrUnreachable] as
+// [MustNoError] does. Matching uses [IsErrorFn] for recursive matching
+// across compound and wrapped errors. It is the predicate counterpart of
+// [MustNoErrorExcept], for allow-lists that cannot be expressed as a fixed
+// set of sentinel errors. A nil check matches nothing, so a non-nil err
+// then panics — the same degenerate shape as MustNoError. The panic
+// value's top stack frame resolves to the caller, not to this helper.
+func MustNoErrorExceptFn(err error, check func(error) bool) {
+	// check != nil is a short-circuit, not load-bearing: IsErrorFn
+	// already returns false for a nil check, so a nil check still
+	// reaches the panic below.
+	switch {
+	case err == nil:
+		return
+	case check != nil && IsErrorFn(check, err):
+		return
+	default:
+		panic(NewUnreachableError(1, err, ""))
+	}
+}
