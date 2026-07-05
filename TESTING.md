@@ -950,7 +950,7 @@ func TestAssertionFailure(t *testing.T) {
 func TestValidation(t *testing.T) {
     err := ValidateInput("")
     core.AssertError(t, err, "validation error")
-    core.AssertErrorIs(t, err, ErrInvalidInput, "error type")
+    core.AssertErrorIs(t, err, core.ErrInvalid, "error type")
 }
 ```
 

@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"slices"
 )
 
@@ -16,8 +17,9 @@ var (
 	ErrExists = errors.New("already exists")
 	// ErrNotExists indicates something doesn't exist
 	ErrNotExists = errors.New("does not exist")
-	// ErrInvalid indicates an argument isn't valid
-	ErrInvalid = errors.New("invalid argument")
+	// ErrInvalid indicates an argument isn't valid. It's an alias of
+	// [fs.ErrInvalid] so errors.Is matches across the boundary.
+	ErrInvalid = fs.ErrInvalid
 	// ErrUnknown indicates something isn't recognized
 	ErrUnknown = errors.New("unknown")
 	// ErrNilReceiver indicates a method was called over a nil instance

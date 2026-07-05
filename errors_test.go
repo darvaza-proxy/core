@@ -3,6 +3,8 @@ package core
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"testing"
 )
 
@@ -657,4 +659,13 @@ func unwrapBranchesTestCases() []unwrapBranchesTestCase {
 // Test Unwrap(err) hits all three type-switch branches and the default.
 func TestUnwrapBranches(t *testing.T) {
 	RunTestCases(t, unwrapBranchesTestCases())
+}
+
+// Test ErrInvalid is an alias of the standard sentinel, so errors.Is
+// matches across the boundary and the message text is unchanged.
+func TestErrInvalidAlias(t *testing.T) {
+	AssertSame(t, fs.ErrInvalid, ErrInvalid, "fs.ErrInvalid identity")
+	AssertErrorIs(t, ErrInvalid, os.ErrInvalid, "os.ErrInvalid match")
+	AssertErrorIs(t, os.ErrInvalid, ErrInvalid, "reverse match")
+	AssertEqual(t, "invalid argument", ErrInvalid.Error(), "message")
 }
