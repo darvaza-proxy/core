@@ -401,9 +401,14 @@ Special error types for network-style temporary and timeout conditions:
 
 ### Error Testing and Utilities
 
-* `IsError(err, errs...)` / `IsErrorFn(check, errs...)` /
-  `IsErrorFn2(check, errs...)` - error testing with custom checker functions
-  and multiple error comparison.
+* `IsError(err, errs...)` - recursively test whether an error chain matches
+  any of the targets, by identity or the error's own `Is(error) bool`
+  method.
+* `IsErrorFn(check, errs...)` / `IsErrorFn2(check, errs...)` - recursive
+  error testing with custom checker functions.
+* `NewCheckErrorIsIn(targets)` / `NewCheckErrorIsIn2(targets)` - build the
+  per-node check functions behind `IsError`, for composing the same
+  identity-or-`Is` matching with `IsErrorFn` / `IsErrorFn2`.
 * `CoalesceError(errs...)` - return first non-nil error from argument list.
 
 ## Stack Tracing

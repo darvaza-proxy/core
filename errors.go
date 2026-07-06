@@ -210,41 +210,53 @@ func Unwrap(err error) []error {
 	})
 }
 
-// IsError recursively check if the given error is in in the given list,
-// or just non-nil if no options to check are given.
+// IsError recursively checks if the given error is in the given list,
+// or just non-nil if no options to check are given. An error matches
+// a target by identity or via the error's own Is(error) bool method —
+// the same per-node test [errors.Is] applies — never the target's.
+// Recursion covers Unwrap() error, Unwrap() []error and
+// Errors() []error layers.
 func IsError(err error, errs ...error) bool {
 	switch {
 	case err == nil:
 		return false
 	case len(errs) == 0:
 		return true
+	default:
+		return IsErrorFn(NewCheckErrorIsIn(errs), err)
 	}
-
-	fn := func(err error) bool {
-		return slices.Contains(errs, err)
-	}
-
-	return IsErrorFn(fn, err)
 }
 
 // IsErrorFn recursively checks if any of the given errors satisfies
-// the specified check function.
-//
-// revive:disable:cognitive-complexity
+// the specified check function, testing the errors themselves before
+// descending into their unwrapped layers.
 func IsErrorFn(check func(error) bool, errs ...error) bool {
-	// revive:enable:cognitive-complexity
-	if check == nil || len(errs) == 0 {
+	switch {
+	case check == nil, len(errs) == 0:
+		return false
+	case checkIsErrorFnShallow(check, errs):
+		return true
+	case checkIsErrorFnUnwrapped(check, errs):
+		return true
+	default:
 		return false
 	}
+}
 
-	// direct match first
+// checkIsErrorFnShallow tests the errors themselves against the
+// check function, without unwrapping.
+func checkIsErrorFnShallow(check func(error) bool, errs []error) bool {
 	for _, e := range errs {
 		if e != nil && check(e) {
 			return true
 		}
 	}
+	return false
+}
 
-	// and unwrapping
+// checkIsErrorFnUnwrapped tests the unwrapped layers of each error,
+// recursing via IsErrorFn.
+func checkIsErrorFnUnwrapped(check func(error) bool, errs []error) bool {
 	for _, e := range errs {
 		if errs := Unwrap(e); len(errs) > 0 {
 			if IsErrorFn(check, errs...) {
@@ -257,18 +269,27 @@ func IsErrorFn(check func(error) bool, errs ...error) bool {
 }
 
 // IsErrorFn2 recursively checks if any of the given errors gets a
-// certain answer from the check function.
+// certain answer from the check function, testing the errors
+// themselves before descending into their unwrapped layers.
 // As opposed to IsErrorFn, IsErrorFn2 will stop when it has certainty
 // of a false result.
-//
-// revive:disable:cognitive-complexity
 func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) {
-	// revive:enable:cognitive-complexity
 	if check == nil || len(errs) == 0 {
 		return false, true
+	} else if is, known := checkIsErrorFn2Shallow(check, errs); known {
+		return is, true
+	} else if is, known := checkIsErrorFn2Unwrapped(check, errs); known {
+		return is, true
 	}
 
-	// direct match first
+	// unknown
+	return false, false
+}
+
+// checkIsErrorFn2Shallow tests the errors themselves against the
+// check function, without unwrapping, stopping at the first known
+// answer.
+func checkIsErrorFn2Shallow(check func(error) (bool, bool), errs []error) (is, known bool) {
 	for _, e := range errs {
 		if e != nil {
 			if is, known = check(e); known {
@@ -277,7 +298,13 @@ func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) 
 		}
 	}
 
-	// and unwrapping
+	// unknown
+	return false, false
+}
+
+// checkIsErrorFn2Unwrapped tests the unwrapped layers of each error,
+// recursing via IsErrorFn2, stopping at the first known answer.
+func checkIsErrorFn2Unwrapped(check func(error) (bool, bool), errs []error) (is, known bool) {
 	for _, e := range errs {
 		if errs := Unwrap(e); len(errs) > 0 {
 			if is, known = IsErrorFn2(check, errs...); known {
@@ -288,6 +315,81 @@ func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) 
 
 	// unknown
 	return false, false
+}
+
+// NewCheckErrorIsIn builds the [IsErrorFn] predicate for IsError: the
+// returned closure reports whether a chain node matches any of the
+// targets, by identity or the node's own Is(error) bool method.
+func NewCheckErrorIsIn(targets []error) func(error) bool {
+	return func(err error) bool {
+		return slices.ContainsFunc(targets, func(target error) bool {
+			is, _ := errorIs(target, err)
+			return is
+		})
+	}
+}
+
+// NewCheckErrorIsIn2 is the [IsErrorFn2] counterpart of
+// [NewCheckErrorIsIn]: the returned closure reports whether a chain
+// node matches any of the targets, and whether that answer is final.
+// A match is final; a miss is final only when no target could match
+// deeper nodes either — e.g. every target is nil — so IsErrorFn2 can
+// stop early without missing a wrapped match.
+func NewCheckErrorIsIn2(targets []error) func(error) (bool, bool) {
+	return func(err error) (is, known bool) {
+		known = true
+		for _, target := range targets {
+			is2, known2 := errorIs(target, err)
+			if is2 {
+				return true, true
+			}
+			known = known && known2
+		}
+		return false, known
+	}
+}
+
+// errorIs tests a single node against a target: identity first via
+// errorEq, then the node's own Is(error) bool method — the same
+// per-node test [errors.Is] applies. Unwrapping is the caller's
+// concern. known follows the [IsErrorFn2] convention, reporting
+// whether the answer is final for the whole chain: a match is final,
+// and so is a nil operand — nil matches nothing deeper either. A miss
+// stays unknown because a wrapped error may still match.
+func errorIs(target, err error) (is, known bool) {
+	if is, known := errorEq(target, err); known {
+		return is, true
+	}
+
+	// try the Is(error) bool interface, if implemented
+	if e, ok := err.(interface{ Is(error) bool }); ok && e.Is(target) {
+		return true, true
+	}
+
+	// no match here; deeper nodes may still match
+	return false, false
+}
+
+// errorEq compares two errors by identity. known is true only when
+// identity settles the match question: the errors are equal, or one
+// is nil — nil only ever matches nil. Inequality stays unknown, as an
+// Is method may still match, and so does a panicking comparison of a
+// shared non-comparable dynamic type — the case [errors.Is] sidesteps
+// via reflection.
+func errorEq(a, b error) (is, known bool) {
+	// a panicking comparison leaves the zero (false, false)
+	defer func() {
+		_ = recover()
+	}()
+
+	switch {
+	case a == nil, b == nil:
+		return a == b, true
+	case a == b:
+		return true, true
+	default:
+		return false, false
+	}
 }
 
 // CheckIsTemporary tests an error for temporary conditions without unwrapping.
