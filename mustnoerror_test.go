@@ -10,16 +10,30 @@ var (
 	errSentinel = errors.New("sentinel error")
 	errOther    = errors.New("other error")
 	errExtra    = errors.New("extra error")
+
+	// errNilPointer is a non-nil error interface holding a nil
+	// pointer — the typed-nil shape MustNoError* treats as a real
+	// error.
+	errNilPointer error = (*nilPointerError)(nil)
 )
 
-// matchesSentinel and matchesOther are stable predicates for the
-// MustNoErrorExceptFn rows; named (not inline closures) so the data
-// table stays easy to scan.
-func matchesSentinel(err error) bool { return err == errSentinel }
-func matchesOther(err error) bool    { return err == errOther }
+// nilPointerError exists to build errNilPointer; Error never
+// dereferences its receiver, so calling it on the nil pointer is
+// safe.
+type nilPointerError struct{}
+
+func (*nilPointerError) Error() string { return "nil pointer error" }
+
+// matchesSentinel, matchesOther and matchesNilPointer are stable
+// predicates for the MustNoErrorExceptFn tests, both the data-table
+// rows and the standalone no-match tests; named (not inline
+// closures) so the call sites stay easy to scan.
+func matchesSentinel(err error) bool   { return err == errSentinel }
+func matchesOther(err error) bool      { return err == errOther }
+func matchesNilPointer(err error) bool { return err == errNilPointer }
 
 // mustNoErrorTestCase exercises MustNoError across the nil and
-// non-nil err paths. The non-nil row also pins that the wrapped
+// non-nil err paths. The non-nil rows also pin that the wrapped
 // panic value chains to ErrUnreachable, so a future change in the
 // panic shape fails loudly.
 type mustNoErrorTestCase struct {
@@ -55,6 +69,8 @@ func mustNoErrorTestCases() []mustNoErrorTestCase {
 			nil, false),
 		newMustNoErrorTestCase("non-nil err panics",
 			errSentinel, true),
+		newMustNoErrorTestCase("nil pointer err panics",
+			errNilPointer, true),
 	}
 }
 
@@ -67,11 +83,15 @@ func TestMustNoError(t *testing.T) {
 // TestMustNoErrorPreservesOriginal verifies the panic value chains
 // to the original error as well as ErrUnreachable. The two
 // assertions taken together pin that the helper does not lose the
-// underlying error on its way to the panic.
+// underlying error on its way to the panic. The typed-nil assertion
+// pins that a typed nil survives into the chain unchanged too.
 func TestMustNoErrorPreservesOriginal(t *testing.T) {
 	fn := func() { MustNoError(errSentinel) }
 	AssertPanic(t, fn, ErrUnreachable, "ErrUnreachable in chain")
 	AssertPanic(t, fn, errSentinel, "original err in chain")
+
+	fnNil := func() { MustNoError(errNilPointer) }
+	AssertPanic(t, fnNil, errNilPointer, "typed-nil err in chain")
 }
 
 // assertUnreachablePanicShape pins that r is a *PanicError whose
@@ -110,6 +130,36 @@ func TestMustNoErrorPanicShape(t *testing.T) {
 	MustNoError(errSentinel)
 }
 
+// assertPlainUnreachableShape pins the no-cause panic shape:
+// NewUnreachableError treats ErrUnreachable as "no distinct cause",
+// so the *PanicError payload is the bare sentinel — the constructor's
+// baseline shape — instead of the two-error CompoundError that
+// assertUnreachablePanicShape pins for a real cause. Shared by the
+// UnreachablePanicShape tests for MustNoError, MustNoErrorExcept and
+// MustNoErrorExceptFn so their structural pins stay symmetric. r is
+// normalised through AsRecovered so a nil (no-panic) input fails the
+// first assertion with a clear message.
+func assertPlainUnreachableShape(t T, r any) {
+	t.Helper()
+	rec := AsRecovered(r)
+	AssertMustNotNil(t, rec, "recovered value")
+	pe := AssertMustTypeIs[*PanicError](t, rec,
+		"recovered is *PanicError")
+	AssertMustSame(t, ErrUnreachable, pe.Unwrap(),
+		"payload is ErrUnreachable")
+}
+
+// TestMustNoErrorUnreachablePanicShape pins
+// MustNoError(ErrUnreachable): the sentinel as guarded err carries no
+// distinct cause, so NewUnreachableError normalises it away and the
+// panic takes the plain no-cause shape.
+func TestMustNoErrorUnreachablePanicShape(t *testing.T) {
+	defer func() {
+		assertPlainUnreachableShape(t, recover())
+	}()
+	MustNoError(ErrUnreachable)
+}
+
 // TestMustNoErrorExceptPreservesOriginal mirrors
 // TestMustNoErrorPreservesOriginal for the no-match panic path of
 // MustNoErrorExcept: when none of the allowed errors match, the
@@ -133,10 +183,21 @@ func TestMustNoErrorExceptPanicShape(t *testing.T) {
 	MustNoErrorExcept(errSentinel, errOther)
 }
 
+// TestMustNoErrorExceptUnreachablePanicShape mirrors
+// TestMustNoErrorUnreachablePanicShape for the no-match path of
+// MustNoErrorExcept: ErrUnreachable as the guarded err takes the
+// plain no-cause shape here too.
+func TestMustNoErrorExceptUnreachablePanicShape(t *testing.T) {
+	defer func() {
+		assertPlainUnreachableShape(t, recover())
+	}()
+	MustNoErrorExcept(ErrUnreachable, errOther)
+}
+
 // mustNoErrorExceptTestCase exercises MustNoErrorExcept across the
-// nil/non-nil err axis and the allowed-list match outcomes. Each
-// row pins both the panic outcome and the case to verify the
-// helper's three guard branches behave as documented.
+// nil/non-nil err axis and the allowed-list match outcomes. Together
+// the rows verify the helper's three guard branches behave as
+// documented.
 type mustNoErrorExceptTestCase struct {
 	name string
 
@@ -191,6 +252,14 @@ func mustNoErrorExceptTestCases() []mustNoErrorExceptTestCase {
 		newMustNoErrorExceptTestCase("non-nil wrapped match",
 			fmt.Errorf("context: %w", errSentinel),
 			[]error{errSentinel}, false),
+		newMustNoErrorExceptTestCase("nil pointer no match panics",
+			errNilPointer, []error{errOther}, true),
+		newMustNoErrorExceptTestCase("nil pointer identity match",
+			errNilPointer, []error{errNilPointer}, false),
+		newMustNoErrorExceptTestCase("nil-only allowed panics",
+			errSentinel, []error{nil}, true),
+		newMustNoErrorExceptTestCase("nil entry beside match",
+			errSentinel, []error{nil, errSentinel}, false),
 	}
 }
 
@@ -255,6 +324,10 @@ func mustNoErrorExceptFnTestCases() []mustNoErrorExceptFnTestCase {
 		newMustNoErrorExceptFnTestCase("non-nil wrapped match",
 			fmt.Errorf("context: %w", errSentinel),
 			matchesSentinel, false),
+		newMustNoErrorExceptFnTestCase("nil pointer no match panics",
+			errNilPointer, matchesOther, true),
+		newMustNoErrorExceptFnTestCase("nil pointer predicate match",
+			errNilPointer, matchesNilPointer, false),
 	}
 }
 
@@ -285,6 +358,17 @@ func TestMustNoErrorExceptFnPanicShape(t *testing.T) {
 		assertUnreachablePanicShape(t, recover(), errSentinel)
 	}()
 	MustNoErrorExceptFn(errSentinel, matchesOther)
+}
+
+// TestMustNoErrorExceptFnUnreachablePanicShape mirrors
+// TestMustNoErrorUnreachablePanicShape for the no-match path of
+// MustNoErrorExceptFn: ErrUnreachable as the guarded err takes the
+// plain no-cause shape here too.
+func TestMustNoErrorExceptFnUnreachablePanicShape(t *testing.T) {
+	defer func() {
+		assertPlainUnreachableShape(t, recover())
+	}()
+	MustNoErrorExceptFn(ErrUnreachable, matchesOther)
 }
 
 // callMustNoError is a thin wrapper around MustNoError used as a

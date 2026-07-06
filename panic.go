@@ -197,8 +197,14 @@ func MaybeT[T any](value any) T {
 // pair, MustNoError guards a bare error from a call whose non-nil return
 // signals a path that should be impossible. Routing through ErrUnreachable
 // is the deliberate difference from Must (which annotates the panic with
-// "core.Must"); it lets recovering code match [ErrUnreachable]. The panic
-// value's top stack frame resolves to the caller, not to this helper.
+// "core.Must"); it lets recovering code match [ErrUnreachable].
+//
+// A typed nil — a non-nil error interface holding a nil pointer —
+// counts as non-nil and panics. Passing ErrUnreachable itself means
+// there is no distinct cause to report, so the panic value takes the
+// plain no-cause shape: the bare sentinel instead of a compound pairing
+// it with a cause. The panic value's top stack frame resolves to the
+// caller, not to this helper.
 func MustNoError(err error) {
 	if err != nil {
 		panic(NewUnreachableError(1, err, ""))
@@ -210,6 +216,8 @@ func MustNoError(err error) {
 // Matching uses [IsError] for recursive matching across compound and
 // wrapped errors. With an empty allowed list it degenerates to
 // MustNoError; callers with no allowed list should use that form directly.
+// Nil entries in allowed are inert: they never match and never suppress
+// a panic.
 // The panic value's top stack frame resolves to the caller, not to this
 // helper.
 func MustNoErrorExcept(err error, allowed ...error) {
