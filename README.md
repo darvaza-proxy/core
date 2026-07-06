@@ -551,6 +551,10 @@ both `*testing.T` and `MockT`:
   presence/absence.
 * `AssertErrorIs(t, err, target, name...)` - error chain checking with
   `errors.Is`.
+* `AssertErrorIsFn(t, err, targetFn, name...)` - error chain checking against
+  a check function via `IsErrorFn`.
+* `AssertErrorAs[E](t, err, name...)` - error chain extraction with
+  `errors.As`, returns (*match, ok).
 * `AssertTypeIs[T](t, value, name...)` - type assertion with casting, returns
   (value, ok).
 * `AssertPanic(t, fn, expectedPanic, name...)` /
@@ -587,6 +591,10 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
   terminate on error expectation mismatch.
 * `AssertMustErrorIs(t, err, target, name...)` - terminate on error chain
   mismatch.
+* `AssertMustErrorIsFn(t, err, targetFn, name...)` - terminate on check
+  function mismatch.
+* `AssertMustErrorAs[E](t, err, name...) *E` - terminate when no match in the
+  error chain, returns matched value.
 * `AssertMustTypeIs[T](t, value, name...) T` - terminate on type assertion
   failure, returns cast value.
 * `AssertMustPanic(t, fn, expectedPanic, name...)` /

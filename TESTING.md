@@ -160,6 +160,8 @@ core.AssertNotNil(t, value, "non-nil check")
 core.AssertError(t, err, "error")
 core.AssertNoError(t, err, "success")
 core.AssertErrorIs(t, err, target, "error chain")
+core.AssertErrorIsFn(t, err, os.IsTimeout, "error check")
+pathErr, ok := core.AssertErrorAs[*fs.PathError](t, err, "error type")
 ```
 
 **Advanced Assertions:**

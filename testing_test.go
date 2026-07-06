@@ -293,6 +293,74 @@ func TestAssertErrorIs(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
+// Test AssertErrorIsFn
+func TestAssertErrorIsFn(t *testing.T) {
+	mock := &MockT{}
+	baseErr := errors.New("base error")
+	wrappedErr := Wrap(baseErr, "wrapped")
+	isBase := func(err error) bool { return err == baseErr }
+
+	// Test AssertErrorIsFn with matching function (success)
+	result := AssertErrorIsFn(mock, wrappedErr, isBase, "error fn test")
+	AssertTrue(t, result, "AssertErrorIsFn result with matching function")
+	AssertFalse(t, mock.HasErrors(), "no errors on success")
+	AssertTrue(t, mock.HasLogs(), "has logs on success")
+
+	mock.Reset()
+
+	// Test AssertErrorIsFn with non-matching error (failure)
+	result = AssertErrorIsFn(mock, errors.New("other error"), isBase, "error fn mismatch test")
+	AssertFalse(t, result, "AssertErrorIsFn result with non-matching error")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+
+	mock.Reset()
+
+	// Test AssertErrorIsFn with nil function (failure)
+	result = AssertErrorIsFn(mock, wrappedErr, nil, "nil fn test")
+	AssertFalse(t, result, "AssertErrorIsFn result with nil function")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+
+	mock.Reset()
+
+	// Test AssertErrorIsFn with nil error (failure)
+	result = AssertErrorIsFn(mock, nil, isBase, "nil error test")
+	AssertFalse(t, result, "AssertErrorIsFn result with nil error")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+}
+
+// Test AssertErrorAs
+func TestAssertErrorAs(t *testing.T) {
+	mock := &MockT{}
+	baseErr := errors.New("base error")
+	wrapped := Wrap(baseErr, "note")
+
+	// Test AssertErrorAs with direct match (success, err is the match)
+	out, ok := AssertErrorAs[*WrappedError](mock, wrapped, "direct match")
+	AssertTrue(t, ok, "AssertErrorAs result with direct match")
+	AssertMustNotNil(t, out, "matched pointer")
+	AssertSame(t, wrapped, *out, "matched value")
+	AssertFalse(t, mock.HasErrors(), "no errors on success")
+	AssertTrue(t, mock.HasLogs(), "has logs on success")
+
+	mock.Reset()
+
+	// Test AssertErrorAs with nested match (success, err contains the match)
+	joined := errors.Join(errors.New("other error"), wrapped)
+	out, ok = AssertErrorAs[*WrappedError](mock, joined, "nested match")
+	AssertTrue(t, ok, "AssertErrorAs result with nested match")
+	AssertMustNotNil(t, out, "matched pointer")
+	AssertSame(t, wrapped, *out, "matched value")
+	AssertFalse(t, mock.HasErrors(), "no errors on success")
+
+	mock.Reset()
+
+	// Test AssertErrorAs without match (failure)
+	out, ok = AssertErrorAs[*WrappedError](mock, baseErr, "no match")
+	AssertFalse(t, ok, "AssertErrorAs result without match")
+	AssertNil(t, out, "nil pointer on failure")
+	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+}
+
 // Test AssertTypeIs
 func TestAssertTypeIs(t *testing.T) {
 	mock := &MockT{}
@@ -1029,6 +1097,8 @@ func TestAssertMustFunctions(t *testing.T) {
 	t.Run("AssertMustTrue", testAssertMustTrue)
 	t.Run("AssertMustFalse", testAssertMustFalse)
 	t.Run("AssertMustErrorIs", testAssertMustErrorIs)
+	t.Run("AssertMustErrorIsFn", testAssertMustErrorIsFn)
+	t.Run("AssertMustErrorAs", testAssertMustErrorAs)
 	t.Run("AssertMustTypeIs", testAssertMustTypeIs)
 	t.Run("AssertMustNil", testAssertMustNil)
 	t.Run("AssertMustNotNil", testAssertMustNotNil)
@@ -1311,6 +1381,57 @@ func testAssertMustErrorIs(t *testing.T) {
 	otherErr := errors.New("other error")
 	ok = mock.Run("failure", func(mt T) {
 		AssertMustErrorIs(mt, wrappedErr, otherErr, "error should not match")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustErrorIsFn(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+	baseErr := errors.New("base error")
+	wrappedErr := Wrap(baseErr, "wrapped")
+	isBase := func(err error) bool { return err == baseErr }
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		AssertMustErrorIsFn(mt, wrappedErr, isBase, "error should match")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustErrorIsFn(mt, errors.New("other error"), isBase, "error should not match")
+		mt.Log("should not reach here")
+	})
+	AssertFalse(t, ok, "Failure case should abort")
+	AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+}
+
+func testAssertMustErrorAs(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+	wrapped := Wrap(errors.New("base error"), "note")
+
+	// Test success case
+	ok := mock.Run("success", func(mt T) {
+		out := AssertMustErrorAs[*WrappedError](mt, wrapped, "type should match")
+		AssertSame(mt, wrapped, *out, "matched value")
+		mt.Log("execution continues")
+	})
+	AssertTrue(t, ok, "Success case should not abort")
+
+	mock.Reset()
+
+	// Test failure case
+	ok = mock.Run("failure", func(mt T) {
+		AssertMustErrorAs[*WrappedError](mt, errors.New("plain"), "type should not match")
 		mt.Log("should not reach here")
 	})
 	AssertFalse(t, ok, "Failure case should abort")

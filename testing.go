@@ -605,6 +605,58 @@ func AssertErrorIs(t T, err, target error, name string, args ...any) bool {
 	return ok
 }
 
+// AssertErrorIsFn fails the test if the error does not satisfy the
+// target function. Uses IsErrorFn to traverse wrapped error chains,
+// so the function is tried against the error itself and every error
+// it wraps. A nil error or a nil function fails the assertion.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	AssertErrorIsFn(t, err, os.IsTimeout, "timeout error")
+//	AssertErrorIsFn(t, err, isRetryable, "retry for %s", op)
+func AssertErrorIsFn(t T, err error, targetFn func(error) bool, name string, args ...any) bool {
+	t.Helper()
+	ok := IsErrorFn(targetFn, err)
+	if !ok {
+		doError(t, name, args, "expected error matching function, got %v", err)
+	} else {
+		doLog(t, name, args, "%v", err)
+	}
+	return ok
+}
+
+// AssertErrorAs fails the test if the error chain does not contain an
+// error of type U. Uses errors.As to find the match. U must implement
+// the error interface — typically a pointer type; an interface type
+// needs to embed error, as net.Error does.
+// The name parameter can include printf-style formatting.
+// Returns a pointer to the matched value and a boolean indicating
+// success; the pointer is nil when the assertion failed.
+//
+// Example usage:
+//
+//	pathErr, ok := AssertErrorAs[*fs.PathError](t, err, "path error")
+//	valErr, ok := AssertErrorAs[*ValidationError](t, err, "validation for %s", field)
+func AssertErrorAs[U error](t T, err error, name string, args ...any) (*U, bool) {
+	t.Helper()
+	var result U
+	out := &result
+
+	ok := errors.As(err, &result)
+	if !ok {
+		doError(t, name, args, "expected error of type %T, got %T", result, err)
+		out = nil
+	} else if reflect.DeepEqual(err, result) {
+		doLog(t, name, args, "%v is %T", err, result)
+	} else {
+		doLog(t, name, args, "%v contained %v", err, result)
+	}
+
+	return out, ok
+}
+
 // AssertTypeIs fails the test if value is not of the expected type.
 // It returns the value cast to the expected type and a boolean indicating success.
 // The name parameter can include printf-style formatting.
@@ -993,6 +1045,37 @@ func AssertMustErrorIs(t T, err, target error, name string, args ...any) {
 	if !AssertErrorIs(t, err, target, name, args...) {
 		t.FailNow()
 	}
+}
+
+// AssertMustErrorIsFn calls AssertErrorIsFn and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustErrorIsFn(t, err, os.IsTimeout, "timeout error")
+//	AssertMustErrorIsFn(t, err, isRetryable, "retry for %s", op)
+func AssertMustErrorIsFn(t T, err error, targetFn func(error) bool, name string, args ...any) {
+	t.Helper()
+	if !AssertErrorIsFn(t, err, targetFn, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustErrorAs calls AssertErrorAs and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+// Returns a pointer to the matched value on success.
+//
+// Example usage:
+//
+//	pathErr := AssertMustErrorAs[*fs.PathError](t, err, "path error")
+//	valErr := AssertMustErrorAs[*ValidationError](t, err, "validation for %s", field)
+func AssertMustErrorAs[U error](t T, err error, name string, args ...any) *U {
+	t.Helper()
+	out, ok := AssertErrorAs[U](t, err, name, args...)
+	if !ok {
+		t.FailNow()
+	}
+	return out
 }
 
 // AssertMustTypeIs calls AssertTypeIs and t.FailNow() if the assertion fails.
