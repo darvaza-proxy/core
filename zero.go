@@ -218,7 +218,12 @@ func isReflectValueSame(va, vb reflect.Value) bool {
 //   - Different values for basic types.
 //   - One nil and one non-nil value.
 //   - Different types.
-//   - Arrays, structs, and other composite types (not handled).
+//   - Arrays, structs, and other composite value types: being the
+//     same thing means a change to one would reach both, but two
+//     equal aggregates are distinct storage that can diverge. Compare
+//     them by value with [AreEqual].
+//   - Values that cannot be unwrapped via Interface(), as reached
+//     through unexported struct fields.
 //
 // Special case for slices: Go's runtime optimises zero-capacity slices
 // (make([]T, 0)) to share a common zero-sized allocation. IsSame treats
@@ -320,7 +325,9 @@ func isReflectSliceZero(v reflect.Value) bool {
 //   - va and vb have the same type (checked by caller)
 //   - Neither value is nil (nil cases handled by isSameTypedNil)
 //
-// Returns false for unhandled types (arrays, structs, etc.)
+// Returns false for unhandled types (arrays, structs, etc.), and for
+// values that cannot be unwrapped via Interface(), as reached through
+// unexported struct fields.
 func isSamePointer(va, vb reflect.Value) bool {
 	var ok bool
 	switch va.Kind() {
@@ -337,16 +344,32 @@ func isSamePointer(va, vb reflect.Value) bool {
 		ok = va.Pointer() == vb.Pointer()
 	case reflect.Interface:
 		// Extract concrete values and compare them recursively
-		a := va.Elem().Interface()
-		b := vb.Elem().Interface()
-		ok = IsSame(a, b)
+		ok = isSameInterface(va, vb)
 	case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
 		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.Bool:
-		ok = va.Interface() == vb.Interface()
+		ok = isSameValue(va, vb)
 	default:
 	}
 	return ok
+}
+
+// isSameInterface extracts the values held by two interfaces and
+// compares them recursively. Interfaces that cannot be unwrapped —
+// unexported struct fields reached by reflection — are never same.
+func isSameInterface(va, vb reflect.Value) bool {
+	if !va.CanInterface() || !vb.CanInterface() {
+		return false
+	}
+	return IsSame(va.Elem().Interface(), vb.Elem().Interface())
+}
+
+// isSameValue compares two primitive values by ==. Values that
+// cannot be unwrapped via Interface() — unexported struct fields
+// reached by reflection — are never same.
+func isSameValue(va, vb reflect.Value) bool {
+	return va.CanInterface() && vb.CanInterface() &&
+		va.Interface() == vb.Interface()
 }
 
 // AreComparable reports whether the given values are safe operands of

@@ -1134,9 +1134,43 @@ func isSameInterfaceTestCases() []isSameTestCase {
 	)
 }
 
+// opaqueFields provides reflect.Values that cannot be unwrapped via
+// Interface(), as reached through unexported struct fields.
+type opaqueFields struct {
+	v any
+	n int
+}
+
+func isSameUnexportedFieldTestCases() []isSameTestCase {
+	a := reflect.ValueOf(opaqueFields{v: 42, n: 1})
+	b := reflect.ValueOf(opaqueFields{v: 42, n: 1})
+	plain := any(42)
+
+	return S(
+		newIsSameTestCase("unexported scalar fields",
+			a.Field(1), b.Field(1), false,
+			"fields that cannot be unwrapped are never same"),
+		newIsSameTestCase("unexported interface fields",
+			a.Field(0), b.Field(0), false,
+			"interface fields that cannot be unwrapped are never same"),
+		newIsSameTestCase("unexported vs plain value",
+			a.Field(1), reflect.ValueOf(1), false,
+			"one side that cannot be unwrapped is never same"),
+		newIsSameTestCase("plain vs unexported value",
+			reflect.ValueOf(1), a.Field(1), false,
+			"one side that cannot be unwrapped is never same"),
+		newIsSameTestCase("plain vs unexported interface",
+			reflect.ValueOf(&plain).Elem(), a.Field(0), false,
+			"one side that cannot be unwrapped is never same"),
+	)
+}
+
 func TestIsSame(t *testing.T) {
 	t.Run("value types", func(t *testing.T) {
 		RunTestCases(t, isSameValueTypeTestCases())
+	})
+	t.Run("unexported fields", func(t *testing.T) {
+		RunTestCases(t, isSameUnexportedFieldTestCases())
 	})
 	t.Run("reference types", func(t *testing.T) {
 		RunTestCases(t, isSameReferenceTypeTestCases())
@@ -1169,6 +1203,14 @@ func isSameInterfaceReflectValueTestCases() []isSameTestCase {
 	v2 := reflect.ValueOf(&interface2).Elem()
 	v3 := reflect.ValueOf(&interface3).Elem()
 
+	// Nil interface reflect.Values: Kind() == reflect.Interface and
+	// CanInterface() == true, but Elem() is the zero Value. These pin
+	// that isSameTypedNil decides them before isSameInterface calls
+	// Elem().Interface(), which would panic on a zero Value.
+	var nilInterface1, nilInterface2 any
+	nv1 := reflect.ValueOf(&nilInterface1).Elem()
+	nv2 := reflect.ValueOf(&nilInterface2).Elem()
+
 	return S(
 		// Same values in interface reflect.Values
 		newIsSameTestCase("interface reflect.Values with same value", v1, v2, true,
@@ -1177,6 +1219,15 @@ func isSameInterfaceReflectValueTestCases() []isSameTestCase {
 		// Different values in interface reflect.Values
 		newIsSameTestCase("interface reflect.Values with different values", v1, v3, false,
 			"interface reflect.Values containing different values should not be same"),
+
+		// Nil interface reflect.Values are both nil: decided as same
+		// without unwrapping, so no panic on the zero Elem().
+		newIsSameTestCase("nil interface reflect.Values", nv1, nv2, true,
+			"two nil interface reflect.Values should be same, not panic"),
+
+		// One nil, one non-nil: decided as not same, still no unwrap.
+		newIsSameTestCase("nil vs non-nil interface reflect.Value", nv1, v1, false,
+			"nil and non-nil interface reflect.Values should not be same"),
 	)
 }
 
@@ -1610,10 +1661,13 @@ func areEqualNilTestCases() []areEqualTestCase {
 func areEqualIdentityTestCases() []areEqualTestCase {
 	slice := S(1, 2, 3)
 	m := map[string]int{"a": 1}
+	o := reflect.ValueOf(opaqueFields{v: 42, n: 1})
 
 	return []areEqualTestCase{
 		newAreEqualTestCase("same slice", S[any](slice, slice), true, true),
 		newAreEqualTestCase("same map", S[any](m, m), true, true),
+		newAreEqualTestCase("unexported fields stay unknown",
+			S[any](o.Field(1), o.Field(1)), false, false),
 		newAreEqualTestCase("distinct maps",
 			S[any](map[string]int{}, map[string]int{}), false, false),
 		newAreEqualTestCase("undecided then settled",
