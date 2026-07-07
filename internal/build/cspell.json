@@ -82,12 +82,12 @@
     "Wrapf"
   ],
   "ignorePaths": [
-    "*.lock",
-    ".coverage",
-    ".git",
-    ".tmp",
-    "go.sum",
-    "node_modules",
-    "vendor"
+    "**/*.lock",
+    "**/.coverage",
+    "**/.git",
+    "**/.tmp",
+    "**/go.sum",
+    "**/node_modules",
+    "**/vendor"
   ]
 }

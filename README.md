@@ -132,6 +132,20 @@ Key distinctions from `IsZero`:
   types (numbers, strings, booleans), compares by equal values. Two nils
   of the same type are considered the same.
 
+#### Safe Comparison
+
+* `AreComparable(values...)` - reports whether the values are safe operands
+  of `==`: a true result guarantees no comparison between them can panic.
+  Untyped nils are safe.
+* `AreEqual(values...)` - reports whether each value equals the next, as
+  `==` would decide, without ever panicking, returning `(is, known bool)`.
+  Values of the same comparable type are tested with `==`; otherwise typed
+  nils, identity, or the value's own `Equal(T) bool` method settle the
+  answer, and slices are compared element by element, one level deep.
+  Anything else is reported as unknown rather than resolved by deep
+  comparison; callers that need a decision anyway can fall back to
+  `reflect.DeepEqual` when it is not known.
+
 #### Other Utilities
 
 * `Coalesce[T](values...)` returns the first non-zero value.
@@ -401,9 +415,14 @@ Special error types for network-style temporary and timeout conditions:
 
 ### Error Testing and Utilities
 
-* `IsError(err, errs...)` / `IsErrorFn(check, errs...)` /
-  `IsErrorFn2(check, errs...)` - error testing with custom checker functions
-  and multiple error comparison.
+* `IsError(err, errs...)` - recursively test whether an error chain matches
+  any of the targets, by identity or the error's own `Is(error) bool`
+  method.
+* `IsErrorFn(check, errs...)` / `IsErrorFn2(check, errs...)` - recursive
+  error testing with custom checker functions.
+* `NewCheckErrorIsIn(targets)` / `NewCheckErrorIsIn2(targets)` - build the
+  per-node check functions behind `IsError`, for composing the same
+  identity-or-`Is` matching with `IsErrorFn` / `IsErrorFn2`.
 * `CoalesceError(errs...)` - return first non-nil error from argument list.
 
 ## Stack Tracing
@@ -549,8 +568,13 @@ both `*testing.T` and `MockT`:
 
 * `AssertError(t, err, name...)` / `AssertNoError(t, err, name...)` - error
   presence/absence.
-* `AssertErrorIs(t, err, target, name...)` - error chain checking with
-  `errors.Is`.
+* `AssertErrorIs(t, err, target, name...)` /
+  `AssertNotErrorIs(t, err, target, name...)` - error chain
+  presence/absence via `errors.Is`.
+* `AssertErrorIsFn(t, err, targetFn, name...)` - error chain checking against
+  a check function via `IsErrorFn`.
+* `AssertErrorAs[E](t, err, name...)` - error chain extraction with
+  `errors.As`, returns (*match, ok).
 * `AssertTypeIs[T](t, value, name...)` - type assertion with casting, returns
   (value, ok).
 * `AssertPanic(t, fn, expectedPanic, name...)` /
@@ -587,6 +611,10 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
   terminate on error expectation mismatch.
 * `AssertMustErrorIs(t, err, target, name...)` - terminate on error chain
   mismatch.
+* `AssertMustErrorIsFn(t, err, targetFn, name...)` - terminate on check
+  function mismatch.
+* `AssertMustErrorAs[E](t, err, name...) *E` - terminate when no match in the
+  error chain, returns matched value.
 * `AssertMustTypeIs[T](t, value, name...) T` - terminate on type assertion
   failure, returns cast value.
 * `AssertMustPanic(t, fn, expectedPanic, name...)` /

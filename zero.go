@@ -218,7 +218,12 @@ func isReflectValueSame(va, vb reflect.Value) bool {
 //   - Different values for basic types.
 //   - One nil and one non-nil value.
 //   - Different types.
-//   - Arrays, structs, and other composite types (not handled).
+//   - Arrays, structs, and other composite value types: being the
+//     same thing means a change to one would reach both, but two
+//     equal aggregates are distinct storage that can diverge. Compare
+//     them by value with [AreEqual].
+//   - Values that cannot be unwrapped via Interface(), as reached
+//     through unexported struct fields.
 //
 // Special case for slices: Go's runtime optimises zero-capacity slices
 // (make([]T, 0)) to share a common zero-sized allocation. IsSame treats
@@ -320,7 +325,9 @@ func isReflectSliceZero(v reflect.Value) bool {
 //   - va and vb have the same type (checked by caller)
 //   - Neither value is nil (nil cases handled by isSameTypedNil)
 //
-// Returns false for unhandled types (arrays, structs, etc.)
+// Returns false for unhandled types (arrays, structs, etc.), and for
+// values that cannot be unwrapped via Interface(), as reached through
+// unexported struct fields.
 func isSamePointer(va, vb reflect.Value) bool {
 	var ok bool
 	switch va.Kind() {
@@ -337,14 +344,274 @@ func isSamePointer(va, vb reflect.Value) bool {
 		ok = va.Pointer() == vb.Pointer()
 	case reflect.Interface:
 		// Extract concrete values and compare them recursively
-		a := va.Elem().Interface()
-		b := vb.Elem().Interface()
-		ok = IsSame(a, b)
+		ok = isSameInterface(va, vb)
 	case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
 		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.Bool:
-		ok = va.Interface() == vb.Interface()
+		ok = isSameValue(va, vb)
 	default:
 	}
 	return ok
+}
+
+// isSameInterface extracts the values held by two interfaces and
+// compares them recursively. Interfaces that cannot be unwrapped —
+// unexported struct fields reached by reflection — are never same.
+func isSameInterface(va, vb reflect.Value) bool {
+	if !va.CanInterface() || !vb.CanInterface() {
+		return false
+	}
+	return IsSame(va.Elem().Interface(), vb.Elem().Interface())
+}
+
+// isSameValue compares two primitive values by ==. Values that
+// cannot be unwrapped via Interface() — unexported struct fields
+// reached by reflection — are never same.
+func isSameValue(va, vb reflect.Value) bool {
+	return va.CanInterface() && vb.CanInterface() &&
+		va.Interface() == vb.Interface()
+}
+
+// AreComparable reports whether the given values are safe operands of
+// the == operator: a true result guarantees no comparison between
+// them can panic. Untyped nils are safe — a nil interface compares
+// against anything — while values with a non-comparable dynamic type
+// are not. It returns false when no values are given.
+func AreComparable(vvi ...any) bool {
+	if len(vvi) == 0 {
+		return false
+	}
+
+	for _, vi := range vvi {
+		if !isComparableValue(asReflectValue(vi)) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isComparableValue reports whether a value can be an operand of ==
+// without panicking. The invalid value — an untyped nil — compares
+// safely against anything.
+func isComparableValue(v reflect.Value) bool {
+	return !v.IsValid() || v.Comparable()
+}
+
+// AreEqual reports whether every given value equals the next one, as
+// the == operator would decide, without ever panicking. Values of the
+// same comparable type are tested with == itself. When == is
+// unavailable, typed nils and identity — sharing the same underlying
+// data, as [IsSame] sees it — settle the question, and the value's
+// own Equal method, following the Equal(T) bool convention, stands in
+// for ==.
+//
+// Slices without a decisive Equal method are compared element by
+// element, one level deep: lengths must match, and each element pair
+// is decided by the same rules, except that nested slices are not
+// walked — those settle only by nil, identity, or their own Equal
+// method. A nil slice equals only nil — unlike slices.Equal, the
+// empty slice is not its equal.
+//
+// known reports whether the answer is settled. A pair that is neither
+// comparable, nil, identical, decided by an Equal method, nor a slice
+// settled element by element leaves the list undecided — deciding
+// would take the deep comparison AreEqual deliberately avoids —
+// unless a later pair settles the whole list as unequal. Callers that
+// need a decision anyway can fall back to [reflect.DeepEqual] when
+// known is false.
+//
+// Untyped nil only equals untyped nil, values of different types are
+// never equal, and a single value is vacuously equal. AreEqual
+// returns (false, true) when no values are given.
+func AreEqual(vvi ...any) (is, known bool) {
+	if len(vvi) == 0 {
+		return false, true
+	}
+
+	known = true
+	prev := newComparableValue(vvi[0])
+	for _, vi := range vvi[1:] {
+		next := newComparableValue(vi)
+
+		switch is2, known2 := areEqual2(prev, next, true); {
+		case known2 && !is2:
+			// one unequal pair settles the whole list
+			return false, true
+		case !known2:
+			// undecided; a later pair may still settle the list
+			known = false
+		default:
+			// pair equal; keep walking
+		}
+
+		prev = next
+	}
+
+	if !known {
+		// unknown
+		return false, false
+	}
+	return true, true
+}
+
+// areEqual2 decides equality for a single pair. known reports whether
+// the answer is settled. deep allows one level of element-wise slice
+// comparison; element pairs pass false so nested slices are not
+// walked.
+func areEqual2(a, b comparableValue, deep bool) (is, known bool) {
+	switch {
+	case a.t != b.t:
+		// different types are never equal
+		return false, true
+	case a.t == nil:
+		// both untyped nil
+		return true, true
+	case a.ok && b.ok:
+		// safe ==
+		return a.v.Interface() == b.v.Interface(), true
+	default:
+		return areEqualFallback(a.v, b.v, deep)
+	}
+}
+
+// areEqualFallback decides equality when == is unavailable: typed
+// nils and identity settle the question — nil only equals nil, and
+// identity proves equality — and the value's own Equal method stands
+// in for ==. When deep, slices left undecided get one level of
+// element-wise comparison. Anything else stays unknown — two distinct
+// values may still be equal, and deciding that would take a deep
+// comparison.
+//
+//revive:disable-next-line:flag-parameter // deep bounds recursion, not two behaviours
+func areEqualFallback(va, vb reflect.Value, deep bool) (is, known bool) {
+	if same, ok := isSameTypedNil(va, vb); ok {
+		// nil only equals nil
+		return same, true
+	}
+
+	if isSamePointer(va, vb) {
+		// identity proves equality
+		return true, true
+	}
+
+	if is, known = equalMethod(va, vb); known || !deep {
+		return is, known
+	}
+
+	return areEqualSlice(va, vb)
+}
+
+// areEqualSlice compares two slices of the same type element by
+// element. Lengths must match; anything that isn't a slice stays
+// unknown.
+func areEqualSlice(va, vb reflect.Value) (is, known bool) {
+	switch {
+	case va.Kind() != reflect.Slice:
+		// only slices are walked
+		return false, false
+	case va.Len() != vb.Len():
+		// different lengths are never equal
+		return false, true
+	default:
+		return areEqualSliceElements(va, vb)
+	}
+}
+
+// areEqualSliceElements walks the element pairs of two equal-length
+// slices, aggregating like [AreEqual] does over its list: one unequal
+// element settles the pair, an undecided element leaves it unknown
+// unless a later element settles it.
+func areEqualSliceElements(va, vb reflect.Value) (is, known bool) {
+	known = true
+	for i := range va.Len() {
+		switch is2, known2 := areEqualElement(va.Index(i), vb.Index(i)); {
+		case known2 && !is2:
+			// one unequal element settles the whole pair
+			return false, true
+		case !known2:
+			// undecided; a later element may still settle the pair
+			known = false
+		default:
+			// element equal; keep walking
+		}
+	}
+
+	if !known {
+		// unknown
+		return false, false
+	}
+	return true, true
+}
+
+// areEqualElement decides equality for one pair of slice elements,
+// judged like top-level operands — interface elements are unwrapped
+// first — but without walking nested slices.
+func areEqualElement(va, vb reflect.Value) (is, known bool) {
+	a := newComparableValue(unwrapInterface(va))
+	b := newComparableValue(unwrapInterface(vb))
+	return areEqual2(a, b, false)
+}
+
+// unwrapInterface returns the value held by an interface so its
+// content can be judged on its own; anything else passes through
+// unchanged.
+func unwrapInterface(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Interface {
+		return v.Elem()
+	}
+	return v
+}
+
+// equalMethod consults the value's own Equal method, following the
+// Equal(T) bool convention, as a stand-in for an unavailable ==.
+// Without such a method, or if the call panics, the question stays
+// unknown.
+func equalMethod(va, vb reflect.Value) (is, known bool) {
+	// a panicking Equal leaves the zero (false, false)
+	defer func() {
+		_ = recover()
+	}()
+
+	m := va.MethodByName("Equal")
+	if !m.IsValid() || !isEqualMethodType(m.Type(), vb.Type()) {
+		// unknown
+		return false, false
+	}
+
+	return m.Call([]reflect.Value{vb})[0].Bool(), true
+}
+
+// isEqualMethodType reports whether a method signature matches
+// Equal(T) bool for the given operand type.
+func isEqualMethodType(mt, arg reflect.Type) bool {
+	return mt.NumIn() == 1 && mt.In(0) == arg &&
+		mt.NumOut() == 1 && mt.Out(0).Kind() == reflect.Bool
+}
+
+// comparableValue carries the reflection state of one [AreEqual]
+// operand so each value is reflected only once.
+type comparableValue struct {
+	t reflect.Type
+	v reflect.Value
+	// ok reports whether v supports direct == comparison via
+	// Interface().
+	ok bool
+}
+
+// newComparableValue captures the reflection state of one value.
+// Untyped nil yields a nil type and no direct == support; its
+// equality is decided by type alone.
+func newComparableValue(vi any) comparableValue {
+	v := asReflectValue(vi)
+	if !v.IsValid() {
+		// untyped nil
+		return comparableValue{v: v}
+	}
+
+	return comparableValue{
+		t:  v.Type(),
+		v:  v,
+		ok: v.Comparable() && v.CanInterface(),
+	}
 }

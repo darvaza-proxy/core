@@ -1,8 +1,13 @@
 package core
 
+// cspell:words Errno ENOENT
+
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"syscall"
 	"testing"
 )
 
@@ -12,6 +17,8 @@ var _ TestCase = coalesceErrorTestCase{}
 var _ TestCase = isErrorTestCase{}
 var _ TestCase = isErrorFnTestCase{}
 var _ TestCase = isErrorFn2TestCase{}
+var _ TestCase = checkErrorIsInTestCase{}
+var _ TestCase = checkErrorIsIn2TestCase{}
 var _ TestCase = temporaryErrorTestCase{}
 var _ TestCase = checkIsTemporaryTestCase{}
 var _ TestCase = isTemporaryTestCase{}
@@ -226,6 +233,40 @@ func TestCoalesceError(t *testing.T) {
 	RunTestCases(t, testCases)
 }
 
+// errorWithIs matches a single target via its Is method instead of
+// identity, exercising the Is(error) bool support in IsError.
+type errorWithIs struct {
+	target error
+}
+
+func (*errorWithIs) Error() string { return "error with Is" }
+
+func (e *errorWithIs) Is(target error) bool { return target == e.target }
+
+// nonComparableError is a value-typed error carrying a slice, so its
+// dynamic type does not support ==: comparing two of them panics
+// rather than reporting false. It pins that IsError degrades the
+// comparison to "no match" instead of panicking.
+type nonComparableError struct {
+	codes []int
+}
+
+func (nonComparableError) Error() string { return "non-comparable error" }
+
+// nonComparableErrorWithIs is non-comparable like nonComparableError,
+// and its Is accepts anything: it pins that the Is(error) bool probe
+// still runs after the identity comparison degrades, so a
+// non-comparable error can match through its own Is method.
+type nonComparableErrorWithIs struct {
+	codes []int
+}
+
+func (nonComparableErrorWithIs) Error() string {
+	return "non-comparable error with Is"
+}
+
+func (nonComparableErrorWithIs) Is(error) bool { return true }
+
 // Test cases for IsError function
 type isErrorTestCase struct {
 	name     string
@@ -259,6 +300,11 @@ func TestIsError(t *testing.T) {
 	err2 := errors.New("error 2")
 	err3 := errors.New("error 3")
 	wrappedErr := fmt.Errorf("wrapped: %w", err1)
+	errIs := &errorWithIs{target: err2}
+	pathErr := &fs.PathError{Op: "open", Path: "missing",
+		Err: syscall.ENOENT}
+	errNonComparable := nonComparableError{codes: []int{1}}
+	errNonComparableIs := nonComparableErrorWithIs{codes: []int{2}}
 
 	testCases := []isErrorTestCase{
 		newIsErrorTestCase("nil error", nil, false, err1),
@@ -270,9 +316,155 @@ func TestIsError(t *testing.T) {
 		newIsErrorTestCase("wrapped error no match", wrappedErr, false, err2),
 		newIsErrorTestCase("multiple targets", err2, true, err1, err2, err3),
 		newIsErrorTestCase("empty targets", err1, true),
+		newIsErrorTestCase("Is method match", errIs, true, err2),
+		newIsErrorTestCase("Is method mismatch", errIs, false, err3),
+		newIsErrorTestCase("wrapped Is method match",
+			fmt.Errorf("wrapped: %w", errIs), true, err2),
+		newIsErrorTestCase("target Is method not consulted",
+			err2, false, errIs),
+		newIsErrorTestCase("Errno match via Is method",
+			pathErr, true, fs.ErrNotExist),
+		newIsErrorTestCase("Is method self match", errIs, true, errIs),
+		newIsErrorTestCase("Is method match second target",
+			errIs, true, err3, err2),
+		newIsErrorTestCase("Errno self match",
+			syscall.ENOENT, true, syscall.ENOENT),
+		newIsErrorTestCase("non-comparable no match",
+			errNonComparable, false, errNonComparable),
+		newIsErrorTestCase("non-comparable Is method match",
+			errNonComparableIs, true, errNonComparableIs),
 	}
 
 	RunTestCases(t, testCases)
+}
+
+// Test cases for the NewCheckErrorIsIn per-node closure
+type checkErrorIsInTestCase struct {
+	err     error
+	name    string
+	targets []error
+
+	want bool
+}
+
+func newCheckErrorIsInTestCase(name string, err error,
+	targets []error, want bool) checkErrorIsInTestCase {
+	return checkErrorIsInTestCase{
+		name:    name,
+		err:     err,
+		targets: targets,
+		want:    want,
+	}
+}
+
+func (tc checkErrorIsInTestCase) Name() string { return tc.name }
+
+func (tc checkErrorIsInTestCase) Test(t *testing.T) {
+	t.Helper()
+	check := NewCheckErrorIsIn(tc.targets)
+	AssertEqual(t, tc.want, check(tc.err), "check result")
+}
+
+func checkErrorIsInTestCases() []checkErrorIsInTestCase {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	errIs := &errorWithIs{target: err2}
+
+	return []checkErrorIsInTestCase{
+		newCheckErrorIsInTestCase("identity match",
+			err1, []error{err1}, true),
+		newCheckErrorIsInTestCase("identity mismatch",
+			err1, []error{err2}, false),
+		newCheckErrorIsInTestCase("Is method match second target",
+			errIs, []error{err1, err2}, true),
+		newCheckErrorIsInTestCase("nil target never matches",
+			err1, []error{nil}, false),
+		newCheckErrorIsInTestCase("no targets",
+			err1, nil, false),
+		newCheckErrorIsInTestCase("no unwrapping",
+			fmt.Errorf("wrapped: %w", err1), []error{err1}, false),
+	}
+}
+
+// TestNewCheckErrorIsIn exercises the per-node closure directly:
+// matching is identity-or-Is per node, without unwrapping — traversal
+// belongs to IsErrorFn.
+func TestNewCheckErrorIsIn(t *testing.T) {
+	RunTestCases(t, checkErrorIsInTestCases())
+}
+
+// Test cases for the NewCheckErrorIsIn2 per-node closure
+type checkErrorIsIn2TestCase struct {
+	err     error
+	name    string
+	targets []error
+
+	wantIs    bool
+	wantKnown bool
+}
+
+func newCheckErrorIsIn2TestCase(name string, err error,
+	targets []error, wantIs, wantKnown bool) checkErrorIsIn2TestCase {
+	return checkErrorIsIn2TestCase{
+		name:      name,
+		err:       err,
+		targets:   targets,
+		wantIs:    wantIs,
+		wantKnown: wantKnown,
+	}
+}
+
+func (tc checkErrorIsIn2TestCase) Name() string { return tc.name }
+
+func (tc checkErrorIsIn2TestCase) Test(t *testing.T) {
+	t.Helper()
+	is, known := NewCheckErrorIsIn2(tc.targets)(tc.err)
+	AssertEqual(t, tc.wantIs, is, "is")
+	AssertEqual(t, tc.wantKnown, known, "known")
+}
+
+func checkErrorIsIn2TestCases() []checkErrorIsIn2TestCase {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	errIs := &errorWithIs{target: err2}
+
+	return []checkErrorIsIn2TestCase{
+		newCheckErrorIsIn2TestCase("identity match",
+			err1, []error{err1}, true, true),
+		newCheckErrorIsIn2TestCase("miss is not final",
+			err1, []error{err2}, false, false),
+		newCheckErrorIsIn2TestCase("Is method match second target",
+			errIs, []error{err1, err2}, true, true),
+		newCheckErrorIsIn2TestCase("Is method miss not final",
+			errIs, []error{err1}, false, false),
+		newCheckErrorIsIn2TestCase("nil target final miss",
+			err1, []error{nil}, false, true),
+		newCheckErrorIsIn2TestCase("nil beside real target",
+			err1, []error{nil, err2}, false, false),
+		newCheckErrorIsIn2TestCase("no targets final miss",
+			err1, nil, false, true),
+		newCheckErrorIsIn2TestCase("no unwrapping",
+			fmt.Errorf("wrapped: %w", err1), []error{err1},
+			false, false),
+	}
+}
+
+// TestNewCheckErrorIsIn2 exercises the two-result per-node closure:
+// a match is final, a miss is final only when no target could match
+// deeper nodes either.
+func TestNewCheckErrorIsIn2(t *testing.T) {
+	RunTestCases(t, checkErrorIsIn2TestCases())
+}
+
+// TestNewCheckErrorIsIn2Compose pins composition with IsErrorFn2: a
+// per-node miss is not final, so traversal descends into wrapped
+// errors and still finds the match.
+func TestNewCheckErrorIsIn2Compose(t *testing.T) {
+	target := errors.New("target")
+	check := NewCheckErrorIsIn2([]error{target})
+	is, known := IsErrorFn2(check, fmt.Errorf("wrapped: %w", target))
+	AssertTrue(t, is, "is")
+	AssertTrue(t, known, "known")
 }
 
 // Test cases for TemporaryError constructors and methods
@@ -657,4 +849,13 @@ func unwrapBranchesTestCases() []unwrapBranchesTestCase {
 // Test Unwrap(err) hits all three type-switch branches and the default.
 func TestUnwrapBranches(t *testing.T) {
 	RunTestCases(t, unwrapBranchesTestCases())
+}
+
+// Test ErrInvalid is an alias of the standard sentinel, so errors.Is
+// matches across the boundary and the message text is unchanged.
+func TestErrInvalidAlias(t *testing.T) {
+	AssertSame(t, fs.ErrInvalid, ErrInvalid, "fs.ErrInvalid identity")
+	AssertErrorIs(t, ErrInvalid, os.ErrInvalid, "os.ErrInvalid match")
+	AssertErrorIs(t, os.ErrInvalid, ErrInvalid, "reverse match")
+	AssertEqual(t, "invalid argument", ErrInvalid.Error(), "message")
 }
