@@ -61,12 +61,9 @@ func (wg *WaitGroup) Go(fn func() error) {
 // to intercept the returned error
 func (wg *WaitGroup) GoCatch(fn func() error, catch func(error) error) {
 	if fn != nil {
-		wg.wg.Add(1)
-
-		go func() {
-			defer wg.wg.Done()
+		wg.wg.Go(func() {
 			wg.run(fn, catch)
-		}()
+		})
 	}
 }
 

@@ -260,15 +260,13 @@ func runContentionBenchmark(b *testing.B, sl *SpinLock) {
 	iterations := b.N / numWorkers
 
 	for range numWorkers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				sl.Lock()
 				_ = runtime.NumGoroutine()
 				sl.Unlock()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

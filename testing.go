@@ -804,13 +804,11 @@ func doLog(t T, prefixFormat string, prefixArgs []any, messageFormat string, mes
 func runWorkers(numWorkers int, worker func(int) error, errCh chan error) {
 	var wg sync.WaitGroup
 	for i := range numWorkers {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			if err := worker(id); err != nil {
+		wg.Go(func() {
+			if err := worker(i); err != nil {
 				errCh <- err
 			}
-		}(i)
+		})
 	}
 	wg.Wait()
 	close(errCh)

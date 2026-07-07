@@ -25,7 +25,7 @@ It serves as the base for other darvaza.org projects.
 
 ## Prerequisites
 
-- Go 1.24 or later (the project's minimum).
+- Go 1.25 or later (the project's minimum).
 - `make` available; `$GOPATH` configured.
 
 See [BUILDING.md → Required Tools](BUILDING.md#required-tools) for the

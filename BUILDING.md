@@ -272,7 +272,7 @@ Tools are auto-detected and replaced with `true` (no-op) if unavailable.
 
 #### Required Tools
 
-- **Go 1.24+**: Required minimum.
+- **Go 1.25+**: Required minimum.
 - **golangci-lint**: Go code linting (version selected by Go version).
 - **revive**: Additional Go linting rules.
 - **make**: Build orchestration.
@@ -294,7 +294,7 @@ The coverage system provides comprehensive testing:
 
 GitHub Actions workflows provide:
 
-- **Build Testing**: Tests across Go 1.24, 1.25 and 1.26.
+- **Build Testing**: Tests across Go 1.25 and 1.26.
 - **Race Detection**: Dedicated workflow for race condition testing.
 - **Coverage Reporting**: Automatic Codecov uploads.
 - **Dependency Updates**: Automated Renovate PRs.
@@ -544,7 +544,7 @@ The build system integrates with development environments:
 
 GitHub Actions workflows provide:
 
-- **Multi-version Testing**: Go 1.24, 1.25 and 1.26.
+- **Multi-version Testing**: Go 1.25 and 1.26.
 - **Coverage Reporting**: Automatic Codecov uploads.
 - **Dependency Management**: Renovate integration.
 - **Branch Protection**: WIP branch exclusion.
