@@ -132,6 +132,18 @@ Key distinctions from `IsZero`:
   types (numbers, strings, booleans), compares by equal values. Two nils
   of the same type are considered the same.
 
+#### Safe Comparison
+
+* `AreComparable(values...)` - reports whether the values are safe operands
+  of `==`: a true result guarantees no comparison between them can panic.
+  Untyped nils are safe.
+* `AreEqual(values...)` - reports whether each value equals the next, as
+  `==` would decide, without ever panicking, returning `(is, known bool)`.
+  Values of the same comparable type are tested with `==`; otherwise typed
+  nils, identity, or the value's own `Equal(T) bool` method settle the
+  answer. Anything else is reported as unknown rather than resolved by
+  deep comparison.
+
 #### Other Utilities
 
 * `Coalesce[T](values...)` returns the first non-zero value.

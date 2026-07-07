@@ -348,3 +348,167 @@ func isSamePointer(va, vb reflect.Value) bool {
 	}
 	return ok
 }
+
+// AreComparable reports whether the given values are safe operands of
+// the == operator: a true result guarantees no comparison between
+// them can panic. Untyped nils are safe — a nil interface compares
+// against anything — while values with a non-comparable dynamic type
+// are not. It returns false when no values are given.
+func AreComparable(vvi ...any) bool {
+	if len(vvi) == 0 {
+		return false
+	}
+
+	for _, vi := range vvi {
+		if !isComparableValue(asReflectValue(vi)) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isComparableValue reports whether a value can be an operand of ==
+// without panicking. The invalid value — an untyped nil — compares
+// safely against anything.
+func isComparableValue(v reflect.Value) bool {
+	return !v.IsValid() || v.Comparable()
+}
+
+// AreEqual reports whether every given value equals the next one, as
+// the == operator would decide, without ever panicking. Values of the
+// same comparable type are tested with == itself. When == is
+// unavailable, typed nils and identity — sharing the same underlying
+// data, as [IsSame] sees it — settle the question, and the value's
+// own Equal method, following the Equal(T) bool convention, stands in
+// for ==.
+//
+// known reports whether the answer is settled. A pair that is neither
+// comparable, nil, identical, nor equipped with an Equal method
+// leaves the list undecided — deciding would take the deep comparison
+// AreEqual deliberately avoids — unless a later pair settles the
+// whole list as unequal.
+//
+// Untyped nil only equals untyped nil, values of different types are
+// never equal, and a single value is vacuously equal. AreEqual
+// returns (false, true) when no values are given.
+func AreEqual(vvi ...any) (is, known bool) {
+	if len(vvi) == 0 {
+		return false, true
+	}
+
+	known = true
+	prev := newComparableValue(vvi[0])
+	for _, vi := range vvi[1:] {
+		next := newComparableValue(vi)
+
+		switch is2, known2 := areEqual2(prev, next); {
+		case known2 && !is2:
+			// one unequal pair settles the whole list
+			return false, true
+		case !known2:
+			// undecided; a later pair may still settle the list
+			known = false
+		default:
+			// pair equal; keep walking
+		}
+
+		prev = next
+	}
+
+	if !known {
+		// unknown
+		return false, false
+	}
+	return true, true
+}
+
+// areEqual2 decides equality for a single pair. known reports whether
+// the answer is settled.
+func areEqual2(a, b comparableValue) (is, known bool) {
+	switch {
+	case a.t != b.t:
+		// different types are never equal
+		return false, true
+	case a.t == nil:
+		// both untyped nil
+		return true, true
+	case a.ok && b.ok:
+		// safe ==
+		return a.v.Interface() == b.v.Interface(), true
+	default:
+		return areEqualFallback(a.v, b.v)
+	}
+}
+
+// areEqualFallback decides equality when == is unavailable: typed
+// nils and identity settle the question — nil only equals nil, and
+// identity proves equality — and the value's own Equal method stands
+// in for ==. Anything else stays unknown — two distinct values may
+// still be equal, and deciding that would take a deep comparison.
+func areEqualFallback(va, vb reflect.Value) (is, known bool) {
+	if same, ok := isSameTypedNil(va, vb); ok {
+		// nil only equals nil
+		return same, true
+	}
+
+	if isSamePointer(va, vb) {
+		// identity proves equality
+		return true, true
+	}
+
+	return equalMethod(va, vb)
+}
+
+// equalMethod consults the value's own Equal method, following the
+// Equal(T) bool convention, as a stand-in for an unavailable ==.
+// Without such a method, or if the call panics, the question stays
+// unknown.
+func equalMethod(va, vb reflect.Value) (is, known bool) {
+	// a panicking Equal leaves the zero (false, false)
+	defer func() {
+		_ = recover()
+	}()
+
+	m := va.MethodByName("Equal")
+	if !m.IsValid() || !isEqualMethodType(m.Type(), vb.Type()) {
+		// unknown
+		return false, false
+	}
+
+	return m.Call([]reflect.Value{vb})[0].Bool(), true
+}
+
+// isEqualMethodType reports whether a method signature matches
+// Equal(T) bool for the given operand type.
+func isEqualMethodType(mt, arg reflect.Type) bool {
+	return mt.NumIn() == 1 && mt.In(0) == arg &&
+		mt.NumOut() == 1 && mt.Out(0).Kind() == reflect.Bool
+}
+
+// comparableValue carries the reflection state of one [AreEqual]
+// operand so each value is reflected only once.
+type comparableValue struct {
+	t reflect.Type
+	v reflect.Value
+	// ok reports whether v supports direct == comparison via
+	// Interface().
+	ok bool
+}
+
+// newComparableValue captures the reflection state of one value.
+// Untyped nil yields a nil type and no direct == support; its
+// equality is decided by type alone.
+func newComparableValue(vi any) comparableValue {
+	v := asReflectValue(vi)
+	if !v.IsValid() {
+		// untyped nil
+		return comparableValue{v: v}
+	}
+
+	return comparableValue{
+		t:  v.Type(),
+		v:  v,
+		ok: v.Comparable() && v.CanInterface(),
+	}
+}

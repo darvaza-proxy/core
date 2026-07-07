@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 	"unsafe"
@@ -19,6 +20,8 @@ var _ TestCase = initializationSemanticsTestCase{}
 var _ TestCase = isSameTestCase{}
 var _ TestCase = isSameStackOverflowTestCase{}
 var _ TestCase = isZeroCustomInterfaceTestCase{}
+var _ TestCase = areComparableTestCase{}
+var _ TestCase = areEqualTestCase{}
 
 type zeroTestCase[T comparable] struct {
 	expected T
@@ -1458,5 +1461,180 @@ func TestIsZeroCustomInterface(t *testing.T) {
 			hasIsZeroType{zero: true}, true),
 		newIsZeroCustomInterfaceTestCase("custom IsZero returns false",
 			hasIsZeroType{zero: false}, false),
+	})
+}
+
+// eqSlice is non-comparable and follows the Equal(T) bool convention.
+type eqSlice []int
+
+func (s eqSlice) Equal(o eqSlice) bool { return slices.Equal(s, o) }
+
+// panicEqSlice is non-comparable with an Equal method that panics.
+type panicEqSlice []int
+
+func (panicEqSlice) Equal(panicEqSlice) bool { panic("Equal called") }
+
+// oddEqSlice is non-comparable with an Equal method that doesn't
+// follow the Equal(T) bool convention.
+type oddEqSlice []int
+
+func (oddEqSlice) Equal() bool { return true }
+
+// eqAlways is comparable with an Equal method that always matches,
+// proving == takes precedence for comparable types.
+type eqAlways int
+
+func (eqAlways) Equal(eqAlways) bool { return true }
+
+type areComparableTestCase struct {
+	name string
+	vvi  []any
+	want bool
+}
+
+func (tc areComparableTestCase) Name() string { return tc.name }
+
+func (tc areComparableTestCase) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.want, AreComparable(tc.vvi...), "comparable")
+}
+
+func newAreComparableTestCase(name string, vvi []any,
+	want bool) areComparableTestCase {
+	return areComparableTestCase{
+		name: name,
+		vvi:  vvi,
+		want: want,
+	}
+}
+
+func areComparableTestCases() []areComparableTestCase {
+	return []areComparableTestCase{
+		newAreComparableTestCase("no values", nil, false),
+		newAreComparableTestCase("untyped nil", S[any](nil), true),
+		newAreComparableTestCase("untyped nil and int", S[any](nil, 42), true),
+		newAreComparableTestCase("untyped nil and slice",
+			S[any](nil, S(1)), false),
+		newAreComparableTestCase("single int", S[any](42), true),
+		newAreComparableTestCase("ints", S[any](1, 2, 3), true),
+		newAreComparableTestCase("mixed comparable types",
+			S[any](1, "a", true), true),
+		newAreComparableTestCase("slice", S[any](S(1, 2)), false),
+		newAreComparableTestCase("map", S[any](map[string]int{}), false),
+		newAreComparableTestCase("comparable struct",
+			S[any](struct{ A int }{1}), true),
+		newAreComparableTestCase("comparable then slice",
+			S[any](1, S(2)), false),
+		newAreComparableTestCase("array holding slice",
+			S[any]([1]any{S(1)}), false),
+	}
+}
+
+func TestAreComparable(t *testing.T) {
+	RunTestCases(t, areComparableTestCases())
+}
+
+type areEqualTestCase struct {
+	name      string
+	vvi       []any
+	wantIs    bool
+	wantKnown bool
+}
+
+func (tc areEqualTestCase) Name() string { return tc.name }
+
+func (tc areEqualTestCase) Test(t *testing.T) {
+	t.Helper()
+	is, known := AreEqual(tc.vvi...)
+	AssertEqual(t, tc.wantIs, is, "is")
+	AssertEqual(t, tc.wantKnown, known, "known")
+}
+
+func newAreEqualTestCase(name string, vvi []any,
+	wantIs, wantKnown bool) areEqualTestCase {
+	return areEqualTestCase{
+		name:      name,
+		vvi:       vvi,
+		wantIs:    wantIs,
+		wantKnown: wantKnown,
+	}
+}
+
+func areEqualComparableTestCases() []areEqualTestCase {
+	return []areEqualTestCase{
+		newAreEqualTestCase("no values", nil, false, true),
+		newAreEqualTestCase("single value", S[any](42), true, true),
+		newAreEqualTestCase("equal ints", S[any](42, 42), true, true),
+		newAreEqualTestCase("unequal ints", S[any](42, 43), false, true),
+		newAreEqualTestCase("different types", S[any](42, "42"), false, true),
+		newAreEqualTestCase("int vs int64", S[any](42, int64(42)), false, true),
+		newAreEqualTestCase("equal chain", S[any]("a", "a", "a"), true, true),
+		newAreEqualTestCase("chain broken at the end",
+			S[any]("a", "a", "b"), false, true),
+		newAreEqualTestCase("NaN never equals",
+			S[any](math.NaN(), math.NaN()), false, true),
+		newAreEqualTestCase("== beats Equal for comparable types",
+			S[any](eqAlways(1), eqAlways(2)), false, true),
+	}
+}
+
+func areEqualNilTestCases() []areEqualTestCase {
+	return []areEqualTestCase{
+		newAreEqualTestCase("both untyped nil", S[any](nil, nil), true, true),
+		newAreEqualTestCase("untyped nil vs zero", S[any](nil, 0), false, true),
+		newAreEqualTestCase("untyped nil vs typed nil",
+			S[any](nil, (*int)(nil)), false, true),
+		newAreEqualTestCase("typed nil pointers",
+			S[any]((*int)(nil), (*int)(nil)), true, true),
+		newAreEqualTestCase("nil slices",
+			S[any]([]int(nil), []int(nil)), true, true),
+		newAreEqualTestCase("nil vs empty slice",
+			S[any]([]int(nil), S[int]()), false, true),
+		newAreEqualTestCase("nil maps",
+			S[any](map[string]int(nil), map[string]int(nil)), true, true),
+	}
+}
+
+func areEqualIdentityTestCases() []areEqualTestCase {
+	slice := S(1, 2, 3)
+	m := map[string]int{"a": 1}
+
+	return []areEqualTestCase{
+		newAreEqualTestCase("same slice", S[any](slice, slice), true, true),
+		newAreEqualTestCase("distinct equal slices",
+			S[any](S(1, 2, 3), S(1, 2, 3)), false, false),
+		newAreEqualTestCase("same map", S[any](m, m), true, true),
+		newAreEqualTestCase("distinct maps",
+			S[any](map[string]int{}, map[string]int{}), false, false),
+		newAreEqualTestCase("undecided then settled",
+			S[any](S(1), S(2), "x"), false, true),
+	}
+}
+
+func areEqualMethodTestCases() []areEqualTestCase {
+	return []areEqualTestCase{
+		newAreEqualTestCase("Equal method match",
+			S[any](eqSlice{1, 2}, eqSlice{1, 2}), true, true),
+		newAreEqualTestCase("Equal method mismatch",
+			S[any](eqSlice{1}, eqSlice{2}), false, true),
+		newAreEqualTestCase("panicking Equal method",
+			S[any](panicEqSlice{1}, panicEqSlice{1}), false, false),
+		newAreEqualTestCase("mismatched Equal signature",
+			S[any](oddEqSlice{1}, oddEqSlice{1}), false, false),
+	}
+}
+
+func TestAreEqual(t *testing.T) {
+	t.Run("comparable", func(t *testing.T) {
+		RunTestCases(t, areEqualComparableTestCases())
+	})
+	t.Run("nil", func(t *testing.T) {
+		RunTestCases(t, areEqualNilTestCases())
+	})
+	t.Run("identity", func(t *testing.T) {
+		RunTestCases(t, areEqualIdentityTestCases())
+	})
+	t.Run("Equal method", func(t *testing.T) {
+		RunTestCases(t, areEqualMethodTestCases())
 	})
 }
