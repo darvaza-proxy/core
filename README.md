@@ -554,8 +554,9 @@ both `*testing.T` and `MockT`:
 
 * `AssertError(t, err, name...)` / `AssertNoError(t, err, name...)` - error
   presence/absence.
-* `AssertErrorIs(t, err, target, name...)` - error chain checking with
-  `errors.Is`.
+* `AssertErrorIs(t, err, target, name...)` /
+  `AssertNotErrorIs(t, err, target, name...)` - error chain
+  presence/absence via `errors.Is`.
 * `AssertErrorIsFn(t, err, targetFn, name...)` - error chain checking against
   a check function via `IsErrorFn`.
 * `AssertErrorAs[E](t, err, name...)` - error chain extraction with

@@ -605,6 +605,27 @@ func AssertErrorIs(t T, err, target error, name string, args ...any) bool {
 	return ok
 }
 
+// AssertNotErrorIs fails the test if the error matches the target
+// error. Uses errors.Is to check, so the target is tested against
+// the whole error chain.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	AssertNotErrorIs(t, err, ErrNotFound, "unexpected lookup error")
+//	AssertNotErrorIs(t, err, ErrInvalid, "validation for %s", field)
+func AssertNotErrorIs(t T, err, target error, name string, args ...any) bool {
+	t.Helper()
+	ok := !errors.Is(err, target)
+	if !ok {
+		doError(t, name, args, "expected error not matching %v, got %v", target, err)
+	} else {
+		doLog(t, name, args, "%v", err)
+	}
+	return ok
+}
+
 // AssertErrorIsFn fails the test if the error does not satisfy the
 // target function. Uses IsErrorFn to traverse wrapped error chains,
 // so the function is tried against the error itself and every error
@@ -1043,6 +1064,21 @@ func AssertMustFalse(t T, value bool, name string, args ...any) {
 func AssertMustErrorIs(t T, err, target error, name string, args ...any) {
 	t.Helper()
 	if !AssertErrorIs(t, err, target, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNotErrorIs calls AssertNotErrorIs and t.FailNow() if the
+// assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNotErrorIs(t, err, ErrNotFound, "unexpected lookup error")
+//	AssertMustNotErrorIs(t, err, ErrInvalid, "validation for %s", field)
+func AssertMustNotErrorIs(t T, err, target error, name string, args ...any) {
+	t.Helper()
+	if !AssertNotErrorIs(t, err, target, name, args...) {
 		t.FailNow()
 	}
 }
