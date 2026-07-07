@@ -141,8 +141,10 @@ Key distinctions from `IsZero`:
   `==` would decide, without ever panicking, returning `(is, known bool)`.
   Values of the same comparable type are tested with `==`; otherwise typed
   nils, identity, or the value's own `Equal(T) bool` method settle the
-  answer. Anything else is reported as unknown rather than resolved by
-  deep comparison.
+  answer, and slices are compared element by element, one level deep.
+  Anything else is reported as unknown rather than resolved by deep
+  comparison; callers that need a decision anyway can fall back to
+  `reflect.DeepEqual` when it is not known.
 
 #### Other Utilities
 
