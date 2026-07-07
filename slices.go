@@ -30,6 +30,8 @@ func SliceMinusFn[T any](a, b []T, eq func(T, T) bool) []T {
 }
 
 // SliceContains tells if a slice contains a given element
+//
+// Deprecated: Use [slices.Contains] instead.
 func SliceContains[T comparable](a []T, v T) bool {
 	return SliceContainsFn(a, v, func(va, vb T) bool {
 		return va == vb
@@ -48,6 +50,8 @@ func SliceContainsFn[T any](a []T, v T, eq func(T, T) bool) bool {
 }
 
 // SliceEqual tells if two slices are equal.
+//
+// Deprecated: Use [slices.Equal] instead.
 func SliceEqual[T comparable](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
@@ -59,6 +63,8 @@ func SliceEqual[T comparable](a, b []T) bool {
 }
 
 // SliceEqualFn tells if two slices are equal using a comparing helper.
+//
+// Deprecated: Use [slices.EqualFunc] instead.
 func SliceEqualFn[T any](a, b []T, eq func(va, vb T) bool) bool {
 	if len(a) != len(b) || eq == nil {
 		return false
@@ -196,6 +202,8 @@ func SliceCopyFn[T any](s []T,
 }
 
 // SliceCopy makes a shallow copy of a given slice
+//
+// Deprecated: Use [slices.Clone] instead.
 func SliceCopy[T any](s []T) []T {
 	l := len(s)
 	result := make([]T, l)
@@ -250,6 +258,8 @@ func SliceSortFn[T any](x []T, less func(a, b T) bool) {
 // function. This sort is not guaranteed to be stable.
 // cmp(a, b) should return a negative number when a < b, a positive number when
 // a > b and zero when a == b.
+//
+// Deprecated: Use [slices.SortFunc] instead.
 func SliceSort[T any](x []T, cmp func(a, b T) int) {
 	if cmp != nil && len(x) > 0 {
 		slices.SortFunc(x, cmp)
@@ -257,6 +267,8 @@ func SliceSort[T any](x []T, cmp func(a, b T) int) {
 }
 
 // SliceSortOrdered sorts the slice x of an [Ordered] type in ascending order.
+//
+// Deprecated: Use [slices.Sort] instead.
 func SliceSortOrdered[T Ordered](x []T) {
 	if len(x) > 0 {
 		slices.Sort(x)
@@ -320,6 +332,8 @@ func doP[T any](x []T, p float64, less func(a, b T) bool) T {
 
 // SliceReverse modifies a slice reversing the order of its
 // elements.
+//
+// Deprecated: Use [slices.Reverse] instead.
 func SliceReverse[T any](x []T) {
 	l := len(x)
 	if l > 1 {

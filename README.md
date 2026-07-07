@@ -148,11 +148,11 @@ Key distinctions from `IsZero`:
 
 #### Search and Comparison
 
-* `SliceContains[T](slice, value)` - check if slice contains value.
+* ~~`SliceContains[T](slice, value)`~~ - deprecated, use `slices.Contains`.
 * `SliceContainsFn[T](slice, value, eq)` - check containment with custom
   equality.
-* `SliceEqual[T](a, b)` - compare two slices for equality.
-* `SliceEqualFn[T](a, b, eq)` - compare slices with custom equality function.
+* ~~`SliceEqual[T](a, b)`~~ - deprecated, use `slices.Equal`.
+* ~~`SliceEqualFn[T](a, b, eq)`~~ - deprecated, use `slices.EqualFunc`.
 
 #### Transformation
 
@@ -160,7 +160,7 @@ Key distinctions from `IsZero`:
 * `SliceMap[T1,T2](slice, fn)` - transform each element with cumulative
   function.
 * `SliceReplaceFn[T](slice, fn)` - replace/filter elements in-place.
-* `SliceCopy[T](slice)` - create shallow copy of slice.
+* ~~`SliceCopy[T](slice)`~~ - deprecated, use `slices.Clone`.
 * `SliceCopyFn[T](slice, fn)` - create filtered/transformed copy.
 
 #### Set Operations
@@ -174,10 +174,10 @@ Key distinctions from `IsZero`:
 
 #### Sorting and Ordering
 
-* `SliceSort[T](slice, cmp)` - sort using comparison function (returns int).
+* ~~`SliceSort[T](slice, cmp)`~~ - deprecated, use `slices.SortFunc`.
 * `SliceSortFn[T](slice, less)` - sort using less function (returns bool).
-* `SliceSortOrdered[T](slice)` - sort ordered types (int, string, float64).
-* `SliceReverse[T](slice)` - reverse slice in-place.
+* ~~`SliceSortOrdered[T](slice)`~~ - deprecated, use `slices.Sort`.
+* ~~`SliceReverse[T](slice)`~~ - deprecated, use `slices.Reverse`.
 * `SliceReversed[T](slice)` - return reversed copy.
 * `SliceReversedFn[T](slice, fn)` - return transformed and reversed copy.
 
