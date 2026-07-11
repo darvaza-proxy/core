@@ -256,14 +256,17 @@ Key distinctions from `IsZero`:
 
 ## Error Handling
 
-### Standard Error Variables
+### Standard Error Sentinels
 
-Predefined error values for common conditions:
+Predefined errors for common conditions. All are `StringError` constants
+except `ErrTODO` (a wrapped error) and `ErrInvalid` (an alias of
+`fs.ErrInvalid`):
 
 * `ErrNotImplemented` - functionality not yet implemented.
 * `ErrTODO` - placeholder for future implementation.
-* `ErrExists` - resource already exists.
-* `ErrNotExists` - resource does not exist.
+* `ErrExists` - resource already exists (distinct from `fs.ErrExist`).
+* `ErrNotExists` - resource does not exist (distinct from
+  `fs.ErrNotExist`).
 * `ErrInvalid` - invalid input or state.
 * `ErrUnknown` - unknown or unspecified error.
 * `ErrNilReceiver` - method called on nil receiver.
