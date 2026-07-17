@@ -256,18 +256,42 @@ Key distinctions from `IsZero`:
 
 ## Error Handling
 
-### Standard Error Variables
+### Standard Error Sentinels
 
-Predefined error values for common conditions:
+Predefined errors for common conditions. All are `StringError` constants
+except `ErrTODO` (a wrapped error) and `ErrInvalid` (an alias of
+`fs.ErrInvalid`):
 
 * `ErrNotImplemented` - functionality not yet implemented.
 * `ErrTODO` - placeholder for future implementation.
-* `ErrExists` - resource already exists.
-* `ErrNotExists` - resource does not exist.
+* `ErrExists` - resource already exists (distinct from `fs.ErrExist`).
+* `ErrNotExists` - resource does not exist (distinct from
+  `fs.ErrNotExist`).
 * `ErrInvalid` - invalid input or state.
 * `ErrUnknown` - unknown or unspecified error.
 * `ErrNilReceiver` - method called on nil receiver.
 * `ErrUnreachable` - indicates impossible condition.
+
+### String Errors
+
+The `StringError` type is an error whose message is the string itself.
+Because its underlying type is `string`, sentinels can be declared as
+constants rather than variables:
+
+```go
+const ErrClosed core.StringError = "already closed"
+```
+
+* Values with equal text compare equal, so `errors.Is` matches by value.
+* `.AsError()` returns nil for the empty string, following the
+  `AsError()` convention used across the package.
+* `.OK()` reports whether the string is empty (no error), the inverse of
+  a non-nil `.AsError()`.
+* `.IsZero()` reports whether the string is empty, so `IsZero` recognises
+  a zero `StringError` through its own method.
+* `NewStringError(format, args...)` - build one from a formatted message,
+  returning nil when the result is empty. Without arguments the format is
+  used verbatim, leaving a literal `%` untouched.
 
 ### Error Wrapping
 
