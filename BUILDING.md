@@ -49,8 +49,7 @@ project-root/
 ├── renovate.json              # Dependency update configuration
 ├── .github/workflows/         # CI/CD workflows
 │   ├── build.yml             # Multi-version Go builds
-│   ├── test.yml              # Testing (optional)
-│   ├── race.yml              # Race detection testing
+│   ├── platforms.yml        # Cross-platform test and race, gated on Linux
 │   ├── codecov.yml           # Coverage reporting
 │   ├── renovate.yml          # Dependency updates
 │   ├── claude.yml            # Claude Code workflow
