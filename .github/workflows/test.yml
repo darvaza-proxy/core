@@ -32,4 +32,4 @@ jobs:
         cache-dependency-path: '**/go.sum'
 
     - name: Run tests
-      run: make test GOTEST_FLAGS="-v"
+      run: make test
