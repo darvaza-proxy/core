@@ -297,7 +297,10 @@ The coverage system provides comprehensive testing:
 GitHub Actions workflows provide:
 
 - **Build Testing**: Tests across Go 1.25 and 1.26.
-- **Race Detection**: Dedicated workflow for race condition testing.
+- **Cross-platform Testing**: `platforms.yml` vets every `GOOS` and runs
+  the test and race suites natively on Linux, macOS and Windows. The
+  macOS and Windows jobs are gated behind the cheap Linux ones, so a
+  compile error fails fast without billing the premium runners.
 - **Coverage Reporting**: Automatic Codecov uploads.
 - **Dependency Updates**: Automated Renovate PRs.
 - **Branch Protection**: Ignores WIP branches.
@@ -507,7 +510,8 @@ make check-grammar
 
 - **`GO`**: Go command (default: `go`).
 - **`GOTEST_FLAGS`**: Additional test flags.
-- **`GOUP_FLAGS`**: Flags for dependency updates.
+- **`GOUP_FLAGS`**: Flags for dependency updates (default: `-v`).
+- **`GOVET_FLAGS`**: Additional vet flags (default: `-v`).
 - **`COVERAGE_HTML`**: Generate HTML coverage reports.
 - **`JQ`**: JSON processor command.
 
