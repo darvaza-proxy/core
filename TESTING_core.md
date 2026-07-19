@@ -16,9 +16,11 @@ proper testing, especially when testing the assertion functions themselves.
 
 ```text
 Independent Base Functions:
-├── AssertEqual[T]         (standalone implementation)
-├── AssertNotEqual[T]      (standalone implementation)
-├── AssertSliceEqual[T]    (uses reflect.DeepEqual)
+├── AssertEqual[T]         (uses AreEqual)
+├── AssertNotEqual[T]      (uses AreEqual)
+├── AssertSliceEqual[T]    (uses AreEqual)
+├── AssertDeepEqual[T]     (uses reflect.DeepEqual)
+├── AssertNotDeepEqual[T]  (uses reflect.DeepEqual)
 ├── AssertContains         (uses strings.Contains)
 ├── AssertNotContain       (uses strings.Contains)
 ├── AssertNil              (uses IsNil utility)

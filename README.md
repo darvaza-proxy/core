@@ -572,10 +572,15 @@ both `*testing.T` and `MockT`:
 
 #### Basic Assertions
 
-* `AssertEqual[T](t, expected, actual, name...)` - generic value comparison.
+* `AssertEqual[T](t, expected, actual, name...)` - generic value comparison,
+  decided by `AreEqual`.
 * `AssertNotEqual[T](t, expected, actual, name...)` - generic inequality
-  comparison.
-* `AssertSliceEqual[T](t, expected, actual, name...)` - slice comparison using
+  comparison, decided by `AreEqual`.
+* `AssertSliceEqual[T](t, expected, actual, name...)` - slice comparison,
+  settling length and nil-ness first, then the elements via `AreEqual`.
+* `AssertDeepEqual[T](t, expected, actual, name...)` - value comparison using
+  `reflect.DeepEqual`.
+* `AssertNotDeepEqual[T](t, expected, actual, name...)` - inequality using
   `reflect.DeepEqual`.
 * `AssertSame(t, expected, actual, name...)` - same value/reference comparison
   using pointer equality for reference types, value equality for basic types.
@@ -587,6 +592,17 @@ both `*testing.T` and `MockT`:
   checking.
 * `AssertContains(t, text, substring, name...)` - string containment.
 * `AssertNotContain(t, text, substring, name...)` - string exclusion.
+
+The `Equal` family delegates to `AreEqual`, so it accepts values that aren't
+comparable and honours an `Equal(T) bool` method. `AssertDeepEqual` and its
+`Must` form settle what it cannot decide — nested slices, and anything else
+needing a deep traversal — which the failure names as such.
+
+`AssertSliceEqual` settles shape before contents: a length difference is
+reported as a count, and nil-versus-empty by name, since only nil equals nil
+and both otherwise print as an indistinguishable `[]`. Once the shape matches,
+the first element known to differ is reported by index, so a long slice needn't
+be diffed by eye.
 
 #### Error and Type Assertions
 
@@ -623,6 +639,10 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
 * `AssertMustNotEqual[T](t, expected, actual, name...)` - terminate on equality.
 * `AssertMustSliceEqual[T](t, expected, actual, name...)` - terminate on slice
   inequality.
+* `AssertMustDeepEqual[T](t, expected, actual, name...)` - terminate on deep
+  inequality.
+* `AssertMustNotDeepEqual[T](t, expected, actual, name...)` - terminate on deep
+  equality.
 * `AssertMustTrue(t, condition, name...)` /
   `AssertMustFalse(t, condition, name...)` - terminate on boolean mismatch.
 * `AssertMustNil(t, value, name...)` / `AssertMustNotNil(t, value, name...)` -

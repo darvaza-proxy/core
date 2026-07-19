@@ -1737,3 +1737,50 @@ func TestAreEqual(t *testing.T) {
 		RunTestCases(t, areEqualSliceTestCases())
 	})
 }
+
+// Benchmarks
+//
+// AreEqual buys its panic-free breadth with reflection, and these measure
+// what that costs against a plain ==. They exist to document the gap, not
+// to be closed: the Assert family that calls AreEqual runs in tests, where
+// a decisive answer and a useful message beat nanoseconds.
+
+// benchEqualSink keeps the compiler from eliding the comparisons below.
+var benchEqualSink bool
+
+func BenchmarkEqualOperator(b *testing.B) {
+	x, y := 42, 42
+	for b.Loop() {
+		benchEqualSink = x == y
+	}
+}
+
+func BenchmarkAreEqualComparable(b *testing.B) {
+	x, y := 42, 42
+	for b.Loop() {
+		benchEqualSink, _ = AreEqual(x, y)
+	}
+}
+
+func BenchmarkAreEqualMethod(b *testing.B) {
+	x, y := eqSlice{1, 2, 3}, eqSlice{1, 2, 3}
+	for b.Loop() {
+		benchEqualSink, _ = AreEqual(x, y)
+	}
+}
+
+func BenchmarkAreEqualSlice(b *testing.B) {
+	x, y := S(1, 2, 3), S(1, 2, 3)
+	for b.Loop() {
+		benchEqualSink, _ = AreEqual(x, y)
+	}
+}
+
+// BenchmarkAreEqualUndecided measures the walk that ends in no answer,
+// the path Assert functions turn into a failure.
+func BenchmarkAreEqualUndecided(b *testing.B) {
+	x, y := map[string]int{"a": 1}, map[string]int{"a": 1}
+	for b.Loop() {
+		benchEqualSink, _ = AreEqual(x, y)
+	}
+}
