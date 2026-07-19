@@ -146,6 +146,8 @@ for log messages, not a complete message:
 core.AssertEqual(t, expected, actual, "value")
 core.AssertNotEqual(t, expected, actual, "value")
 core.AssertSliceEqual(t, expectedSlice, actualSlice, "slice")
+core.AssertDeepEqual(t, expected, actual, "value")
+core.AssertNotDeepEqual(t, expected, actual, "value")
 core.AssertSame(t, expected, actual, "same reference/value")
 core.AssertNotSame(t, expected, actual, "different reference/value")
 core.AssertTrue(t, condition, "condition")
@@ -153,6 +155,32 @@ core.AssertFalse(t, condition, "negation")
 core.AssertNil(t, value, "nil check")
 core.AssertNotNil(t, value, "non-nil check")
 ```
+
+**Choosing between `Equal` and `DeepEqual`:**
+
+Reach for `AssertEqual` first. It delegates to `core.AreEqual`, so it takes
+values that aren't comparable — a slice, a map — and honours an
+`Equal(T) bool` method where the type defines one.
+
+`AreEqual` walks a slice one level deep and no further. A pair it cannot
+settle fails the assertion, reporting that the values need a deep
+comparison. That is the signal to switch to `AssertDeepEqual`, or
+`AssertMustDeepEqual` where the assertion should abort. The failure names
+no function to call: a base assertion cannot tell whether its caller came
+through a `Must` wrapper, and sending a `Must` caller to a non-`Must`
+function would trade their abort away silently.
+
+The deep form is a fallback, not a stronger one. `reflect.DeepEqual` never
+asks the type, so a lenient `Equal` method passes `AssertEqual` and fails
+`AssertDeepEqual` — and a slice falling back withdraws that treatment from
+every element as well. Worth knowing before taking the advice the failure
+gives.
+
+`AssertSliceEqual` settles shape before contents. A length difference is
+reported as a count, and nil-versus-empty by name, since only nil equals
+nil and both otherwise print as an indistinguishable `[]`. Once the shape
+matches, the first element known to differ is reported by index, sparing
+the reader a long pair of slices to diff by eye.
 
 **Error Assertions:**
 

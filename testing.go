@@ -280,49 +280,66 @@ func RunTestCases[T TestCase](t *testing.T, cases []T) {
 }
 
 // AssertEqual compares two values and reports differences.
-// This is a generic helper that works with any comparable type.
+// Equality is decided by [AreEqual], so the values need not be
+// comparable: typed nils, identity, an Equal(T) bool method, and
+// slices one level deep all settle the answer without panicking.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
+// [AssertDeepEqual] settles what [AreEqual] cannot decide.
 //
 // Example usage:
 //
 //	AssertEqual(t, 42, result, "result value")
 //	AssertEqual(t, "hello", str, "string %d comparison", 1)
-func AssertEqual[U comparable](t T, expected, actual U, name string, args ...any) bool {
+func AssertEqual[U any](t T, expected, actual U, name string, args ...any) bool {
 	t.Helper()
-	ok := actual == expected
-	if !ok {
+	switch is, known := AreEqual(expected, actual); {
+	case !known:
+		doError(t, name, args, "undecided for %T, needs a deep comparison", actual)
+		return false
+	case !is:
 		doError(t, name, args, "expected %v, got %v", expected, actual)
-	} else {
+		return false
+	default:
 		doLog(t, name, args, "%v", actual)
+		return true
 	}
-	return ok
 }
 
 // AssertNotEqual compares two values and ensures they are different.
-// This is a generic helper that works with any comparable type.
-// The name parameter can include printf-style formatting.
+// Inequality is decided by [AreEqual], so the values need not be
+// comparable. The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
+// [AssertNotDeepEqual] settles what [AreEqual] cannot decide.
 //
 // Example usage:
 //
 //	AssertNotEqual(t, 42, result, "result value")
 //	AssertNotEqual(t, "hello", str, "string %d comparison", 1)
-func AssertNotEqual[U comparable](t T, expected, actual U, name string, args ...any) bool {
+func AssertNotEqual[U any](t T, expected, actual U, name string, args ...any) bool {
 	t.Helper()
-	ok := actual != expected
-	if !ok {
-		doError(t, name, args, "expected not %v, got %v", expected, actual)
-	} else {
+	switch is, known := AreEqual(expected, actual); {
+	case !known:
+		doError(t, name, args, "undecided for %T, needs a deep comparison", actual)
+		return false
+	case is:
+		doError(t, name, args, "expected a different value, got %v", actual)
+		return false
+	default:
 		doLog(t, name, args, "%v", actual)
+		return true
 	}
-	return ok
 }
 
 // AssertSliceEqual compares two slices and reports differences.
-// This uses reflect.DeepEqual for comprehensive comparison.
+// Shape is settled first — a length difference is reported as a count,
+// and nil-versus-empty by name, a nil slice being the equal of nil
+// alone. The elements are then decided by [AreEqual], and the first
+// known to differ is reported by index rather than as two whole slices.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
+// [AreEqual] walks one level deep. For nested or otherwise incomparable
+// elements, [AssertDeepEqual] takes a slice as readily as any other type.
 //
 // Example usage:
 //
@@ -330,9 +347,111 @@ func AssertNotEqual[U comparable](t T, expected, actual U, name string, args ...
 //	AssertSliceEqual(t, S("a", "b"), strings, "string slice %s", "test")
 func AssertSliceEqual[U any](t T, expected, actual []U, name string, args ...any) bool {
 	t.Helper()
+	switch {
+	case len(expected) != len(actual):
+		doError(t, name, args, "expected %d elements, got %d",
+			len(expected), len(actual))
+		return false
+	case (expected == nil) != (actual == nil):
+		doError(t, name, args, "expected %s slice, got %s slice",
+			emptySliceKind(expected), emptySliceKind(actual))
+		return false
+	}
+
+	switch is, known := AreEqual(expected, actual); {
+	case !known:
+		doError(t, name, args, "undecided for %s elements, needs a deep comparison",
+			reflect.TypeFor[U]())
+		return false
+	case !is:
+		doSliceDiffError(t, expected, actual, name, args)
+		return false
+	default:
+		doLog(t, name, args, "%v", actual)
+		return true
+	}
+}
+
+// emptySliceKind names an empty slice by its nil-ness, so a nil-versus-empty
+// mismatch reads as such instead of as two identical-looking "[]".
+func emptySliceKind[U any](s []U) string {
+	if s == nil {
+		return "nil"
+	}
+	return "empty"
+}
+
+// doSliceDiffError points at the first element known to differ, sparing
+// the reader a long pair of slices to diff by eye. Lengths are equal by
+// the time it is called.
+//
+// Only a decided difference is cited, because only a decided difference
+// settles the slice. An element [AreEqual] cannot judge is not excused
+// here: standing alone it fails the assertion as undecided before this
+// point is reached, so arriving here means something else settled the
+// verdict — and that is what the reader needs named.
+func doSliceDiffError[U any](t T, expected, actual []U, name string, args []any) {
+	t.Helper()
+	for i := range expected {
+		if is, known := AreEqual(expected[i], actual[i]); is || !known {
+			continue
+		}
+
+		doError(t, name, args, "index %d: expected %v, got %v",
+			i, expected[i], actual[i])
+		return
+	}
+
+	// Unreachable: the slice is decided element-wise, an Equal method on
+	// a named slice type being erased by the []U parameter, so a definite
+	// inequality always has a differing element to point at. Reported
+	// whole rather than silently passing if that ever stops holding.
+	doError(t, name, args, "expected %v, got %v", expected, actual)
+}
+
+// AssertDeepEqual compares two values with [reflect.DeepEqual].
+// It settles what [AssertEqual] leaves undecided, at the cost of the
+// deep traversal [AreEqual] avoids: unexported fields are inspected,
+// and cyclic data is followed until it repeats.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Prefer [AssertEqual] unless the values genuinely need the deep
+// comparison; it honours an Equal(T) bool method, which
+// [reflect.DeepEqual] ignores — elements included, so falling back here
+// from [AssertSliceEqual] withdraws that treatment from every element
+// as well.
+//
+// Example usage:
+//
+//	AssertDeepEqual(t, want, got, "parsed config")
+//	AssertDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+func AssertDeepEqual[U any](t T, expected, actual U, name string, args ...any) bool {
+	t.Helper()
 	ok := reflect.DeepEqual(expected, actual)
 	if !ok {
 		doError(t, name, args, "expected %v, got %v", expected, actual)
+	} else {
+		doLog(t, name, args, "%v", actual)
+	}
+	return ok
+}
+
+// AssertNotDeepEqual compares two values with [reflect.DeepEqual] and
+// ensures they are different. It settles what [AssertNotEqual] leaves
+// undecided.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	AssertNotDeepEqual(t, want, got, "parsed config")
+//	AssertNotDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+func AssertNotDeepEqual[U any](t T, expected, actual U, name string, args ...any) bool {
+	t.Helper()
+	ok := !reflect.DeepEqual(expected, actual)
+	if !ok {
+		doError(t, name, args, "expected a different value, got %v", actual)
 	} else {
 		doLog(t, name, args, "%v", actual)
 	}
@@ -903,7 +1022,7 @@ func collectErrors(errCh chan error) error {
 //
 //	AssertMustEqual(t, 42, result, "result value")
 //	AssertMustEqual(t, "hello", str, "string %d comparison", 1)
-func AssertMustEqual[U comparable](t T, expected, actual U, name string, args ...any) {
+func AssertMustEqual[U any](t T, expected, actual U, name string, args ...any) {
 	t.Helper()
 	if !AssertEqual(t, expected, actual, name, args...) {
 		t.FailNow()
@@ -917,9 +1036,38 @@ func AssertMustEqual[U comparable](t T, expected, actual U, name string, args ..
 //
 //	AssertMustNotEqual(t, 42, result, "result value")
 //	AssertMustNotEqual(t, "hello", str, "string %d comparison", 1)
-func AssertMustNotEqual[U comparable](t T, expected, actual U, name string, args ...any) {
+func AssertMustNotEqual[U any](t T, expected, actual U, name string, args ...any) {
 	t.Helper()
 	if !AssertNotEqual(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustDeepEqual calls AssertDeepEqual and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustDeepEqual(t, want, got, "parsed config")
+//	AssertMustDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+func AssertMustDeepEqual[U any](t T, expected, actual U, name string, args ...any) {
+	t.Helper()
+	if !AssertDeepEqual(t, expected, actual, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustNotDeepEqual calls AssertNotDeepEqual and t.FailNow() if the
+// assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustNotDeepEqual(t, want, got, "parsed config")
+//	AssertMustNotDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+func AssertMustNotDeepEqual[U any](t T, expected, actual U, name string, args ...any) {
+	t.Helper()
+	if !AssertNotDeepEqual(t, expected, actual, name, args...) {
 		t.FailNow()
 	}
 }
