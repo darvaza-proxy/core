@@ -49,8 +49,7 @@ project-root/
 ├── renovate.json              # Dependency update configuration
 ├── .github/workflows/         # CI/CD workflows
 │   ├── build.yml             # Multi-version Go builds
-│   ├── test.yml              # Testing (optional)
-│   ├── race.yml              # Race detection testing
+│   ├── platforms.yml        # Cross-platform test and race, gated on Linux
 │   ├── codecov.yml           # Coverage reporting
 │   ├── renovate.yml          # Dependency updates
 │   ├── claude.yml            # Claude Code workflow
@@ -108,6 +107,8 @@ Creates Makefile rules for each discovered module:
 - `test` - Run unit tests (no cache reuse)
 - `tidy` - Format, lint, and validate code
 - `up` - Update module dependencies
+- `vet` - Vet packages; compiles each package and its tests, so it
+  doubles as a cross-platform compile check under `GOOS`
 
 ### Tool Version Selection (`get_version.sh`)
 
@@ -255,6 +256,7 @@ The system automatically generates targets for each discovered module:
 - **`race-{module}`**: Run race detection tests for specific module.
 - **`get-{module}`**: Download dependencies for specific module.
 - **`up-{module}`**: Update dependencies for specific module.
+- **`vet-{module}`**: Vet specific module, cross-compiling its tests.
 
 ### Tool Integration
 

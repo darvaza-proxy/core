@@ -34,6 +34,7 @@
     "goimports",
     "golangci",
     "golangci-lint",
+    "GOOS",
     "GOPATH",
     "goroutines",
     "GOTEST",
