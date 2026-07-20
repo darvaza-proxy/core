@@ -76,7 +76,7 @@ func AsError[T any](v T) error {
 // the elements that are errors.
 func AsErrors[T any](vv []T) []error {
 	return SliceAsFn(func(v T) (error, bool) {
-		err := AsError[T](v)
+		err := AsError(v)
 		return err, err != nil
 	}, vv)
 }
