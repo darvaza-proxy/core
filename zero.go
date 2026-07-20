@@ -398,13 +398,20 @@ func isComparableValue(v reflect.Value) bool {
 	return !v.IsValid() || v.Comparable()
 }
 
-// AreEqual reports whether every given value equals the next one, as
-// the == operator would decide, without ever panicking. Values of the
-// same comparable type are tested with == itself. When == is
-// unavailable, typed nils and identity — sharing the same underlying
-// data, as [IsSame] sees it — settle the question, and the value's
-// own Equal method, following the Equal(T) bool convention, stands in
-// for ==.
+// AreEqual reports whether every given value equals the next one,
+// without ever panicking. Values of the same comparable type are tested
+// with == first: a true == is authoritative, and a false == defers to
+// the value's own Equal method, following the Equal(T) bool convention.
+// A comparable type whose == tests more than its own notion of equality
+// still settles correctly this way:
+//   - time.Time compares its monotonic reading under ==, its instant
+//     under Equal.
+//   - a pointer type that defines Equal compares identity under ==, its
+//     contents under Equal.
+//
+// When == is unavailable, the question is settled by typed nils, by
+// identity (the same underlying data, as [IsSame] sees it), and by the
+// Equal method standing in for ==.
 //
 // Slices without a decisive Equal method are compared element by
 // element, one level deep: lengths must match, and each element pair
@@ -468,11 +475,31 @@ func areEqual2(a, b comparableValue, deep bool) (is, known bool) {
 		// both untyped nil
 		return true, true
 	case a.ok && b.ok:
-		// safe ==
-		return a.v.Interface() == b.v.Interface(), true
+		// == decides; a false == still defers to an Equal method
+		return areEqualComparable(a.v, b.v)
 	default:
 		return areEqualFallback(a.v, b.v, deep)
 	}
+}
+
+// areEqualComparable settles two operands that both support ==. A true
+// == is authoritative and skips the Equal method. A false == defers to
+// the Equal method, following the Equal(T) bool convention, so a type
+// whose == tests more than its own notion of equality still settles
+// correctly. Without a decisive Equal method, == stands.
+func areEqualComparable(va, vb reflect.Value) (is, known bool) {
+	if va.Interface() == vb.Interface() {
+		// authoritative
+		return true, true
+	}
+
+	if is, known = equalMethod(va, vb); known {
+		// Equal rescues a pair == calls unequal
+		return is, true
+	}
+
+	// == is authoritative when no Equal method decides
+	return false, true
 }
 
 // areEqualFallback decides equality when == is unavailable: typed
@@ -564,7 +591,8 @@ func unwrapInterface(v reflect.Value) reflect.Value {
 }
 
 // equalMethod consults the value's own Equal method, following the
-// Equal(T) bool convention, as a stand-in for an unavailable ==.
+// Equal(T) bool convention, to decide a pair == cannot settle, whether
+// because == is unavailable or because it called the pair unequal.
 // Without such a method, or if the call panics, the question stays
 // unknown.
 func equalMethod(va, vb reflect.Value) (is, known bool) {
