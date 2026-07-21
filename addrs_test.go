@@ -123,17 +123,12 @@ func (tc parseNetIPTestCase) Test(t *testing.T) {
 
 	got, err := ParseNetIP(tc.input)
 	if tc.wantErr {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		}
-	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
-		if !got.Equal(tc.want) {
-			t.Errorf("Expected %v, got %v", tc.want, got)
-		}
+		AssertError(t, err, "error")
+		return
 	}
+
+	AssertNoError(t, err, "parse")
+	AssertEqual(t, tc.want, got, "IP")
 }
 
 func TestParseNetIP(t *testing.T) {
@@ -451,15 +446,11 @@ func TestAsNetIPAddresses(t *testing.T) {
 	result := asNetIPAddresses(addrs...)
 
 	// Should have 3 valid addresses (invalid one skipped)
-	if len(result) != 3 {
-		t.Errorf("Expected 3 addresses, got %d", len(result))
-	}
+	AssertMustEqual(t, 3, len(result), "count")
 
 	// Verify the IPv4-mapped address is unmapped
 	lastAddr := result[2]
-	if !lastAddr.Equal(net.ParseIP("192.168.1.2")) {
-		t.Errorf("Expected unmapped IPv4 address, got %v", lastAddr)
-	}
+	AssertEqual(t, net.ParseIP("192.168.1.2"), lastAddr, "unmapped IPv4")
 }
 
 func TestAsNetIP(t *testing.T) {
@@ -472,13 +463,9 @@ func testAsNetIPv4(t *testing.T) {
 	addr := netip.MustParseAddr("192.168.1.1")
 	ip := asNetIP(addr)
 	expected := net.ParseIP("192.168.1.1").To4()
-	if !ip.Equal(expected) {
-		t.Errorf("Expected %v, got %v", expected, ip)
-	}
+	AssertEqual(t, expected, ip, "IPv4")
 	// Should be 4 bytes for IPv4
-	if len(ip) != 4 {
-		t.Errorf("Expected 4 bytes for IPv4, got %d", len(ip))
-	}
+	AssertEqual(t, 4, len(ip), "byte length")
 }
 
 func testAsNetIPv6(t *testing.T) {
@@ -486,13 +473,9 @@ func testAsNetIPv6(t *testing.T) {
 	addr := netip.MustParseAddr("2001:db8::1")
 	ip := asNetIP(addr)
 	expected := net.ParseIP("2001:db8::1")
-	if !ip.Equal(expected) {
-		t.Errorf("Expected %v, got %v", expected, ip)
-	}
+	AssertEqual(t, expected, ip, "IPv6")
 	// Should be 16 bytes for IPv6
-	if len(ip) != 16 {
-		t.Errorf("Expected 16 bytes for IPv6, got %d", len(ip))
-	}
+	AssertEqual(t, 16, len(ip), "byte length")
 }
 
 func TestAppendNetIPAsIP(t *testing.T) {

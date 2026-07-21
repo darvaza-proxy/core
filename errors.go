@@ -1,38 +1,31 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"slices"
 )
 
-// Sentinel errors for common conditions. Except for [ErrTODO] and
-// [ErrInvalid], these are [StringError] constants: they can't be
-// reassigned and match by value.
-const (
-	// ErrNotImplemented indicates something hasn't been implemented yet
-	ErrNotImplemented StringError = "not implemented"
-	// ErrExists indicates something already exists. It is deliberately
-	// general, distinct from the file-centric [fs.ErrExist].
-	ErrExists StringError = "already exists"
-	// ErrNotExists indicates something doesn't exist. It is deliberately
-	// general, distinct from the file-centric [fs.ErrNotExist].
-	ErrNotExists StringError = "does not exist"
-	// ErrUnknown indicates something isn't recognized
-	ErrUnknown StringError = "unknown"
-	// ErrNilReceiver indicates a method was called over a nil instance
-	ErrNilReceiver StringError = "nil receiver"
-	// ErrUnreachable indicates something impossible happened
-	ErrUnreachable StringError = "unreachable"
-)
-
 var (
+	// ErrNotImplemented indicates something hasn't been implemented yet
+	ErrNotImplemented = errors.New("not implemented")
 	// ErrTODO is like ErrNotImplemented but used especially to
 	// indicate something needs to be implemented
 	ErrTODO = Wrap(ErrNotImplemented, "TODO")
+	// ErrExists indicates something already exists
+	ErrExists = errors.New("already exists")
+	// ErrNotExists indicates something doesn't exist
+	ErrNotExists = errors.New("does not exist")
 	// ErrInvalid indicates an argument isn't valid. It's an alias of
 	// [fs.ErrInvalid] so errors.Is matches across the boundary.
 	ErrInvalid = fs.ErrInvalid
+	// ErrUnknown indicates something isn't recognized
+	ErrUnknown = errors.New("unknown")
+	// ErrNilReceiver indicates a method was called over a nil instance
+	ErrNilReceiver = errors.New("nil receiver")
+	// ErrUnreachable indicates something impossible happened
+	ErrUnreachable = errors.New("unreachable")
 )
 
 var (
