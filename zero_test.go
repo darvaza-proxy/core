@@ -5,6 +5,7 @@ import (
 	"math"
 	"reflect"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unsafe"
@@ -1544,10 +1545,22 @@ type panicEqMap map[string]int
 func (panicEqMap) Equal(panicEqMap) bool { panic("Equal called") }
 
 // eqAlways is comparable with an Equal method that always matches,
-// proving == takes precedence for comparable types.
+// proving a false == defers to Equal for comparable types.
 type eqAlways int
 
 func (eqAlways) Equal(eqAlways) bool { return true }
+
+// eqNeverComparable is comparable with an Equal method that never
+// matches. The call counter lets a test prove a true == skips Equal
+// outright while a false == still invokes it.
+type eqNeverComparable int
+
+var eqNeverComparableCalls atomic.Int64
+
+func (eqNeverComparable) Equal(eqNeverComparable) bool {
+	eqNeverComparableCalls.Add(1)
+	return false
+}
 
 type areComparableTestCase struct {
 	name string
@@ -1636,8 +1649,12 @@ func areEqualComparableTestCases() []areEqualTestCase {
 			S[any]("a", "a", "b"), false, true),
 		newAreEqualTestCase("NaN never equals",
 			S[any](math.NaN(), math.NaN()), false, true),
-		newAreEqualTestCase("== beats Equal for comparable types",
-			S[any](eqAlways(1), eqAlways(2)), false, true),
+		newAreEqualTestCase("Equal rescues a false ==",
+			S[any](eqAlways(1), eqAlways(2)), true, true),
+		newAreEqualTestCase("true == skips Equal",
+			S[any](eqNeverComparable(1), eqNeverComparable(1)), true, true),
+		newAreEqualTestCase("false == with false Equal stays unequal",
+			S[any](eqNeverComparable(1), eqNeverComparable(2)), false, true),
 	}
 }
 
@@ -1736,6 +1753,22 @@ func TestAreEqual(t *testing.T) {
 	t.Run("slices", func(t *testing.T) {
 		RunTestCases(t, areEqualSliceTestCases())
 	})
+}
+
+// TestAreEqualComparableEqualCalls pins that AreEqual consults a
+// comparable type's Equal method only when == is false: a true == skips
+// it outright, a false == invokes it. The table rows above cover the
+// returned verdict; this covers the call itself.
+func TestAreEqualComparableEqualCalls(t *testing.T) {
+	eqNeverComparableCalls.Store(0)
+	is, _ := AreEqual(eqNeverComparable(1), eqNeverComparable(1))
+	AssertTrue(t, is, "true == equal")
+	AssertEqual(t, int64(0), eqNeverComparableCalls.Load(), "Equal skipped on true ==")
+
+	eqNeverComparableCalls.Store(0)
+	is, _ = AreEqual(eqNeverComparable(1), eqNeverComparable(2))
+	AssertFalse(t, is, "false == unequal")
+	AssertEqual(t, int64(1), eqNeverComparableCalls.Load(), "Equal consulted on false ==")
 }
 
 // Benchmarks
