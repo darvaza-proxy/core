@@ -26,13 +26,13 @@ func runListIterationTest(t *testing.T, iterFn func(*list.List, func(int) bool),
 		l.PushBack(v)
 	}
 
-	var result []int
+	result := S[int]()
 	iterFn(l, func(v int) bool {
 		result = append(result, v)
 		return false
 	})
 
-	assertIntSlicesEqual(t, expected, result)
+	AssertSliceEqual(t, expected, result, "visited values")
 }
 
 func testListElementIteration(
@@ -58,13 +58,13 @@ func runListElementIterationTest(
 		l.PushBack(v)
 	}
 
-	var result []int
+	result := S[int]()
 	iterFn(l, func(e *list.Element) bool {
 		result = append(result, e.Value.(int))
 		return false
 	})
 
-	assertIntSlicesEqual(t, expected, result)
+	AssertSliceEqual(t, expected, result, "visited values")
 }
 
 func TestListForEach(t *testing.T) {
@@ -92,7 +92,7 @@ func TestListForEachBackward(t *testing.T) {
 	testListIteration(t, "single element", ListForEachBackward[int], S(1), S(1))
 	testListIteration(t, "multiple elements", ListForEachBackward[int], S(1, 2, 3), S(3, 2, 1))
 
-	testListForEachBackwardNilAndEarlyReturn(t, "ListForEachBackward", func(l *list.List, fn func(int) bool) {
+	testListForEachNilAndEarlyReturn(t, "ListForEachBackward", func(l *list.List, fn func(int) bool) {
 		ListForEachBackward(l, fn)
 	})
 }
@@ -102,23 +102,10 @@ func TestListForEachBackwardElement(t *testing.T) {
 	testListElementIteration(t, "single element", ListForEachBackwardElement, S(1), S(1))
 	testListElementIteration(t, "multiple elements", ListForEachBackwardElement, S(1, 2, 3), S(3, 2, 1))
 
-	testListForEachBackwardElementNilAndEarlyReturn(t, "ListForEachBackwardElement",
+	testListForEachElementNilAndEarlyReturn(t, "ListForEachBackwardElement",
 		func(l *list.List, fn func(*list.Element) bool) {
 			ListForEachBackwardElement(l, fn)
 		})
-}
-
-func assertIntSlicesEqual(t *testing.T, expected, actual []int) {
-	t.Helper()
-	if len(actual) != len(expected) {
-		t.Errorf("Expected length %d, got %d", len(expected), len(actual))
-	}
-	for i, v := range actual {
-		if i >= len(expected) || v != expected[i] {
-			t.Errorf("Expected %v, got %v", expected, actual)
-			break
-		}
-	}
 }
 
 // Test cases for ListContains function
@@ -244,12 +231,8 @@ func TestListCopy(t *testing.T) {
 // Test ListCopy with nil input
 func TestListCopyNil(t *testing.T) {
 	result := ListCopy[int](nil)
-	if result == nil {
-		t.Error("ListCopy(nil) should return a new empty list, not nil")
-	}
-	if result.Len() != 0 {
-		t.Errorf("ListCopy(nil) should return empty list, got length %d", result.Len())
-	}
+	AssertMustNotNil(t, result, "ListCopy(nil)")
+	AssertEqual(t, 0, result.Len(), "length")
 }
 
 // Test ListContainsFn function
@@ -379,9 +362,7 @@ func testListForEachNilFunction(t *testing.T, name string, iterFn func(*list.Lis
 	l.PushBack(1)
 	l.PushBack(2)
 
-	var result []int
-	iterFn(l, func(int) bool { return false })
-	AssertEqual(t, 0, len(result), name+" nil function")
+	AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
 }
 
 func testListForEachEarlyReturn(t *testing.T, name string, iterFn func(*list.List, func(int) bool)) {
@@ -436,9 +417,7 @@ func testListForEachElementNilFunction(t *testing.T, name string, iterFn func(*l
 	l := list.New()
 	l.PushBack(1)
 
-	var called bool
-	iterFn(l, nil)
-	AssertFalse(t, called, name+" nil function")
+	AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
 }
 
 func testListForEachElementEarlyReturn(t *testing.T, name string, iterFn func(*list.List, func(*list.Element) bool)) {
@@ -471,17 +450,6 @@ func testListForEachElementNilList(t *testing.T, name string, iterFn func(*list.
 		return false
 	})
 	AssertEqual(t, 0, len(result), name+" nil list")
-}
-
-func testListForEachBackwardNilAndEarlyReturn(t *testing.T, name string, iterFn func(*list.List, func(int) bool)) {
-	t.Helper()
-	testListForEachNilAndEarlyReturn(t, name, iterFn)
-}
-
-func testListForEachBackwardElementNilAndEarlyReturn(t *testing.T, name string,
-	iterFn func(*list.List, func(*list.Element) bool)) {
-	t.Helper()
-	testListForEachElementNilAndEarlyReturn(t, name, iterFn)
 }
 
 type listForEachTypeMismatchTestCase struct {

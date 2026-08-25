@@ -28,9 +28,7 @@ func (tc coalesceTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
 	got := Coalesce(tc.inputs...)
-	if got != tc.expected {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "Coalesce")
 }
 
 // Factory function for coalesceTestCase
@@ -95,17 +93,17 @@ func (tc coalescePointerTestCase[T]) Test(t *testing.T) {
 
 	got := Coalesce(tc.inputs...)
 
-	// Compare pointer values
-	if tc.expected == nil && got == nil {
+	// Coalesce returns one of its arguments, so the rows pair it with a
+	// separately allocated pointer of equal value. Compare what they
+	// point at: AreEqual settles pointers by identity, which would call
+	// every such row unequal.
+	if tc.expected == nil {
+		AssertNil(t, got, "Coalesce")
 		return
 	}
-	if tc.expected == nil || got == nil {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, got, tc.expected)
-		return
-	}
-	if *got != *tc.expected {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, *got, *tc.expected)
-	}
+
+	AssertMustNotNil(t, got, "Coalesce result")
+	AssertEqual(t, *tc.expected, *got, "Coalesce value")
 }
 
 // Factory function for coalescePointerTestCase
@@ -206,9 +204,7 @@ func (tc iifTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifTestCase
@@ -253,9 +249,7 @@ func (tc iifStringTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStringTestCase
@@ -299,17 +293,16 @@ func (tc iifPointerTestCase) Test(t *testing.T) {
 
 	got := IIf(tc.cond, tc.yes, tc.no)
 
-	// Compare pointer values
-	if tc.expected == nil && got == nil {
+	// As with Coalesce above, the expected pointer is allocated apart
+	// from the one IIf selects, so compare what they point at rather
+	// than the pointers themselves.
+	if tc.expected == nil {
+		AssertNil(t, got, "IIf")
 		return
 	}
-	if tc.expected == nil || got == nil {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-		return
-	}
-	if *got != *tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, *got, *tc.expected)
-	}
+
+	AssertMustNotNil(t, got, "IIf result")
+	AssertEqual(t, *tc.expected, *got, "IIf value")
 }
 
 // Factory function for iifPointerTestCase
@@ -353,9 +346,7 @@ func (tc iifStructTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %+v, %+v) = %+v, want %+v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStructTestCase
@@ -401,19 +392,11 @@ func TestIIfEvaluation(t *testing.T) {
 	no := evaluateNoFunction(&calledNo)
 
 	// Both should be evaluated before IIf is called
-	if !calledYes || !calledNo {
-		t.Errorf("Functions not evaluated before IIf call: yes=%v, no=%v", calledYes, calledNo)
-	}
+	AssertTrue(t, calledYes, "yes evaluated")
+	AssertTrue(t, calledNo, "no evaluated")
 
-	result := IIf(true, yes, no)
-	if result != 42 {
-		t.Errorf("IIf(true, 42, 100) = %v, want 42", result)
-	}
-
-	result = IIf(false, yes, no)
-	if result != 100 {
-		t.Errorf("IIf(false, 42, 100) = %v, want 100", result)
-	}
+	AssertEqual(t, 42, IIf(true, yes, no), "IIf true")
+	AssertEqual(t, 100, IIf(false, yes, no), "IIf false")
 }
 
 func evaluateYesFunction(called *bool) int {
