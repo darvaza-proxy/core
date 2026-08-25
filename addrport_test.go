@@ -114,12 +114,8 @@ func (tc addrPortTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, ok := AddrPort(tc.input)
-	if ok != tc.wantOK {
-		t.Errorf("Expected ok=%v, got %v", tc.wantOK, ok)
-	}
-	if got != tc.want {
-		t.Errorf("Expected %v, got %v", tc.want, got)
-	}
+	AssertEqual(t, tc.wantOK, ok, "ok")
+	AssertEqual(t, tc.want, got, "address")
 }
 
 func TestAddrPort(t *testing.T) {
@@ -195,15 +191,9 @@ func (tc typeSpecificAddrPortTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, ok, known := typeSpecificAddrPort(tc.input)
-	if known != tc.wantKnown {
-		t.Errorf("Expected known=%v, got %v", tc.wantKnown, known)
-	}
-	if ok != tc.wantOK {
-		t.Errorf("Expected ok=%v, got %v", tc.wantOK, ok)
-	}
-	if got != tc.want {
-		t.Errorf("Expected %v, got %v", tc.want, got)
-	}
+	AssertEqual(t, tc.wantKnown, known, "known")
+	AssertEqual(t, tc.wantOK, ok, "ok")
+	AssertEqual(t, tc.want, got, "address")
 }
 
 func TestTypeSpecificAddrPort(t *testing.T) {
@@ -217,33 +207,31 @@ func TestAddrPortInterfaceChaining(t *testing.T) {
 }
 
 func testRecursiveInterfaceResolution(t *testing.T) {
+	t.Helper()
+
 	// Create a provider that returns another provider
 	tcpAddr := &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080}
 	provider := addrProvider{tcpAddr}
 
 	got, ok := AddrPort(provider)
-	if !ok {
-		t.Error("Expected success for addrProvider with TCPAddr")
-	}
+	AssertTrue(t, ok, "ok")
 
 	want := netip.MustParseAddrPort("192.168.1.1:8080")
-	if got != want {
-		t.Errorf("Expected %v, got %v", want, got)
-	}
+	AssertEqual(t, want, got, "address")
 }
 
 func testNilFromInterfaceMethods(t *testing.T) {
+	t.Helper()
+
 	nilProvider := addrProvider{nil}
-	_, ok := AddrPort(nilProvider)
-	if ok {
-		t.Error("Expected failure for nil Addr()")
-	}
+	got, ok := AddrPort(nilProvider)
+	AssertFalse(t, ok, "nil Addr() ok")
+	AssertEqual(t, netip.AddrPort{}, got, "nil Addr() address")
 
 	nilRemoteProvider := remoteAddrProvider{nil}
-	_, ok = AddrPort(nilRemoteProvider)
-	if ok {
-		t.Error("Expected failure for nil RemoteAddr()")
-	}
+	got, ok = AddrPort(nilRemoteProvider)
+	AssertFalse(t, ok, "nil RemoteAddr() ok")
+	AssertEqual(t, netip.AddrPort{}, got, "nil RemoteAddr() address")
 }
 
 // Test with real network connection types (mock)
@@ -261,14 +249,10 @@ func TestAddrPortWithMockConnection(t *testing.T) {
 	}
 
 	got, ok := AddrPort(conn)
-	if !ok {
-		t.Error("Expected success for mock connection")
-	}
+	AssertTrue(t, ok, "ok")
 
 	want := netip.MustParseAddrPort("192.168.1.100:12345")
-	if got != want {
-		t.Errorf("Expected %v, got %v", want, got)
-	}
+	AssertEqual(t, want, got, "address")
 }
 
 // Test with IPv4 addresses using To4()
@@ -278,15 +262,11 @@ func TestAddrPortIPv4Handling(t *testing.T) {
 	tcpAddr := &net.TCPAddr{IP: ipv4, Port: 8080}
 
 	got, ok := AddrPort(tcpAddr)
-	if !ok {
-		t.Error("Expected success for IPv4 address")
-	}
+	AssertTrue(t, ok, "ok")
 
 	// Should get the IPv4 address directly
 	want := netip.MustParseAddrPort("192.168.1.1:8080")
-	if got != want {
-		t.Errorf("Expected %v, got %v", want, got)
-	}
+	AssertEqual(t, want, got, "address")
 }
 
 // Benchmarks

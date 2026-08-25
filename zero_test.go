@@ -37,7 +37,7 @@ func (tc zeroTestCase[T]) Name() string {
 func (tc zeroTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 	result := Zero(tc.factory())
-	AssertEqual(t, tc.expected, result, "Zero[%s]", tc.name)
+	AssertEqual(t, tc.expected, result, "Zero[%T]", tc.expected)
 }
 
 // Generic test case for reference types that should return nil
