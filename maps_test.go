@@ -568,10 +568,8 @@ func TestMapListCopy(t *testing.T) {
 	// Verify contents
 	for key, srcList := range src {
 		dstList, ok := dst[key]
-		if !ok {
-			t.Errorf("MapListCopy missing key %q", key)
-			continue
-		}
+		AssertMustTrue(t, ok, "key %q copied", key)
+		AssertMustNotNil(t, dstList, "key %q list", key)
 		AssertEqual(t, srcList.Len(), dstList.Len(), "list length[%q]", key)
 	}
 
@@ -596,9 +594,11 @@ func TestMapListCopyFn(t *testing.T) {
 	})
 
 	// Verify transformation
-	el := dst["key1"].Front()
-	v, ok := el.Value.(data)
-	AssertTrue(t, ok, "MapListCopyFn type check")
+	copied := dst["key1"]
+	AssertMustNotNil(t, copied, "key1 copied")
+	el := copied.Front()
+	AssertMustNotNil(t, el, "first element")
+	v := AssertMustTypeIs[data](t, el.Value, "first element value")
 	AssertEqual(t, "a-copy", v.value, "transformed value")
 
 	// Test filtering
@@ -606,7 +606,9 @@ func TestMapListCopyFn(t *testing.T) {
 		return v, v.value != "b" // exclude "b"
 	})
 
-	AssertEqual(t, 1, dst2["key1"].Len(), "filtered length")
+	filtered := dst2["key1"]
+	AssertMustNotNil(t, filtered, "key1 filtered")
+	AssertEqual(t, 1, filtered.Len(), "filtered length")
 }
 
 type mapAllListContainsTestCase struct {

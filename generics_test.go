@@ -72,9 +72,7 @@ func (tc coalesceTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
 	got := Coalesce(tc.inputs...)
-	if got != tc.expected {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "Coalesce")
 }
 
 // Factory function for coalesceTestCase
@@ -138,18 +136,7 @@ func (tc coalescePointerTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
 	got := Coalesce(tc.inputs...)
-
-	// Compare pointer values
-	if tc.expected == nil && got == nil {
-		return
-	}
-	if tc.expected == nil || got == nil {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, got, tc.expected)
-		return
-	}
-	if *got != *tc.expected {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, *got, *tc.expected)
-	}
+	AssertSame(t, tc.expected, got, "Coalesce")
 }
 
 // Factory function for coalescePointerTestCase
@@ -165,18 +152,26 @@ func intPtr(v int) *int {
 	return &v
 }
 
-var coalescePointerTestCases = []coalescePointerTestCase[int]{
-	newCoalescePointerTestCase("all nil", S[*int](nil, nil, nil), nil),
-	newCoalescePointerTestCase("first non-nil", S(nil, intPtr(42), nil, intPtr(100)), intPtr(42)),
-	newCoalescePointerTestCase("last non-nil", S(nil, nil, nil, intPtr(100)), intPtr(100)),
-	newCoalescePointerTestCase("single value", S(intPtr(42)), intPtr(42)),
-	newCoalescePointerTestCase("single nil", S[*int](nil), nil),
-	newCoalescePointerTestCase("empty inputs", S[*int](), nil),
-	newCoalescePointerTestCase("zero value pointer is not nil", S(nil, intPtr(0), nil, intPtr(100)), intPtr(0)),
+// coalescePointerTestCases pairs each row with the input pointer it
+// expects back, rather than with a separately allocated one of equal
+// value, so that the identity Coalesce promises is what the rows
+// declare.
+func coalescePointerTestCases() []coalescePointerTestCase[int] {
+	first, last, zero := intPtr(42), intPtr(100), intPtr(0)
+
+	return []coalescePointerTestCase[int]{
+		newCoalescePointerTestCase("all nil", S[*int](nil, nil, nil), nil),
+		newCoalescePointerTestCase("first non-nil", S(nil, first, nil, last), first),
+		newCoalescePointerTestCase("last non-nil", S(nil, nil, nil, last), last),
+		newCoalescePointerTestCase("single value", S(first), first),
+		newCoalescePointerTestCase("single nil", S[*int](nil), nil),
+		newCoalescePointerTestCase("empty inputs", S[*int](), nil),
+		newCoalescePointerTestCase("zero value pointer is not nil", S(nil, zero, nil, last), zero),
+	}
 }
 
 func TestCoalescePointer(t *testing.T) {
-	RunTestCases(t, coalescePointerTestCases)
+	RunTestCases(t, coalescePointerTestCases())
 }
 
 // testStruct for testing struct coalescing
@@ -250,9 +245,7 @@ func (tc iifTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifTestCase
@@ -297,9 +290,7 @@ func (tc iifStringTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStringTestCase
@@ -342,18 +333,7 @@ func (tc iifPointerTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-
-	// Compare pointer values
-	if tc.expected == nil && got == nil {
-		return
-	}
-	if tc.expected == nil || got == nil {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-		return
-	}
-	if *got != *tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, *got, *tc.expected)
-	}
+	AssertSame(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifPointerTestCase
@@ -367,17 +347,24 @@ func newIifPointerTestCase(name string, cond bool, yes, no, expected *int) iifPo
 	}
 }
 
-var iifPointerTestCases = []iifPointerTestCase{
-	newIifPointerTestCase("true condition", true, intPtr(42), intPtr(100), intPtr(42)),
-	newIifPointerTestCase("false condition", false, intPtr(42), intPtr(100), intPtr(100)),
-	newIifPointerTestCase("true with nil", true, nil, intPtr(100), nil),
-	newIifPointerTestCase("false with nil", false, intPtr(42), nil, nil),
-	newIifPointerTestCase("both nil true", true, nil, nil, nil),
-	newIifPointerTestCase("both nil false", false, nil, nil, nil),
+// iifPointerTestCases declares as the expectation the very pointer IIf
+// should hand back, since IIf returns one of its arguments and identity
+// is what says which.
+func iifPointerTestCases() []iifPointerTestCase {
+	yes, no := intPtr(42), intPtr(100)
+
+	return []iifPointerTestCase{
+		newIifPointerTestCase("true condition", true, yes, no, yes),
+		newIifPointerTestCase("false condition", false, yes, no, no),
+		newIifPointerTestCase("true with nil", true, nil, no, nil),
+		newIifPointerTestCase("false with nil", false, yes, nil, nil),
+		newIifPointerTestCase("both nil true", true, nil, nil, nil),
+		newIifPointerTestCase("both nil false", false, nil, nil, nil),
+	}
 }
 
 func TestIIfPointer(t *testing.T) {
-	RunTestCases(t, iifPointerTestCases)
+	RunTestCases(t, iifPointerTestCases())
 }
 
 // iifStructTestCase tests IIf with structs
@@ -397,9 +384,7 @@ func (tc iifStructTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %+v, %+v) = %+v, want %+v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStructTestCase
@@ -445,19 +430,11 @@ func TestIIfEvaluation(t *testing.T) {
 	no := evaluateNoFunction(&calledNo)
 
 	// Both should be evaluated before IIf is called
-	if !calledYes || !calledNo {
-		t.Errorf("Functions not evaluated before IIf call: yes=%v, no=%v", calledYes, calledNo)
-	}
+	AssertTrue(t, calledYes, "yes evaluated")
+	AssertTrue(t, calledNo, "no evaluated")
 
-	result := IIf(true, yes, no)
-	if result != 42 {
-		t.Errorf("IIf(true, 42, 100) = %v, want 42", result)
-	}
-
-	result = IIf(false, yes, no)
-	if result != 100 {
-		t.Errorf("IIf(false, 42, 100) = %v, want 100", result)
-	}
+	AssertEqual(t, 42, IIf(true, yes, no), "IIf true")
+	AssertEqual(t, 100, IIf(false, yes, no), "IIf false")
 }
 
 func evaluateYesFunction(called *bool) int {

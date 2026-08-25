@@ -164,12 +164,11 @@ func (tc quietWrapTestCase) Test(t *testing.T) {
 	if tc.expected == "" {
 		AssertEqual(t, tc.err, result, "QuietWrap original")
 	} else {
-		AssertEqual(t, tc.expected, result.Error(), "QuietWrap message")
-
 		// Test that it's wrappable
-		if wrapped, ok := result.(Unwrappable); ok {
-			AssertEqual(t, tc.err, wrapped.Unwrap(), "QuietWrap unwrap")
-		}
+		wrapped := AssertMustTypeIs[Unwrappable](t, result, "QuietWrap")
+
+		AssertEqual(t, tc.expected, result.Error(), "QuietWrap message")
+		AssertEqual(t, tc.err, wrapped.Unwrap(), "QuietWrap unwrap")
 	}
 }
 

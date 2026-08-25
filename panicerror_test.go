@@ -3,7 +3,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 )
 
@@ -119,16 +118,13 @@ func (tc panicErrorUnwrapTestCase) Test(t *testing.T) {
 	pe := NewPanicError(0, tc.payload)
 	unwrapped := pe.Unwrap()
 
-	if tc.expectUnwrap {
-		if unwrapped == nil {
-			t.Fatal("expected unwrapped error, got nil")
-		}
-		if unwrapped.Error() != tc.expectedError {
-			t.Fatalf("expected unwrapped error '%s', got '%s'", tc.expectedError, unwrapped.Error())
-		}
-	} else if unwrapped != nil {
-		t.Fatalf("expected nil unwrapped, got %v", unwrapped)
+	if !tc.expectUnwrap {
+		AssertNil(t, unwrapped, "Unwrap")
+		return
 	}
+
+	AssertMustError(t, unwrapped, "Unwrap")
+	AssertEqual(t, tc.expectedError, unwrapped.Error(), "unwrapped")
 }
 
 // Factory function for panicErrorUnwrapTestCase
@@ -164,16 +160,12 @@ func (tc newPanicErrorfTestCase) Test(t *testing.T) {
 	pe := NewPanicErrorf(0, tc.format, tc.args...)
 
 	// Test Error method
-	errorStr := pe.Error()
 	expectedError := fmt.Sprintf("panic: %s", tc.expected)
-	if errorStr != expectedError {
-		t.Fatalf("expected error '%s', got '%s'", expectedError, errorStr)
-	}
+	AssertEqual(t, expectedError, pe.Error(), "Error")
 
-	// Test that payload is an error
-	if _, ok := pe.Recovered().(error); !ok {
-		t.Fatalf("expected error payload, got %T", pe.Recovered())
-	}
+	// Test that the payload is an error carrying the formatted message
+	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload")
+	AssertEqual(t, tc.expected, payload.Error(), "payload message")
 }
 
 // Factory function for newPanicErrorfTestCase
@@ -187,28 +179,23 @@ func newNewPanicErrorfTestCase(name, format string, args []any, expected string)
 }
 
 func runNewPanicWrapTest(t *testing.T) {
+	t.Helper()
 	originalErr := errors.New("original error")
 	note := "wrapped note"
 
 	pe := NewPanicWrap(0, originalErr, note)
 
 	// Test that it wraps the error
-	unwrapped := pe.Unwrap()
-	if unwrapped == nil {
-		t.Fatal("expected unwrapped error, got nil")
-	}
+	AssertError(t, pe.Unwrap(), "Unwrap")
 
 	// Test error message contains both note and original
 	errorStr := pe.Error()
-	if !strings.Contains(errorStr, note) {
-		t.Fatalf("expected error to contain note '%s', got '%s'", note, errorStr)
-	}
-	if !strings.Contains(errorStr, originalErr.Error()) {
-		t.Fatalf("expected error to contain original error '%s', got '%s'", originalErr.Error(), errorStr)
-	}
+	AssertContains(t, errorStr, note, "note")
+	AssertContains(t, errorStr, originalErr.Error(), "original error")
 }
 
 func runNewPanicWrapfTest(t *testing.T) {
+	t.Helper()
 	originalErr := errors.New("original error")
 	format := "wrapped %s: %d"
 	args := S[any]("note", 42)
@@ -216,19 +203,12 @@ func runNewPanicWrapfTest(t *testing.T) {
 	pe := NewPanicWrapf(0, originalErr, format, args...)
 
 	// Test that it wraps the error
-	unwrapped := pe.Unwrap()
-	if unwrapped == nil {
-		t.Fatal("expected unwrapped error, got nil")
-	}
+	AssertError(t, pe.Unwrap(), "Unwrap")
 
 	// Test error message contains formatted note and original
 	errorStr := pe.Error()
-	if !strings.Contains(errorStr, "wrapped note: 42") {
-		t.Fatalf("expected error to contain formatted note, got '%s'", errorStr)
-	}
-	if !strings.Contains(errorStr, originalErr.Error()) {
-		t.Fatalf("expected error to contain original error '%s', got '%s'", originalErr.Error(), errorStr)
-	}
+	AssertContains(t, errorStr, "wrapped note: 42", "formatted note")
+	AssertContains(t, errorStr, originalErr.Error(), "original error")
 }
 
 // panicTestCase states what Panic raises: a *PanicError over a captured

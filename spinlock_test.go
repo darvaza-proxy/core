@@ -229,10 +229,7 @@ func BenchmarkSpinLockUncontended(b *testing.B) {
 	RunBenchmark(b, func() any {
 		return new(SpinLock)
 	}, func(data any) {
-		sl, ok := data.(*SpinLock)
-		if !ok {
-			b.Fatal("invalid data type")
-		}
+		sl := MustT[*SpinLock](data)
 		for b.Loop() {
 			sl.Lock()
 			// Do minimal work while holding the lock
@@ -246,10 +243,7 @@ func BenchmarkSpinLockContended(b *testing.B) {
 	RunBenchmark(b, func() any {
 		return new(SpinLock)
 	}, func(data any) {
-		sl, ok := data.(*SpinLock)
-		if !ok {
-			b.Fatal("invalid data type")
-		}
+		sl := MustT[*SpinLock](data)
 		runContentionBenchmark(b, sl)
 	})
 }
