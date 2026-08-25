@@ -227,9 +227,7 @@ func TestCatcherRecovered(t *testing.T) {
 
 	// Initially no panic
 	recovered := catcher.Recovered()
-	if !AssertNil(t, recovered, "initially nil recovered") {
-		t.Fail()
-	}
+	AssertNil(t, recovered, "initially nil recovered")
 
 	// After panic
 	_ = catcher.Try(func() error {
@@ -237,9 +235,7 @@ func TestCatcherRecovered(t *testing.T) {
 	})
 
 	recovered = catcher.Recovered()
-	if !AssertNotNil(t, recovered, "recovered panic after Try") {
-		t.Fail()
-	}
+	AssertMustNotNil(t, recovered, "recovered panic after Try")
 
 	// String panics get converted to errors by NewPanicError
 	if err, ok := recovered.Recovered().(error); ok {

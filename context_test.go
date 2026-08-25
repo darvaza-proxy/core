@@ -152,35 +152,23 @@ func withTimeoutTestCases() []withTimeoutTestCase {
 }
 
 func testWithTimeoutExpiration(t *testing.T) {
+	t.Helper()
+
 	ctx, cancel := WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	select {
-	case <-ctx.Done():
-		// Should timeout
-		AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
-	case <-time.After(100 * time.Millisecond):
-		t.Error("context should have timed out")
-	}
+	AssertMustClosed(t, ctx.Done(), 100*time.Millisecond, "done")
+	AssertErrorIs(t, ctx.Err(), context.DeadlineExceeded, "timeout error")
 }
 
 func testWithTimeoutCancellation(t *testing.T) {
+	t.Helper()
+
 	ctx, cancel := WithTimeout(context.Background(), time.Hour)
 
-	select {
-	case <-ctx.Done():
-		t.Error("context should not be done immediately")
-	default:
-	}
-
+	AssertOpen(t, ctx.Done(), 0, "done before cancel")
 	cancel()
-
-	select {
-	case <-ctx.Done():
-		// Expected
-	default:
-		t.Error("context should be done after cancel")
-	}
+	AssertClosed(t, ctx.Done(), 0, "done after cancel")
 }
 
 func TestWithTimeout(t *testing.T) {
@@ -253,21 +241,15 @@ func withTimeoutCauseTestCases() []withTimeoutCauseTestCase {
 }
 
 func testWithTimeoutCauseExpiration(t *testing.T) {
+	t.Helper()
+
 	testErr := errors.New("custom timeout cause")
 	ctx, cancel := WithTimeoutCause(context.Background(), 10*time.Millisecond, testErr)
 	defer cancel()
 
-	select {
-	case <-ctx.Done():
-		// Should timeout
-		AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
-		// Check cause (if supported by Go version)
-		if cause := context.Cause(ctx); cause != testErr {
-			AssertEqual(t, testErr, cause, "cause")
-		}
-	case <-time.After(100 * time.Millisecond):
-		t.Error("context should have timed out")
-	}
+	AssertMustClosed(t, ctx.Done(), 100*time.Millisecond, "done")
+	AssertErrorIs(t, ctx.Err(), context.DeadlineExceeded, "timeout error")
+	AssertErrorIs(t, context.Cause(ctx), testErr, "cause")
 }
 
 func TestWithTimeoutCause(t *testing.T) {
