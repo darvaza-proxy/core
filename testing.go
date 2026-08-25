@@ -458,7 +458,18 @@ func AssertNotDeepEqual[U any](t T, expected, actual U, name string, args ...any
 	return ok
 }
 
+// stringContains reports whether s contains substr, and whether substr can be
+// looked for at all. Nothing contains the empty string, so an empty substr is
+// a mistake at the call site rather than a negative answer, and ok is false.
+func stringContains(s, substr string) (found, ok bool) {
+	if substr == "" {
+		return false, false
+	}
+	return strings.Contains(s, substr), true
+}
+
 // AssertContains fails the test if the string does not contain the substring.
+// An empty substring is rejected: no test means to assert it.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -468,16 +479,20 @@ func AssertNotDeepEqual[U any](t T, expected, actual U, name string, args ...any
 //	AssertContains(t, output, "success", "command output for %s", cmd)
 func AssertContains(t T, s, substr, name string, args ...any) bool {
 	t.Helper()
-	ok := strings.Contains(s, substr)
-	if !ok {
-		doError(t, name, args, "expected %q to contain %q", s, substr)
-	} else {
+	found, ok := stringContains(s, substr)
+	switch {
+	case !ok:
+		doError(t, name, args, "expected a non-empty substring")
+	case found:
 		doLog(t, name, args, "contains %q", substr)
+	default:
+		doError(t, name, args, "expected %q to contain %q", s, substr)
 	}
-	return ok
+	return found
 }
 
 // AssertNotContain fails the test if the string contains the substring.
+// An empty substring is rejected: no test means to assert it.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -487,17 +502,16 @@ func AssertContains(t T, s, substr, name string, args ...any) bool {
 //	AssertNotContain(t, output, "error", "command output for %s", cmd)
 func AssertNotContain(t T, s, substr, name string, args ...any) bool {
 	t.Helper()
-	if substr == "" {
-		doError(t, name, args, "substring cannot be empty for AssertNotContain")
-		return false
-	}
-	ok := !strings.Contains(s, substr)
-	if !ok {
+	found, ok := stringContains(s, substr)
+	switch {
+	case !ok:
+		doError(t, name, args, "expected a non-empty substring")
+	case found:
 		doError(t, name, args, "expected %q not to contain %q", s, substr)
-	} else {
+	default:
 		doLog(t, name, args, "does not contain %q", substr)
 	}
-	return ok
+	return ok && !found
 }
 
 // AssertError fails the test if error is nil.
@@ -544,6 +558,7 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 //   - nil: Any panic is acceptable (most common case - just verify it panics).
 //   - error: Uses errors.Is semantics to match error chains (resilient to wrapping).
 //   - string: Checks if the panic message contains this substring (resilient to message changes).
+//     An empty substring is rejected: no test means to assert it, and nil already says any panic.
 //   - Recovered: Direct comparison without unwrapping (for testing panic recovery).
 //   - other types: Exact equality check after unwrapping Recovered if present.
 //
@@ -631,23 +646,26 @@ func doAssertPanicError(t T, recovered any, target error, name string, args ...a
 }
 
 func doAssertPanicContains(t T, recovered any, substr, name string, args ...any) bool {
-	var msg string
-
 	t.Helper()
+
+	var msg string
 	if s, ok := recovered.(string); ok {
 		msg = s
 	} else {
 		msg = AsRecovered(recovered).Error()
 	}
 
-	ok := strings.Contains(msg, substr)
-	if ok {
+	found, ok := stringContains(msg, substr)
+	switch {
+	case !ok:
+		doError(t, name, args, "expected a non-empty substring")
+	case found:
 		doLog(t, name, args, "panic contains %q: %q", substr, msg)
-	} else {
+	default:
 		doError(t, name, args, "expected panic to contain %q, got %q", substr, msg)
 	}
 
-	return ok
+	return found
 }
 
 // AssertNoPanic runs a function expecting it not to panic.
