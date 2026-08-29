@@ -235,60 +235,34 @@ func TestAssertNotDeepEqual(t *testing.T) {
 func TestAssertContains(t *testing.T) {
 	mock := &MockT{}
 
-	// Test successful assertion
-	result := AssertContains(mock, "hello world", "world", "contains test")
-	AssertTrue(t, result, "AssertContains result when contains")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
-
-	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	AssertEqual(t, "contains test: contains \"world\"", lastLog, "log message on success")
+	assertPassed(t, mock, AssertContains(mock, "hello world", "world",
+		"contains test"), "contains")
+	assertLastLog(t, mock, "contains test: contains \"world\"", "contains")
 
 	mock.Reset()
+	assertFailed(t, mock, AssertContains(mock, "hello world", "xyz",
+		"not contains test"), "expected \"hello world\" to contain \"xyz\"", "missing")
 
-	// Test failed assertion
-	result = AssertContains(mock, "hello world", "xyz", "not contains test")
-	AssertFalse(t, result, "AssertContains result when not contains")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
-	AssertFalse(t, mock.HasLogs(), "no logs on failure")
-
-	assertErrorContains(t, mock, "expected \"hello world\" to contain \"xyz\"", "error message")
+	mock.Reset()
+	assertFailed(t, mock, AssertContains(mock, "hello world", "",
+		"empty substring test"), "expected a non-empty substring", "empty")
 }
 
 // Test AssertNotContain
 func TestAssertNotContain(t *testing.T) {
 	mock := &MockT{}
 
-	// Test successful assertion (substring not present)
-	result := AssertNotContain(mock, "hello world", "xyz", "not contains test")
-	AssertTrue(t, result, "AssertNotContain result when not contains")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
-
-	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	AssertEqual(t, "not contains test: does not contain \"xyz\"", lastLog, "log message on success")
+	assertPassed(t, mock, AssertNotContain(mock, "hello world", "xyz",
+		"not contains test"), "not contains")
+	assertLastLog(t, mock, "not contains test: does not contain \"xyz\"", "not contains")
 
 	mock.Reset()
-
-	// Test failed assertion (substring present)
-	result = AssertNotContain(mock, "hello world", "world", "contains test")
-	AssertFalse(t, result, "AssertNotContain result when contains")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
-	AssertFalse(t, mock.HasLogs(), "no logs on failure")
-
-	assertErrorContains(t, mock, "expected \"hello world\" not to contain \"world\"", "error message")
+	assertFailed(t, mock, AssertNotContain(mock, "hello world", "world",
+		"contains test"), "expected \"hello world\" not to contain \"world\"", "present")
 
 	mock.Reset()
-
-	// Test empty substring assertion (should fail)
-	result = AssertNotContain(mock, "hello world", "", "empty substring test")
-	AssertFalse(t, result, "AssertNotContain result with empty substring")
-	AssertTrue(t, mock.HasErrors(), "has errors on empty substring")
-	AssertFalse(t, mock.HasLogs(), "no logs on empty substring")
-
-	assertErrorContains(t, mock, "substring cannot be empty for AssertNotContain", "empty substring error message")
+	assertFailed(t, mock, AssertNotContain(mock, "hello world", "",
+		"empty substring test"), "expected a non-empty substring", "empty")
 }
 
 // Test AssertError and AssertNoError
@@ -541,13 +515,14 @@ func TestAssertTypeIs(t *testing.T) {
 
 // assertPanicTestCase for table-driven tests
 type assertPanicTestCase struct {
-	panicFn      func()
-	expected     any
-	logContains  string
+	panicFn  func()
+	expected any
+	// message is a substring of what the assertion is expected to
+	// report: the log on acceptance, the error on rejection.
+	message      string
 	name         string
 	desc         string
 	expectResult bool
-	expectErrors bool
 }
 
 // Compile-time verification
@@ -562,27 +537,59 @@ func (tc assertPanicTestCase) Test(t *testing.T) {
 	mock := &MockT{}
 
 	result := AssertPanic(mock, tc.panicFn, tc.expected, tc.desc)
-	AssertEqual(t, tc.expectResult, result, "result")
-	AssertEqual(t, tc.expectErrors, mock.HasErrors(), "has errors")
+	AssertEqual(t, !result, mock.HasErrors(), "errors follow result")
 
-	if tc.logContains != "" && mock.HasLogs() {
-		lastLog, _ := mock.LastLog()
-		AssertContains(t, lastLog, tc.logContains, "log content")
+	if tc.expectResult {
+		assertPassed(t, mock, result, tc.desc)
+		tc.assertLogged(t, mock)
+	} else {
+		assertFailed(t, mock, result, tc.message, tc.desc)
 	}
 }
 
-// revive:disable-next-line:argument-limit
-func newAssertPanicTestCase(name string, panicFn func(), expected any, desc string,
-	expectResult, expectErrors bool, logContains string) assertPanicTestCase {
-	return assertPanicTestCase{
-		name:         name,
-		panicFn:      panicFn,
-		expected:     expected,
-		desc:         desc,
-		expectResult: expectResult,
-		expectErrors: expectErrors,
-		logContains:  logContains,
+// assertLogged checks the message an accepted panic logged.
+func (tc assertPanicTestCase) assertLogged(t *testing.T, mock *MockT) {
+	t.Helper()
+
+	lastLog, ok := mock.LastLog()
+	AssertMustTrue(t, ok, "logged")
+	AssertContains(t, lastLog, tc.message, "log content")
+}
+
+// newAssertPanicTestCase builds the part of a row that does not depend on the
+// outcome. Every row says what the assertion reports, so neither variant may
+// leave message empty.
+func newAssertPanicTestCase(name string, panicFn func(), expected any,
+	desc, message string) assertPanicTestCase {
+	if message == "" {
+		panic("assertPanicTestCase: every row must say what it reports")
 	}
+
+	return assertPanicTestCase{
+		name:     name,
+		panicFn:  panicFn,
+		expected: expected,
+		desc:     desc,
+		message:  message,
+	}
+}
+
+// newAssertPanicTestCaseAccept declares a row the assertion accepts: it
+// returns true, records no error, and logs a message containing wantLog.
+func newAssertPanicTestCaseAccept(name string, panicFn func(), expected any,
+	desc, wantLog string) assertPanicTestCase {
+	tc := newAssertPanicTestCase(name, panicFn, expected, desc, wantLog)
+	tc.expectResult = true
+	return tc
+}
+
+// newAssertPanicTestCaseReject declares a row the assertion rejects: it
+// returns false, logs nothing, and records an error containing wantError.
+func newAssertPanicTestCaseReject(name string, panicFn func(), expected any,
+	desc, wantError string) assertPanicTestCase {
+	tc := newAssertPanicTestCase(name, panicFn, expected, desc, wantError)
+	tc.expectResult = false
+	return tc
 }
 
 func assertPanicTestCases() []assertPanicTestCase {
@@ -593,47 +600,41 @@ func assertPanicTestCases() []assertPanicTestCase {
 
 	return []assertPanicTestCase{
 		// Any panic tests
-		newAssertPanicTestCase("any panic accepted",
-			func() { panic("test panic") }, nil, "panic test",
-			true, false, "test panic"),
-		newAssertPanicTestCase("no panic fails",
-			func() {}, nil, "no panic test",
-			false, true, ""),
+		newAssertPanicTestCaseAccept("any panic accepted",
+			func() { panic("test panic") }, nil, "panic test", "test panic"),
+		newAssertPanicTestCaseReject("no panic fails",
+			func() {}, nil, "no panic test", "expected panic but got nil"),
 
 		// String matching tests
-		newAssertPanicTestCase("string substring match",
-			func() { panic("specific panic message") }, "specific", "string test",
-			true, false, "contains"),
-		newAssertPanicTestCase("string mismatch",
+		newAssertPanicTestCaseAccept("string substring match",
+			func() { panic("specific panic message") }, "specific", "string test", "contains"),
+		newAssertPanicTestCaseReject("string mismatch",
 			func() { panic("wrong") }, "expected", "wrong string test",
-			false, true, ""),
-		newAssertPanicTestCase("non-string panic with string expected",
-			func() { panic(123) }, "123", "non-string test",
-			true, false, "contains"),
+			`expected panic to contain "expected"`),
+		newAssertPanicTestCaseReject("empty substring",
+			func() { panic("any message") }, "", "empty substring test",
+			"expected a non-empty substring"),
+		newAssertPanicTestCaseAccept("non-string panic with string expected",
+			func() { panic(123) }, "123", "non-string test", "contains"),
 
 		// Error matching tests
-		newAssertPanicTestCase("error match",
-			func() { panic(testErr) }, testErr, "error test",
-			true, false, "panic error"),
-		newAssertPanicTestCase("error mismatch",
+		newAssertPanicTestCaseAccept("error match",
+			func() { panic(testErr) }, testErr, "error test", "panic error"),
+		newAssertPanicTestCaseReject("error mismatch",
 			func() { panic(testErr) }, otherErr, "wrong error test",
-			false, true, ""),
+			"expected panic error other error"),
 
 		// Exact matching tests
-		newAssertPanicTestCase("integer match",
-			func() { panic(42) }, 42, "int test",
-			true, false, "panic: 42"),
-		newAssertPanicTestCase("integer mismatch",
-			func() { panic(42) }, 43, "wrong int test",
-			false, true, ""),
+		newAssertPanicTestCaseAccept("integer match",
+			func() { panic(42) }, 42, "int test", "panic: 42"),
+		newAssertPanicTestCaseReject("integer mismatch",
+			func() { panic(42) }, 43, "wrong int test", "expected panic 43"),
 
 		// Recovered type tests
-		newAssertPanicTestCase("Recovered type match",
-			func() { panic(panicErr) }, panicErr, "recovered test",
-			true, false, "panic:"),
-		newAssertPanicTestCase("Recovered unwrapping",
-			func() { panic(wrappedPanic) }, 99, "unwrapped test",
-			true, false, "panic: 99"),
+		newAssertPanicTestCaseAccept("Recovered type match",
+			func() { panic(panicErr) }, panicErr, "recovered test", "panic:"),
+		newAssertPanicTestCaseAccept("Recovered unwrapping",
+			func() { panic(wrappedPanic) }, 99, "unwrapped test", "panic: 99"),
 	}
 }
 
@@ -1705,12 +1706,27 @@ func testAssertMustNotSame(t *testing.T) {
 	assertMustAborted(t, mock, ok)
 }
 
-// assertErrorContains checks that the last error from MockT contains the expected substring
+// assertErrorContains checks that the last error from MockT contains the expected substring.
+// An empty expected substring matches any error, so it is a mistake at the call site.
+// The precondition is reported directly: this helper backs the tests for the assertions
+// it would otherwise route through.
 func assertErrorContains(t *testing.T, mock *MockT, expected, desc string) {
 	t.Helper()
+	if expected == "" {
+		t.Fatalf("%s: expected a non-empty substring", desc)
+	}
+
 	lastErr, ok := mock.LastError()
 	AssertTrue(t, ok, "LastError ok for "+desc)
 	AssertTrue(t, strings.Contains(lastErr, expected), desc)
+}
+
+// assertLastLog checks the message an assertion logged on success.
+func assertLastLog(t *testing.T, mock *MockT, expected, desc string) {
+	t.Helper()
+	lastLog, ok := mock.LastLog()
+	AssertTrue(t, ok, "%s last log", desc)
+	AssertEqual(t, expected, lastLog, "%s log message", desc)
 }
 
 // assertMustContinued checks that a Must assertion passed and let the
