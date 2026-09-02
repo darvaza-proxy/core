@@ -24,8 +24,8 @@ type panicErrorMethodsTestCase struct {
 var panicErrorMethodsTestCases = []panicErrorMethodsTestCase{
 	newPanicErrorMethodsTestCase("string payload", "test error", "test error"),
 	newPanicErrorMethodsTestCase("error payload", errors.New("wrapped error"), "wrapped error"),
-	newPanicErrorMethodsTestCase("int payload", 42, "%!s(int=42)"),
-	newPanicErrorMethodsTestCase("nil payload", nil, "%!s(<nil>)"),
+	newPanicErrorMethodsTestCase("int payload", 42, "42"),
+	newPanicErrorMethodsTestCase("nil payload", nil, "<nil>"),
 }
 
 func (tc panicErrorMethodsTestCase) Name() string {

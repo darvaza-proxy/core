@@ -20,7 +20,7 @@ type PanicError struct {
 
 // Error returns the payload as a string
 func (p *PanicError) Error() string {
-	return fmt.Sprintf("panic: %s", p.payload)
+	return fmt.Sprintf("panic: %v", p.payload)
 }
 
 // Unwrap returns the payload if it's and error
