@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"io"
+	"runtime"
+	"strconv"
 	"testing"
 )
 
@@ -12,9 +14,9 @@ var _ TestCase = framePkgNameTestCase{}
 var _ TestCase = framePkgFileTestCase{}
 var _ TestCase = frameFileLineTestCase{}
 var _ TestCase = frameFormatTestCase{}
+var _ TestCase = capturedFrameFormatTestCase{}
 var _ TestCase = stackFormatTestCase{}
 var _ TestCase = formatLineTestCase{}
-var _ TestCase = writeFormatTestCase{}
 var _ TestCase = writeFormatPanicsTestCase{}
 
 const (
@@ -465,6 +467,90 @@ func TestFrameFormat(t *testing.T) {
 	RunTestCases(t, frameFormatTestCases())
 }
 
+// capturedFrameFormatTestCase formats a frame captured from a real call,
+// where frameFormatTestCases builds its frames from literals.
+type capturedFrameFormatTestCase struct {
+	name     string
+	frame    *Frame
+	format   string
+	expected string
+}
+
+func (tc capturedFrameFormatTestCase) Name() string {
+	return tc.name
+}
+
+func (tc capturedFrameFormatTestCase) Test(t *testing.T) {
+	t.Helper()
+	result := fmt.Sprintf(tc.format, tc.frame)
+	AssertEqual(t, tc.expected, result, "formatted output")
+}
+
+func newCapturedFrameFormatTestCase(name string, frame *Frame,
+	format, expected string) capturedFrameFormatTestCase {
+	return capturedFrameFormatTestCase{
+		name:     name,
+		frame:    frame,
+		format:   format,
+		expected: expected,
+	}
+}
+
+// capturedFrame returns the frame StackFrame reports for the call site of
+// capturedFrame's caller, alongside the file and line runtime.Caller
+// reports for the same site. The two reach the runtime by different
+// routes, so the caller can state one against the other.
+func capturedFrame(t *testing.T) (*Frame, string, int) {
+	t.Helper()
+
+	frame := StackFrame(1)
+	_, file, line, ok := runtime.Caller(1)
+	AssertMustTrue(t, ok, "runtime.Caller")
+
+	return frame, file, line
+}
+
+func capturedFrameFormatTestCases(frame *Frame, file string,
+	line int) []capturedFrameFormatTestCase {
+	const funcName = "TestCapturedFrameFormat"
+	const fullName = "darvaza.org/core." + funcName
+	const baseFile = "stack_test.go"
+	const pkgFile = "darvaza.org/core/" + baseFile
+
+	lineText := strconv.Itoa(line)
+
+	return S(
+		newCapturedFrameFormatTestCase("file %s", frame, "%s", baseFile),
+		newCapturedFrameFormatTestCase("line %d", frame, "%d", lineText),
+		newCapturedFrameFormatTestCase("name %n", frame, "%n", funcName),
+		newCapturedFrameFormatTestCase("file:line %v", frame, "%v",
+			baseFile+":"+lineText),
+		newCapturedFrameFormatTestCase("file %+s", frame, "%+s",
+			fullName+"\n\t"+file),
+		newCapturedFrameFormatTestCase("name %+n", frame, "%+n", fullName),
+		newCapturedFrameFormatTestCase("file:line %+v", frame, "%+v",
+			fullName+"\n\t"+file+":"+lineText),
+		newCapturedFrameFormatTestCase("file %#s", frame, "%#s", pkgFile),
+		newCapturedFrameFormatTestCase("file:line %#v", frame, "%#v",
+			pkgFile+":"+lineText),
+	)
+}
+
+// Test Frame.Format against a captured frame. The expectations are built
+// from what runtime.Caller reports for the same call site, so the
+// preconditions state that frameForPC agrees with it on file and line —
+// the line being resolved there from the raw pc, where the name comes
+// from pc - 1.
+func TestCapturedFrameFormat(t *testing.T) {
+	frame, file, line := capturedFrame(t)
+
+	AssertMustNotNil(t, frame, "captured frame")
+	AssertMustEqual(t, file, frame.File(), "captured file")
+	AssertMustEqual(t, line, frame.Line(), "captured line")
+
+	RunTestCases(t, capturedFrameFormatTestCases(frame, file, line))
+}
+
 // Test case for Stack.Format method
 type stackFormatTestCase struct {
 	name      string
@@ -592,48 +678,6 @@ func formatLineTestCases() []formatLineTestCase {
 // Test formatLine function directly (0% coverage)
 func TestFormatLineMethod(t *testing.T) {
 	RunTestCases(t, formatLineTestCases())
-}
-
-// Test case for writeFormat edge cases
-type writeFormatTestCase struct {
-	name   string
-	format string
-}
-
-func (tc writeFormatTestCase) Name() string {
-	return tc.name
-}
-
-func (tc writeFormatTestCase) Test(t *testing.T) {
-	t.Helper()
-	frame := &Frame{name: "test", file: "test.go", line: 10}
-	result := fmt.Sprintf(tc.format, frame)
-	// Just ensure it doesn't panic and produces some output
-	AssertNotEqual(t, "", result, "output for %s", tc.format)
-}
-
-func newWriteFormatTestCase(name, format string) writeFormatTestCase {
-	return writeFormatTestCase{
-		name:   name,
-		format: format,
-	}
-}
-
-func writeFormatTestCases() []writeFormatTestCase {
-	return S(
-		newWriteFormatTestCase("basic file", "%s"),
-		newWriteFormatTestCase("basic line", "%d"),
-		newWriteFormatTestCase("basic name", "%n"),
-		newWriteFormatTestCase("plus file", "%+s"),
-		newWriteFormatTestCase("plus name", "%+n"),
-		newWriteFormatTestCase("file:line", "%v"),
-		newWriteFormatTestCase("plus file:line", "%+v"),
-	)
-}
-
-// Test writeFormat error conditions for better coverage (60% -> higher)
-func TestWriteFormatEdgeCases(t *testing.T) {
-	RunTestCases(t, writeFormatTestCases())
 }
 
 // failingWriter returns a fixed (n, err) from every Write.
