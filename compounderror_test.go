@@ -8,12 +8,68 @@ import (
 
 // Compile-time verification that test case types implement TestCase interface
 var (
+	_ TestCase = newCompoundErrorTestCase{}
 	_ TestCase = compoundErrorErrorTestCase{}
 	_ TestCase = compoundErrorOKTestCase{}
 	_ TestCase = compoundErrorAsErrorTestCase{}
 	_ TestCase = compoundErrorAppendErrorTestCase{}
 	_ TestCase = compoundErrorAppendTestCase{}
 )
+
+// newCompoundErrorTestCase states what NewCompoundError collects from
+// its arguments. want is the exact member list, in order; a row that
+// expects nothing passes nil, since a constructor with nothing to
+// collect appends nothing.
+type newCompoundErrorTestCase struct {
+	name string
+	errs []error
+	want []error
+}
+
+func newNewCompoundErrorTestCase(name string, errs, want []error) newCompoundErrorTestCase {
+	return newCompoundErrorTestCase{
+		name: name,
+		errs: errs,
+		want: want,
+	}
+}
+
+func (tc newCompoundErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc newCompoundErrorTestCase) Test(t *testing.T) {
+	t.Helper()
+	ce := NewCompoundError(tc.errs...)
+
+	AssertMustNotNil(t, ce, "result")
+	AssertSliceEqual(t, tc.want, ce.Errs, "members")
+	AssertEqual(t, len(ce.Errs) == 0, ce.OK(), "OK matches emptiness")
+}
+
+func newCompoundErrorTestCases() []newCompoundErrorTestCase {
+	first := errors.New("first error")
+	second := errors.New("second error")
+	third := errors.New("third error")
+	nested := error(&CompoundError{Errs: S(second, third)})
+
+	return []newCompoundErrorTestCase{
+		newNewCompoundErrorTestCase("no errors", nil, nil),
+		newNewCompoundErrorTestCase("single error",
+			S(first), S(first)),
+		newNewCompoundErrorTestCase("several errors",
+			S(first, second, third), S(first, second, third)),
+		newNewCompoundErrorTestCase("nil members dropped",
+			S(first, nil, third), S(first, third)),
+		newNewCompoundErrorTestCase("all nil", S[error](nil, nil), nil),
+		newNewCompoundErrorTestCase("nested list kept as one member",
+			S(first, nested), S(first, nested)),
+	}
+}
+
+func TestNewCompoundError(t *testing.T) {
+	RunTestCases(t, newCompoundErrorTestCases())
+}
 
 type compoundErrorErrorTestCase struct {
 	expected string
