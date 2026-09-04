@@ -616,6 +616,18 @@ func assertPanicTestCases() []assertPanicTestCase {
 			"expected a non-empty substring"),
 		newAssertPanicTestCaseAccept("non-string panic with string expected",
 			func() { panic(123) }, "123", "non-string test", "contains"),
+		// Only a string is searched as itself; every other payload
+		// is rendered as a *PanicError, an error included.
+		newAssertPanicTestCaseReject("string panic carries no prefix",
+			func() { panic("boom") }, "panic: boom",
+			"string prefix test",
+			`expected panic to contain "panic: boom"`),
+		newAssertPanicTestCaseAccept("StringError panic renders as an error",
+			func() { panic(StringError("boom")) }, "panic: boom",
+			"StringError test", "contains"),
+		newAssertPanicTestCaseAccept("PanicError panic keeps its own prefix",
+			func() { panic(panicErr) }, "panic:",
+			"PanicError prefix test", "contains"),
 
 		// Error matching tests
 		newAssertPanicTestCaseAccept("error match",
