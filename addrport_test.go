@@ -24,7 +24,7 @@ var addrPortTestCases = []addrPortTestCase{
 		netip.MustParseAddrPort("192.168.1.1:8080"), true),
 	newAddrPortTestCase("pointer to AddrPort", addrPortPtr(netip.MustParseAddrPort("10.0.0.1:443")),
 		netip.MustParseAddrPort("10.0.0.1:443"), true),
-	newAddrPortTestCase("zero AddrPort", netip.AddrPort{}, netip.AddrPort{}, true),
+	newAddrPortTestCase("zero AddrPort", netip.AddrPort{}, netip.AddrPort{}, false),
 	// TCP addresses
 	newAddrPortTestCase("TCPAddr IPv4", &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080},
 		netip.MustParseAddrPort("192.168.1.1:8080"), true),
@@ -33,6 +33,8 @@ var addrPortTestCases = []addrPortTestCase{
 	newAddrPortTestCase("TCPAddr with zone", &net.TCPAddr{IP: net.ParseIP("fe80::1"), Port: 22, Zone: "eth0"},
 		netip.MustParseAddrPort("[fe80::1]:22"), true),
 	newAddrPortTestCase("TCPAddr with nil IP", &net.TCPAddr{IP: nil, Port: 8080}, netip.AddrPort{}, false),
+	newAddrPortTestCase("TCPAddr with port above the 16-bit range",
+		&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 65536}, netip.AddrPort{}, false),
 	newAddrPortTestCase("TCPAddr with zero port", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0},
 		netip.MustParseAddrPort("127.0.0.1:0"), true),
 	// UDP addresses
@@ -44,6 +46,8 @@ var addrPortTestCases = []addrPortTestCase{
 	// Interface types
 	newAddrPortTestCase("type with AddrPort() method", addrPortProvider{netip.MustParseAddrPort("127.0.0.1:9090")},
 		netip.MustParseAddrPort("127.0.0.1:9090"), true),
+	newAddrPortTestCase("type with AddrPort() method returning an invalid value",
+		addrPortProvider{netip.AddrPort{}}, netip.AddrPort{}, false),
 	newAddrPortTestCase("type with Addr() method returning TCPAddr",
 		addrProvider{&net.TCPAddr{IP: net.ParseIP("10.0.0.1"), Port: 80}},
 		netip.MustParseAddrPort("10.0.0.1:80"), true),
@@ -110,7 +114,7 @@ func (tc addrPortTestCase) Test(t *testing.T) {
 	if ok != tc.wantOK {
 		t.Errorf("Expected ok=%v, got %v", tc.wantOK, ok)
 	}
-	if ok && got != tc.want {
+	if got != tc.want {
 		t.Errorf("Expected %v, got %v", tc.want, got)
 	}
 }
@@ -121,10 +125,11 @@ func TestAddrPort(t *testing.T) {
 
 // Test typeSpecificAddrPort directly
 type typeSpecificAddrPortTestCase struct {
-	name   string
-	input  any
-	want   netip.AddrPort
-	wantOK bool
+	name      string
+	input     any
+	want      netip.AddrPort
+	wantOK    bool
+	wantKnown bool
 }
 
 var typeSpecificAddrPortTestCases = []typeSpecificAddrPortTestCase{
@@ -136,20 +141,42 @@ var typeSpecificAddrPortTestCases = []typeSpecificAddrPortTestCase{
 		netip.MustParseAddrPort("127.0.0.1:9000"), true),
 	newTypeSpecificAddrPortTestCase("UDPAddr", &net.UDPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 53},
 		netip.MustParseAddrPort("10.0.0.1:53"), true),
+	newTypeSpecificAddrPortTestCase("zero AddrPort", netip.AddrPort{}, netip.AddrPort{}, false),
+	newTypeSpecificAddrPortTestCase("pointer to zero AddrPort", addrPortPtr(netip.AddrPort{}),
+		netip.AddrPort{}, false),
 	newTypeSpecificAddrPortTestCase("TCPAddr with invalid IP", &net.TCPAddr{IP: S[byte](1, 2, 3), Port: 80},
 		netip.AddrPort{}, false), // Invalid IP length
 	newTypeSpecificAddrPortTestCase("UDPAddr with invalid IP", &net.UDPAddr{IP: S[byte](), Port: 80},
 		netip.AddrPort{}, false), // Empty IP
-	newTypeSpecificAddrPortTestCase("unsupported type", "not an address", netip.AddrPort{}, false),
+	newTypeSpecificAddrPortTestCase("TCPAddr with negative port",
+		&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: -1}, netip.AddrPort{}, false),
+	newTypeSpecificAddrPortTestCase("UDPAddr with port above the 16-bit range",
+		&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 65536}, netip.AddrPort{}, false),
+	newTypeSpecificAddrPortTestCaseUnknown("unsupported type", "not an address"),
 }
 
+// newTypeSpecificAddrPortTestCase declares a row for a type the switch
+// recognises, whether or not it yields an address.
 func newTypeSpecificAddrPortTestCase(name string, input any, want netip.AddrPort,
 	wantOK bool) typeSpecificAddrPortTestCase {
 	return typeSpecificAddrPortTestCase{
-		name:   name,
-		input:  input,
-		want:   want,
-		wantOK: wantOK,
+		name:      name,
+		input:     input,
+		want:      want,
+		wantOK:    wantOK,
+		wantKnown: true,
+	}
+}
+
+// newTypeSpecificAddrPortTestCaseUnknown declares a row for a type the switch
+// does not recognise, which never yields an address.
+func newTypeSpecificAddrPortTestCaseUnknown(name string, input any) typeSpecificAddrPortTestCase {
+	return typeSpecificAddrPortTestCase{
+		name:      name,
+		input:     input,
+		want:      netip.AddrPort{},
+		wantOK:    false,
+		wantKnown: false,
 	}
 }
 
@@ -160,11 +187,14 @@ func (tc typeSpecificAddrPortTestCase) Name() string {
 func (tc typeSpecificAddrPortTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got, ok := typeSpecificAddrPort(tc.input)
+	got, ok, known := typeSpecificAddrPort(tc.input)
+	if known != tc.wantKnown {
+		t.Errorf("Expected known=%v, got %v", tc.wantKnown, known)
+	}
 	if ok != tc.wantOK {
 		t.Errorf("Expected ok=%v, got %v", tc.wantOK, ok)
 	}
-	if ok && got != tc.want {
+	if got != tc.want {
 		t.Errorf("Expected %v, got %v", tc.want, got)
 	}
 }
