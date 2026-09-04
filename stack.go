@@ -285,24 +285,20 @@ func (st Stack) String() string {
 // Here captures and returns the current stack frame where it was called.
 // This is useful for capturing the immediate calling context for debugging.
 //
-// Returns nil if stack capture fails or if called in an environment where
-// runtime stack information is unavailable.
+// A called function always has a caller, so the capture cannot come up
+// empty and Here always returns a frame.
 //
 // Example:
 //
 //	frame := Here()
-//	if frame != nil {
-//	    fmt.Printf("Called from %s at %s", frame.FuncName(), frame.FileLine())
-//	}
+//	fmt.Printf("Called from %s at %s", frame.FuncName(), frame.FileLine())
 func Here() *Frame {
-	const depth = 1
-	var pcs [depth]uintptr
+	var pcs [1]uintptr
 
-	if n := runtime.Callers(2, pcs[:]); n > 0 {
-		f := frameForPC(pcs[0])
-		return &f
-	}
-	return nil
+	callers := MustOK(getCallers(0, pcs[:]))
+
+	f := frameForPC(callers[0])
+	return &f
 }
 
 // StackFrame captures a specific frame in the call stack, skipping the
@@ -311,8 +307,9 @@ func Here() *Frame {
 // Parameters:
 //   - skip: number of stack frames to skip (0 = caller, 1 = caller's caller, etc.)
 //
-// Returns nil if the stack doesn't have enough frames or if capture fails.
-// Useful for creating stack-aware error reporting utilities.
+// Returns nil if skip is negative, if the stack doesn't have enough frames,
+// or if capture fails. Useful for creating stack-aware error reporting
+// utilities.
 //
 // Example:
 //
@@ -322,11 +319,10 @@ func Here() *Frame {
 //	    log.Printf("Error originated from %s", frame.Name())
 //	}
 func StackFrame(skip int) *Frame {
-	const depth = MaxDepth
-	var pcs [depth]uintptr
+	var pcs [MaxDepth]uintptr
 
-	if n := runtime.Callers(2, pcs[:]); n > skip {
-		f := frameForPC(pcs[skip])
+	if callers, ok := getCallers(skip, pcs[:]); ok {
+		f := frameForPC(callers[0])
 		return &f
 	}
 
@@ -340,8 +336,9 @@ func StackFrame(skip int) *Frame {
 // Parameters:
 //   - skip: number of initial stack frames to skip before capture begins
 //
-// Returns an empty Stack if capture fails or if there are insufficient frames.
-// The maximum capture depth is limited by MaxDepth (32 frames).
+// Returns an empty Stack if skip is negative, if capture fails, or if there
+// are insufficient frames. The maximum capture depth is limited by MaxDepth
+// (32 frames).
 //
 // This function is commonly used for error reporting, debugging, and logging
 // where complete call context is needed.
@@ -354,16 +351,13 @@ func StackFrame(skip int) *Frame {
 //	    fmt.Printf("[%d] %s at %s", i, frame.Name(), frame.FileLine())
 //	}
 func StackTrace(skip int) Stack {
-	const depth = MaxDepth
-	var pcs [depth]uintptr
+	var pcs [MaxDepth]uintptr
 	var st Stack
 
-	if n := runtime.Callers(2, pcs[:]); n > skip {
-		var frames []Frame
+	if callers, ok := getCallers(skip, pcs[:]); ok {
+		frames := make([]Frame, 0, len(callers))
 
-		frames = make([]Frame, 0, n-skip)
-
-		for _, pc := range pcs[skip:n] {
+		for _, pc := range callers {
 			frames = append(frames, frameForPC(pc))
 		}
 
@@ -371,4 +365,30 @@ func StackTrace(skip int) Stack {
 	}
 
 	return st
+}
+
+// getCallers fills pcs with the program counters above the function that
+// called it, and returns what is left after skipping skip of them. skip
+// counts as it does for StackFrame and StackTrace: 0 is that function's own
+// caller, 1 the caller above it.
+//
+// The buffer belongs to the caller, so one frame's worth serves where only
+// one frame is wanted, and the result does not escape. Its length caps the
+// capture, and a stack too short to reach skip reports false. So does a
+// negative skip, which is neither clamped to zero nor counted from the end.
+//
+// The 3 given to runtime.Callers accounts for runtime.Callers itself,
+// getCallers, and the function that called it, so getCallers must be called
+// directly by the one whose callers are wanted.
+func getCallers(skip int, pcs []uintptr) ([]uintptr, bool) {
+	if skip < 0 {
+		return nil, false
+	}
+
+	n := runtime.Callers(3, pcs)
+	if n <= skip {
+		return nil, false
+	}
+
+	return pcs[skip:n], true
 }
