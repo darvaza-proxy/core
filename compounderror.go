@@ -56,16 +56,17 @@ func (w *CompoundError) OK() bool {
 //
 //revive:disable-next-line:confusing-naming
 func (w *CompoundError) Ok() bool {
-	return len(w.Errs) == 0
+	return w.OK()
 }
 
 // AsError returns itself as an `error` when
-// there are errors stored, and nil when there aren't
+// there are errors stored, and nil when there aren't.
+// A nil receiver counts as empty, as it does for [CompoundError.OK].
 func (w *CompoundError) AsError() error {
-	if len(w.Errs) > 0 {
-		return w
+	if w.OK() {
+		return nil
 	}
-	return nil
+	return w
 }
 
 // AppendError adds an error to the collection, unwrapping other implementers of the [Errors]

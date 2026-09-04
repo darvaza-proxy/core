@@ -206,6 +206,18 @@ func TestCompoundErrorAsError(t *testing.T) {
 	RunTestCases(t, compoundErrorAsErrorTestCases)
 }
 
+// A nil receiver holds no errors, so the three emptiness accessors agree on
+// it. The table above cannot state this: its Test body builds the receiver.
+// AsError dereferenced it before OK did the guarding for both.
+func TestCompoundErrorNilReceiver(t *testing.T) {
+	var ce *CompoundError
+
+	AssertTrue(t, ce.OK(), "OK")
+	AssertTrue(t, ce.Ok(), "Ok")
+	AssertNil(t, ce.AsError(), "AsError")
+	AssertNil(t, AsError(ce), "core.AsError")
+}
+
 type compoundErrorAppendErrorTestCase struct {
 	name        string
 	initial     []error
