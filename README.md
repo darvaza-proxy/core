@@ -308,6 +308,7 @@ Error wrapping functions:
 The `CompoundError` type aggregates multiple errors:
 
 * Implements both `Unwrap() []error` and `Errors() []error` interfaces.
+* `NewCompoundError(errs...)` - collect errors as given, dropping nils.
 * `.AppendError(err)` / `.Append(errs...)` - add errors.
 * `.AsError()` - convert to single error or nil.
 * `.OK()` - check if no errors.
