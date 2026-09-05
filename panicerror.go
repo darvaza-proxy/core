@@ -114,23 +114,18 @@ func NewUnreachableErrorf(skip int, err error, format string, args ...any) error
 
 // NewUnreachableError creates a new annotated ErrUnreachable with callstack.
 func NewUnreachableError(skip int, err error, note string) error {
-	if err == ErrUnreachable {
-		err = nil
-	}
-
-	switch {
-	case err == nil && note == "":
-		return NewPanicError(deeper(skip), ErrUnreachable)
-	case err == nil:
-		return NewPanicWrap(deeper(skip), ErrUnreachable, note)
-	case note != "":
-		err = Wrap(err, note)
+	switch err {
+	case nil, ErrUnreachable:
+		err = ErrUnreachable
 	default:
+		err = QuietWrap(NewCompoundError(ErrUnreachable, err),
+			"%s: %s", ErrUnreachable, err)
 	}
 
-	return NewPanicError(deeper(skip), &CompoundError{
-		Errs: []error{ErrUnreachable, err},
-	})
+	if note == "" {
+		return NewPanicError(deeper(skip), err)
+	}
+	return NewPanicWrap(deeper(skip), err, note)
 }
 
 // deeper accounts for the frame of the constructor doing the capturing,

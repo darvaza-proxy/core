@@ -365,19 +365,41 @@ func newPanicWrapFunctionsTestCase(name string, fn func(error), originalErr erro
 	}
 }
 
+// newUnreachableErrorTestCase states NewUnreachableError's contract in
+// the terms callers use: what [errors.Is] finds in the returned chain,
+// what the message carries, and which errors the chain bottoms out in.
+// How the payload is assembled to hold them is not asserted — a caller
+// matching the sentinel or the cause cannot tell, and pinning the
+// concrete type only breaks the rows when the assembly is rearranged.
+//
+// wantCause is the distinct cause the row expects at the bottom of the
+// chain beside ErrUnreachable, or nil for the rows where there is none
+// — passing nil, or passing ErrUnreachable itself, which the
+// constructor normalises to the same shape: the sentinel alone, not
+// the sentinel paired with itself. Every row declares wantMsg outright
+// rather than deriving it from note, so the no-note rows state what the
+// message carries instead.
 type newUnreachableErrorTestCase struct {
-	name       string
-	err        error
-	note       string
-	expectType string
+	err       error
+	wantCause error
+	name      string
+	note      string
+	wantMsg   string
 }
 
 var newUnreachableErrorTestCases = []newUnreachableErrorTestCase{
-	newNewUnreachableErrorTestCase("nil error, empty note", nil, ""),
-	newNewUnreachableErrorTestCase("nil error, with note", nil, "test note"),
-	newNewUnreachableErrorTestCase("ErrUnreachable, with note", ErrUnreachable, "test note"),
-	newNewUnreachableErrorTestCase("other error, no note", errors.New("other error"), ""),
-	newNewUnreachableErrorTestCase("other error, with note", errors.New("other error"), "test note"),
+	newNewUnreachableErrorTestCase("nil error, empty note",
+		nil, "", nil, "unreachable"),
+	newNewUnreachableErrorTestCase("nil error, with note",
+		nil, "test note", nil, "test note"),
+	newNewUnreachableErrorTestCase("ErrUnreachable, empty note",
+		ErrUnreachable, "", nil, "unreachable"),
+	newNewUnreachableErrorTestCase("ErrUnreachable, with note",
+		ErrUnreachable, "test note", nil, "test note"),
+	newNewUnreachableErrorTestCase("other error, no note",
+		errSentinel, "", errSentinel, "sentinel error"),
+	newNewUnreachableErrorTestCase("other error, with note",
+		errSentinel, "test note", errSentinel, "test note"),
 }
 
 func (tc newUnreachableErrorTestCase) Name() string {
@@ -388,41 +410,49 @@ func (tc newUnreachableErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := NewUnreachableError(0, tc.err, tc.note)
 
-	if result == nil {
-		t.Fatal("expected non-nil error, got nil")
+	AssertMustNotNil(t, result, "result")
+	pe := AssertMustTypeIs[*PanicError](t, result, "result is *PanicError")
+	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+
+	AssertErrorIs(t, result, ErrUnreachable, "ErrUnreachable in chain")
+	AssertNotErrorIs(t, result, errUnrelated, "unrelated error absent")
+	AssertContains(t, result.Error(), tc.wantMsg, "message")
+	AssertSliceEqual(t, tc.wantLeaves(), errorLeaves(result), "chain leaves")
+}
+
+// wantLeaves is the exact list of errors the chain bottoms out in: the
+// sentinel alone, or the sentinel followed by the declared cause.
+func (tc newUnreachableErrorTestCase) wantLeaves() []error {
+	if tc.wantCause == nil {
+		return S(ErrUnreachable)
+	}
+	return S(ErrUnreachable, tc.wantCause)
+}
+
+// errorLeaves follows Unwrap through every layer of err and returns the
+// errors that unwrap no further, in order.
+func errorLeaves(err error) []error {
+	errs := Unwrap(err)
+	if len(errs) == 0 {
+		return S(err)
 	}
 
-	// Test that it's a PanicError
-	pe, ok := result.(*PanicError)
-	if !ok {
-		t.Fatalf("expected PanicError, got %T", result)
+	var leaves []error
+	for _, e := range errs {
+		leaves = append(leaves, errorLeaves(e)...)
 	}
-
-	// Test that ErrUnreachable is somewhere in the chain
-	if !errors.Is(result, ErrUnreachable) {
-		t.Fatal("expected ErrUnreachable in error chain")
-	}
-
-	// Test error message
-	errorStr := result.Error()
-	if errorStr == "" {
-		t.Fatal("expected non-empty error message")
-	}
-
-	// Test stack trace
-	stack := pe.CallStack()
-	if len(stack) == 0 {
-		t.Fatal("expected non-empty stack trace")
-	}
+	return leaves
 }
 
 // Factory function for newUnreachableErrorTestCase
-func newNewUnreachableErrorTestCase(name string, err error, note string) newUnreachableErrorTestCase {
+func newNewUnreachableErrorTestCase(name string, err error, note string,
+	wantCause error, wantMsg string) newUnreachableErrorTestCase {
 	return newUnreachableErrorTestCase{
-		name:       name,
-		err:        err,
-		note:       note,
-		expectType: "PanicError",
+		name:      name,
+		err:       err,
+		note:      note,
+		wantCause: wantCause,
+		wantMsg:   wantMsg,
 	}
 }
 
@@ -559,7 +589,7 @@ func TestDeeper(t *testing.T) {
 	RunTestCases(t, deeperTestCases())
 }
 
-// The eight wrappers below give each constructor a stable, named caller
+// The seven wrappers below give each constructor a stable, named caller
 // for TestPanicConstructorsNegativeSkip, in the manner of
 // callMustNoError in the MustNoError tests. Each passes a negative
 // skip, so the captured top frame should resolve to the wrapper itself.
@@ -580,19 +610,14 @@ func negativeSkipPanicWrapf() *PanicError {
 	return NewPanicWrapf(-1, errSentinel, "note %d", 42)
 }
 
-// NewUnreachableError calls deeper once per arm, so each arm needs a
-// caller of its own; without one a revert there goes unnoticed. The
-// bare and note-only arms are reached through a nil cause.
-func negativeSkipUnreachableErrorBare() error {
-	return NewUnreachableError(-1, nil, "")
-}
-
-func negativeSkipUnreachableErrorNoteOnly() error {
-	return NewUnreachableError(-1, nil, "note")
-}
-
 func negativeSkipUnreachableError() error {
 	return NewUnreachableError(-1, errSentinel, "note")
+}
+
+// NewUnreachableError calls deeper once per arm, so the note-less arm
+// needs a caller of its own; without it a revert there goes unnoticed.
+func negativeSkipUnreachableErrorNoNote() error {
+	return NewUnreachableError(-1, errSentinel, "")
 }
 
 func negativeSkipUnreachableErrorf() error {
@@ -629,10 +654,10 @@ func (tc negativeSkipTestCase) Test(t *testing.T) {
 	assertTopFrameIs(t, tc.recovered, tc.wantFunc, 2)
 }
 
-// negativeSkipTestCases covers every one of the eight deeper call
+// negativeSkipTestCases covers every one of the seven deeper call
 // sites — verified by reverting each to skip+1 in turn and checking a
-// row failed. NewUnreachableError holds three of the eight, one per
-// arm, hence its three rows.
+// row failed. NewUnreachableError holds two of the seven, one per arm,
+// hence its two rows.
 func negativeSkipTestCases() []negativeSkipTestCase {
 	return []negativeSkipTestCase{
 		newNegativeSkipTestCase("NewPanicError",
@@ -643,12 +668,10 @@ func negativeSkipTestCases() []negativeSkipTestCase {
 			negativeSkipPanicWrap(), "negativeSkipPanicWrap"),
 		newNegativeSkipTestCase("NewPanicWrapf",
 			negativeSkipPanicWrapf(), "negativeSkipPanicWrapf"),
-		newNegativeSkipTestCase("NewUnreachableError bare",
-			negativeSkipUnreachableErrorBare(), "negativeSkipUnreachableErrorBare"),
-		newNegativeSkipTestCase("NewUnreachableError note only",
-			negativeSkipUnreachableErrorNoteOnly(), "negativeSkipUnreachableErrorNoteOnly"),
-		newNegativeSkipTestCase("NewUnreachableError with cause",
+		newNegativeSkipTestCase("NewUnreachableError with note",
 			negativeSkipUnreachableError(), "negativeSkipUnreachableError"),
+		newNegativeSkipTestCase("NewUnreachableError without note",
+			negativeSkipUnreachableErrorNoNote(), "negativeSkipUnreachableErrorNoNote"),
 		newNegativeSkipTestCase("NewUnreachableErrorf",
 			negativeSkipUnreachableErrorf(), "negativeSkipUnreachableErrorf"),
 	}
