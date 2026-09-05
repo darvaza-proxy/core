@@ -513,3 +513,147 @@ func TestNewUnreachableError(t *testing.T) {
 func TestNewUnreachableErrorf(t *testing.T) {
 	t.Run("NewUnreachableErrorf", runNewUnreachableErrorfTest)
 }
+
+var _ TestCase = deeperTestCase{}
+
+// deeperTestCase pins the skip normalisation every panic constructor
+// applies. A negative skip is clamped to 1 rather than passed down to
+// getCallers, which rejects it and yields an empty stack.
+type deeperTestCase struct {
+	name string
+	skip int
+	want int
+}
+
+func newDeeperTestCase(name string, skip, want int) deeperTestCase {
+	return deeperTestCase{
+		name: name,
+		skip: skip,
+		want: want,
+	}
+}
+
+func (tc deeperTestCase) Name() string {
+	return tc.name
+}
+
+func (tc deeperTestCase) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.want, deeper(tc.skip), "deeper(%d)", tc.skip)
+}
+
+// The clamped rows all state 1, the same answer the zero row states, so
+// a negative skip is indistinguishable from no skip at all. The far
+// positive row declares that only the negative side is clamped.
+func deeperTestCases() []deeperTestCase {
+	return []deeperTestCase{
+		newDeeperTestCase("no skip", 0, 1),
+		newDeeperTestCase("one frame", 1, 2),
+		newDeeperTestCase("far positive", 9999, 10000),
+		newDeeperTestCase("minus one", -1, 1),
+		newDeeperTestCase("far negative", -9999, 1),
+	}
+}
+
+func TestDeeper(t *testing.T) {
+	RunTestCases(t, deeperTestCases())
+}
+
+// The eight wrappers below give each constructor a stable, named caller
+// for TestPanicConstructorsNegativeSkip, in the manner of
+// callMustNoError in the MustNoError tests. Each passes a negative
+// skip, so the captured top frame should resolve to the wrapper itself.
+
+func negativeSkipPanicError() *PanicError {
+	return NewPanicError(-1, "boom")
+}
+
+func negativeSkipPanicErrorf() *PanicError {
+	return NewPanicErrorf(-1, "boom %d", 42)
+}
+
+func negativeSkipPanicWrap() *PanicError {
+	return NewPanicWrap(-1, errSentinel, "note")
+}
+
+func negativeSkipPanicWrapf() *PanicError {
+	return NewPanicWrapf(-1, errSentinel, "note %d", 42)
+}
+
+// NewUnreachableError calls deeper once per arm, so each arm needs a
+// caller of its own; without one a revert there goes unnoticed. The
+// bare and note-only arms are reached through a nil cause.
+func negativeSkipUnreachableErrorBare() error {
+	return NewUnreachableError(-1, nil, "")
+}
+
+func negativeSkipUnreachableErrorNoteOnly() error {
+	return NewUnreachableError(-1, nil, "note")
+}
+
+func negativeSkipUnreachableError() error {
+	return NewUnreachableError(-1, errSentinel, "note")
+}
+
+func negativeSkipUnreachableErrorf() error {
+	return NewUnreachableErrorf(-1, errSentinel, "note %d", 42)
+}
+
+var _ TestCase = negativeSkipTestCase{}
+
+// negativeSkipTestCase states what the clamp is worth: 1 means the
+// constructor's immediate caller, so a negative skip attributes there
+// rather than to a frame inside panicerror.go. recovered is the value
+// one of the wrappers above returned, and wantFunc names that wrapper.
+// TestDeeper pins the arithmetic; these rows pin the wiring.
+type negativeSkipTestCase struct {
+	recovered any
+	name      string
+	wantFunc  string
+}
+
+func newNegativeSkipTestCase(name string, recovered any, wantFunc string) negativeSkipTestCase {
+	return negativeSkipTestCase{
+		name:      name,
+		recovered: recovered,
+		wantFunc:  wantFunc,
+	}
+}
+
+func (tc negativeSkipTestCase) Name() string {
+	return tc.name
+}
+
+func (tc negativeSkipTestCase) Test(t *testing.T) {
+	t.Helper()
+	assertTopFrameIs(t, tc.recovered, tc.wantFunc, 2)
+}
+
+// negativeSkipTestCases covers every one of the eight deeper call
+// sites — verified by reverting each to skip+1 in turn and checking a
+// row failed. NewUnreachableError holds three of the eight, one per
+// arm, hence its three rows.
+func negativeSkipTestCases() []negativeSkipTestCase {
+	return []negativeSkipTestCase{
+		newNegativeSkipTestCase("NewPanicError",
+			negativeSkipPanicError(), "negativeSkipPanicError"),
+		newNegativeSkipTestCase("NewPanicErrorf",
+			negativeSkipPanicErrorf(), "negativeSkipPanicErrorf"),
+		newNegativeSkipTestCase("NewPanicWrap",
+			negativeSkipPanicWrap(), "negativeSkipPanicWrap"),
+		newNegativeSkipTestCase("NewPanicWrapf",
+			negativeSkipPanicWrapf(), "negativeSkipPanicWrapf"),
+		newNegativeSkipTestCase("NewUnreachableError bare",
+			negativeSkipUnreachableErrorBare(), "negativeSkipUnreachableErrorBare"),
+		newNegativeSkipTestCase("NewUnreachableError note only",
+			negativeSkipUnreachableErrorNoteOnly(), "negativeSkipUnreachableErrorNoteOnly"),
+		newNegativeSkipTestCase("NewUnreachableError with cause",
+			negativeSkipUnreachableError(), "negativeSkipUnreachableError"),
+		newNegativeSkipTestCase("NewUnreachableErrorf",
+			negativeSkipUnreachableErrorf(), "negativeSkipUnreachableErrorf"),
+	}
+}
+
+func TestPanicConstructorsNegativeSkip(t *testing.T) {
+	RunTestCases(t, negativeSkipTestCases())
+}
