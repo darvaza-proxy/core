@@ -519,8 +519,8 @@ func (tc mustPanicTestCase) Test(t *testing.T) {
 	_, err := testMust("value", tc.err)
 	AssertError(t, err, "Must panic")
 
-	// Verify the panic contains our original error
-	AssertTrue(t, errors.Is(err, tc.err), "panic wraps original")
+	AssertErrorIs(t, err, ErrUnreachable, "ErrUnreachable in chain")
+	AssertErrorIs(t, err, tc.err, "original error in chain")
 
 	// Verify it's a proper PanicError
 	panicErr, ok := AssertTypeIs[*PanicError](t, err, "panic type")
@@ -734,8 +734,8 @@ func (tc mustOKPanicTestCase) Test(t *testing.T) {
 		stack := panicErr.CallStack()
 		AssertTrue(t, len(stack) > 0, "has stack trace")
 
-		// Verify the error message contains our expected text
-		AssertContains(t, panicErr.Error(), "core.MustOK: operation failed", "panic message")
+		AssertErrorIs(t, panicErr, ErrUnreachable, "ErrUnreachable in chain")
+		AssertContains(t, panicErr.Error(), "operation failed", "reason")
 	}
 }
 
@@ -892,19 +892,19 @@ func (tc mustTPanicTestCase) Test(t *testing.T) {
 	case "string":
 		AssertPanic(t, func() {
 			_ = MustT[string](tc.input)
-		}, nil, "MustT should panic for invalid string conversion")
+		}, ErrUnreachable, "MustT should panic for invalid string conversion")
 	case "int":
 		AssertPanic(t, func() {
 			_ = MustT[int](tc.input)
-		}, nil, "MustT should panic for invalid int conversion")
+		}, ErrUnreachable, "MustT should panic for invalid int conversion")
 	case "error":
 		AssertPanic(t, func() {
 			_ = MustT[error](tc.input)
-		}, nil, "MustT should panic for invalid error conversion")
+		}, ErrUnreachable, "MustT should panic for invalid error conversion")
 	case "fmt.Stringer":
 		AssertPanic(t, func() {
 			_ = MustT[fmt.Stringer](tc.input)
-		}, nil, "MustT should panic for invalid fmt.Stringer conversion")
+		}, ErrUnreachable, "MustT should panic for invalid fmt.Stringer conversion")
 	default:
 		t.Errorf("unsupported target type: %s", tc.target)
 	}

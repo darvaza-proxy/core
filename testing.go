@@ -557,7 +557,10 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 //
 //   - nil: Any panic is acceptable (most common case - just verify it panics).
 //   - error: Uses errors.Is semantics to match error chains (resilient to wrapping).
+//     A [StringError] is an error, so it matches here by value rather than as a substring.
 //   - string: Checks if the panic message contains this substring (resilient to message changes).
+//     The message is the panic value as [PanicError] renders it: a string is searched as
+//     itself, and any other payload, an error included, sits behind the "panic: " prefix.
 //     An empty substring is rejected: no test means to assert it, and nil already says any panic.
 //   - Recovered: Direct comparison without unwrapping (for testing panic recovery).
 //   - other types: Exact equality check after unwrapping Recovered if present.

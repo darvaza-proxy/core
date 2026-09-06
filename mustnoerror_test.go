@@ -11,6 +11,11 @@ var (
 	errOther    = errors.New("other error")
 	errExtra    = errors.New("extra error")
 
+	// errUnrelated is never put into any chain under test. The
+	// errors.Is assertions pair a match against it as a non-match,
+	// so a chain that answered true to everything would fail.
+	errUnrelated = errors.New("unrelated error")
+
 	// errNilPointer is a non-nil error interface holding a nil
 	// pointer — the typed-nil shape MustNoError* treats as a real
 	// error.
@@ -94,35 +99,31 @@ func TestMustNoErrorPreservesOriginal(t *testing.T) {
 	AssertPanic(t, fnNil, errNilPointer, "typed-nil err in chain")
 }
 
-// assertUnreachablePanicShape pins that r is a *PanicError whose
-// Unwrap() yields a *CompoundError holding exactly two errors,
-// [ErrUnreachable, want]. Shared by the PanicShape tests for
-// MustNoError, MustNoErrorExcept and MustNoErrorExceptFn so their
-// structural pins stay symmetric — all three helpers route through
-// the same NewUnreachableError call, so a regression in one would
-// hit the others identically. r is normalised through AsRecovered
-// so a nil (no-panic) input fails the first assertion with a clear
-// message.
+// assertUnreachablePanicShape pins that r is a *PanicError chaining to
+// both ErrUnreachable and want. What the payload is assembled from is
+// NewUnreachableError's business; what callers depend on is that
+// [errors.Is] finds each of the two, so that is what this asserts.
+// errUnrelated pins the chain as discriminating rather than matching
+// anything put to it. Shared by the PanicShape tests for MustNoError,
+// MustNoErrorExcept and MustNoErrorExceptFn, whose three separate
+// NewUnreachableError calls take identical arguments, so a regression
+// in one would hit the others identically. r is the raw recovered
+// value, as assertTopFrameIs takes it: AsRecovered would wrap a
+// non-Recovered panic in a *PanicError, leaving the type assertion to
+// state what the line above it had just built.
 func assertUnreachablePanicShape(t T, r any, want error) {
 	t.Helper()
-	rec := AsRecovered(r)
-	AssertMustNotNil(t, rec, "recovered value")
-	pe := AssertMustTypeIs[*PanicError](t, rec,
-		"recovered is *PanicError")
-	ce := AssertMustTypeIs[*CompoundError](t, pe.Unwrap(),
-		"payload is *CompoundError")
-	AssertMustEqual(t, 2, len(ce.Errs),
-		"CompoundError holds 2 errors")
-	AssertMustSame(t, ErrUnreachable, ce.Errs[0],
-		"first error is ErrUnreachable")
-	AssertMustSame(t, want, ce.Errs[1],
-		"second error is original")
+	AssertMustNotNil(t, r, "recovered value")
+	pe := AssertMustTypeIs[*PanicError](t, r,
+		"recovered value is *PanicError")
+	AssertErrorIs(t, pe, ErrUnreachable, "ErrUnreachable in chain")
+	AssertErrorIs(t, pe, want, "original error in chain")
+	AssertNotErrorIs(t, pe, errUnrelated, "unrelated error absent")
 }
 
-// TestMustNoErrorPanicShape pins the structural shape of the panic
-// value: a *PanicError whose Unwrap() yields a CompoundError holding
-// [ErrUnreachable, original]. A future change to NewUnreachableError
-// that flattens or reorders the chain will fail this test.
+// TestMustNoErrorPanicShape pins what MustNoError panics with on its
+// non-nil path: a *PanicError chaining to both ErrUnreachable and the
+// original error, asserted by assertUnreachablePanicShape.
 func TestMustNoErrorPanicShape(t *testing.T) {
 	defer func() {
 		assertUnreachablePanicShape(t, recover(), errSentinel)
@@ -131,20 +132,20 @@ func TestMustNoErrorPanicShape(t *testing.T) {
 }
 
 // assertPlainUnreachableShape pins the no-cause panic shape:
-// NewUnreachableError treats ErrUnreachable as "no distinct cause",
-// so the *PanicError payload is the bare sentinel — the constructor's
-// baseline shape — instead of the two-error CompoundError that
-// assertUnreachablePanicShape pins for a real cause. Shared by the
+// NewUnreachableError treats ErrUnreachable as "no distinct cause", so
+// the *PanicError payload is the bare sentinel rather than a pairing of
+// the sentinel with a cause. Identity is the assertion here, not
+// [errors.Is]: matching the sentinel would pass for either shape, and
+// the distinction between them is the whole point. Shared by the
 // UnreachablePanicShape tests for MustNoError, MustNoErrorExcept and
 // MustNoErrorExceptFn so their structural pins stay symmetric. r is
-// normalised through AsRecovered so a nil (no-panic) input fails the
-// first assertion with a clear message.
+// the raw recovered value, for the reason assertUnreachablePanicShape
+// gives.
 func assertPlainUnreachableShape(t T, r any) {
 	t.Helper()
-	rec := AsRecovered(r)
-	AssertMustNotNil(t, rec, "recovered value")
-	pe := AssertMustTypeIs[*PanicError](t, rec,
-		"recovered is *PanicError")
+	AssertMustNotNil(t, r, "recovered value")
+	pe := AssertMustTypeIs[*PanicError](t, r,
+		"recovered value is *PanicError")
 	AssertMustSame(t, ErrUnreachable, pe.Unwrap(),
 		"payload is ErrUnreachable")
 }
@@ -173,9 +174,7 @@ func TestMustNoErrorExceptPreservesOriginal(t *testing.T) {
 }
 
 // TestMustNoErrorExceptPanicShape mirrors TestMustNoErrorPanicShape
-// for the no-match path of MustNoErrorExcept. Structural shape of
-// the panic value is identical because both helpers route through
-// the same NewUnreachableError call.
+// for the no-match path of MustNoErrorExcept.
 func TestMustNoErrorExceptPanicShape(t *testing.T) {
 	defer func() {
 		assertUnreachablePanicShape(t, recover(), errSentinel)
@@ -350,9 +349,7 @@ func TestMustNoErrorExceptFnPreservesOriginal(t *testing.T) {
 }
 
 // TestMustNoErrorExceptFnPanicShape mirrors TestMustNoErrorPanicShape
-// for the no-match path of MustNoErrorExceptFn. Structural shape of
-// the panic value is identical because all three helpers route through
-// the same NewUnreachableError call.
+// for the no-match path of MustNoErrorExceptFn.
 func TestMustNoErrorExceptFnPanicShape(t *testing.T) {
 	defer func() {
 		assertUnreachablePanicShape(t, recover(), errSentinel)

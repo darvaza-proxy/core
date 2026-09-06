@@ -762,3 +762,41 @@ func TestFrameForPCUnknown(t *testing.T) {
 func TestStackFrameSkipExceeds(t *testing.T) {
 	AssertNil(t, StackFrame(10000), "StackFrame returns nil when skip > depth")
 }
+
+// Cover the same branch through StackTrace, which yields an empty Stack
+// rather than a nil Frame. Statement coverage cannot show this one: the
+// arm it takes holds no statements.
+func TestStackTraceSkipExceeds(t *testing.T) {
+	AssertEqual(t, 0, len(StackTrace(10000)), "stack length")
+}
+
+// Cover the negative-skip guard, which rejects rather than clamping to zero.
+// Without it the buffer is sliced from a negative index, so the assertion
+// that matters is that the call returns at all.
+func TestStackFrameNegativeSkip(t *testing.T) {
+	var frame *Frame
+
+	AssertMustNoPanic(t, func() { frame = StackFrame(-1) }, "StackFrame(-1)")
+	AssertNil(t, frame, "frame")
+}
+
+func TestStackTraceNegativeSkip(t *testing.T) {
+	var stack Stack
+
+	AssertMustNoPanic(t, func() { stack = StackTrace(-1) }, "StackTrace(-1)")
+	AssertEqual(t, 0, len(stack), "stack length")
+}
+
+// StackTrace documents a capture limited to MaxDepth frames. Recurse past
+// it so the buffer, rather than the stack, decides the length.
+func TestStackTraceMaxDepth(t *testing.T) {
+	stack := deepestStackTrace(MaxDepth)
+	AssertEqual(t, MaxDepth, len(stack), "stack length")
+}
+
+func deepestStackTrace(depth int) Stack {
+	if depth > 0 {
+		return deepestStackTrace(depth - 1)
+	}
+	return StackTrace(0)
+}
