@@ -1,6 +1,8 @@
 package core
 
 import (
+	"errors"
+	"fmt"
 	"sync/atomic"
 )
 
@@ -93,7 +95,7 @@ func Catch(fn func() error) error {
 //	data := Must(json.Marshal(obj))  // panics if marshal fails
 func Must[V any](value V, err error) V {
 	if err != nil {
-		panic(NewPanicWrap(1, err, "core.Must"))
+		panic(NewUnreachableError(1, err, ""))
 	}
 	return value
 }
@@ -132,7 +134,7 @@ func Maybe[V any](value V, _ error) V {
 // revive:disable-next-line:flag-parameter
 func MustOK[V any](value V, ok bool) V {
 	if !ok {
-		panic(NewPanicError(1, "core.MustOK: operation failed"))
+		panic(NewUnreachableError(1, errors.New("operation failed"), ""))
 	}
 	return value
 }
@@ -170,7 +172,8 @@ func MaybeOK[V any](value V, _ bool) V {
 func MustT[T any](value any) T {
 	result, ok := value.(T)
 	if !ok {
-		panic(NewPanicErrorf(1, "core.MustT: failed to convert %T to %T", value, result))
+		err := fmt.Errorf("failed to convert %T to %T", value, result)
+		panic(NewUnreachableError(1, err, ""))
 	}
 	return result
 }
@@ -195,9 +198,8 @@ func MaybeT[T any](value any) T {
 // MustNoError panics if err is non-nil, wrapping it in [ErrUnreachable].
 // It is the no-value sibling of [Must]: where Must guards a (value, err)
 // pair, MustNoError guards a bare error from a call whose non-nil return
-// signals a path that should be impossible. Routing through ErrUnreachable
-// is the deliberate difference from Must (which annotates the panic with
-// "core.Must"); it lets recovering code match [ErrUnreachable].
+// signals a path that should be impossible. Recovering code matches
+// [ErrUnreachable].
 //
 // A typed nil — a non-nil error interface holding a nil pointer —
 // counts as non-nil and panics. Passing ErrUnreachable itself means
