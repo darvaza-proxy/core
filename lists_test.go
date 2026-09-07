@@ -7,105 +7,157 @@ import (
 
 // Compile-time verification that test case types implement TestCase interface
 var (
+	_ TestCase = listForEachTestCase{}
+	_ TestCase = listForEachElementTestCase{}
 	_ TestCase = listContainsTestCase{}
 	_ TestCase = listCopyTestCase{}
 	_ TestCase = listForEachTypeMismatchTestCase{}
 )
 
-func testListIteration(t *testing.T, name string, iterFn func(*list.List, func(int) bool), values, expected []int) {
-	t.Helper()
-	t.Run(name, func(t *testing.T) {
-		runListIterationTest(t, iterFn, values, expected)
-	})
+// listValues collects the values of a list of int, walking it through
+// container/list rather than through any subject under test.
+func listValues(l *list.List) []int {
+	out := make([]int, 0, l.Len())
+	for e := l.Front(); e != nil; e = e.Next() {
+		out = append(out, e.Value.(int))
+	}
+	return out
 }
 
-func runListIterationTest(t *testing.T, iterFn func(*list.List, func(int) bool), values, expected []int) {
-	t.Helper()
+// listOf builds a list of int, pushing the values in the order given.
+func listOf(values ...int) *list.List {
 	l := list.New()
 	for _, v := range values {
 		l.PushBack(v)
 	}
+	return l
+}
+
+// listForEachTestCase visits a list through one of the iteration
+// functions taking a value callback. That function is the suite's
+// subject rather than row data: the list factory hands the same one to
+// every row of a table.
+type listForEachTestCase struct {
+	iterFn   func(*list.List, func(int) bool)
+	name     string
+	values   []int
+	expected []int
+}
+
+func (tc listForEachTestCase) Name() string {
+	return tc.name
+}
+
+func (tc listForEachTestCase) Test(t *testing.T) {
+	t.Helper()
 
 	var result []int
-	iterFn(l, func(v int) bool {
+	tc.iterFn(listOf(tc.values...), func(v int) bool {
 		result = append(result, v)
 		return false
 	})
 
-	AssertSliceEqual(t, expected, result, "visited values")
+	AssertSliceEqual(t, tc.expected, result, "visited values")
 }
 
-func testListElementIteration(
-	t *testing.T,
-	name string,
-	iterFn func(*list.List, func(*list.Element) bool),
-	values, expected []int,
-) {
-	t.Helper()
-	t.Run(name, func(t *testing.T) {
-		runListElementIterationTest(t, iterFn, values, expected)
-	})
-}
-
-func runListElementIterationTest(
-	t *testing.T,
-	iterFn func(*list.List, func(*list.Element) bool),
-	values, expected []int,
-) {
-	t.Helper()
-	l := list.New()
-	for _, v := range values {
-		l.PushBack(v)
+func newListForEachTestCase(name string, iterFn func(*list.List, func(int) bool),
+	values, expected []int) listForEachTestCase {
+	return listForEachTestCase{
+		name:     name,
+		iterFn:   iterFn,
+		values:   values,
+		expected: expected,
 	}
+}
+
+// listForEachTestCases takes the order in which the subject visits
+// several elements, which is what separates a forward function from a
+// backward one.
+func listForEachTestCases(iterFn func(*list.List, func(int) bool),
+	wantMultiple []int) []listForEachTestCase {
+	return []listForEachTestCase{
+		newListForEachTestCase("empty list", iterFn, nil, nil),
+		newListForEachTestCase("single element", iterFn, S(1), S(1)),
+		newListForEachTestCase("multiple elements", iterFn, S(1, 2, 3), wantMultiple),
+	}
+}
+
+// listForEachElementTestCase is the same suite for the iteration
+// functions taking an element callback.
+type listForEachElementTestCase struct {
+	iterFn   func(*list.List, func(*list.Element) bool)
+	name     string
+	values   []int
+	expected []int
+}
+
+func (tc listForEachElementTestCase) Name() string {
+	return tc.name
+}
+
+func (tc listForEachElementTestCase) Test(t *testing.T) {
+	t.Helper()
 
 	var result []int
-	iterFn(l, func(e *list.Element) bool {
+	tc.iterFn(listOf(tc.values...), func(e *list.Element) bool {
 		result = append(result, e.Value.(int))
 		return false
 	})
 
-	AssertSliceEqual(t, expected, result, "visited values")
+	AssertSliceEqual(t, tc.expected, result, "visited values")
+}
+
+func newListForEachElementTestCase(name string, iterFn func(*list.List, func(*list.Element) bool),
+	values, expected []int) listForEachElementTestCase {
+	return listForEachElementTestCase{
+		name:     name,
+		iterFn:   iterFn,
+		values:   values,
+		expected: expected,
+	}
+}
+
+func listForEachElementTestCases(iterFn func(*list.List, func(*list.Element) bool),
+	wantMultiple []int) []listForEachElementTestCase {
+	return []listForEachElementTestCase{
+		newListForEachElementTestCase("empty list", iterFn, nil, nil),
+		newListForEachElementTestCase("single element", iterFn, S(1), S(1)),
+		newListForEachElementTestCase("multiple elements", iterFn, S(1, 2, 3), wantMultiple),
+	}
 }
 
 func TestListForEach(t *testing.T) {
-	testListIteration(t, "empty list", ListForEach[int], nil, nil)
-	testListIteration(t, "single element", ListForEach[int], S(1), S(1))
-	testListIteration(t, "multiple elements", ListForEach[int], S(1, 2, 3), S(1, 2, 3))
+	RunTestCases(t, listForEachTestCases(ListForEach[int], S(1, 2, 3)))
 
 	testListForEachNilAndEarlyReturn(t, "ListForEach", func(l *list.List, fn func(int) bool) {
 		ListForEach(l, fn)
-	})
+	}, S(1, 2))
 }
 
 func TestListForEachElement(t *testing.T) {
-	testListElementIteration(t, "empty list", ListForEachElement, nil, nil)
-	testListElementIteration(t, "single element", ListForEachElement, S(1), S(1))
-	testListElementIteration(t, "multiple elements", ListForEachElement, S(1, 2, 3), S(1, 2, 3))
+	RunTestCases(t, listForEachElementTestCases(ListForEachElement, S(1, 2, 3)))
 
-	testListForEachElementNilAndEarlyReturn(t, "ListForEachElement", func(l *list.List, fn func(*list.Element) bool) {
-		ListForEachElement(l, fn)
-	})
+	testListForEachElementNilAndEarlyReturn(t, "ListForEachElement",
+		func(l *list.List, fn func(*list.Element) bool) {
+			ListForEachElement(l, fn)
+		}, S(1, 2))
 }
 
 func TestListForEachBackward(t *testing.T) {
-	testListIteration(t, "empty list", ListForEachBackward[int], nil, nil)
-	testListIteration(t, "single element", ListForEachBackward[int], S(1), S(1))
-	testListIteration(t, "multiple elements", ListForEachBackward[int], S(1, 2, 3), S(3, 2, 1))
+	RunTestCases(t, listForEachTestCases(ListForEachBackward[int], S(3, 2, 1)))
 
 	testListForEachNilAndEarlyReturn(t, "ListForEachBackward", func(l *list.List, fn func(int) bool) {
 		ListForEachBackward(l, fn)
-	})
+	}, S(3, 2))
 }
 
 func TestListForEachBackwardElement(t *testing.T) {
-	testListElementIteration(t, "empty list", ListForEachBackwardElement, nil, nil)
-	testListElementIteration(t, "single element", ListForEachBackwardElement, S(1), S(1))
-	testListElementIteration(t, "multiple elements", ListForEachBackwardElement, S(1, 2, 3), S(3, 2, 1))
+	RunTestCases(t, listForEachElementTestCases(ListForEachBackwardElement, S(3, 2, 1)))
 
 	testListForEachElementNilAndEarlyReturn(t, "ListForEachBackwardElement",
 		func(l *list.List, fn func(*list.Element) bool) {
 			ListForEachBackwardElement(l, fn)
-		})
+		}, S(3, 2))
 }
 
 // Test cases for ListContains function
@@ -194,26 +246,14 @@ func (tc listCopyTestCase) Test(t *testing.T) {
 	// Copy the list
 	copied := ListCopy[int](orig)
 
-	// Verify same length
-	AssertEqual(t, orig.Len(), copied.Len(), "length")
+	// Everything below reads the copy, so a copy that is the original
+	// or holds the wrong values makes the rest meaningless.
+	AssertMustNotSame(t, orig, copied, "list instance")
+	AssertMustSliceEqual(t, tc.values, listValues(copied), "copied values")
 
-	// Verify same elements
-	origElem := orig.Front()
-	copiedElem := copied.Front()
-	for origElem != nil && copiedElem != nil {
-		AssertEqual(t, origElem.Value.(int), copiedElem.Value.(int), "element value")
-		origElem = origElem.Next()
-		copiedElem = copiedElem.Next()
-	}
-
-	// Verify they are different lists (not the same pointer)
-	AssertNotSame(t, orig, copied, "list instance")
-
-	// Verify independence - modifying one doesn't affect the other
-	if orig.Len() > 0 {
-		orig.PushBack(999)
-		AssertEqual(t, orig.Len()-1, copied.Len(), "independence")
-	}
+	// Appending to the original must not reach the copy.
+	orig.PushBack(999)
+	AssertSliceEqual(t, tc.values, listValues(copied), "copy after appending to the original")
 }
 
 func TestListCopy(t *testing.T) {
@@ -293,13 +333,8 @@ func testListCopyFnTransformation(t *testing.T) {
 		return v * 2, true
 	})
 
-	AssertEqual(t, 3, result.Len(), "length")
-	expected := S(2, 4, 6)
-	i := 0
-	for e := result.Front(); e != nil; e = e.Next() {
-		AssertEqual(t, expected[i], e.Value.(int), "value[%d]", i)
-		i++
-	}
+	AssertMustNotNil(t, result, "ListCopyFn(_, double)")
+	AssertSliceEqual(t, S(2, 4, 6), listValues(result), "doubled values")
 }
 
 func testListCopyFnFiltering(t *testing.T) {
@@ -315,13 +350,8 @@ func testListCopyFnFiltering(t *testing.T) {
 		return v, v%2 == 0
 	})
 
-	AssertEqual(t, 2, result.Len(), "filtered length")
-	expected := S(2, 4)
-	i := 0
-	for e := result.Front(); e != nil; e = e.Next() {
-		AssertEqual(t, expected[i], e.Value.(int), "value[%d]", i)
-		i++
-	}
+	AssertMustNotNil(t, result, "ListCopyFn(_, keepEven)")
+	AssertSliceEqual(t, S(2, 4), listValues(result), "kept values")
 }
 
 func testListCopyFnNilList(t *testing.T) {
@@ -329,7 +359,8 @@ func testListCopyFnNilList(t *testing.T) {
 	result := ListCopyFn((*list.List)(nil), func(v int) (int, bool) {
 		return v, true
 	})
-	AssertEqual(t, 0, result.Len(), "nil list")
+	AssertMustNotNil(t, result, "ListCopyFn(nil, _)")
+	AssertSliceEqual(t, S[int](), listValues(result), "nil list")
 }
 
 func testListCopyFnNilFunction(t *testing.T) {
@@ -338,18 +369,19 @@ func testListCopyFnNilFunction(t *testing.T) {
 	l.PushBack(42)
 
 	result := ListCopyFn[int](l, nil)
-	AssertEqual(t, 1, result.Len(), "nil function")
-	AssertEqual(t, 42, result.Front().Value.(int), "value")
+	AssertMustNotNil(t, result, "ListCopyFn(_, nil)")
+	AssertSliceEqual(t, S(42), listValues(result), "copied values")
 }
 
-func testListForEachNilAndEarlyReturn(t *testing.T, name string, iterFn func(*list.List, func(int) bool)) {
+func testListForEachNilAndEarlyReturn(t *testing.T, name string,
+	iterFn func(*list.List, func(int) bool), wantEarly []int) {
 	t.Helper()
 
 	t.Run("nil function", func(t *testing.T) {
 		testListForEachNilFunction(t, name, iterFn)
 	})
 	t.Run("early return", func(t *testing.T) {
-		testListForEachEarlyReturn(t, name, iterFn)
+		testListForEachEarlyReturn(t, name, iterFn, wantEarly)
 	})
 	t.Run("nil list", func(t *testing.T) {
 		testListForEachNilList(t, name, iterFn)
@@ -365,7 +397,8 @@ func testListForEachNilFunction(t *testing.T, name string, iterFn func(*list.Lis
 	AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
 }
 
-func testListForEachEarlyReturn(t *testing.T, name string, iterFn func(*list.List, func(int) bool)) {
+func testListForEachEarlyReturn(t *testing.T, name string,
+	iterFn func(*list.List, func(int) bool), want []int) {
 	t.Helper()
 	l := list.New()
 	l.PushBack(1)
@@ -377,35 +410,30 @@ func testListForEachEarlyReturn(t *testing.T, name string, iterFn func(*list.Lis
 		result = append(result, v)
 		return v == 2 // Stop when we hit 2
 	})
-	AssertEqual(t, 2, len(result), name+" early return")
-	if name == "ListForEach" {
-		AssertEqual(t, 1, result[0], "First element")
-		AssertEqual(t, 2, result[1], "Second element")
-	} else {
-		AssertEqual(t, 3, result[0], "first (backward)")
-		AssertEqual(t, 2, result[1], "second (backward)")
-	}
+	AssertSliceEqual(t, want, result, name+" early return")
 }
 
 func testListForEachNilList(t *testing.T, name string, iterFn func(*list.List, func(int) bool)) {
 	t.Helper()
-	var result []int
-	iterFn((*list.List)(nil), func(v int) bool {
-		result = append(result, v)
-		return false
-	})
-	AssertEqual(t, 0, len(result), name+" nil list")
+	visits := 0
+	AssertNoPanic(t, func() {
+		iterFn((*list.List)(nil), func(int) bool {
+			visits++
+			return false
+		})
+	}, name+" nil list")
+	AssertEqual(t, 0, visits, name+" nil list visits")
 }
 
 func testListForEachElementNilAndEarlyReturn(t *testing.T, name string,
-	iterFn func(*list.List, func(*list.Element) bool)) {
+	iterFn func(*list.List, func(*list.Element) bool), wantEarly []int) {
 	t.Helper()
 
 	t.Run("nil function", func(t *testing.T) {
 		testListForEachElementNilFunction(t, name, iterFn)
 	})
 	t.Run("early return", func(t *testing.T) {
-		testListForEachElementEarlyReturn(t, name, iterFn)
+		testListForEachElementEarlyReturn(t, name, iterFn, wantEarly)
 	})
 	t.Run("nil list", func(t *testing.T) {
 		testListForEachElementNilList(t, name, iterFn)
@@ -420,7 +448,8 @@ func testListForEachElementNilFunction(t *testing.T, name string, iterFn func(*l
 	AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
 }
 
-func testListForEachElementEarlyReturn(t *testing.T, name string, iterFn func(*list.List, func(*list.Element) bool)) {
+func testListForEachElementEarlyReturn(t *testing.T, name string,
+	iterFn func(*list.List, func(*list.Element) bool), want []int) {
 	t.Helper()
 	l := list.New()
 	l.PushBack(1)
@@ -432,24 +461,19 @@ func testListForEachElementEarlyReturn(t *testing.T, name string, iterFn func(*l
 		result = append(result, e.Value.(int))
 		return e.Value.(int) == 2 // Stop when we hit 2
 	})
-	AssertEqual(t, 2, len(result), name+" early return")
-	if name == "ListForEachElement" {
-		AssertEqual(t, 1, result[0], "First element")
-		AssertEqual(t, 2, result[1], "Second element")
-	} else {
-		AssertEqual(t, 3, result[0], "first (backward)")
-		AssertEqual(t, 2, result[1], "second (backward)")
-	}
+	AssertSliceEqual(t, want, result, name+" early return")
 }
 
 func testListForEachElementNilList(t *testing.T, name string, iterFn func(*list.List, func(*list.Element) bool)) {
 	t.Helper()
-	var result []int
-	iterFn((*list.List)(nil), func(e *list.Element) bool {
-		result = append(result, e.Value.(int))
-		return false
-	})
-	AssertEqual(t, 0, len(result), name+" nil list")
+	visits := 0
+	AssertNoPanic(t, func() {
+		iterFn((*list.List)(nil), func(*list.Element) bool {
+			visits++
+			return false
+		})
+	}, name+" nil list")
+	AssertEqual(t, 0, visits, name+" nil list visits")
 }
 
 type listForEachTypeMismatchTestCase struct {
@@ -468,7 +492,7 @@ func (tc listForEachTypeMismatchTestCase) Test(t *testing.T) {
 		collected = append(collected, v)
 		return false
 	})
-	AssertSliceEqual(t, tc.want, collected, tc.name)
+	AssertSliceEqual(t, tc.want, collected, "visited values")
 }
 
 func newListForEachTypeMismatchTestCase(name string, l *list.List,
