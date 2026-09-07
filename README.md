@@ -714,6 +714,15 @@ Enhanced wait group with error handling:
 * `.Wait()` - wait for completion.
 * `.Err()` - get first error.
 
+### Polling
+
+* `WaitForCond(predicate, timeout, step)` - poll a predicate every `step`
+  until it holds or `timeout` elapses, reporting which. The predicate is
+  consulted before the deadline, so one already true passes with a zero
+  timeout.
+* `WaitForCondContext(ctx, predicate, step)` - the same wait ending when
+  the context does; a nil context means no deadline and no cancellation.
+
 ### ErrGroup
 
 Context-aware error group with cancellation:
