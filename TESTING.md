@@ -203,6 +203,28 @@ core.AssertPanic(t, func() { panic("test") }, "panic")
 core.AssertNoPanic(t, func() { /* safe code */ }, "no panic")
 ```
 
+**Channel and Timing Assertions:**
+
+```go
+core.AssertEventually(t, func() bool { return srv.Ready() }, time.Second, "ready")
+core.AssertEventuallyContext(t, t.Context(), func() bool { return srv.Ready() }, "ready")
+core.AssertClosed(t, done, time.Second, "workers finished")
+core.AssertOpen(t, done, 10*time.Millisecond, "workers still running")
+core.AssertReceives(t, ready, n, time.Second, "workers ready")
+```
+
+`AssertClosed` and `AssertOpen` state whether a channel closes within the
+timeout. They receive until the close or the deadline, so the verdict is
+the channel's state whatever it held, and the values consumed on the way
+are counted in the report. They are for channels that signal by closing; a
+channel that carries values wants `AssertReceives`, which waits for `n`
+values under one shared timeout, returns them in arrival order, and fails
+on a close before the n-th. `AssertEventually` polls its predicate
+every millisecond through `core.WaitForCond`, which is the same wait returned
+as a value, for a caller that wants to branch on it rather than assert it.
+`AssertEventuallyContext` does the same under a context, so a test polling
+under `t.Context()` needs no budget of its own.
+
 **Fatal Assertions (`AssertMust*`):**
 
 All `AssertMustFoo()` functions call the corresponding `AssertFoo()` function
