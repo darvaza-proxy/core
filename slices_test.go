@@ -339,34 +339,57 @@ func newSliceMapTestCase[T1, T2 any](name string, input []T1, fn func([]T2, T1) 
 }
 
 func TestSliceMap(t *testing.T) {
+	// Simple case first
+	t.Run("debug", testSliceMapDebug)
+
+	t.Run("int to string", runTestSliceMapIntToString)
+	t.Run("string to int", runTestSliceMapStringToInt)
+}
+
+func runTestSliceMapIntToString(t *testing.T) {
+	t.Helper()
+
 	// Simple transformation: returns one element per input
 	intToString := func(_ []string, i int) []string {
 		return S(fmt.Sprintf("num_%d", i))
 	}
 
-	// Simple case first
-	t.Run("debug", testSliceMapDebug)
-
-	// Test simple mapping
 	testCases := []sliceMapTestCase[int, string]{
 		newSliceMapTestCase("single element", S(42), intToString, S("num_42")),
 		newSliceMapTestCase("multiple elements", S(1, 2, 3), intToString, S("num_1", "num_2", "num_3")),
 		newSliceMapTestCase("negative numbers", S(-1, 0, 1), intToString, S("num_-1", "num_0", "num_1")),
+		newSliceMapTestCase("empty slice", S[int](), intToString, nil),
+		newSliceMapTestCase("nil slice", nil, intToString, nil),
+		newSliceMapTestCase[int, string]("nil function", S(1, 2), nil, nil),
 	}
-
-	// Test empty slice separately
-	t.Run("empty slice", testSliceMapEmpty)
 
 	RunTestCases(t, testCases)
 }
 
-func testSliceMapEmpty(t *testing.T) {
+func runTestSliceMapStringToInt(t *testing.T) {
 	t.Helper()
-	intToString := func(_ []string, i int) []string {
-		return S(fmt.Sprintf("num_%d", i))
+
+	// Maps each string to its length and drops the empty ones, so a row
+	// can state a result shorter than its input and one that is nil
+	// though both the input and the function are not.
+	lengths := func(_ []int, s string) []int {
+		if s == "" {
+			return nil
+		}
+		return S(len(s))
 	}
-	result := SliceMap(S[int](), intToString)
-	AssertEqual(t, 0, len(result), "result slice length")
+
+	testCases := []sliceMapTestCase[string, int]{
+		newSliceMapTestCase("single element", S("hello"), lengths, S(5)),
+		newSliceMapTestCase("multiple elements", S("a", "bb", "ccc"), lengths, S(1, 2, 3)),
+		newSliceMapTestCase("element dropped", S("a", "", "ccc"), lengths, S(1, 3)),
+		newSliceMapTestCase("every element dropped", S("", ""), lengths, nil),
+		newSliceMapTestCase("empty slice", S[string](), lengths, nil),
+		newSliceMapTestCase("nil slice", nil, lengths, nil),
+		newSliceMapTestCase[string, int]("nil function", S("a"), nil, nil),
+	}
+
+	RunTestCases(t, testCases)
 }
 
 func testSliceMapDebug(t *testing.T) {
