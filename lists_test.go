@@ -478,3 +478,45 @@ func TestListForEachTypeMismatch(t *testing.T) {
 		newListForEachTypeMismatchTestCase("backward", l, ListForEachBackward[int], S(3, 1)),
 	})
 }
+
+// ListContains and ListContainsFn walk the list through ListForEach, so
+// they inherit that skip: the type parameter selects which of a mixed
+// list's elements they can match at all.
+func TestListContainsTypeMismatch(t *testing.T) {
+	l := list.New()
+	l.PushBack(1)
+	l.PushBack("not-an-int")
+	l.PushBack(3)
+
+	AssertTrue(t, ListContains(l, 3), "ListContains(_, 3)")
+	AssertFalse(t, ListContains(l, 2), "ListContains(_, 2)")
+	AssertTrue(t, ListContains(l, "not-an-int"), `ListContains(_, "not-an-int")`)
+}
+
+// ListCopy inherits the skip as well, which drops the elements of
+// another type rather than carrying them over.
+func TestListCopyTypeMismatch(t *testing.T) {
+	l := list.New()
+	l.PushBack(1)
+	l.PushBack("not-an-int")
+	l.PushBack(3)
+
+	copied := ListCopy[int](l)
+	AssertMustNotNil(t, copied, "ListCopy[int]")
+	AssertSliceEqual(t, S(1, 3), listValues(copied), "copied values")
+	AssertEqual(t, 3, l.Len(), "source length")
+}
+
+// ListCopy is documented as shallow, so the copy holds the values the
+// original holds rather than duplicates of them.
+func TestListCopyIsShallow(t *testing.T) {
+	v := 42
+	orig := list.New()
+	orig.PushBack(&v)
+
+	copied := ListCopy[*int](orig)
+	AssertMustEqual(t, 1, copied.Len(), "length")
+
+	got := AssertMustTypeIs[*int](t, copied.Front().Value, "copied element")
+	AssertSame(t, &v, got, "element pointer")
+}
