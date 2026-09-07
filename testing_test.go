@@ -8,7 +8,10 @@ import (
 )
 
 // Compile-time verification that test case types implement TestCase interface
-var _ TestCase = (*mockTestCase)(nil)
+var (
+	_ TestCase = (*mockTestCase)(nil)
+	_ TestCase = mockTMessageAtTestCase{}
+)
 
 // Test MockT implementation
 func TestMockT(t *testing.T) {
@@ -21,6 +24,8 @@ func TestMockT(t *testing.T) {
 	t.Run("multiple messages", testMockTMultiple)
 	t.Run("reset functionality", testMockTReset)
 	t.Run("empty state queries", testMockTEmptyQueries)
+	t.Run("counts", testMockTCounts)
+	t.Run("message at", testMockTMessageAt)
 	t.Run("concurrent safety", testMockTConcurrent)
 }
 
@@ -893,6 +898,9 @@ func testMockTReset(t *testing.T) {
 	mock.Reset()
 	AssertFalse(t, mock.HasErrors(), "HasErrors after Reset")
 	AssertFalse(t, mock.HasLogs(), "HasLogs after Reset")
+	AssertEqual(t, 0, mock.NumErrors(), "NumErrors after Reset")
+	AssertEqual(t, 0, mock.NumLogs(), "NumLogs after Reset")
+	AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls after Reset")
 	AssertEqual(t, 0, mock.HelperCalled, "HelperCalled after Reset")
 	AssertFalse(t, mock.Failed(), "Failed after Reset")
 	AssertEqual(t, 0, len(mock.Errors), "Errors length after Reset")
@@ -910,6 +918,92 @@ func testMockTEmptyQueries(t *testing.T) {
 	lastLog, ok := mock.LastLog()
 	AssertFalse(t, ok, "LastLog ok when empty")
 	AssertEqual(t, "", lastLog, "LastLog value when empty")
+
+	AssertEqual(t, 0, mock.NumErrors(), "NumErrors when empty")
+	AssertEqual(t, 0, mock.NumLogs(), "NumLogs when empty")
+	AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls when empty")
+
+	msg, ok := mock.ErrorAt(0)
+	AssertFalse(t, ok, "ErrorAt(0) ok when empty")
+	AssertEqual(t, "", msg, "ErrorAt(0) value when empty")
+
+	msg, ok = mock.LogAt(-1)
+	AssertFalse(t, ok, "LogAt(-1) ok when empty")
+	AssertEqual(t, "", msg, "LogAt(-1) value when empty")
+}
+
+func testMockTCounts(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	mock.Error("first error")
+	mock.Errorf("second %s", "error")
+	mock.Log("first log")
+	mock.Logf("second %s", "log")
+	mock.Log("third log")
+	mock.Helper()
+	mock.Helper()
+	mock.Helper()
+	mock.Helper()
+
+	AssertEqual(t, 2, mock.NumErrors(), "NumErrors")
+	AssertEqual(t, 3, mock.NumLogs(), "NumLogs")
+	AssertEqual(t, 4, mock.NumHelperCalls(), "NumHelperCalls")
+}
+
+// mockTMessageAtTestCase exercises the index rule shared by ErrorAt and
+// LogAt against a mock holding the same three messages in both lists. The
+// middle one is empty, so a recorded empty message and an index out of
+// range come back with the same string and differ only in the bool.
+type mockTMessageAtTestCase struct {
+	name   string
+	want   string
+	index  int
+	wantOK bool
+}
+
+func newMockTMessageAtTestCase(name string, index int, want string,
+	wantOK bool) mockTMessageAtTestCase {
+	return mockTMessageAtTestCase{
+		name:   name,
+		index:  index,
+		want:   want,
+		wantOK: wantOK,
+	}
+}
+
+func (tc mockTMessageAtTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mockTMessageAtTestCase) Test(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+	for _, msg := range S("first", "", "third") {
+		mock.Error(msg)
+		mock.Log(msg)
+	}
+
+	msg, ok := mock.ErrorAt(tc.index)
+	AssertEqual(t, tc.wantOK, ok, "ErrorAt ok")
+	AssertEqual(t, tc.want, msg, "ErrorAt value")
+
+	msg, ok = mock.LogAt(tc.index)
+	AssertEqual(t, tc.wantOK, ok, "LogAt ok")
+	AssertEqual(t, tc.want, msg, "LogAt value")
+}
+
+func testMockTMessageAt(t *testing.T) {
+	t.Helper()
+	RunTestCases(t, S(
+		newMockTMessageAtTestCase("first", 0, "first", true),
+		newMockTMessageAtTestCase("empty message", 1, "", true),
+		newMockTMessageAtTestCase("last", 2, "third", true),
+		newMockTMessageAtTestCase("past the end", 3, "", false),
+		newMockTMessageAtTestCase("last from the end", -1, "third", true),
+		newMockTMessageAtTestCase("first from the end", -3, "first", true),
+		newMockTMessageAtTestCase("before the start", -4, "", false),
+	))
 }
 
 func testMockTConcurrent(t *testing.T) {
@@ -931,6 +1025,13 @@ func testMockTConcurrent(t *testing.T) {
 			mock.Logf("concurrent log %d", id)
 		default:
 		}
+		// Read while the other workers write. The values are in flight
+		// and not asserted; the race detector is what this exercises.
+		mock.NumErrors()
+		mock.ErrorAt(-1)
+		mock.NumLogs()
+		mock.LogAt(0)
+		mock.NumHelperCalls()
 		return nil
 	})
 	AssertNoError(t, err, "concurrent MockT operations")

@@ -124,13 +124,17 @@ enhanced capabilities:
 
 - **Thread-safe operations**: All methods are protected by sync.RWMutex for
   concurrent use
-- **Helper call tracking**: HelperCalled field counts how many times
+- **Helper call tracking**: NumHelperCalls() counts how many times
   Helper() was called
 - **Failed state management**: Failed() reports test failure state; Error()
   and Errorf() automatically mark as failed
 - **Formatted logging**: Errorf() and Logf() provide printf-style formatting
 - **Complete state inspection**: HasErrors(), HasLogs(), LastError(),
-  LastLog() for detailed testing
+  LastLog(), NumErrors(), NumLogs(), ErrorAt(i) and LogAt(i) for detailed
+  testing. The At accessors count a negative index from the end, so
+  ErrorAt(-1) is LastError(), and return ("", false) out of range. Read
+  through them rather than the Errors, Logs and HelperCalled fields: the
+  accessors take the lock, a bare field read does not
 - **State reset**: Reset() clears all collected data and resets counters
 - **Fatal/FailNow support**: Full implementation of Fatal(), Fatalf(), and
   FailNow() methods with proper panic behaviour

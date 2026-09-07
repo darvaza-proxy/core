@@ -159,10 +159,24 @@ func (m *MockT) HasErrors() bool {
 func (m *MockT) LastError() (string, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if len(m.Errors) == 0 {
-		return "", false
-	}
-	return m.Errors[len(m.Errors)-1], true
+	return messageAt(m.Errors, -1)
+}
+
+// NumErrors returns how many error messages have been recorded.
+func (m *MockT) NumErrors() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.Errors)
+}
+
+// ErrorAt returns the i-th recorded error message and whether there is
+// one. A negative i counts from the end, so ErrorAt(-1) is what LastError
+// returns. An i outside the recorded messages in either direction returns
+// ("", false).
+func (m *MockT) ErrorAt(i int) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return messageAt(m.Errors, i)
 }
 
 // HasLogs returns true if any log messages were recorded.
@@ -176,10 +190,44 @@ func (m *MockT) HasLogs() bool {
 func (m *MockT) LastLog() (string, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if len(m.Logs) == 0 {
+	return messageAt(m.Logs, -1)
+}
+
+// NumLogs returns how many log messages have been recorded.
+func (m *MockT) NumLogs() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.Logs)
+}
+
+// LogAt returns the i-th recorded log message and whether there is one.
+// A negative i counts from the end, so LogAt(-1) is what LastLog returns.
+// An i outside the recorded messages in either direction returns
+// ("", false).
+func (m *MockT) LogAt(i int) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return messageAt(m.Logs, i)
+}
+
+// NumHelperCalls returns how many times Helper has been called.
+func (m *MockT) NumHelperCalls() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.HelperCalled
+}
+
+// messageAt resolves i against msgs, counting a negative i from the end
+// so that -1 is the last message. It reports false when i falls outside
+// msgs in either direction. The caller holds the lock.
+func messageAt(msgs []string, i int) (string, bool) {
+	if i < 0 {
+		i += len(msgs)
+	}
+	if i < 0 || i >= len(msgs) {
 		return "", false
 	}
-	return m.Logs[len(m.Logs)-1], true
+	return msgs[i], true
 }
 
 // Reset clears all recorded errors, logs, failed state, and helper state.
