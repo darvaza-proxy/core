@@ -319,7 +319,7 @@ func Here() *Frame {
 //	    log.Printf("Error originated from %s", frame.Name())
 //	}
 func StackFrame(skip int) *Frame {
-	var pcs [MaxDepth]uintptr
+	var pcs [1]uintptr
 
 	if callers, ok := getCallers(skip, pcs[:]); ok {
 		f := frameForPC(callers[0])
@@ -337,8 +337,8 @@ func StackFrame(skip int) *Frame {
 //   - skip: number of initial stack frames to skip before capture begins
 //
 // Returns an empty Stack if skip is negative, if capture fails, or if there
-// are insufficient frames. The maximum capture depth is limited by MaxDepth
-// (32 frames).
+// are insufficient frames. The capture holds at most MaxDepth (32) frames,
+// counted after the skip.
 //
 // This function is commonly used for error reporting, debugging, and logging
 // where complete call context is needed.
@@ -368,27 +368,28 @@ func StackTrace(skip int) Stack {
 }
 
 // getCallers fills pcs with the program counters above the function that
-// called it, and returns what is left after skipping skip of them. skip
-// counts as it does for StackFrame and StackTrace: 0 is that function's own
-// caller, 1 the caller above it.
+// called it, skipping skip of them first. skip counts as it does for
+// StackFrame and StackTrace: 0 is that function's own caller, 1 the caller
+// above it.
 //
 // The buffer belongs to the caller, so one frame's worth serves where only
 // one frame is wanted, and the result does not escape. Its length caps the
-// capture, and a stack too short to reach skip reports false. So does a
-// negative skip, which is neither clamped to zero nor counted from the end.
+// capture after the skip, and a stack too short to reach skip reports
+// false. So does a negative skip, which is neither clamped to zero nor
+// counted from the end, and a skip too large to add the frames below to.
 //
-// The 3 given to runtime.Callers accounts for runtime.Callers itself,
-// getCallers, and the function that called it, so getCallers must be called
-// directly by the one whose callers are wanted.
+// The 3 added to skip accounts for runtime.Callers itself, getCallers, and
+// the function that called it, so getCallers must be called directly by the
+// one whose callers are wanted.
 func getCallers(skip int, pcs []uintptr) ([]uintptr, bool) {
-	if skip < 0 {
+	if skip < 0 || 3+skip < 0 {
 		return nil, false
 	}
 
-	n := runtime.Callers(3, pcs)
-	if n <= skip {
+	n := runtime.Callers(3+skip, pcs)
+	if n == 0 {
 		return nil, false
 	}
 
-	return pcs[skip:n], true
+	return pcs[:n], true
 }

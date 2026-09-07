@@ -19,6 +19,7 @@ var _ TestCase = stackFormatTestCase{}
 var _ TestCase = formatLineTestCase{}
 var _ TestCase = writeFormatTestCase{}
 var _ TestCase = writeFormatPanicsTestCase{}
+var _ TestCase = stackTraceMaxDepthTestCase{}
 
 const (
 	MaxTestDepth = 16
@@ -787,16 +788,51 @@ func TestStackTraceNegativeSkip(t *testing.T) {
 	AssertEqual(t, 0, len(stack), "stack length")
 }
 
-// StackTrace documents a capture limited to MaxDepth frames. Recurse past
-// it so the buffer, rather than the stack, decides the length.
-func TestStackTraceMaxDepth(t *testing.T) {
-	stack := deepestStackTrace(MaxDepth)
+// StackTrace documents a capture limited to MaxDepth frames, counted after
+// the skip. Recurse past it so the buffer, rather than the stack, decides
+// the length.
+type stackTraceMaxDepthTestCase struct {
+	name string
+	skip int
+}
+
+func newStackTraceMaxDepthTestCase(name string, skip int) stackTraceMaxDepthTestCase {
+	return stackTraceMaxDepthTestCase{name: name, skip: skip}
+}
+
+func (tc stackTraceMaxDepthTestCase) Name() string { return tc.name }
+
+func (tc stackTraceMaxDepthTestCase) Test(t *testing.T) {
+	t.Helper()
+	stack := deepestStackTrace(MaxDepth, tc.skip)
 	AssertEqual(t, MaxDepth, len(stack), "stack length")
 }
 
-func deepestStackTrace(depth int) Stack {
+func TestStackTraceMaxDepth(t *testing.T) {
+	RunTestCases(t, S(
+		newStackTraceMaxDepthTestCase("no skip", 0),
+		newStackTraceMaxDepthTestCase("skip one", 1),
+	))
+}
+
+func deepestStackTrace(depth, skip int) Stack {
 	if depth > 0 {
-		return deepestStackTrace(depth - 1)
+		return deepestStackTrace(depth-1, skip)
 	}
-	return StackTrace(0)
+	return StackTrace(skip)
+}
+
+// StackFrame reaches a caller MaxDepth levels up when the stack is deep
+// enough: the skip is counted before the capture, not out of it.
+func TestStackFrameMaxDepth(t *testing.T) {
+	frame := deepestStackFrame(MaxDepth+1, MaxDepth)
+	AssertMustNotNil(t, frame, "frame")
+	AssertEqual(t, "deepestStackFrame", fmt.Sprintf("%n", frame), "frame name")
+}
+
+func deepestStackFrame(depth, skip int) *Frame {
+	if depth > 0 {
+		return deepestStackFrame(depth-1, skip)
+	}
+	return StackFrame(skip)
 }
