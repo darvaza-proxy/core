@@ -172,7 +172,7 @@ func MaybeOK[V any](value V, _ bool) V {
 func MustT[T any](value any) T {
 	result, ok := value.(T)
 	if !ok {
-		err := fmt.Errorf("failed to convert %T to %T", value, result)
+		err := fmt.Errorf("failed to convert %T to %s", value, TypeName[T]())
 		panic(NewUnreachableError(1, err, ""))
 	}
 	return result
