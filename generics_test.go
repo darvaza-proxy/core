@@ -249,7 +249,7 @@ func (tc iifTestCase) Test(t *testing.T) {
 }
 
 // Factory function for iifTestCase
-func newIifTestCase(name string, cond bool, yes, no, expected int) iifTestCase {
+func newIIfTestCase(name string, cond bool, yes, no, expected int) iifTestCase {
 	return iifTestCase{
 		name:     name,
 		cond:     cond,
@@ -260,13 +260,13 @@ func newIifTestCase(name string, cond bool, yes, no, expected int) iifTestCase {
 }
 
 var iifTestCases = []iifTestCase{
-	newIifTestCase("true condition", true, 42, 100, 42),
-	newIifTestCase("false condition", false, 42, 100, 100),
-	newIifTestCase("true with zeros", true, 0, 100, 0),
-	newIifTestCase("false with zeros", false, 42, 0, 0),
-	newIifTestCase("same values", true, 42, 42, 42),
-	newIifTestCase("negative values true", true, -42, -100, -42),
-	newIifTestCase("negative values false", false, -42, -100, -100),
+	newIIfTestCase("true condition", true, 42, 100, 42),
+	newIIfTestCase("false condition", false, 42, 100, 100),
+	newIIfTestCase("true with zeros", true, 0, 100, 0),
+	newIIfTestCase("false with zeros", false, 42, 0, 0),
+	newIIfTestCase("same values", true, 42, 42, 42),
+	newIIfTestCase("negative values true", true, -42, -100, -42),
+	newIIfTestCase("negative values false", false, -42, -100, -100),
 }
 
 func TestIIfInt(t *testing.T) {
@@ -294,7 +294,7 @@ func (tc iifStringTestCase) Test(t *testing.T) {
 }
 
 // Factory function for iifStringTestCase
-func newIifStringTestCase(name string, cond bool, yes, no, expected string) iifStringTestCase {
+func newIIfStringTestCase(name string, cond bool, yes, no, expected string) iifStringTestCase {
 	return iifStringTestCase{
 		name:     name,
 		cond:     cond,
@@ -305,11 +305,11 @@ func newIifStringTestCase(name string, cond bool, yes, no, expected string) iifS
 }
 
 var iifStringTestCases = []iifStringTestCase{
-	newIifStringTestCase("true condition", true, "hello", "world", "hello"),
-	newIifStringTestCase("false condition", false, "hello", "world", "world"),
-	newIifStringTestCase("true with empty", true, "", "world", ""),
-	newIifStringTestCase("false with empty", false, "hello", "", ""),
-	newIifStringTestCase("same values", true, "same", "same", "same"),
+	newIIfStringTestCase("true condition", true, "hello", "world", "hello"),
+	newIIfStringTestCase("false condition", false, "hello", "world", "world"),
+	newIIfStringTestCase("true with empty", true, "", "world", ""),
+	newIIfStringTestCase("false with empty", false, "hello", "", ""),
+	newIIfStringTestCase("same values", true, "same", "same", "same"),
 }
 
 func TestIIfString(t *testing.T) {
@@ -337,7 +337,7 @@ func (tc iifPointerTestCase) Test(t *testing.T) {
 }
 
 // Factory function for iifPointerTestCase
-func newIifPointerTestCase(name string, cond bool, yes, no, expected *int) iifPointerTestCase {
+func newIIfPointerTestCase(name string, cond bool, yes, no, expected *int) iifPointerTestCase {
 	return iifPointerTestCase{
 		name:     name,
 		cond:     cond,
@@ -354,12 +354,12 @@ func iifPointerTestCases() []iifPointerTestCase {
 	yes, no := intPtr(42), intPtr(100)
 
 	return []iifPointerTestCase{
-		newIifPointerTestCase("true condition", true, yes, no, yes),
-		newIifPointerTestCase("false condition", false, yes, no, no),
-		newIifPointerTestCase("true with nil", true, nil, no, nil),
-		newIifPointerTestCase("false with nil", false, yes, nil, nil),
-		newIifPointerTestCase("both nil true", true, nil, nil, nil),
-		newIifPointerTestCase("both nil false", false, nil, nil, nil),
+		newIIfPointerTestCase("true condition", true, yes, no, yes),
+		newIIfPointerTestCase("false condition", false, yes, no, no),
+		newIIfPointerTestCase("true with nil", true, nil, no, nil),
+		newIIfPointerTestCase("false with nil", false, yes, nil, nil),
+		newIIfPointerTestCase("both nil true", true, nil, nil, nil),
+		newIIfPointerTestCase("both nil false", false, nil, nil, nil),
 	}
 }
 
@@ -388,7 +388,7 @@ func (tc iifStructTestCase) Test(t *testing.T) {
 }
 
 // Factory function for iifStructTestCase
-func newIifStructTestCase(name string, cond bool, yes, no, expected testStruct) iifStructTestCase {
+func newIIfStructTestCase(name string, cond bool, yes, no, expected testStruct) iifStructTestCase {
 	return iifStructTestCase{
 		name:     name,
 		cond:     cond,
@@ -399,19 +399,19 @@ func newIifStructTestCase(name string, cond bool, yes, no, expected testStruct) 
 }
 
 var iifStructTestCases = []iifStructTestCase{
-	newIifStructTestCase("true condition", true,
+	newIIfStructTestCase("true condition", true,
 		testStruct{Value: "hello", Count: 42},
 		testStruct{Value: "world", Count: 100},
 		testStruct{Value: "hello", Count: 42}),
-	newIifStructTestCase("false condition", false,
+	newIIfStructTestCase("false condition", false,
 		testStruct{Value: "hello", Count: 42},
 		testStruct{Value: "world", Count: 100},
 		testStruct{Value: "world", Count: 100}),
-	newIifStructTestCase("true with zero", true,
+	newIIfStructTestCase("true with zero", true,
 		testStruct{},
 		testStruct{Value: "world", Count: 100},
 		testStruct{}),
-	newIifStructTestCase("false with zero", false,
+	newIIfStructTestCase("false with zero", false,
 		testStruct{Value: "hello", Count: 42},
 		testStruct{},
 		testStruct{}),
