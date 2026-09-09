@@ -39,7 +39,7 @@ func (tc keysTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := Keys(tc.input)
-	AssertEqual(t, tc.expected, len(got), "Keys", tc.input)
+	AssertEqual(t, tc.expected, len(got), "Keys(%v)", tc.input)
 
 	tc.verifyAllKeysPresent(t, got)
 }
@@ -89,7 +89,7 @@ func (tc sortedKeysTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := SortedKeys(tc.input)
-	AssertSliceEqual(t, tc.expected, got, "SortedKeys", tc.input)
+	AssertSliceEqual(t, tc.expected, got, "SortedKeys(%v)", tc.input)
 }
 
 // Factory function for sortedKeysTestCase
@@ -136,7 +136,7 @@ func (tc sortedValuesTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := SortedValues(tc.input)
-	AssertSliceEqual(t, tc.expected, got, "SortedValues", tc.input)
+	AssertSliceEqual(t, tc.expected, got, "SortedValues(%v)", tc.input)
 }
 
 // Factory function for sortedValuesTestCase
@@ -183,7 +183,7 @@ func (tc sortedValuesCondTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := SortedValuesCond(tc.input, tc.predicate)
-	AssertSliceEqual(t, tc.expected, got, "SortedValuesCond", tc.input)
+	AssertSliceEqual(t, tc.expected, got, "SortedValuesCond(%v, _)", tc.input)
 }
 
 // Factory function for sortedValuesCondTestCase
@@ -250,8 +250,8 @@ func (tc mapValueTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, found := MapValue(tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.expected, got, "MapValue value", tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.found, found, "MapValue found", tc.m, tc.key, tc.def)
+	AssertEqual(t, tc.expected, got, "MapValue(%v, %q, %v) value", tc.m, tc.key, tc.def)
+	AssertEqual(t, tc.found, found, "MapValue(%v, %q, %v) found", tc.m, tc.key, tc.def)
 }
 
 // Factory function for mapValueTestCase
@@ -303,7 +303,7 @@ func (tc mapContainsTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := MapContains(tc.m, tc.key)
-	AssertEqual(t, tc.expected, got, "MapContains", tc.m, tc.key)
+	AssertEqual(t, tc.expected, got, "MapContains(%v, %q)", tc.m, tc.key)
 }
 
 func TestMapContains(t *testing.T) {
@@ -370,7 +370,7 @@ func (tc mapListContainsTestCase) Name() string {
 func (tc mapListContainsTestCase) Test(t *testing.T) {
 	t.Helper()
 	got := MapListContains(tc.m, tc.key, tc.value)
-	AssertEqual(t, tc.expected, got, "MapListContains", tc.key, tc.value)
+	AssertEqual(t, tc.expected, got, "MapListContains(_, %q, %q)", tc.key, tc.value)
 }
 
 func TestMapListContains(t *testing.T) {
@@ -626,7 +626,7 @@ func (tc mapAllListContainsTestCase) Name() string {
 func (tc mapAllListContainsTestCase) Test(t *testing.T) {
 	t.Helper()
 	got := MapAllListContains(tc.m, tc.value)
-	AssertEqual(t, tc.expected, got, "MapAllListContains", tc.value)
+	AssertEqual(t, tc.expected, got, "MapAllListContains(_, %q)", tc.value)
 }
 
 // Factory function for mapAllListContainsTestCase

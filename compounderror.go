@@ -21,6 +21,16 @@ type CompoundError struct {
 	Errs []error
 }
 
+// NewCompoundError collects errs into a CompoundError as given: nil
+// members are dropped and the rest are kept in order, a member that is
+// itself a list of errors included. The result is never nil; with
+// nothing to collect it is empty and [CompoundError.OK].
+func NewCompoundError(errs ...error) *CompoundError {
+	w := new(CompoundError)
+	w.doAppend(errs...)
+	return w
+}
+
 func (w *CompoundError) Error() string {
 	s := make([]string, 0, len(w.Errs))
 	for _, err := range w.Errs {
@@ -56,16 +66,17 @@ func (w *CompoundError) OK() bool {
 //
 //revive:disable-next-line:confusing-naming
 func (w *CompoundError) Ok() bool {
-	return len(w.Errs) == 0
+	return w.OK()
 }
 
 // AsError returns itself as an `error` when
-// there are errors stored, and nil when there aren't
+// there are errors stored, and nil when there aren't.
+// A nil receiver counts as empty, as it does for [CompoundError.OK].
 func (w *CompoundError) AsError() error {
-	if len(w.Errs) > 0 {
-		return w
+	if w.OK() {
+		return nil
 	}
-	return nil
+	return w
 }
 
 // AppendError adds an error to the collection, unwrapping other implementers of the [Errors]

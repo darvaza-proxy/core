@@ -20,7 +20,7 @@ type PanicError struct {
 
 // Error returns the payload as a string
 func (p *PanicError) Error() string {
-	return fmt.Sprintf("panic: %s", p.payload)
+	return fmt.Sprintf("panic: %v", p.payload)
 }
 
 // Unwrap returns the payload if it's and error
@@ -48,7 +48,7 @@ func NewPanicError(skip int, payload any) *PanicError {
 	}
 	return &PanicError{
 		payload: payload,
-		stack:   StackTrace(skip + 1),
+		stack:   StackTrace(deeper(skip)),
 	}
 }
 
@@ -64,7 +64,7 @@ func NewPanicErrorf(skip int, format string, args ...any) *PanicError {
 
 	return &PanicError{
 		payload: payload,
-		stack:   StackTrace(skip + 1),
+		stack:   StackTrace(deeper(skip)),
 	}
 }
 
@@ -73,7 +73,7 @@ func NewPanicErrorf(skip int, format string, args ...any) *PanicError {
 func NewPanicWrap(skip int, err error, note string) *PanicError {
 	return &PanicError{
 		payload: Wrap(err, note),
-		stack:   StackTrace(skip + 1),
+		stack:   StackTrace(deeper(skip)),
 	}
 }
 
@@ -82,7 +82,7 @@ func NewPanicWrap(skip int, err error, note string) *PanicError {
 func NewPanicWrapf(skip int, err error, format string, args ...any) *PanicError {
 	return &PanicError{
 		payload: Wrapf(err, format, args...),
-		stack:   StackTrace(skip + 1),
+		stack:   StackTrace(deeper(skip)),
 	}
 }
 
@@ -109,26 +109,32 @@ func PanicWrapf(err error, format string, args ...any) {
 
 // NewUnreachableErrorf creates a new annotated ErrUnreachable with callstack.
 func NewUnreachableErrorf(skip int, err error, format string, args ...any) error {
-	return NewUnreachableError(skip+1, err, fmt.Sprintf(format, args...))
+	return NewUnreachableError(deeper(skip), err, fmt.Sprintf(format, args...))
 }
 
 // NewUnreachableError creates a new annotated ErrUnreachable with callstack.
 func NewUnreachableError(skip int, err error, note string) error {
-	if err == ErrUnreachable {
-		err = nil
-	}
-
-	switch {
-	case err == nil && note == "":
-		return NewPanicError(skip+1, ErrUnreachable)
-	case err == nil:
-		return NewPanicWrap(skip+1, ErrUnreachable, note)
-	case note != "":
-		err = Wrap(err, note)
+	switch err {
+	case nil, ErrUnreachable:
+		err = ErrUnreachable
 	default:
+		err = QuietWrap(NewCompoundError(ErrUnreachable, err),
+			"%s: %s", ErrUnreachable, err)
 	}
 
-	return NewPanicError(skip+1, &CompoundError{
-		Errs: []error{ErrUnreachable, err},
-	})
+	if note == "" {
+		return NewPanicError(deeper(skip), err)
+	}
+	return NewPanicWrap(deeper(skip), err, note)
+}
+
+// deeper accounts for the frame of the constructor doing the capturing,
+// so a skip of 0 attributes to that constructor's own caller. A negative
+// skip clamps to 1 instead of reaching [StackTrace], which rejects it
+// and captures nothing.
+func deeper(skip int) int {
+	if skip < 0 {
+		return 1
+	}
+	return skip + 1
 }

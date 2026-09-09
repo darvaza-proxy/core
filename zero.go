@@ -167,7 +167,7 @@ func isReflectValueNil(v reflect.Value) bool {
 
 	// Only certain types can be nil
 	switch v.Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func, reflect.Interface:
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func, reflect.Interface:
 		return v.IsNil()
 	default:
 		// Basic types, structs, arrays cannot be nil
@@ -340,7 +340,7 @@ func isSamePointer(va, vb reflect.Value) bool {
 			pa, pb := va.Pointer(), vb.Pointer()
 			ok = pa == pb && pa != 0
 		}
-	case reflect.Ptr, reflect.Map, reflect.Chan, reflect.Func, reflect.UnsafePointer:
+	case reflect.Pointer, reflect.Map, reflect.Chan, reflect.Func, reflect.UnsafePointer:
 		ok = va.Pointer() == vb.Pointer()
 	case reflect.Interface:
 		// Extract concrete values and compare them recursively

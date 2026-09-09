@@ -37,9 +37,9 @@ func (tc sliceReverseTestCase) Test(t *testing.T) {
 	t.Helper()
 	c := SliceCopy(tc.a)
 	SliceReverse(c)
-	AssertSliceEqual(t, tc.b, c, "SliceReverse", tc.a)
+	AssertSliceEqual(t, tc.b, c, "SliceReverse(%v)", tc.a)
 	if SliceEqual(c, tc.b) {
-		t.Logf("%s(%q) → %q", "SliceReverse", tc.a, c)
+		t.Logf("%s(%v) → %v", "SliceReverse", tc.a, c)
 	}
 }
 
@@ -146,7 +146,7 @@ func (tc sliceMinusTestCase) Name() string {
 func (tc sliceMinusTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := SliceMinus(tc.a, tc.b)
-	AssertSliceEqual(t, tc.expected, result, "SliceMinus", tc.a, tc.b)
+	AssertSliceEqual(t, tc.expected, result, "SliceMinus(%v, %v)", tc.a, tc.b)
 }
 
 func newSliceMinusTestCase(name string, a, b, expected []int) sliceMinusTestCase {
@@ -187,7 +187,7 @@ func (tc sliceMinusFnTestCase) Name() string {
 func (tc sliceMinusFnTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := SliceMinusFn(tc.a, tc.b, tc.equal)
-	AssertSliceEqual(t, tc.expected, result, "SliceMinusFn", tc.a, tc.b)
+	AssertSliceEqual(t, tc.expected, result, "SliceMinusFn(%q, %q, _)", tc.a, tc.b)
 }
 
 func newSliceMinusFnTestCase(name string, a, b, expected []string,
