@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // SpinLock is a simple CompareAndSwap locking mechanism.
@@ -310,4 +311,57 @@ func (eg *ErrGroup) defaultErrGroupCatcher(err error) error {
 		err = context.Canceled
 	}
 	return err
+}
+
+// WaitForCond polls predicate every step until it returns true or timeout
+// elapses, and reports whether it did. The predicate is evaluated before the
+// deadline is checked, so one that is already true is reported true even
+// with a zero timeout. A nil predicate, a negative timeout or a step that
+// is not positive is reported false without consulting the predicate.
+func WaitForCond(cond func() bool, timeout, step time.Duration) bool {
+	if cond == nil || timeout < 0 || step <= 0 {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return WaitForCondContext(ctx, cond, step)
+}
+
+// WaitForCondContext polls predicate every step until it returns true or
+// ctx is done, and reports whether it did. The predicate is evaluated before
+// ctx is checked, so one that is already true is reported true even under a
+// context that has already ended, and when ctx ends the predicate is
+// evaluated one last time and its answer reported. A nil ctx is taken as
+// context.TODO, so the wait then ends only when the predicate holds. A nil
+// predicate or a step that is not positive is reported false without
+// consulting the predicate.
+func WaitForCondContext(ctx context.Context, cond func() bool, step time.Duration) bool {
+	if cond == nil || step <= 0 {
+		return false
+	}
+	if ctx == nil {
+		ctx = context.TODO()
+	}
+
+	return doWaitForCond(ctx, cond, step)
+}
+
+// doWaitForCond is the loop behind WaitForCondContext, for arguments it has
+// already checked.
+func doWaitForCond(ctx context.Context, cond func() bool, step time.Duration) bool {
+	ticker := time.NewTicker(step)
+	defer ticker.Stop()
+
+	for {
+		if cond() {
+			return true
+		}
+
+		select {
+		case <-ctx.Done():
+			return cond()
+		case <-ticker.C:
+		}
+	}
 }

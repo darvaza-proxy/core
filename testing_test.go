@@ -8,7 +8,10 @@ import (
 )
 
 // Compile-time verification that test case types implement TestCase interface
-var _ TestCase = (*mockTestCase)(nil)
+var (
+	_ TestCase = (*mockTestCase)(nil)
+	_ TestCase = mockTMessageAtTestCase{}
+)
 
 // Test MockT implementation
 func TestMockT(t *testing.T) {
@@ -21,6 +24,8 @@ func TestMockT(t *testing.T) {
 	t.Run("multiple messages", testMockTMultiple)
 	t.Run("reset functionality", testMockTReset)
 	t.Run("empty state queries", testMockTEmptyQueries)
+	t.Run("counts", testMockTCounts)
+	t.Run("message at", testMockTMessageAt)
 	t.Run("concurrent safety", testMockTConcurrent)
 }
 
@@ -763,7 +768,7 @@ func testMockTInitialState(t *testing.T) {
 
 	AssertFalse(t, mock.HasErrors(), "initial HasErrors")
 	AssertFalse(t, mock.HasLogs(), "initial HasLogs")
-	AssertEqual(t, 0, mock.HelperCalled, "initial HelperCalled")
+	AssertEqual(t, 0, mock.NumHelperCalls(), "initial NumHelperCalls")
 	AssertFalse(t, mock.Failed(), "initial Failed")
 }
 
@@ -772,12 +777,12 @@ func testMockTHelper(t *testing.T) {
 	mock := &MockT{}
 
 	mock.Helper()
-	AssertEqual(t, 1, mock.HelperCalled, "HelperCalled after Helper()")
+	AssertEqual(t, 1, mock.NumHelperCalls(), "NumHelperCalls after Helper()")
 
 	// Test multiple calls increment the counter
 	mock.Helper()
 	mock.Helper()
-	AssertEqual(t, 3, mock.HelperCalled, "HelperCalled after multiple calls")
+	AssertEqual(t, 3, mock.NumHelperCalls(), "NumHelperCalls after multiple calls")
 }
 
 func testMockTErrors(t *testing.T) {
@@ -787,8 +792,7 @@ func testMockTErrors(t *testing.T) {
 	mock.Error("test error")
 	AssertTrue(t, mock.HasErrors(), "HasErrors after Error")
 	AssertTrue(t, mock.Failed(), "Failed after Error")
-	AssertEqual(t, 1, len(mock.Errors), "Errors length")
-	AssertEqual(t, "test error", mock.Errors[0], "first error")
+	AssertEqual(t, 1, mock.NumErrors(), "NumErrors")
 
 	lastErr, ok := mock.LastError()
 	AssertTrue(t, ok, "LastError ok")
@@ -802,8 +806,7 @@ func testMockTLogs(t *testing.T) {
 	mock.Log("test log")
 	AssertTrue(t, mock.HasLogs(), "HasLogs after Log")
 	AssertFalse(t, mock.Failed(), "Failed after Log should be false")
-	AssertEqual(t, 1, len(mock.Logs), "Logs length")
-	AssertEqual(t, "test log", mock.Logs[0], "first log")
+	AssertEqual(t, 1, mock.NumLogs(), "NumLogs")
 
 	lastLog, ok := mock.LastLog()
 	AssertTrue(t, ok, "LastLog ok")
@@ -850,8 +853,7 @@ func testMockTFormatted(t *testing.T) {
 	mock.Errorf("error %d: %s", 42, "test message")
 	AssertTrue(t, mock.HasErrors(), "HasErrors after Errorf")
 	AssertTrue(t, mock.Failed(), "Failed after Errorf")
-	AssertEqual(t, 1, len(mock.Errors), "Errors length after Errorf")
-	AssertEqual(t, "error 42: test message", mock.Errors[0], "formatted error message")
+	AssertEqual(t, 1, mock.NumErrors(), "NumErrors after Errorf")
 
 	lastErr, ok := mock.LastError()
 	AssertTrue(t, ok, "LastError ok after Errorf")
@@ -863,8 +865,7 @@ func testMockTFormatted(t *testing.T) {
 	mock.Logf("log %d: %s", 24, "test message")
 	AssertTrue(t, mock.HasLogs(), "HasLogs after Logf")
 	AssertFalse(t, mock.Failed(), "Failed after Logf should be false")
-	AssertEqual(t, 1, len(mock.Logs), "Logs length after Logf")
-	AssertEqual(t, "log 24: test message", mock.Logs[0], "formatted log message")
+	AssertEqual(t, 1, mock.NumLogs(), "NumLogs after Logf")
 
 	lastLog, ok := mock.LastLog()
 	AssertTrue(t, ok, "LastLog ok after Logf")
@@ -880,8 +881,8 @@ func testMockTMultiple(t *testing.T) {
 	mock.Error("second error")
 	mock.Log("second log")
 
-	AssertEqual(t, 2, len(mock.Errors), "multiple errors length")
-	AssertEqual(t, 2, len(mock.Logs), "multiple logs length")
+	AssertEqual(t, 2, mock.NumErrors(), "multiple errors length")
+	AssertEqual(t, 2, mock.NumLogs(), "multiple logs length")
 
 	lastErr, ok := mock.LastError()
 	AssertTrue(t, ok, "LastError ok after multiple")
@@ -905,10 +906,10 @@ func testMockTReset(t *testing.T) {
 	mock.Reset()
 	AssertFalse(t, mock.HasErrors(), "HasErrors after Reset")
 	AssertFalse(t, mock.HasLogs(), "HasLogs after Reset")
-	AssertEqual(t, 0, mock.HelperCalled, "HelperCalled after Reset")
+	AssertEqual(t, 0, mock.NumErrors(), "NumErrors after Reset")
+	AssertEqual(t, 0, mock.NumLogs(), "NumLogs after Reset")
+	AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls after Reset")
 	AssertFalse(t, mock.Failed(), "Failed after Reset")
-	AssertEqual(t, 0, len(mock.Errors), "Errors length after Reset")
-	AssertEqual(t, 0, len(mock.Logs), "Logs length after Reset")
 }
 
 func testMockTEmptyQueries(t *testing.T) {
@@ -922,6 +923,92 @@ func testMockTEmptyQueries(t *testing.T) {
 	lastLog, ok := mock.LastLog()
 	AssertFalse(t, ok, "LastLog ok when empty")
 	AssertEqual(t, "", lastLog, "LastLog value when empty")
+
+	AssertEqual(t, 0, mock.NumErrors(), "NumErrors when empty")
+	AssertEqual(t, 0, mock.NumLogs(), "NumLogs when empty")
+	AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls when empty")
+
+	msg, ok := mock.ErrorAt(0)
+	AssertFalse(t, ok, "ErrorAt(0) ok when empty")
+	AssertEqual(t, "", msg, "ErrorAt(0) value when empty")
+
+	msg, ok = mock.LogAt(-1)
+	AssertFalse(t, ok, "LogAt(-1) ok when empty")
+	AssertEqual(t, "", msg, "LogAt(-1) value when empty")
+}
+
+func testMockTCounts(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	mock.Error("first error")
+	mock.Errorf("second %s", "error")
+	mock.Log("first log")
+	mock.Logf("second %s", "log")
+	mock.Log("third log")
+	mock.Helper()
+	mock.Helper()
+	mock.Helper()
+	mock.Helper()
+
+	AssertEqual(t, 2, mock.NumErrors(), "NumErrors")
+	AssertEqual(t, 3, mock.NumLogs(), "NumLogs")
+	AssertEqual(t, 4, mock.NumHelperCalls(), "NumHelperCalls")
+}
+
+// mockTMessageAtTestCase exercises the index rule shared by ErrorAt and
+// LogAt against a mock holding the same three messages in both lists. The
+// middle one is empty, so a recorded empty message and an index out of
+// range come back with the same string and differ only in the bool.
+type mockTMessageAtTestCase struct {
+	name   string
+	want   string
+	index  int
+	wantOK bool
+}
+
+func newMockTMessageAtTestCase(name string, index int, want string,
+	wantOK bool) mockTMessageAtTestCase {
+	return mockTMessageAtTestCase{
+		name:   name,
+		index:  index,
+		want:   want,
+		wantOK: wantOK,
+	}
+}
+
+func (tc mockTMessageAtTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mockTMessageAtTestCase) Test(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+	for _, msg := range S("first", "", "third") {
+		mock.Error(msg)
+		mock.Log(msg)
+	}
+
+	msg, ok := mock.ErrorAt(tc.index)
+	AssertEqual(t, tc.wantOK, ok, "ErrorAt ok")
+	AssertEqual(t, tc.want, msg, "ErrorAt value")
+
+	msg, ok = mock.LogAt(tc.index)
+	AssertEqual(t, tc.wantOK, ok, "LogAt ok")
+	AssertEqual(t, tc.want, msg, "LogAt value")
+}
+
+func testMockTMessageAt(t *testing.T) {
+	t.Helper()
+	RunTestCases(t, S(
+		newMockTMessageAtTestCase("first", 0, "first", true),
+		newMockTMessageAtTestCase("empty message", 1, "", true),
+		newMockTMessageAtTestCase("last", 2, "third", true),
+		newMockTMessageAtTestCase("past the end", 3, "", false),
+		newMockTMessageAtTestCase("last from the end", -1, "third", true),
+		newMockTMessageAtTestCase("first from the end", -3, "first", true),
+		newMockTMessageAtTestCase("before the start", -4, "", false),
+	))
 }
 
 func testMockTConcurrent(t *testing.T) {
@@ -943,6 +1030,13 @@ func testMockTConcurrent(t *testing.T) {
 			mock.Logf("concurrent log %d", id)
 		default:
 		}
+		// Read while the other workers write. The values are in flight
+		// and not asserted; the race detector is what this exercises.
+		mock.NumErrors()
+		mock.ErrorAt(-1)
+		mock.NumLogs()
+		mock.LogAt(0)
+		mock.NumHelperCalls()
 		return nil
 	})
 	AssertNoError(t, err, "concurrent MockT operations")
@@ -951,7 +1045,6 @@ func testMockTConcurrent(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors after concurrent operations")
 	AssertTrue(t, mock.HasLogs(), "has logs after concurrent operations")
 	AssertTrue(t, mock.Failed(), "failed after concurrent operations")
-	AssertTrue(t, mock.HelperCalled > 0, "helper called during concurrent operations")
 
 	// Check that we have the expected number of operations
 	// We should have 2 errors per 5 operations (case 1 and 3)
@@ -961,9 +1054,9 @@ func testMockTConcurrent(t *testing.T) {
 	expectedLogs := 4    // 10 workers, 2 out of every 5 operations
 	expectedHelpers := 2 // 10 workers, 1 out of every 5 operations
 
-	AssertEqual(t, expectedErrors, len(mock.Errors), "concurrent error count")
-	AssertEqual(t, expectedLogs, len(mock.Logs), "concurrent log count")
-	AssertEqual(t, expectedHelpers, mock.HelperCalled, "concurrent helper count")
+	AssertEqual(t, expectedErrors, mock.NumErrors(), "concurrent error count")
+	AssertEqual(t, expectedLogs, mock.NumLogs(), "concurrent log count")
+	AssertEqual(t, expectedHelpers, mock.NumHelperCalls(), "concurrent helper count")
 }
 
 // Test AssertSame
@@ -1064,8 +1157,9 @@ func TestMockTFatal(t *testing.T) {
 
 	AssertFalse(t, ok, "Fatal should cause test to fail")
 	AssertTrue(t, mock.Failed(), "Fatal should mark test as failed")
-	AssertEqual(t, 1, len(mock.Errors), "Fatal should record error")
-	AssertEqual(t, "test fatal message", mock.Errors[0], "Fatal error message")
+	AssertEqual(t, 1, mock.NumErrors(), "Fatal should record error")
+	AssertEqual(t, "test fatal message", mustMessageAt(t, mock.ErrorAt, 0, "Fatal error"),
+		"Fatal error message")
 }
 
 func TestMockTFatalf(t *testing.T) {
@@ -1078,8 +1172,9 @@ func TestMockTFatalf(t *testing.T) {
 
 	AssertFalse(t, ok, "Fatalf should cause test to fail")
 	AssertTrue(t, mock.Failed(), "Fatalf should mark test as failed")
-	AssertEqual(t, 1, len(mock.Errors), "Fatalf should record error")
-	AssertEqual(t, "test fatalf message 42", mock.Errors[0], "Fatalf error message")
+	AssertEqual(t, 1, mock.NumErrors(), "Fatalf should record error")
+	AssertEqual(t, "test fatalf message 42", mustMessageAt(t, mock.ErrorAt, 0, "Fatalf error"),
+		"Fatalf error message")
 }
 
 func TestMockTFailNow(t *testing.T) {
@@ -1092,7 +1187,7 @@ func TestMockTFailNow(t *testing.T) {
 
 	AssertFalse(t, ok, "FailNow should cause test to fail")
 	AssertTrue(t, mock.Failed(), "FailNow should mark test as failed")
-	AssertEqual(t, 0, len(mock.Errors), "FailNow should not record error")
+	AssertEqual(t, 0, mock.NumErrors(), "FailNow should not record error")
 }
 
 func TestMockTRunSuccess(t *testing.T) {
@@ -1105,8 +1200,8 @@ func TestMockTRunSuccess(t *testing.T) {
 
 	AssertTrue(t, ok, "Successful test should return true")
 	AssertFalse(t, mock.Failed(), "Successful test should not be marked as failed")
-	AssertEqual(t, 1, len(mock.Logs), "Should record log message")
-	AssertEqual(t, "test passed", mock.Logs[0], "Log message content")
+	AssertEqual(t, 1, mock.NumLogs(), "Should record log message")
+	AssertEqual(t, "test passed", mustMessageAt(t, mock.LogAt, 0, "log"), "Log message content")
 }
 
 func TestMockTRunNilChecks(t *testing.T) {
@@ -1157,9 +1252,10 @@ func testEarlyAbortSuccess(t *testing.T) {
 
 	AssertTrue(t, ok, "Test should pass when assertion succeeds")
 	AssertFalse(t, mock.Failed(), "Should not be marked as failed")
-	AssertEqual(t, 2, len(mock.Logs), "Should have 2 log messages")
+	AssertEqual(t, 2, mock.NumLogs(), "Should have 2 log messages")
 	// First log from AssertEqual success, second from explicit Log
-	AssertTrue(t, strings.Contains(mock.Logs[0], "equal values: 42"), "First log from assertion")
+	AssertContains(t, mustMessageAt(t, mock.LogAt, 0, "first log"), "equal values: 42",
+		"First log from assertion")
 }
 
 func testEarlyAbortFailure(t *testing.T) {
@@ -1177,9 +1273,10 @@ func testEarlyAbortFailure(t *testing.T) {
 
 	AssertFalse(t, ok, "Test should fail when assertion fails and FailNow is called")
 	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 1, len(mock.Errors), "Should have error from failed assertion")
-	AssertEqual(t, 0, len(mock.Logs), "Should have no logs after early abort")
-	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 42, got 24"), "Error from failed assertion")
+	AssertEqual(t, 1, mock.NumErrors(), "Should have error from failed assertion")
+	AssertEqual(t, 0, mock.NumLogs(), "Should have no logs after early abort")
+	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "error"), "expected 42, got 24",
+		"Error from failed assertion")
 }
 
 func testEarlyAbortMultiple(t *testing.T) {
@@ -1203,9 +1300,10 @@ func testEarlyAbortMultiple(t *testing.T) {
 
 	AssertFalse(t, ok, "Test should fail on third assertion")
 	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 1, len(mock.Errors), "Should have one error from failed assertion")
-	AssertEqual(t, 2, len(mock.Logs), "Should have logs from first two successful assertions")
-	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 1, got 2"), "Error from third assertion")
+	AssertEqual(t, 1, mock.NumErrors(), "Should have one error from failed assertion")
+	AssertEqual(t, 2, mock.NumLogs(), "Should have logs from first two successful assertions")
+	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "error"), "expected 1, got 2",
+		"Error from third assertion")
 }
 
 func testEarlyAbortMixed(t *testing.T) {
@@ -1236,19 +1334,19 @@ func testEarlyAbortMixed(t *testing.T) {
 
 	AssertFalse(t, ok, "Test should fail due to early abort")
 	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 2, len(mock.Errors), "Should have two errors")
-	AssertEqual(t, 2, len(mock.Logs), "Should have two logs before abort")
+	AssertEqual(t, 2, mock.NumErrors(), "Should have two errors")
+	AssertEqual(t, 2, mock.NumLogs(), "Should have two logs before abort")
 
 	// Check the error messages
-	AssertTrue(t, strings.Contains(mock.Errors[0], "expected 1, got 2"),
+	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "first error"), "expected 1, got 2",
 		"First error from regular assertion")
-	AssertTrue(t, strings.Contains(mock.Errors[1], "expected false, got true"),
+	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 1, "second error"), "expected false, got true",
 		"Second error from early abort assertion")
 
 	// Check log messages
-	AssertTrue(t, strings.Contains(mock.Logs[0], "critical assertion: test"),
+	AssertContains(t, mustMessageAt(t, mock.LogAt, 0, "first log"), "critical assertion: test",
 		"Log from successful critical assertion")
-	AssertTrue(t, strings.Contains(mock.Logs[1], "continuing after critical assertion"),
+	AssertContains(t, mustMessageAt(t, mock.LogAt, 1, "second log"), "continuing after critical assertion",
 		"Log showing execution continued")
 }
 
@@ -1733,6 +1831,15 @@ func assertErrorContains(t *testing.T, mock *MockT, expected, desc string) {
 	AssertTrue(t, strings.Contains(lastErr, expected), desc)
 }
 
+// mustMessageAt returns the message at position i from one of MockT's At
+// accessors, aborting the test when there is none.
+func mustMessageAt(t *testing.T, at func(int) (string, bool), i int, desc string) string {
+	t.Helper()
+	msg, ok := at(i)
+	AssertMustTrue(t, ok, "%s recorded", desc)
+	return msg
+}
+
 // assertLastLog checks the message an assertion logged on success.
 func assertLastLog(t *testing.T, mock *MockT, expected, desc string) {
 	t.Helper()
@@ -1765,8 +1872,8 @@ func assertMustAborted(t *testing.T, mock *MockT, ok bool) {
 	t.Helper()
 	AssertFalse(t, ok, "Failure case should abort")
 	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 1, len(mock.Errors), "Should have error from failed assertion")
-	AssertEqual(t, 0, len(mock.Logs), "Should not reach continuation log")
+	AssertEqual(t, 1, mock.NumErrors(), "Should have error from failed assertion")
+	AssertEqual(t, 0, mock.NumLogs(), "Should not reach continuation log")
 }
 
 // assertPassed checks that an assertion reported success: it returned

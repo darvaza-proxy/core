@@ -535,8 +535,9 @@ library tests and external library users.
   mock implementations.
 * `MockT` - thread-safe mock testing.T implementation with error/log
   collection, helper tracking, state inspection (`HasErrors()`, `HasLogs()`,
-  `LastError()`, `LastLog()`), reset capabilities, and full Fatal/FailNow
-  support with panic recovery via the `Run()` method.
+  `LastError()`, `LastLog()`, `NumErrors()`, `NumLogs()`, `ErrorAt(i)`,
+  `LogAt(i)`, `NumHelperCalls()`), reset capabilities, and full
+  Fatal/FailNow support with panic recovery via the `Run()` method.
 
 ### Cross-Compatible Test Functions
 
@@ -618,6 +619,21 @@ be diffed by eye.
 * `AssertPanic(t, fn, expectedPanic, name...)` /
   `AssertNoPanic(t, fn, name...)` - panic testing with type-aware matching.
 
+#### Channel and Timing Assertions
+
+* `AssertEventually(t, predicate, timeout, name...)` - the predicate holds
+  within the timeout, polled every millisecond through `WaitForCond`.
+* `AssertEventuallyContext(t, ctx, predicate, name...)` - the predicate
+  holds before the context ends, polled the same way through
+  `WaitForCondContext`.
+* `AssertClosed[U](t, ch, timeout, name...)` /
+  `AssertOpen[U](t, ch, timeout, name...)` - the channel closes within the
+  timeout, or stays open for it. Values met on the way are consumed and
+  counted in the report.
+* `AssertReceives[U](t, ch, n, timeout, name...)` - `n` values arrive
+  within one shared timeout and are returned; a close before the n-th
+  fails it.
+
 #### Fatal Assertions
 
 All `AssertMustFoo()` functions call the corresponding `AssertFoo()` function
@@ -664,6 +680,14 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
 * `AssertMustSame(t, expected, actual, name...)` /
   `AssertMustNotSame(t, expected, actual, name...)` - terminate on same-ness
   mismatch.
+* `AssertMustEventually(t, predicate, timeout, name...)` /
+  `AssertMustEventuallyContext(t, ctx, predicate, name...)` - terminate
+  when the predicate does not hold in time.
+* `AssertMustClosed[U](t, ch, timeout, name...)` /
+  `AssertMustOpen[U](t, ch, timeout, name...)` - terminate on channel state
+  mismatch.
+* `AssertMustReceives[U](t, ch, n, timeout, name...)` - terminate when
+  `n` values do not arrive; return the values received.
 
 **Usage Examples:**
 
@@ -713,6 +737,15 @@ Enhanced wait group with error handling:
 * `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`.
 * `.Wait()` - wait for completion.
 * `.Err()` - get first error.
+
+### Polling
+
+* `WaitForCond(predicate, timeout, step)` - poll a predicate every `step`
+  until it holds or `timeout` elapses, reporting which. The predicate is
+  consulted before the deadline, so one already true passes with a zero
+  timeout.
+* `WaitForCondContext(ctx, predicate, step)` - the same wait ending when
+  the context does; a nil context means no deadline and no cancellation.
 
 ### ErrGroup
 
