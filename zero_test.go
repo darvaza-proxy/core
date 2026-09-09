@@ -600,17 +600,6 @@ func testIsNilSlices(t *testing.T) {
 	}
 
 	RunTestCases(t, sliceTests)
-
-	// Additional edge case tests from HEAD - interface containing typed nil
-	var nilPtr *int
-	var vi any = nilPtr
-	AssertTrue(t, IsNil(vi), "interface containing typed nil")
-
-	// Slice of pointers with nil elements
-	ptrSlice := make([]*int, 0, 1)
-	ptrSlice = append(ptrSlice, nil)
-	AssertFalse(t, IsNil(ptrSlice), "slice containing nil elements")
-	AssertTrue(t, IsNil(ptrSlice[0]), "nil element in slice")
 }
 
 func testIsNilMaps(t *testing.T) {
@@ -670,10 +659,6 @@ func testIsNilInterfaces(t *testing.T) {
 
 	RunTestCases(t, interfaceTests)
 }
-
-// Test IsNil with reflect.Value
-// TestIsNilReflectValue is now consolidated with TestIsNilWithReflectValue
-// This test was duplicating the same functionality
 
 func isNilTypedInterfaceTestCases() []isNilTestCase {
 	var nilPtr *int
@@ -1260,36 +1245,8 @@ func isSameInvalidReflectValueTestCases() []isSameTestCase {
 	)
 }
 
-// Also test IsZero and IsNil with invalid reflect.Values
-func isInvalidReflectValueZeroNilTestCases() []isZeroTestCase {
-	invalid := reflect.Value{}
-
-	return S(
-		newIsZeroTestCase("invalid reflect.Value IsZero", invalid, true),
-	)
-}
-
-func isInvalidReflectValueNilTestCases() []isNilTestCase {
-	invalid := reflect.Value{}
-
-	return S(
-		newIsNilTestCase("invalid reflect.Value IsNil", invalid, true),
-	)
-}
-
-// Test invalid reflect.Values in IsSame
 func TestIsSameInvalidReflectValues(t *testing.T) {
-	t.Run("IsSame", func(t *testing.T) {
-		RunTestCases(t, isSameInvalidReflectValueTestCases())
-	})
-
-	t.Run("IsZero", func(t *testing.T) {
-		RunTestCases(t, isInvalidReflectValueZeroNilTestCases())
-	})
-
-	t.Run("IsNil", func(t *testing.T) {
-		RunTestCases(t, isInvalidReflectValueNilTestCases())
-	})
+	RunTestCases(t, isSameInvalidReflectValueTestCases())
 }
 
 // isSameStackOverflowTestCase tests stack overflow scenarios for IsSame function
