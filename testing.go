@@ -615,6 +615,8 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 //
 // This type-specific matching makes tests more resilient to implementation changes
 // whilst still validating that panics occur for the right reasons.
+// A nil fn and an empty substring are mistakes at the call site, and are
+// rejected before fn runs rather than reported as whatever fn did.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -630,6 +632,18 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 //	AssertPanic(t, func() { mustValidate(nil) }, ErrValidation, "validation")
 func AssertPanic(t T, fn func(), expectedPanic any, name string, args ...any) (ok bool) {
 	t.Helper()
+
+	// A mistake at the call site is reported before fn runs, so it
+	// is not hidden behind whatever fn does.
+	if fn == nil {
+		doError(t, name, args, "expected a function, got nil")
+		return false
+	}
+	if s, isString := expectedPanic.(string); isString && s == "" {
+		doError(t, name, args, "expected a non-empty substring")
+		return false
+	}
+
 	defer func() {
 		ok = doAssertPanic(t, recover(), expectedPanic, name, args...)
 	}()
@@ -706,13 +720,11 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 		msg = AsRecovered(recovered).Error()
 	}
 
-	found, ok := stringContains(msg, substr)
-	switch {
-	case !ok:
-		doError(t, name, args, "expected a non-empty substring")
-	case found:
+	// AssertPanic rejected an empty substr before fn ran.
+	found := strings.Contains(msg, substr)
+	if found {
 		doLog(t, name, args, "panic contains %q: %q", substr, msg)
-	default:
+	} else {
 		doError(t, name, args, "expected panic to contain %q, got %q", substr, msg)
 	}
 
@@ -721,6 +733,8 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 
 // AssertNoPanic runs a function expecting it not to panic.
 // This is useful for testing that functions handle edge cases gracefully.
+// A nil fn is a mistake at the call site, and is rejected before it would
+// run rather than reported as a panic.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -730,6 +744,11 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 //	AssertNoPanic(t, func() { handleNilInput(nil) }, "nil input %s", "handling")
 func AssertNoPanic(t T, fn func(), name string, args ...any) (ok bool) {
 	t.Helper()
+	if fn == nil {
+		doError(t, name, args, "expected a function, got nil")
+		return false
+	}
+
 	ok = true
 	defer func() {
 		if r := recover(); r != nil {

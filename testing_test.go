@@ -698,6 +698,8 @@ func assertPanicTestCases() []assertPanicTestCase {
 			func() { panic("test panic") }, nil, "panic test", "test panic"),
 		newAssertPanicTestCaseReject("no panic fails",
 			func() {}, nil, "no panic test", "expected panic but got nil"),
+		newAssertPanicTestCaseReject("nil function",
+			nil, nil, "nil function test", "expected a function"),
 
 		// String matching tests
 		newAssertPanicTestCaseAccept("string substring match",
@@ -707,6 +709,11 @@ func assertPanicTestCases() []assertPanicTestCase {
 			`expected panic to contain "expected"`),
 		newAssertPanicTestCaseReject("empty substring",
 			func() { panic("any message") }, "", "empty substring test",
+			"expected a non-empty substring"),
+		// The call-site mistake is reported whatever fn does, not
+		// as "expected panic but got nil".
+		newAssertPanicTestCaseReject("empty substring without panic",
+			func() {}, "", "empty substring no panic test",
 			"expected a non-empty substring"),
 		newAssertPanicTestCaseAccept("non-string panic with string expected",
 			func() { panic(123) }, "123", "non-string test", "contains"),
@@ -769,6 +776,13 @@ func TestAssertNoPanic(t *testing.T) {
 	result = AssertNoPanic(mock, func() { panic("unexpected") }, "panic test")
 	AssertFalse(t, result, "AssertNoPanic result with panic")
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+
+	mock.Reset()
+
+	// Test AssertNoPanic with a nil function (failure): the call-site
+	// mistake is reported as such, not as a panic.
+	result = AssertNoPanic(mock, nil, "nil function test")
+	assertFailed(t, mock, result, "expected a function", "nil function")
 }
 
 // Test RunConcurrentTest
