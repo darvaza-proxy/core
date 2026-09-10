@@ -319,8 +319,11 @@ type catcherAbortTestCase struct {
 	fn         func(T)
 	name       string
 	wantErrors int
+	wantLogs   int
 
 	wantAborted bool
+	wantFailed  bool
+	wantSkipped bool
 }
 
 func (tc catcherAbortTestCase) Name() string {
@@ -340,11 +343,12 @@ func (tc catcherAbortTestCase) Test(t *testing.T) {
 		continued = true
 	})
 
-	AssertFalse(t, ok, "passed")
-	AssertTrue(t, mock.Failed(), "failed")
+	AssertEqual(t, !tc.wantFailed, ok, "passed")
+	AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
+	AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
 	AssertEqual(t, !tc.wantAborted, continued, "continued")
 	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
-	AssertEqual(t, 0, mock.NumLogs(), "logs")
+	AssertEqual(t, tc.wantLogs, mock.NumLogs(), "logs")
 	AssertNil(t, catcher.Recovered(), "recovered")
 }
 
@@ -356,7 +360,10 @@ func newCatcherAbortTestCase(name string, abort func(T),
 		fn:          abort,
 		name:        name,
 		wantErrors:  wantErrors,
+		wantLogs:    0,
 		wantAborted: true,
+		wantFailed:  true,
+		wantSkipped: false,
 	}
 }
 
@@ -368,7 +375,40 @@ func newCatcherAbortTestCaseContinues(name string, fn func(T),
 		fn:          fn,
 		name:        name,
 		wantErrors:  wantErrors,
+		wantLogs:    0,
 		wantAborted: false,
+		wantFailed:  true,
+		wantSkipped: false,
+	}
+}
+
+// newCatcherAbortTestCaseSkips is a row whose abort skips the test,
+// recording wantLogs on the way.
+func newCatcherAbortTestCaseSkips(name string, abort func(T),
+	wantLogs int) catcherAbortTestCase {
+	return catcherAbortTestCase{
+		fn:          abort,
+		name:        name,
+		wantErrors:  0,
+		wantLogs:    wantLogs,
+		wantAborted: true,
+		wantFailed:  false,
+		wantSkipped: true,
+	}
+}
+
+// newCatcherAbortTestCaseFailsSkips is a row whose abort fails the test
+// and then skips it, recording wantErrors and wantLogs on the way.
+func newCatcherAbortTestCaseFailsSkips(name string, abort func(T),
+	wantErrors, wantLogs int) catcherAbortTestCase {
+	return catcherAbortTestCase{
+		fn:          abort,
+		name:        name,
+		wantErrors:  wantErrors,
+		wantLogs:    wantLogs,
+		wantAborted: true,
+		wantFailed:  true,
+		wantSkipped: true,
 	}
 }
 
@@ -376,6 +416,10 @@ var catcherAbortTestCases = S(
 	newCatcherAbortTestCaseContinues("Fail", func(mt T) { mt.Fail() }, 0),
 	newCatcherAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
 	newCatcherAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
+	newCatcherAbortTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow() }, 0),
+	newCatcherAbortTestCaseSkips("Skip", func(mt T) { mt.Skip("skip") }, 1),
+	newCatcherAbortTestCaseFailsSkips("Fail then SkipNow",
+		func(mt T) { mt.Fail(); mt.SkipNow() }, 0, 0),
 )
 
 func TestCatcherAbort(t *testing.T) {

@@ -18,6 +18,7 @@ var (
 	_ TestCase = (*mockTestCase)(nil)
 	_ TestCase = mockTMessageAtTestCase{}
 	_ TestCase = mockTRunTestCase{}
+	_ TestCase = mockTRunCarryOverTestCase{}
 )
 
 // Test MockT implementation
@@ -853,15 +854,19 @@ func TestAssertPanic(t *testing.T) {
 
 // assertAbortTestCase states what AssertPanic and AssertNoPanic do when
 // fn cuts the test short on the T the assertion reports to: the abort
-// passes through and is not mistaken for a panic, the test is failed by
-// fn alone, and the assertion neither logs nor adds an error of its own.
-// expectPanic is what the assertion under test expects of fn.
+// passes through and is not mistaken for a panic, the test is failed,
+// skipped or both by fn alone, and the assertion neither logs nor adds
+// an error of its own. expectPanic is what the assertion under test
+// expects of fn.
 type assertAbortTestCase struct {
 	abort      func(T)
 	name       string
 	wantErrors int
+	wantLogs   int
 
 	expectPanic bool
+	wantFailed  bool
+	wantSkipped bool
 }
 
 func (tc assertAbortTestCase) Name() string {
@@ -880,19 +885,56 @@ func (tc assertAbortTestCase) Test(t *testing.T) {
 		}
 	})
 
-	AssertFalse(t, ok, "continued")
-	AssertTrue(t, mock.Failed(), "failed")
+	AssertEqual(t, !tc.wantFailed, ok, "passed")
+	AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
+	AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
 	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
-	AssertEqual(t, 0, mock.NumLogs(), "logs")
+	AssertEqual(t, tc.wantLogs, mock.NumLogs(), "logs")
 }
 
+// newAssertPanicAbortTestCase is an AssertPanic row whose abort fails
+// the test, recording wantErrors on the way.
 func newAssertPanicAbortTestCase(name string, abort func(T),
 	wantErrors int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
 		name:        name,
 		wantErrors:  wantErrors,
+		wantLogs:    0,
 		expectPanic: true,
+		wantFailed:  true,
+		wantSkipped: false,
+	}
+}
+
+// newAssertPanicAbortTestCaseSkips is an AssertPanic row whose abort
+// skips the test, recording wantLogs on the way.
+func newAssertPanicAbortTestCaseSkips(name string, abort func(T),
+	wantLogs int) assertAbortTestCase {
+	return assertAbortTestCase{
+		abort:       abort,
+		name:        name,
+		wantErrors:  0,
+		wantLogs:    wantLogs,
+		expectPanic: true,
+		wantFailed:  false,
+		wantSkipped: true,
+	}
+}
+
+// newAssertPanicAbortTestCaseFailsSkips is an AssertPanic row whose
+// abort fails the test and then skips it, recording wantErrors and
+// wantLogs on the way.
+func newAssertPanicAbortTestCaseFailsSkips(name string, abort func(T),
+	wantErrors, wantLogs int) assertAbortTestCase {
+	return assertAbortTestCase{
+		abort:       abort,
+		name:        name,
+		wantErrors:  wantErrors,
+		wantLogs:    wantLogs,
+		expectPanic: true,
+		wantFailed:  true,
+		wantSkipped: true,
 	}
 }
 
@@ -902,19 +944,59 @@ var assertPanicAbortTestCases = S(
 	newAssertPanicAbortTestCase("AssertMust", func(mt T) {
 		AssertMustTrue(mt, false, "must")
 	}, 1),
+	newAssertPanicAbortTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow() }, 0),
+	newAssertPanicAbortTestCaseSkips("Skip", func(mt T) { mt.Skip("skip") }, 1),
+	newAssertPanicAbortTestCaseFailsSkips("Fail then SkipNow",
+		func(mt T) { mt.Fail(); mt.SkipNow() }, 0, 0),
 )
 
 func TestAssertPanicAbort(t *testing.T) {
 	RunTestCases(t, assertPanicAbortTestCases)
 }
 
+// newAssertNoPanicAbortTestCase is an AssertNoPanic row whose abort
+// fails the test, recording wantErrors on the way.
 func newAssertNoPanicAbortTestCase(name string, abort func(T),
 	wantErrors int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
 		name:        name,
 		wantErrors:  wantErrors,
+		wantLogs:    0,
 		expectPanic: false,
+		wantFailed:  true,
+		wantSkipped: false,
+	}
+}
+
+// newAssertNoPanicAbortTestCaseSkips is an AssertNoPanic row whose abort
+// skips the test, recording wantLogs on the way.
+func newAssertNoPanicAbortTestCaseSkips(name string, abort func(T),
+	wantLogs int) assertAbortTestCase {
+	return assertAbortTestCase{
+		abort:       abort,
+		name:        name,
+		wantErrors:  0,
+		wantLogs:    wantLogs,
+		expectPanic: false,
+		wantFailed:  false,
+		wantSkipped: true,
+	}
+}
+
+// newAssertNoPanicAbortTestCaseFailsSkips is an AssertNoPanic row whose
+// abort fails the test and then skips it, recording wantErrors and
+// wantLogs on the way.
+func newAssertNoPanicAbortTestCaseFailsSkips(name string, abort func(T),
+	wantErrors, wantLogs int) assertAbortTestCase {
+	return assertAbortTestCase{
+		abort:       abort,
+		name:        name,
+		wantErrors:  wantErrors,
+		wantLogs:    wantLogs,
+		expectPanic: false,
+		wantFailed:  true,
+		wantSkipped: true,
 	}
 }
 
@@ -924,6 +1006,10 @@ var assertNoPanicAbortTestCases = S(
 	newAssertNoPanicAbortTestCase("AssertMust", func(mt T) {
 		AssertMustTrue(mt, false, "must")
 	}, 1),
+	newAssertNoPanicAbortTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow() }, 0),
+	newAssertNoPanicAbortTestCaseSkips("Skip", func(mt T) { mt.Skip("skip") }, 1),
+	newAssertNoPanicAbortTestCaseFailsSkips("Fail then SkipNow",
+		func(mt T) { mt.Fail(); mt.SkipNow() }, 0, 0),
 )
 
 func TestAssertNoPanicAbort(t *testing.T) {
@@ -1047,6 +1133,7 @@ func testMockTInitialState(t *testing.T) {
 	AssertFalse(t, mock.HasLogs(), "initial HasLogs")
 	AssertEqual(t, 0, mock.NumHelperCalls(), "initial NumHelperCalls")
 	AssertFalse(t, mock.Failed(), "initial Failed")
+	AssertFalse(t, mock.Skipped(), "initial Skipped")
 }
 
 func testMockTHelper(t *testing.T) {
@@ -1179,6 +1266,8 @@ func testMockTReset(t *testing.T) {
 	mock.Helper()
 	mock.Helper()
 	mock.Fail()
+	mock.Run("skip", func(mt T) { mt.SkipNow() })
+	AssertMustTrue(t, mock.Skipped(), "Skipped before Reset")
 
 	mock.Reset()
 	AssertFalse(t, mock.HasErrors(), "HasErrors after Reset")
@@ -1187,6 +1276,7 @@ func testMockTReset(t *testing.T) {
 	AssertEqual(t, 0, mock.NumLogs(), "NumLogs after Reset")
 	AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls after Reset")
 	AssertFalse(t, mock.Failed(), "Failed after Reset")
+	AssertFalse(t, mock.Skipped(), "Skipped after Reset")
 }
 
 func testMockTEmptyQueries(t *testing.T) {
@@ -1427,36 +1517,67 @@ func TestAssertNotSame(t *testing.T) {
 // mockTRunTestCase tests the result MockT.Run reports for a test body,
 // and what the body's calls left recorded in the MockT.
 type mockTRunTestCase struct {
-	fn           func(T)
-	name         string
-	expectErrors []string
-	expectLogs   []string
-	expectFailed bool
+	fn            func(T)
+	name          string
+	expectErrors  []string
+	expectLogs    []string
+	expectFailed  bool
+	expectSkipped bool
 }
 
-// newMockTRunTestCase declares a body under which Run passes, with the
-// logs it leaves.
+// newMockTRunTestCase declares a body under which Run passes without
+// skipping, with the logs it leaves.
 func newMockTRunTestCase(name string, fn func(T),
 	expectLogs []string) mockTRunTestCase {
 	return mockTRunTestCase{
-		fn:           fn,
-		name:         name,
-		expectErrors: nil,
-		expectLogs:   expectLogs,
-		expectFailed: false,
+		fn:            fn,
+		name:          name,
+		expectErrors:  nil,
+		expectLogs:    expectLogs,
+		expectFailed:  false,
+		expectSkipped: false,
 	}
 }
 
-// newMockTRunTestCaseFails declares a body under which Run fails, with
-// the errors and logs it leaves.
+// newMockTRunTestCaseFails declares a body under which Run fails without
+// skipping, with the errors and logs it leaves.
 func newMockTRunTestCaseFails(name string, fn func(T),
 	expectErrors, expectLogs []string) mockTRunTestCase {
 	return mockTRunTestCase{
-		fn:           fn,
-		name:         name,
-		expectErrors: expectErrors,
-		expectLogs:   expectLogs,
-		expectFailed: true,
+		fn:            fn,
+		name:          name,
+		expectErrors:  expectErrors,
+		expectLogs:    expectLogs,
+		expectFailed:  true,
+		expectSkipped: false,
+	}
+}
+
+// newMockTRunTestCaseSkips declares a body that skips, under which Run
+// passes, with the logs it leaves.
+func newMockTRunTestCaseSkips(name string, fn func(T),
+	expectLogs []string) mockTRunTestCase {
+	return mockTRunTestCase{
+		fn:            fn,
+		name:          name,
+		expectErrors:  nil,
+		expectLogs:    expectLogs,
+		expectFailed:  false,
+		expectSkipped: true,
+	}
+}
+
+// newMockTRunTestCaseFailsSkips declares a body that fails and then
+// skips, under which Run fails, with the errors and logs it leaves.
+func newMockTRunTestCaseFailsSkips(name string, fn func(T),
+	expectErrors, expectLogs []string) mockTRunTestCase {
+	return mockTRunTestCase{
+		fn:            fn,
+		name:          name,
+		expectErrors:  expectErrors,
+		expectLogs:    expectLogs,
+		expectFailed:  true,
+		expectSkipped: true,
 	}
 }
 
@@ -1471,6 +1592,7 @@ func (tc mockTRunTestCase) Test(t *testing.T) {
 
 	AssertEqual(t, !tc.expectFailed, ok, "result")
 	AssertEqual(t, tc.expectFailed, mock.Failed(), "Failed()")
+	AssertEqual(t, tc.expectSkipped, mock.Skipped(), "Skipped()")
 	AssertSliceEqual(t, tc.expectErrors, mock.Errors, "errors")
 	AssertSliceEqual(t, tc.expectLogs, mock.Logs, "logs")
 }
@@ -1493,19 +1615,77 @@ func TestMockTRun(t *testing.T) {
 			S("fatal"), nil),
 		newMockTRunTestCaseFails("Fatalf", func(mt T) { mt.Fatalf("fatal %d", 42); mt.Log("continued") },
 			S("fatal 42"), nil),
+		newMockTRunTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow(); mt.Log("continued") },
+			nil),
+		newMockTRunTestCaseSkips("Skip", func(mt T) { mt.Skip("skip"); mt.Log("continued") },
+			S("skip")),
+		newMockTRunTestCaseSkips("Skipf", func(mt T) { mt.Skipf("skip %d", 42); mt.Log("continued") },
+			S("skip 42")),
+		newMockTRunTestCaseFailsSkips("Fail then SkipNow",
+			func(mt T) { mt.Fail(); mt.SkipNow(); mt.Log("continued") },
+			nil, nil),
 	})
 }
 
-// Run reports Failed as it stands, so a failure in an earlier run
-// carries over until Reset: a passing body run after it returns false.
-func TestMockTRunCarriesOver(t *testing.T) {
+// mockTRunCarryOverTestCase states that Failed and Skipped carry over
+// from one Run to the next until Reset: after a first body sets them, a
+// passing body leaves them as they were, and Run reports the result
+// they give.
+type mockTRunCarryOverTestCase struct {
+	first       func(T)
+	name        string
+	wantFailed  bool
+	wantSkipped bool
+}
+
+// newMockTRunCarryOverTestCaseFails declares a first body that fails
+// the test without skipping it.
+func newMockTRunCarryOverTestCaseFails(name string,
+	first func(T)) mockTRunCarryOverTestCase {
+	return mockTRunCarryOverTestCase{
+		first:       first,
+		name:        name,
+		wantFailed:  true,
+		wantSkipped: false,
+	}
+}
+
+// newMockTRunCarryOverTestCaseSkips declares a first body that skips
+// the test without failing it.
+func newMockTRunCarryOverTestCaseSkips(name string,
+	first func(T)) mockTRunCarryOverTestCase {
+	return mockTRunCarryOverTestCase{
+		first:       first,
+		name:        name,
+		wantFailed:  false,
+		wantSkipped: true,
+	}
+}
+
+func (tc mockTRunCarryOverTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mockTRunCarryOverTestCase) Test(t *testing.T) {
+	t.Helper()
 	mock := &MockT{}
-	mock.Run("fails", func(mt T) { mt.FailNow() })
-	AssertMustTrue(t, mock.Failed(), "failed before")
+	mock.Run("first", tc.first)
+	AssertMustEqual(t, tc.wantFailed, mock.Failed(), "failed before")
+	AssertMustEqual(t, tc.wantSkipped, mock.Skipped(), "skipped before")
 
 	ok := mock.Run("passes", func(mt T) { mt.Log("passed") })
-	AssertFalse(t, ok, "passed")
-	AssertTrue(t, mock.Failed(), "failed")
+	AssertEqual(t, !tc.wantFailed, ok, "passed")
+	AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
+	AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
+}
+
+func TestMockTRunCarriesOver(t *testing.T) {
+	RunTestCases(t, []mockTRunCarryOverTestCase{
+		newMockTRunCarryOverTestCaseFails("after FailNow",
+			func(mt T) { mt.FailNow() }),
+		newMockTRunCarryOverTestCaseSkips("after SkipNow",
+			func(mt T) { mt.SkipNow() }),
+	})
 }
 
 func TestMockTRunNilChecks(t *testing.T) {
@@ -1525,12 +1705,12 @@ func TestMockTRunNilChecks(t *testing.T) {
 func TestMockTRunPanicPropagation(t *testing.T) {
 	mock := &MockT{}
 
-	// Test that non-FailNow panics are propagated
+	// Test that panics other than MockT's own sentinels are propagated
 	AssertPanic(t, func() {
 		mock.Run("panic test", func(_ T) {
 			panic("custom panic")
 		})
-	}, "custom panic", "Non-FailNow panics should be propagated")
+	}, "custom panic", "propagated")
 }
 
 // isMockTAbortTestCase states which recovered values IsMockTAbort takes
@@ -1582,12 +1762,16 @@ func recoverFrom(fn func()) (recovered any) {
 
 func isMockTAbortTestCases() []isMockTAbortTestCase {
 	failNow := recoverFrom(func() { (&MockT{}).FailNow() })
+	skipNow := recoverFrom(func() { (&MockT{}).SkipNow() })
 
 	return []isMockTAbortTestCase{
 		newIsMockTAbortTestCase("FailNow", failNow),
+		newIsMockTAbortTestCase("SkipNow", skipNow),
 		newIsMockTAbortTestCase("wrapped",
 			Wrap(MustT[error](failNow), "wrapped")),
 		newIsMockTAbortTestCase("recovered", AsRecovered(failNow)),
+		newIsMockTAbortTestCase("joined",
+			errors.Join(errors.New("another"), MustT[error](failNow))),
 		newIsMockTAbortTestCaseOther("nil", nil),
 		newIsMockTAbortTestCaseOther("another error", errors.New("another")),
 		newIsMockTAbortTestCaseOther("same text", errors.New("MockT.FailNow")),

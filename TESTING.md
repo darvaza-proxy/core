@@ -994,10 +994,10 @@ func TestMyAssertion(t *testing.T) {
 }
 ```
 
-### Testing Fatal/FailNow Scenarios
+### Testing Fatal/FailNow and Skip/SkipNow Scenarios
 
-MockT supports testing functions that call Fatal/FailNow methods via the `Run()`
-method, which returns where they stop the test:
+MockT supports testing functions that call Fatal/FailNow or Skip/SkipNow
+methods via the `Run()` method, which returns where they stop the test:
 
 ```go
 func TestAssertionFailure(t *testing.T) {
@@ -1015,6 +1015,11 @@ func TestAssertionFailure(t *testing.T) {
     core.AssertEqual(t, 0, mock.NumLogs(), "logs")
 }
 ```
+
+A skip stops the test the same way without failing it: `Run` returns true
+for a function that only skips, and `mock.Skipped()` reports the skip.
+`Failed()` and `Skipped()` carry over from one `Run` to the next until
+`Reset()`.
 
 ## Error Testing Patterns
 

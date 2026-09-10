@@ -153,8 +153,12 @@ enhanced capabilities:
 - **State reset**: Reset() clears all collected data and resets counters
 - **Fatal/FailNow support**: Full implementation of Fatal(), Fatalf(), and
   FailNow() methods, which stop the test
+- **Skip/SkipNow support**: Skip(), Skipf() and SkipNow() stop the test
+  the same way and mark it skipped without failing it; Skipped() reports
+  it
 - **Stopping a test**: Run() method executes test functions and returns on
-  FailNow, enabling testing of fatal assertion patterns
+  FailNow and SkipNow, enabling testing of fatal assertion patterns
+  and of code that skips
 
 #### MockT Usage Examples
 

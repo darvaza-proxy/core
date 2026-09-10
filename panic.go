@@ -67,8 +67,8 @@ func (p *Catcher) Do(fn func() error) error {
 
 // Try calls a function, returning its organic error,
 // or storing the recovered error for later consumption.
-// A FailNow that fn calls through [MockT] is not a panic,
-// and passes through.
+// A FailNow or SkipNow that fn calls through [MockT] is not a
+// panic, and passes through.
 func (p *Catcher) Try(fn func() error) error {
 	if fn == nil {
 		return nil
