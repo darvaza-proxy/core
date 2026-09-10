@@ -11,6 +11,8 @@ import (
 var (
 	_ TestCase = (*mockTestCase)(nil)
 	_ TestCase = mockTMessageAtTestCase{}
+	_ TestCase = assertErrorAsTestCase[*WrappedError]{}
+	_ TestCase = assertTypeIsTestCase[string]{}
 )
 
 // Test MockT implementation
@@ -463,59 +465,138 @@ func TestAssertErrorIsFn(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
-// Test AssertErrorAs
-func TestAssertErrorAs(t *testing.T) {
-	mock := &MockT{}
-	baseErr := errors.New("base error")
-	wrapped := Wrap(baseErr, "note")
-
-	// Test AssertErrorAs with direct match (success, err is the match)
-	out, ok := AssertErrorAs[*WrappedError](mock, wrapped, "direct match")
-	AssertTrue(t, ok, "AssertErrorAs result with direct match")
-	AssertMustNotNil(t, out, "matched pointer")
-	AssertSame(t, wrapped, *out, "matched value")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
-
-	mock.Reset()
-
-	// Test AssertErrorAs with nested match (success, err contains the match)
-	joined := errors.Join(errors.New("other error"), wrapped)
-	out, ok = AssertErrorAs[*WrappedError](mock, joined, "nested match")
-	AssertTrue(t, ok, "AssertErrorAs result with nested match")
-	AssertMustNotNil(t, out, "matched pointer")
-	AssertSame(t, wrapped, *out, "matched value")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-
-	mock.Reset()
-
-	// Test AssertErrorAs without match (failure)
-	out, ok = AssertErrorAs[*WrappedError](mock, baseErr, "no match")
-	AssertFalse(t, ok, "AssertErrorAs result without match")
-	AssertNil(t, out, "nil pointer on failure")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+// assertErrorAsTestCase states what AssertErrorAs answers for one
+// target type: a pointer to the match and true when the chain holds
+// one, nil and a report naming the target when it does not, the
+// target included when it is an interface and the zero value has no
+// dynamic type to print.
+type assertErrorAsTestCase[V error] struct {
+	err       error
+	want      V
+	wantError string
+	name      string
+	wantOK    bool
 }
 
-// Test AssertTypeIs
-func TestAssertTypeIs(t *testing.T) {
+func newAssertErrorAsTestCase[V error](name string, err error, want V) TestCase {
+	return assertErrorAsTestCase[V]{
+		err:    err,
+		want:   want,
+		name:   name,
+		wantOK: true,
+	}
+}
+
+func newAssertErrorAsTestCaseFail[V error](name string, err error,
+	wantError string) TestCase {
+	return assertErrorAsTestCase[V]{
+		err:       err,
+		wantError: wantError,
+		name:      name,
+	}
+}
+
+func (tc assertErrorAsTestCase[V]) Name() string {
+	return tc.name
+}
+
+func (tc assertErrorAsTestCase[V]) Test(t *testing.T) {
+	t.Helper()
 	mock := &MockT{}
 
-	// Test AssertTypeIs with correct type (success)
-	var val any = "hello"
-	result, ok := AssertTypeIs[string](mock, val, "type is test")
-	AssertTrue(t, ok, "AssertTypeIs ok with correct type")
-	AssertEqual(t, "hello", result, "AssertTypeIs result with correct type")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	out, ok := AssertErrorAs[V](mock, tc.err, "type")
+	if !tc.wantOK {
+		AssertNil(t, out, "value")
+		assertFailed(t, mock, ok, tc.wantError, "type")
+		return
+	}
 
-	mock.Reset()
+	AssertMustNotNil(t, out, "value")
+	AssertSame(t, tc.want, *out, "value")
+	assertPassed(t, mock, ok, "type")
+}
 
-	// Test AssertTypeIs with incorrect type (failure)
-	val = 42
-	result, ok = AssertTypeIs[string](mock, val, "type is not test")
-	AssertFalse(t, ok, "AssertTypeIs ok with incorrect type")
-	AssertEqual(t, "", result, "AssertTypeIs result with incorrect type")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+func assertErrorAsTestCases() []TestCase {
+	baseErr := errors.New("base error")
+	wrapped := &WrappedError{cause: baseErr, note: "note"}
+	joined := errors.Join(errors.New("other error"), wrapped)
+
+	return S(
+		newAssertErrorAsTestCase("direct match", wrapped, wrapped),
+		newAssertErrorAsTestCase("nested match", joined, wrapped),
+		newAssertErrorAsTestCaseFail[*WrappedError]("no match", baseErr,
+			"expected error of type *core.WrappedError"),
+		newAssertErrorAsTestCaseFail[Recovered]("interface target", baseErr,
+			"expected error of type core.Recovered"),
+	)
+}
+
+func TestAssertErrorAs(t *testing.T) {
+	RunTestCases(t, assertErrorAsTestCases())
+}
+
+// assertTypeIsTestCase states what AssertTypeIs answers for one target
+// type: the value and true when it is one, the zero value and a report
+// naming both types when it is not, the target included when it is an
+// interface and the zero value has no dynamic type to print.
+type assertTypeIsTestCase[V any] struct {
+	input     any
+	want      V
+	wantError string
+	name      string
+	wantOK    bool
+}
+
+func newAssertTypeIsTestCase[V any](name string, input any, want V) TestCase {
+	return assertTypeIsTestCase[V]{
+		input:  input,
+		want:   want,
+		name:   name,
+		wantOK: true,
+	}
+}
+
+func newAssertTypeIsTestCaseFail[V any](name string, input any,
+	wantError string) TestCase {
+	return assertTypeIsTestCase[V]{
+		input:     input,
+		wantError: wantError,
+		name:      name,
+	}
+}
+
+func (tc assertTypeIsTestCase[V]) Name() string {
+	return tc.name
+}
+
+func (tc assertTypeIsTestCase[V]) Test(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	got, ok := AssertTypeIs[V](mock, tc.input, "type")
+	AssertEqual(t, tc.want, got, "value")
+	if tc.wantOK {
+		assertPassed(t, mock, ok, "type")
+	} else {
+		assertFailed(t, mock, ok, tc.wantError, "type")
+	}
+}
+
+func assertTypeIsTestCases() []TestCase {
+	err := errors.New("test error")
+
+	return S(
+		newAssertTypeIsTestCase("string", testHello, testHello),
+		newAssertTypeIsTestCase("error", err, err),
+		newAssertTypeIsTestCaseFail[string]("int to string", 42,
+			"expected type string, got int"),
+		newAssertTypeIsTestCaseFail[error]("int to error", 42,
+			"expected type error, got int"),
+	)
+}
+
+func TestAssertTypeIs(t *testing.T) {
+	RunTestCases(t, assertTypeIsTestCases())
 }
 
 // assertPanicTestCase for table-driven tests

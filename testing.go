@@ -855,7 +855,8 @@ func AssertErrorAs[U error](t T, err error, name string, args ...any) (*U, bool)
 
 	ok := errors.As(err, &result)
 	if !ok {
-		doError(t, name, args, "expected error of type %T, got %T", result, err)
+		doError(t, name, args, "expected error of type %s, got %T",
+			TypeName[U](), err)
 		out = nil
 	} else if reflect.DeepEqual(err, result) {
 		doLog(t, name, args, "%v is %T", err, result)
@@ -878,7 +879,8 @@ func AssertTypeIs[U any](t T, value any, name string, args ...any) (U, bool) {
 	t.Helper()
 	result, ok := value.(U)
 	if !ok {
-		doError(t, name, args, "expected type %T, got %T", result, value)
+		doError(t, name, args, "expected type %s, got %T",
+			TypeName[U](), value)
 	} else {
 		doLog(t, name, args, "%T", value)
 	}
