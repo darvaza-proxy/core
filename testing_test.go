@@ -756,6 +756,67 @@ func TestAssertPanic(t *testing.T) {
 	RunTestCases(t, assertPanicTestCases())
 }
 
+// assertAbortTestCase states what AssertPanic and AssertNoPanic do when
+// fn cuts the test short on the T they report to: the abort passes
+// through, the test is failed by fn alone, and the assertion neither
+// logs nor adds an error of its own.
+type assertAbortTestCase struct {
+	abort      func(T)
+	name       string
+	wantErrors int
+}
+
+var _ TestCase = assertAbortTestCase{}
+
+func (tc assertAbortTestCase) Name() string {
+	return tc.name
+}
+
+func (tc assertAbortTestCase) Test(t *testing.T) {
+	t.Helper()
+	tc.testThrough(t, "AssertPanic", func(mt T, fn func()) {
+		AssertPanic(mt, fn, nil, "aborted")
+	})
+	tc.testThrough(t, "AssertNoPanic", func(mt T, fn func()) {
+		AssertNoPanic(mt, fn, "aborted")
+	})
+}
+
+func (tc assertAbortTestCase) testThrough(t *testing.T, name string,
+	assert func(T, func())) {
+	t.Helper()
+	mock := &MockT{}
+	ok := mock.Run(name, func(mt T) {
+		assert(mt, func() { tc.abort(mt) })
+	})
+	AssertFalse(t, ok, "%s continued", name)
+	AssertTrue(t, mock.Failed(), "%s failed", name)
+	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "%s errors", name)
+	AssertEqual(t, 0, mock.NumLogs(), "%s logs", name)
+}
+
+func newAssertAbortTestCase(name string, abort func(T), wantErrors int) assertAbortTestCase {
+	return assertAbortTestCase{
+		abort:      abort,
+		name:       name,
+		wantErrors: wantErrors,
+	}
+}
+
+func assertAbortTestCases() []assertAbortTestCase {
+	return []assertAbortTestCase{
+		newAssertAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
+		newAssertAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
+		newAssertAbortTestCase("AssertMust", func(mt T) {
+			AssertMustTrue(mt, false, "must")
+		}, 1),
+	}
+}
+
+func TestAssertPanicAbort(t *testing.T) {
+	RunTestCases(t, assertAbortTestCases())
+}
+
 // Test AssertNoPanic
 func TestAssertNoPanic(t *testing.T) {
 	mock := &MockT{}

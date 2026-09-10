@@ -617,6 +617,9 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 // whilst still validating that panics occur for the right reasons.
 // A nil fn and an empty substring are mistakes at the call site, and are
 // rejected before fn runs rather than reported as whatever fn did.
+// A fn that cuts the test short through FailNow on a [MockT] is not a
+// panic the assertion reports: the abort is intercepted and passed on to
+// [MockT.Run].
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -645,7 +648,13 @@ func AssertPanic(t T, fn func(), expectedPanic any, name string, args ...any) (o
 	}
 
 	defer func() {
-		ok = doAssertPanic(t, recover(), expectedPanic, name, args...)
+		recovered := recover()
+		if recovered == errMockTFailNow {
+			// fn cut the test short through MockT; pass the
+			// abort on to MockT.Run rather than report it.
+			panic(recovered)
+		}
+		ok = doAssertPanic(t, recovered, expectedPanic, name, args...)
 	}()
 	fn()
 	return ok
@@ -735,6 +744,9 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 // This is useful for testing that functions handle edge cases gracefully.
 // A nil fn is a mistake at the call site, and is rejected before it would
 // run rather than reported as a panic.
+// A fn that cuts the test short through FailNow on a [MockT] is not a
+// panic the assertion reports: the abort is intercepted and passed on to
+// [MockT.Run].
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -749,14 +761,19 @@ func AssertNoPanic(t T, fn func(), name string, args ...any) (ok bool) {
 		return false
 	}
 
-	ok = true
 	defer func() {
-		if r := recover(); r != nil {
-			doError(t, name, args, "expected no panic but got: %v", r)
-			ok = false
-			return
+		recovered := recover()
+		switch {
+		case recovered == errMockTFailNow:
+			// fn cut the test short through MockT; pass the
+			// abort on to MockT.Run rather than report it.
+			panic(recovered)
+		case recovered != nil:
+			doError(t, name, args, "expected no panic but got: %v", recovered)
+		default:
+			doLog(t, name, args, "%v", "no panic")
+			ok = true
 		}
-		doLog(t, name, args, "%v", "no panic")
 	}()
 	fn()
 	return ok
