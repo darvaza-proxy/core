@@ -1916,8 +1916,9 @@ func assertErrorContains(t *testing.T, mock *MockT, expected, desc string) {
 	}
 
 	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok for "+desc)
-	AssertTrue(t, strings.Contains(lastErr, expected), desc)
+	AssertMustTrue(t, ok, "%s recorded", desc)
+	AssertTrue(t, strings.Contains(lastErr, expected),
+		"%s: %q contains %q", desc, lastErr, expected)
 }
 
 // mustMessageAt returns the message at position i from one of MockT's At
