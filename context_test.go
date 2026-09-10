@@ -18,7 +18,8 @@ var (
 
 // contextKeyStringTestCase states how one key renders: String is the
 // name, and GoString names the value type as well, an interface
-// included when the zero value has no dynamic type to print.
+// included when the zero value has no dynamic type to print. A nil
+// key has no name, and renders as the typed nil conversion.
 type contextKeyStringTestCase[T any] struct {
 	key    *ContextKey[T]
 	want   string
@@ -53,11 +54,21 @@ func contextKeyStringTestCases() []TestCase {
 		newContextKeyStringTestCase("interface type",
 			NewContextKey[fmt.Stringer]("k1"),
 			"k1", `core.NewContextKey[fmt.Stringer]("k1")`),
+		newContextKeyStringTestCase("nil key", (*ContextKey[int])(nil),
+			"<nil>", "(*core.ContextKey[int])(nil)"),
 	)
 }
 
 func TestContextKeyString(t *testing.T) {
 	RunTestCases(t, contextKeyStringTestCases())
+}
+
+// TestContextKeyWithValueNilReceiver states that a nil key refuses
+// the value rather than storing it where Get cannot find it.
+func TestContextKeyWithValueNilReceiver(t *testing.T) {
+	AssertPanic(t, func() {
+		(*ContextKey[int])(nil).WithValue(context.Background(), 1)
+	}, ErrNilReceiver, "nil key")
 }
 
 func TestNewContextKey(t *testing.T) {

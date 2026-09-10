@@ -17,7 +17,14 @@ type ContextKey[T any] struct {
 }
 
 // WithValue safely attaches a value to a context.Context under this key.
+// A nil receiver panics with [ErrNilReceiver]: a nil key cannot hold a
+// value, and [context.WithValue] would store it where [Get] cannot find
+// it.
 func (ck *ContextKey[T]) WithValue(ctx context.Context, v T) context.Context {
+	if ck == nil {
+		panic(NewPanicError(1, ErrNilReceiver))
+	}
+
 	switch ctx {
 	case nil, context.TODO():
 		ctx = context.Background()
@@ -39,13 +46,21 @@ func (ck *ContextKey[T]) Get(ctx context.Context) (T, bool) {
 	return v, ok
 }
 
-// String returns the name
+// String returns the name. A nil receiver has none and renders as
+// "<nil>", as fmt does for a nil pointer.
 func (ck *ContextKey[T]) String() string {
+	if ck == nil {
+		return "<nil>"
+	}
 	return ck.name
 }
 
-// GoString renders this key in Go syntax for %#v
+// GoString renders this key in Go syntax for %#v. A nil receiver
+// renders as the typed nil conversion, as fmt does for a nil pointer.
 func (ck *ContextKey[T]) GoString() string {
+	if ck == nil {
+		return fmt.Sprintf("(*core.ContextKey[%s])(nil)", TypeName[T]())
+	}
 	return fmt.Sprintf("core.NewContextKey[%s](%q)",
 		TypeName[T](), ck.name)
 }
