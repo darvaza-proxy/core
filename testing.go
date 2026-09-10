@@ -409,7 +409,7 @@ func AssertSliceEqual[U any](t T, expected, actual []U, name string, args ...any
 	switch is, known := AreEqual(expected, actual); {
 	case !known:
 		doError(t, name, args, "undecided for %s elements, needs a deep comparison",
-			reflect.TypeFor[U]())
+			TypeName[U]())
 		return false
 	case !is:
 		doSliceDiffError(t, expected, actual, name, args)

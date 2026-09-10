@@ -150,6 +150,9 @@ Key distinctions from `IsZero`:
 
 * `Coalesce[T](values...)` returns the first non-zero value.
 * `IIf[T](condition, ifTrue, ifFalse)` conditional expression.
+* `TypeName[T]()` names a type parameter itself, an interface type
+  included, where `%T` on a value can only name the dynamic type it
+  holds.
 
 ### Type Conversion
 

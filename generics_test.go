@@ -1,17 +1,61 @@
 package core
 
 import (
+	"fmt"
 	"math"
 	"testing"
 )
 
 // TestCase interface validations
+var _ TestCase = typeNameTestCase[int]{}
 var _ TestCase = coalesceTestCase[int]{}
 var _ TestCase = coalescePointerTestCase[int]{}
 var _ TestCase = iifTestCase{}
 var _ TestCase = iifStringTestCase{}
 var _ TestCase = iifPointerTestCase{}
 var _ TestCase = iifStructTestCase{}
+
+// typeNameTestCase states what TypeName renders for one type.
+type typeNameTestCase[T any] struct {
+	want string
+	name string
+}
+
+func newTypeNameTestCase[T any](name, want string) TestCase {
+	return typeNameTestCase[T]{
+		want: want,
+		name: name,
+	}
+}
+
+func (tc typeNameTestCase[T]) Name() string {
+	return tc.name
+}
+
+func (tc typeNameTestCase[T]) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.want, TypeName[T](), "name")
+}
+
+func typeNameTestCases() []TestCase {
+	return S(
+		newTypeNameTestCase[int]("builtin", "int"),
+		newTypeNameTestCase[PanicError]("struct", "core.PanicError"),
+		newTypeNameTestCase[*PanicError]("pointer", "*core.PanicError"),
+		newTypeNameTestCase[[]string]("slice", "[]string"),
+		newTypeNameTestCase[error]("builtin interface", "error"),
+		newTypeNameTestCase[fmt.Stringer]("interface", "fmt.Stringer"),
+		newTypeNameTestCase[Recovered]("package interface", "core.Recovered"),
+		newTypeNameTestCase[interface{ Len() int }]("anonymous interface",
+			"interface { Len() int }"),
+		newTypeNameTestCase[any]("any", "any"),
+		newTypeNameTestCase[[]any]("any slice", "[]any"),
+	)
+}
+
+func TestTypeName(t *testing.T) {
+	RunTestCases(t, typeNameTestCases())
+}
 
 // coalesceTestCase tests Coalesce function with generic type support
 type coalesceTestCase[T comparable] struct {
