@@ -214,7 +214,10 @@ func SliceCopy[T any](s []T) []T {
 }
 
 // SliceMap takes a []T1 and uses a function to produce a []T2
-// by processing each item on the source slice.
+// by processing each item on the source slice. The function receives
+// the result built so far and the item, and returns the entries to
+// append for it. The result is nil when there is nothing to map: an
+// empty or nil slice, or a nil function.
 func SliceMap[T1 any, T2 any](a []T1,
 	fn func(partial []T2, v T1) (newEntries []T2)) []T2 {
 	//
