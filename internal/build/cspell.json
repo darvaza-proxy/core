@@ -64,6 +64,7 @@
     "rhqv",
     "shellcheck",
     "skipcq",
+    "Skipf",
     "splithostport",
     "staticcheck",
     "strconv",

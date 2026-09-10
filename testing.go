@@ -9,7 +9,16 @@ import (
 	"testing"
 )
 
-var errMockTFailNow = errors.New("MockT.FailNow")
+var (
+	errMockTFailNow = errors.New("MockT.FailNow")
+	errMockTSkipNow = errors.New("MockT.SkipNow")
+)
+
+// isMockTAbort reports whether a recovered value is one of MockT's
+// sentinels, raised by FailNow or SkipNow to cut a test short.
+func isMockTAbort(recovered any) bool {
+	return recovered == errMockTFailNow || recovered == errMockTSkipNow
+}
 
 // Compile-time verification that our types implement the T interface
 var (
@@ -30,24 +39,31 @@ type T interface {
 	Fail()
 	FailNow()
 	Failed() bool
+	Skip(args ...any)
+	Skipf(format string, args ...any)
+	SkipNow()
+	Skipped() bool
 }
 
 // MockT is a mock implementation of the T interface for testing purposes.
 // It collects error and log messages instead of reporting them to the testing framework.
 //
-// MockT supports all standard testing methods including Fatal/Fatalf which panic
-// with a special error that can be caught by the Run method. This allows testing
-// of assertion functions and other utilities that may call Fatal methods.
+// MockT supports all standard testing methods including Fatal/Fatalf and
+// Skip/Skipf, which panic with a special error that can be caught by the
+// Run method. This allows testing of assertion functions and other
+// utilities that may call Fatal or Skip methods.
 //
-// The Run method executes test functions and recovers from FailNow/Fatal panics,
-// making it ideal for testing assertion functions where you need to verify both
-// success and failure scenarios without terminating the test runner.
+// The Run method executes test functions and recovers from FailNow/Fatal
+// and SkipNow/Skip panics, making it ideal for testing assertion functions
+// where you need to verify success, failure and skip scenarios without
+// terminating the test runner.
 type MockT struct {
 	Errors       []string
 	Logs         []string
 	HelperCalled int
 	mu           sync.RWMutex
 	failed       bool
+	skipped      bool
 }
 
 // Helper implements the T interface and tracks that it was called.
@@ -133,6 +149,35 @@ func (m *MockT) Failed() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.failed
+}
+
+// Skip implements the T interface and collects log messages, then panics.
+// It combines Log and SkipNow functionality.
+func (m *MockT) Skip(args ...any) {
+	m.Log(args...)
+	m.SkipNow()
+}
+
+// Skipf implements the T interface and collects formatted log messages, then panics.
+// It combines Logf and SkipNow functionality.
+func (m *MockT) Skipf(format string, args ...any) {
+	m.Logf(format, args...)
+	m.SkipNow()
+}
+
+// SkipNow implements the T interface and marks the test as skipped, then panics.
+func (m *MockT) SkipNow() {
+	m.mu.Lock()
+	m.skipped = true
+	m.mu.Unlock()
+	panic(errMockTSkipNow)
+}
+
+// Skipped implements the T interface and returns whether the test has been marked as skipped.
+func (m *MockT) Skipped() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.skipped
 }
 
 // HasErrors returns true if any errors were recorded.
@@ -230,7 +275,7 @@ func messageAt(msgs []string, i int) (string, bool) {
 	return msgs[i], true
 }
 
-// Reset clears all recorded errors, logs, failed state, and helper state.
+// Reset clears all recorded errors, logs, failed and skipped state, and helper state.
 func (m *MockT) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -238,11 +283,14 @@ func (m *MockT) Reset() {
 	m.Logs = nil
 	m.HelperCalled = 0
 	m.failed = false
+	m.skipped = false
 }
 
 // Run runs the test function f with the MockT instance and returns whether it passed.
-// It recovers from FailNow/Fatal panics and returns false if the test failed or panicked.
-// Non-FailNow panics are re-thrown. Returns false for nil MockT or nil function.
+// It recovers from FailNow/Fatal and SkipNow/Skip panics and returns false if the
+// test failed. A skipped test is not a failed one, so it returns true, and Skipped
+// says the test stopped early. Other panics are re-thrown. Returns false for nil
+// MockT or nil function.
 //
 // This method is ideal for testing assertion functions that may call Fatal/FailNow:
 //
@@ -275,15 +323,15 @@ func (m *MockT) Run(_ string, f func(T)) (ok bool) {
 	}
 
 	defer func() {
-		if r := recover(); r != nil && r != errMockTFailNow {
-			// Re-panic if it's not our FailNow error
+		if r := recover(); r != nil && !isMockTAbort(r) {
+			// Re-panic if it's not one of our sentinels
 			panic(r)
 		}
+		ok = !m.Failed()
 	}()
 
 	f(m)
-
-	return !m.Failed()
+	return ok
 }
 
 // S is a helper function for creating test slices in a more concise way.
@@ -617,9 +665,9 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 // whilst still validating that panics occur for the right reasons.
 // A nil fn and an empty substring are mistakes at the call site, and are
 // rejected before fn runs rather than reported as whatever fn did.
-// A fn that cuts the test short through FailNow on a [MockT] is not a
-// panic the assertion reports: the abort is intercepted and passed on to
-// [MockT.Run].
+// A fn that cuts the test short through FailNow or SkipNow on a [MockT]
+// is not a panic the assertion reports: the abort is intercepted and
+// passed on to [MockT.Run].
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -649,7 +697,7 @@ func AssertPanic(t T, fn func(), expectedPanic any, name string, args ...any) (o
 
 	defer func() {
 		recovered := recover()
-		if recovered == errMockTFailNow {
+		if isMockTAbort(recovered) {
 			// fn cut the test short through MockT; pass the
 			// abort on to MockT.Run rather than report it.
 			panic(recovered)
@@ -744,9 +792,9 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 // This is useful for testing that functions handle edge cases gracefully.
 // A nil fn is a mistake at the call site, and is rejected before it would
 // run rather than reported as a panic.
-// A fn that cuts the test short through FailNow on a [MockT] is not a
-// panic the assertion reports: the abort is intercepted and passed on to
-// [MockT.Run].
+// A fn that cuts the test short through FailNow or SkipNow on a [MockT]
+// is not a panic the assertion reports: the abort is intercepted and
+// passed on to [MockT.Run].
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -764,7 +812,7 @@ func AssertNoPanic(t T, fn func(), name string, args ...any) (ok bool) {
 	defer func() {
 		recovered := recover()
 		switch {
-		case recovered == errMockTFailNow:
+		case isMockTAbort(recovered):
 			// fn cut the test short through MockT; pass the
 			// abort on to MockT.Run rather than report it.
 			panic(recovered)

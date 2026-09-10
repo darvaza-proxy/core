@@ -539,8 +539,9 @@ library tests and external library users.
 * `MockT` - thread-safe mock testing.T implementation with error/log
   collection, helper tracking, state inspection (`HasErrors()`, `HasLogs()`,
   `LastError()`, `LastLog()`, `NumErrors()`, `NumLogs()`, `ErrorAt(i)`,
-  `LogAt(i)`, `NumHelperCalls()`), reset capabilities, and full
-  Fatal/FailNow support with panic recovery via the `Run()` method.
+  `LogAt(i)`, `NumHelperCalls()`, `Skipped()`), reset capabilities, and
+  full Fatal/FailNow and Skip/SkipNow support with panic recovery via the
+  `Run()` method.
 
 ### Cross-Compatible Test Functions
 
