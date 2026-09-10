@@ -920,7 +920,7 @@ func AssertNotNil(t T, value any, name string, args ...any) bool {
 	if !ok {
 		doError(t, name, args, "expected non-nil value, got nil")
 	} else {
-		doLog(t, name, args, "%v", value)
+		doLog(t, name, args, "%T", value)
 	}
 	return ok
 }

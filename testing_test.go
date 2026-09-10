@@ -366,6 +366,14 @@ func TestAssertNil(t *testing.T) {
 
 	mock.Reset()
 
+	// Test AssertNotNil with a pointer (success): the log names the
+	// type, not the address, so it reads the same on every run.
+	result = AssertNotNil(mock, new(int), "pointer test")
+	AssertTrue(t, result, "AssertNotNil result with pointer")
+	assertLastLog(t, mock, "pointer test: *int", "pointer")
+
+	mock.Reset()
+
 	// Test AssertNotNil with nil (failure)
 	result = AssertNotNil(mock, nil, "nil test")
 	AssertFalse(t, result, "AssertNotNil result with nil")
