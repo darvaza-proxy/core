@@ -248,7 +248,7 @@ func (m *MockT) Reset() {
 //
 //	mock := &MockT{}
 //	ok := mock.Run("test assertion", func(t T) {
-//		AssertEqual(t, 1, 2, "should fail") // This calls t.Fatal internally
+//		AssertEqual(t, 1, 2, "value") // This calls t.Fatal internally
 //	})
 //	// ok == false, mock.Failed() == true, mock.Errors contains failure message
 //
@@ -764,8 +764,8 @@ func AssertTrue(t T, value bool, name string, args ...any) bool {
 //
 // Example usage:
 //
-//	AssertFalse(t, hasError, "no errors expected")
-//	AssertFalse(t, isEmpty, "container %s should not be empty", name)
+//	AssertFalse(t, hasError, "has error")
+//	AssertFalse(t, isEmpty, "container %s empty", name)
 //
 // revive:disable-next-line:flag-parameter
 func AssertFalse(t T, value bool, name string, args ...any) bool {
@@ -893,8 +893,8 @@ func AssertTypeIs[U any](t T, value any, name string, args ...any) (U, bool) {
 //
 // Example usage:
 //
-//	AssertNil(t, err, "error should be nil")
-//	AssertNil(t, ptr, "pointer %s should be nil", ptrName)
+//	AssertNil(t, err, "error")
+//	AssertNil(t, ptr, "pointer %s", ptrName)
 func AssertNil(t T, value any, name string, args ...any) bool {
 	t.Helper()
 	ok := IsNil(value)
@@ -912,8 +912,8 @@ func AssertNil(t T, value any, name string, args ...any) bool {
 //
 // Example usage:
 //
-//	AssertNotNil(t, result, "result should not be nil")
-//	AssertNotNil(t, m, "map %s should not be nil", mapName)
+//	AssertNotNil(t, result, "result")
+//	AssertNotNil(t, m, "map %s", mapName)
 func AssertNotNil(t T, value any, name string, args ...any) bool {
 	t.Helper()
 	ok := !IsNil(value)
@@ -996,7 +996,7 @@ func AssertNotSame(t T, expected, actual any, name string, args ...any) bool {
 //		// worker logic here
 //		return nil
 //	})
-//	AssertNoError(t, err, "concurrent test should not fail")
+//	AssertNoError(t, err, "workers")
 func RunConcurrentTest(t T, numWorkers int, worker func(int) error) error {
 	t.Helper()
 	errCh := make(chan error, numWorkers)
@@ -1262,8 +1262,8 @@ func AssertMustTrue(t T, value bool, name string, args ...any) {
 //
 // Example usage:
 //
-//	AssertMustFalse(t, hasError, "no errors expected")
-//	AssertMustFalse(t, isEmpty, "container %s should not be empty", name)
+//	AssertMustFalse(t, hasError, "has error")
+//	AssertMustFalse(t, isEmpty, "container %s empty", name)
 //
 // revive:disable-next-line:flag-parameter
 func AssertMustFalse(t T, value bool, name string, args ...any) {
@@ -1355,8 +1355,8 @@ func AssertMustTypeIs[U any](t T, value any, name string, args ...any) U {
 //
 // Example usage:
 //
-//	AssertMustNil(t, err, "error should be nil")
-//	AssertMustNil(t, ptr, "pointer %s should be nil", ptrName)
+//	AssertMustNil(t, err, "error")
+//	AssertMustNil(t, ptr, "pointer %s", ptrName)
 func AssertMustNil(t T, value any, name string, args ...any) {
 	t.Helper()
 	if !AssertNil(t, value, name, args...) {
@@ -1369,8 +1369,8 @@ func AssertMustNil(t T, value any, name string, args ...any) {
 //
 // Example usage:
 //
-//	AssertMustNotNil(t, result, "result should not be nil")
-//	AssertMustNotNil(t, m, "map %s should not be nil", mapName)
+//	AssertMustNotNil(t, result, "result")
+//	AssertMustNotNil(t, m, "map %s", mapName)
 func AssertMustNotNil(t T, value any, name string, args ...any) {
 	t.Helper()
 	if !AssertNotNil(t, value, name, args...) {
