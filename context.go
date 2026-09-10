@@ -44,11 +44,10 @@ func (ck *ContextKey[T]) String() string {
 	return ck.name
 }
 
-// GoString renders this key in Go syntax for %v
+// GoString renders this key in Go syntax for %#v
 func (ck *ContextKey[T]) GoString() string {
-	var zero T
-	return fmt.Sprintf("core.NewContextKey[%T](%q)",
-		zero, ck.name)
+	return fmt.Sprintf("core.NewContextKey[%s](%q)",
+		TypeName[T](), ck.name)
 }
 
 // NewContextKey creates a new ContextKey bound to the

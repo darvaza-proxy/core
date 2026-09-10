@@ -13,15 +13,55 @@ var (
 	_ TestCase = withTimeoutTestCase{}
 	_ TestCase = withTimeoutCauseTestCase{}
 	_ TestCase = contextKeyGetTestCase{}
+	_ TestCase = contextKeyStringTestCase[int]{}
 )
+
+// contextKeyStringTestCase states how one key renders: String is the
+// name, and GoString names the value type as well, an interface
+// included when the zero value has no dynamic type to print.
+type contextKeyStringTestCase[T any] struct {
+	key    *ContextKey[T]
+	want   string
+	wantGo string
+	name   string
+}
+
+func newContextKeyStringTestCase[T any](name string, key *ContextKey[T],
+	want, wantGo string) TestCase {
+	return contextKeyStringTestCase[T]{
+		key:    key,
+		want:   want,
+		wantGo: wantGo,
+		name:   name,
+	}
+}
+
+func (tc contextKeyStringTestCase[T]) Name() string {
+	return tc.name
+}
+
+func (tc contextKeyStringTestCase[T]) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.want, tc.key.String(), "String")
+	AssertEqual(t, tc.wantGo, tc.key.GoString(), "GoString")
+}
+
+func contextKeyStringTestCases() []TestCase {
+	return S(
+		newContextKeyStringTestCase("concrete type", NewContextKey[int]("k0"),
+			"k0", `core.NewContextKey[int]("k0")`),
+		newContextKeyStringTestCase("interface type",
+			NewContextKey[fmt.Stringer]("k1"),
+			"k1", `core.NewContextKey[fmt.Stringer]("k1")`),
+	)
+}
+
+func TestContextKeyString(t *testing.T) {
+	RunTestCases(t, contextKeyStringTestCases())
+}
 
 func TestNewContextKey(t *testing.T) {
 	k0 := NewContextKey[int]("k0")
-	// name
-	AssertEqual(t, "k0", k0.String(), "key name")
-	// name and type
-	s := fmt.Sprintf("core.NewContextKey[%s](%q)", "int", "k0")
-	AssertEqual(t, s, k0.GoString(), "GoString")
 
 	// new context
 	ctx0 := k0.WithValue(context.TODO(), 123)
