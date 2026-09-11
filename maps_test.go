@@ -279,11 +279,15 @@ type mapContainsTestCase struct {
 	expected bool
 }
 
-var mapContainsTestCases = []mapContainsTestCase{
-	newMapContainsTestCase("existing key", map[string]any{"a": 1, "b": "two"}, "a", true),
-	newMapContainsTestCase("missing key", map[string]any{"a": 1, "b": "two"}, "c", false),
-	newMapContainsTestCase("nil map", nil, "a", false),
-	newMapContainsTestCase("nil value exists", map[string]any{"a": nil}, "a", true),
+func mapContainsTestCases() []mapContainsTestCase {
+	m := map[string]any{"a": 1, "b": 2}
+
+	return []mapContainsTestCase{
+		newMapContainsTestCase("existing key", m, "a", true),
+		newMapContainsTestCase("missing key", m, "c", false),
+		newMapContainsTestCase("nil map", nil, "a", false),
+		newMapContainsTestCase("nil value exists", map[string]any{"a": nil}, "a", true),
+	}
 }
 
 func newMapContainsTestCase(name string, m map[string]any, key string, expected bool) mapContainsTestCase {
@@ -307,7 +311,7 @@ func (tc mapContainsTestCase) Test(t *testing.T) {
 }
 
 func TestMapContains(t *testing.T) {
-	RunTestCases(t, mapContainsTestCases)
+	RunTestCases(t, mapContainsTestCases())
 }
 
 func TestMapListInsert(t *testing.T) {
@@ -398,7 +402,8 @@ func TestMapListContainsFn(t *testing.T) {
 	}
 
 	m := make(map[string]*list.List)
-	MapListAppend(m, "key1", customType{id: 1, name: "one"})
+	first := customType{id: 1, name: "one"}
+	MapListAppend(m, "key1", first)
 	MapListAppend(m, "key1", customType{id: 2, name: "two"})
 
 	eq := func(a, b customType) bool { return a.id == b.id }
@@ -410,7 +415,7 @@ func TestMapListContainsFn(t *testing.T) {
 	AssertFalse(t, MapListContainsFn(m, "key1", customType{id: 3, name: "three"}, eq), "MapListContainsFn missing")
 
 	// Test nil eq function
-	AssertFalse(t, MapListContainsFn(m, "key1", customType{id: 1, name: "one"}, nil), "MapListContainsFn nil eq")
+	AssertFalse(t, MapListContainsFn(m, "key1", first, nil), "MapListContainsFn nil eq")
 }
 
 func TestMapListInsertUnique(t *testing.T) {

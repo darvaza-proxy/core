@@ -78,7 +78,7 @@ var zeroIntTestCases = S(
 
 var zeroStringTestCases = S(
 	newZeroTestCase("nil pointer", "", func() *string { return nil }),
-	newZeroTestCase("non-nil pointer", "", func() *string { v := "hello"; return &v }),
+	newZeroTestCase("non-nil pointer", "", func() *string { v := testHello; return &v }),
 )
 
 var zeroBoolTestCases = S(
@@ -340,7 +340,7 @@ func TestIsZeroComplexStruct(t *testing.T) {
 			IntField: 42,
 		}, false),
 		newIsZeroTestCase("struct with string field", complexStruct{
-			StringField: "hello",
+			StringField: testHello,
 		}, false),
 		newIsZeroTestCase("struct with nil slice", complexStruct{
 			SliceField: nil,

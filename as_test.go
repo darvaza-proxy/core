@@ -13,7 +13,10 @@ var _ TestCase = sliceAsFnTestCase{}
 var _ TestCase = asErrorTestCase{}
 var _ TestCase = asErrorsTestCase{}
 
-const testHello = "hello"
+const (
+	testHello = "hello"
+	testWorld = "world"
+)
 
 // asTestCase tests As over one target type: a value of the type comes
 // back with true, anything else as the zero value with false.
@@ -150,9 +153,9 @@ func (tc sliceAsTestCase) Test(t *testing.T) {
 func TestSliceAs(t *testing.T) {
 	testCases := S(
 		newSliceAsTestCase("all strings", S[any]("a", "b", "c"), S("a", "b", "c")),
-		newSliceAsTestCase("mixed types", S[any](testHello, 42, "world", 3.14, "!"),
-			S(testHello, "world", "!")),
-		newSliceAsTestCase("with nil values", S[any](testHello, nil, "world"), S(testHello, "world")),
+		newSliceAsTestCase("mixed types", S[any](testHello, 42, testWorld, 3.14, "!"),
+			S(testHello, testWorld, "!")),
+		newSliceAsTestCase("with nil values", S[any](testHello, nil, testWorld), S(testHello, testWorld)),
 		newSliceAsTestCase("no strings", S[any](1, 2, 3, 4.5, true), nil),
 		newSliceAsTestCase("empty slice", S[any](), nil),
 		newSliceAsTestCase("nil slice", nil, nil),
