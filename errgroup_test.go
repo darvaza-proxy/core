@@ -65,13 +65,8 @@ func (tc errGroupSetDefaultsTestCase) Test(t *testing.T) {
 		t.Errorf("Expected Parent %v, got %v", expectedParent, eg.Parent)
 	}
 
-	if eg.ctx == nil {
-		t.Error("Expected ctx to be initialized")
-	}
-
-	if eg.cancel == nil {
-		t.Error("Expected cancel function to be initialized")
-	}
+	AssertNotNil(t, eg.ctx, "ctx")
+	AssertNotNil(t, eg.cancel, "cancel")
 }
 
 func TestErrGroupSetDefaults(t *testing.T) {
@@ -277,12 +272,10 @@ func (tc errGroupGoCatchTestCase) testNilFunction(t *testing.T, eg *ErrGroup) {
 func (tc errGroupGoCatchTestCase) checkTestResult(t *testing.T, err error) {
 	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Errorf("Test case '%s': Expected error but got nil", tc.name)
-		}
-	} else if err != nil {
-		t.Errorf("Expected no error but got: %v", err)
+		AssertError(t, err, "error")
+		return
 	}
+	AssertNoError(t, err, "error")
 }
 
 func TestErrGroupGoCatch(t *testing.T) {
@@ -312,10 +305,7 @@ func testErrGroupSubsequentCancellation(t *testing.T) {
 	// Second cancellation
 	cause2 := errors.New("second error")
 	isFirst := eg.Cancel(cause2)
-
-	if isFirst {
-		t.Error("Expected subsequent cancellation to return false")
-	}
+	AssertFalse(t, isFirst, "subsequent cancellation")
 
 	// Should keep the first error
 	AssertSame(t, cause1, eg.Err(), "error instance")
@@ -326,11 +316,7 @@ func testErrGroupNilCause(t *testing.T) {
 	var eg ErrGroup
 
 	isFirst := eg.Cancel(nil)
-
-	if !isFirst {
-		t.Error("Expected first cancellation to return true")
-	}
-
+	AssertTrue(t, isFirst, "first cancellation")
 	AssertSame(t, context.Canceled, eg.Err(), "error instance")
 }
 
@@ -361,56 +347,22 @@ func TestErrGroupContext(t *testing.T) {
 	var eg ErrGroup
 
 	ctx := eg.Context()
-	if ctx == nil {
-		t.Error("Expected non-nil context")
-	}
+	AssertMustNotNil(t, ctx, "context")
 
-	// Context should not be done initially
-	select {
-	case <-ctx.Done():
-		t.Error("Context should not be done initially")
-	default:
-		// Expected
-	}
-
-	// Cancel the group
+	AssertOpen(t, ctx.Done(), 0, "done before cancel")
 	eg.Cancel(errors.New("test"))
-
-	// Context should now be done
-	select {
-	case <-ctx.Done():
-		// Expected
-	case <-time.After(1 * time.Millisecond):
-		t.Error("Context should be done after cancellation")
-	}
+	AssertClosed(t, ctx.Done(), time.Millisecond, "done after cancel")
 }
 
 func TestErrGroupCancelled(t *testing.T) {
 	var eg ErrGroup
 
 	cancelled := eg.Cancelled()
-	if cancelled == nil {
-		t.Error("Expected non-nil cancelled channel")
-	}
+	AssertMustNotNil(t, cancelled, "cancelled channel")
 
-	// Should not be cancelled initially
-	select {
-	case <-cancelled:
-		t.Error("Should not be cancelled initially")
-	default:
-		// Expected
-	}
-
-	// Cancel the group
+	AssertOpen(t, cancelled, 0, "cancelled before Cancel")
 	eg.Cancel(errors.New("test"))
-
-	// Should now be cancelled
-	select {
-	case <-cancelled:
-		// Expected
-	case <-time.After(1 * time.Millisecond):
-		t.Error("Should be cancelled after Cancel()")
-	}
+	AssertClosed(t, cancelled, time.Millisecond, "cancelled after Cancel")
 }
 
 func TestErrGroupDone(t *testing.T) {
@@ -422,22 +374,8 @@ func TestErrGroupDone(t *testing.T) {
 	}, nil)
 
 	done := eg.Done()
-
-	// Should not be done yet
-	select {
-	case <-done:
-		t.Error("Done channel closed too early")
-	case <-time.After(5 * time.Millisecond):
-		// Expected
-	}
-
-	// Wait for completion
-	select {
-	case <-done:
-		// Expected
-	case <-time.After(50 * time.Millisecond):
-		t.Error("Done channel never closed")
-	}
+	AssertOpen(t, done, 5*time.Millisecond, "done while the worker runs")
+	AssertClosed(t, done, 50*time.Millisecond, "done")
 }
 
 func TestErrGroupConcurrency(t *testing.T) {
@@ -498,10 +436,7 @@ func testErrGroupCatcherErrorWhenCancelled(t *testing.T) {
 
 	testErr := errors.New("test error")
 	result := eg.defaultErrGroupCatcher(testErr)
-
-	if result != context.Canceled {
-		t.Errorf("Expected context.Canceled, got %v", result)
-	}
+	AssertSame(t, context.Canceled, result, "error instance")
 }
 
 func testErrGroupCatcherNilError(t *testing.T) {
@@ -509,10 +444,7 @@ func testErrGroupCatcherNilError(t *testing.T) {
 	var eg ErrGroup
 
 	result := eg.defaultErrGroupCatcher(nil)
-
-	if result != nil {
-		t.Errorf("Expected nil, got %v", result)
-	}
+	AssertNil(t, result, "result")
 }
 
 func TestErrGroupDefaultErrGroupCatcher(t *testing.T) {
@@ -538,9 +470,7 @@ func TestErrGroupWithCustomParent(t *testing.T) {
 	}, nil)
 
 	err := eg.Wait()
-	if err == nil {
-		t.Error("Expected timeout error from parent context")
-	}
+	AssertError(t, err, "parent timeout")
 }
 
 // errGroupErrTestCase covers ErrGroup.Err() across the pristine and
