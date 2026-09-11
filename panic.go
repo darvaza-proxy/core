@@ -86,7 +86,8 @@ func Catch(fn func() error) error {
 // This is useful for situations where errors should never occur, such as
 // test setup or configuration loading. It follows the common Go pattern
 // of Must* functions that panic on error. The panic includes proper stack
-// traces pointing to the caller.
+// traces pointing to the caller. Recovering code matches [ErrUnreachable],
+// and err through it.
 //
 // Example usage:
 //
@@ -123,7 +124,7 @@ func Maybe[V any](value V, _ error) V {
 // such as accessing map values that are known to exist or type assertions
 // that are guaranteed to be valid. It follows the common Go pattern
 // of Must* functions that panic on failure. The panic includes proper stack
-// traces pointing to the caller.
+// traces pointing to the caller. Recovering code matches [ErrUnreachable].
 //
 // Example usage:
 //
@@ -162,7 +163,7 @@ func MaybeOK[V any](value V, _ bool) V {
 // casting values to interfaces they are known to implement or converting
 // between compatible types. It follows the common Go pattern of Must* functions
 // that panic on failure. The panic includes proper stack traces pointing to
-// the caller.
+// the caller. Recovering code matches [ErrUnreachable].
 //
 // Example usage:
 //
@@ -172,7 +173,7 @@ func MaybeOK[V any](value V, _ bool) V {
 func MustT[T any](value any) T {
 	result, ok := value.(T)
 	if !ok {
-		err := fmt.Errorf("failed to convert %T to %T", value, result)
+		err := fmt.Errorf("failed to convert %T to %s", value, TypeName[T]())
 		panic(NewUnreachableError(1, err, ""))
 	}
 	return result

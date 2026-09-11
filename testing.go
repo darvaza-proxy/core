@@ -248,7 +248,7 @@ func (m *MockT) Reset() {
 //
 //	mock := &MockT{}
 //	ok := mock.Run("test assertion", func(t T) {
-//		AssertEqual(t, 1, 2, "should fail") // This calls t.Fatal internally
+//		AssertEqual(t, 1, 2, "value") // This calls t.Fatal internally
 //	})
 //	// ok == false, mock.Failed() == true, mock.Errors contains failure message
 //
@@ -409,7 +409,7 @@ func AssertSliceEqual[U any](t T, expected, actual []U, name string, args ...any
 	switch is, known := AreEqual(expected, actual); {
 	case !known:
 		doError(t, name, args, "undecided for %s elements, needs a deep comparison",
-			reflect.TypeFor[U]())
+			TypeName[U]())
 		return false
 	case !is:
 		doSliceDiffError(t, expected, actual, name, args)
@@ -615,6 +615,11 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 //
 // This type-specific matching makes tests more resilient to implementation changes
 // whilst still validating that panics occur for the right reasons.
+// A nil fn and an empty substring are mistakes at the call site, and are
+// rejected before fn runs rather than reported as whatever fn did.
+// A fn that cuts the test short through FailNow on a [MockT] is not a
+// panic the assertion reports: the abort is intercepted and passed on to
+// [MockT.Run].
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -630,8 +635,26 @@ func AssertNoError(t T, err error, name string, args ...any) bool {
 //	AssertPanic(t, func() { mustValidate(nil) }, ErrValidation, "validation")
 func AssertPanic(t T, fn func(), expectedPanic any, name string, args ...any) (ok bool) {
 	t.Helper()
+
+	// A mistake at the call site is reported before fn runs, so it
+	// is not hidden behind whatever fn does.
+	if fn == nil {
+		doError(t, name, args, "expected a function, got nil")
+		return false
+	}
+	if s, isString := expectedPanic.(string); isString && s == "" {
+		doError(t, name, args, "expected a non-empty substring")
+		return false
+	}
+
 	defer func() {
-		ok = doAssertPanic(t, recover(), expectedPanic, name, args...)
+		recovered := recover()
+		if recovered == errMockTFailNow {
+			// fn cut the test short through MockT; pass the
+			// abort on to MockT.Run rather than report it.
+			panic(recovered)
+		}
+		ok = doAssertPanic(t, recovered, expectedPanic, name, args...)
 	}()
 	fn()
 	return ok
@@ -706,13 +729,11 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 		msg = AsRecovered(recovered).Error()
 	}
 
-	found, ok := stringContains(msg, substr)
-	switch {
-	case !ok:
-		doError(t, name, args, "expected a non-empty substring")
-	case found:
+	// AssertPanic rejected an empty substr before fn ran.
+	found := strings.Contains(msg, substr)
+	if found {
 		doLog(t, name, args, "panic contains %q: %q", substr, msg)
-	default:
+	} else {
 		doError(t, name, args, "expected panic to contain %q, got %q", substr, msg)
 	}
 
@@ -721,6 +742,11 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 
 // AssertNoPanic runs a function expecting it not to panic.
 // This is useful for testing that functions handle edge cases gracefully.
+// A nil fn is a mistake at the call site, and is rejected before it would
+// run rather than reported as a panic.
+// A fn that cuts the test short through FailNow on a [MockT] is not a
+// panic the assertion reports: the abort is intercepted and passed on to
+// [MockT.Run].
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -730,14 +756,24 @@ func doAssertPanicContains(t T, recovered any, substr, name string, args ...any)
 //	AssertNoPanic(t, func() { handleNilInput(nil) }, "nil input %s", "handling")
 func AssertNoPanic(t T, fn func(), name string, args ...any) (ok bool) {
 	t.Helper()
-	ok = true
+	if fn == nil {
+		doError(t, name, args, "expected a function, got nil")
+		return false
+	}
+
 	defer func() {
-		if r := recover(); r != nil {
-			doError(t, name, args, "expected no panic but got: %v", r)
-			ok = false
-			return
+		recovered := recover()
+		switch {
+		case recovered == errMockTFailNow:
+			// fn cut the test short through MockT; pass the
+			// abort on to MockT.Run rather than report it.
+			panic(recovered)
+		case recovered != nil:
+			doError(t, name, args, "expected no panic but got: %v", recovered)
+		default:
+			doLog(t, name, args, "%v", "no panic")
+			ok = true
 		}
-		doLog(t, name, args, "%v", "no panic")
 	}()
 	fn()
 	return ok
@@ -764,8 +800,8 @@ func AssertTrue(t T, value bool, name string, args ...any) bool {
 //
 // Example usage:
 //
-//	AssertFalse(t, hasError, "no errors expected")
-//	AssertFalse(t, isEmpty, "container %s should not be empty", name)
+//	AssertFalse(t, hasError, "has error")
+//	AssertFalse(t, isEmpty, "container %s empty", name)
 //
 // revive:disable-next-line:flag-parameter
 func AssertFalse(t T, value bool, name string, args ...any) bool {
@@ -855,7 +891,8 @@ func AssertErrorAs[U error](t T, err error, name string, args ...any) (*U, bool)
 
 	ok := errors.As(err, &result)
 	if !ok {
-		doError(t, name, args, "expected error of type %T, got %T", result, err)
+		doError(t, name, args, "expected error of type %s, got %T",
+			TypeName[U](), err)
 		out = nil
 	} else if reflect.DeepEqual(err, result) {
 		doLog(t, name, args, "%v is %T", err, result)
@@ -878,7 +915,8 @@ func AssertTypeIs[U any](t T, value any, name string, args ...any) (U, bool) {
 	t.Helper()
 	result, ok := value.(U)
 	if !ok {
-		doError(t, name, args, "expected type %T, got %T", result, value)
+		doError(t, name, args, "expected type %s, got %T",
+			TypeName[U](), value)
 	} else {
 		doLog(t, name, args, "%T", value)
 	}
@@ -891,8 +929,8 @@ func AssertTypeIs[U any](t T, value any, name string, args ...any) (U, bool) {
 //
 // Example usage:
 //
-//	AssertNil(t, err, "error should be nil")
-//	AssertNil(t, ptr, "pointer %s should be nil", ptrName)
+//	AssertNil(t, err, "error")
+//	AssertNil(t, ptr, "pointer %s", ptrName)
 func AssertNil(t T, value any, name string, args ...any) bool {
 	t.Helper()
 	ok := IsNil(value)
@@ -910,15 +948,15 @@ func AssertNil(t T, value any, name string, args ...any) bool {
 //
 // Example usage:
 //
-//	AssertNotNil(t, result, "result should not be nil")
-//	AssertNotNil(t, m, "map %s should not be nil", mapName)
+//	AssertNotNil(t, result, "result")
+//	AssertNotNil(t, m, "map %s", mapName)
 func AssertNotNil(t T, value any, name string, args ...any) bool {
 	t.Helper()
 	ok := !IsNil(value)
 	if !ok {
 		doError(t, name, args, "expected non-nil value, got nil")
 	} else {
-		doLog(t, name, args, "%v", value)
+		doLog(t, name, args, "%T", value)
 	}
 	return ok
 }
@@ -994,7 +1032,7 @@ func AssertNotSame(t T, expected, actual any, name string, args ...any) bool {
 //		// worker logic here
 //		return nil
 //	})
-//	AssertNoError(t, err, "concurrent test should not fail")
+//	AssertNoError(t, err, "workers")
 func RunConcurrentTest(t T, numWorkers int, worker func(int) error) error {
 	t.Helper()
 	errCh := make(chan error, numWorkers)
@@ -1260,8 +1298,8 @@ func AssertMustTrue(t T, value bool, name string, args ...any) {
 //
 // Example usage:
 //
-//	AssertMustFalse(t, hasError, "no errors expected")
-//	AssertMustFalse(t, isEmpty, "container %s should not be empty", name)
+//	AssertMustFalse(t, hasError, "has error")
+//	AssertMustFalse(t, isEmpty, "container %s empty", name)
 //
 // revive:disable-next-line:flag-parameter
 func AssertMustFalse(t T, value bool, name string, args ...any) {
@@ -1353,8 +1391,8 @@ func AssertMustTypeIs[U any](t T, value any, name string, args ...any) U {
 //
 // Example usage:
 //
-//	AssertMustNil(t, err, "error should be nil")
-//	AssertMustNil(t, ptr, "pointer %s should be nil", ptrName)
+//	AssertMustNil(t, err, "error")
+//	AssertMustNil(t, ptr, "pointer %s", ptrName)
 func AssertMustNil(t T, value any, name string, args ...any) {
 	t.Helper()
 	if !AssertNil(t, value, name, args...) {
@@ -1367,8 +1405,8 @@ func AssertMustNil(t T, value any, name string, args ...any) {
 //
 // Example usage:
 //
-//	AssertMustNotNil(t, result, "result should not be nil")
-//	AssertMustNotNil(t, m, "map %s should not be nil", mapName)
+//	AssertMustNotNil(t, result, "result")
+//	AssertMustNotNil(t, m, "map %s", mapName)
 func AssertMustNotNil(t T, value any, name string, args ...any) {
 	t.Helper()
 	if !AssertNotNil(t, value, name, args...) {

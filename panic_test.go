@@ -20,6 +20,7 @@ var _ TestCase = mustOKPanicTestCase{}
 var _ TestCase = maybeOKTestCase{}
 var _ TestCase = mustTSuccessTestCase{}
 var _ TestCase = mustTPanicTestCase{}
+var _ TestCase = mustTReasonTestCase[int]{}
 var _ TestCase = maybeTTestCase{}
 
 type asRecoveredTestCase struct {
@@ -918,6 +919,46 @@ func TestMustTPanic(t *testing.T) {
 		newMustTPanicTestCase("int to fmt.Stringer", "fmt.Stringer", 42),
 		newMustTPanicTestCase("nil to string", "string", nil),
 	}
+
+	RunTestCases(t, testCases)
+}
+
+// mustTReasonTestCase states the reason MustT panics with for one
+// target type: it names the value's type and the target's, the target
+// included when it is an interface and the zero result has no dynamic
+// type to print.
+type mustTReasonTestCase[T any] struct {
+	input any
+	want  string
+	name  string
+}
+
+func newMustTReasonTestCase[T any](name string, input any, want string) TestCase {
+	return mustTReasonTestCase[T]{
+		input: input,
+		want:  want,
+		name:  name,
+	}
+}
+
+func (tc mustTReasonTestCase[T]) Name() string {
+	return tc.name
+}
+
+func (tc mustTReasonTestCase[T]) Test(t *testing.T) {
+	t.Helper()
+	AssertPanic(t, func() {
+		_ = MustT[T](tc.input)
+	}, tc.want, "reason")
+}
+
+func TestMustTReason(t *testing.T) {
+	testCases := S(
+		newMustTReasonTestCase[int]("concrete target", testHello,
+			"failed to convert string to int"),
+		newMustTReasonTestCase[fmt.Stringer]("interface target", 42,
+			"failed to convert int to fmt.Stringer"),
+	)
 
 	RunTestCases(t, testCases)
 }

@@ -11,6 +11,8 @@ import (
 var (
 	_ TestCase = (*mockTestCase)(nil)
 	_ TestCase = mockTMessageAtTestCase{}
+	_ TestCase = assertErrorAsTestCase[*WrappedError]{}
+	_ TestCase = assertTypeIsTestCase[string]{}
 )
 
 // Test MockT implementation
@@ -364,6 +366,14 @@ func TestAssertNil(t *testing.T) {
 
 	mock.Reset()
 
+	// Test AssertNotNil with a pointer (success): the log names the
+	// type, not the address, so it reads the same on every run.
+	result = AssertNotNil(mock, new(int), "pointer test")
+	AssertTrue(t, result, "AssertNotNil result with pointer")
+	assertLastLog(t, mock, "pointer test: *int", "pointer")
+
+	mock.Reset()
+
 	// Test AssertNotNil with nil (failure)
 	result = AssertNotNil(mock, nil, "nil test")
 	AssertFalse(t, result, "AssertNotNil result with nil")
@@ -463,59 +473,138 @@ func TestAssertErrorIsFn(t *testing.T) {
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
-// Test AssertErrorAs
-func TestAssertErrorAs(t *testing.T) {
-	mock := &MockT{}
-	baseErr := errors.New("base error")
-	wrapped := Wrap(baseErr, "note")
-
-	// Test AssertErrorAs with direct match (success, err is the match)
-	out, ok := AssertErrorAs[*WrappedError](mock, wrapped, "direct match")
-	AssertTrue(t, ok, "AssertErrorAs result with direct match")
-	AssertMustNotNil(t, out, "matched pointer")
-	AssertSame(t, wrapped, *out, "matched value")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
-
-	mock.Reset()
-
-	// Test AssertErrorAs with nested match (success, err contains the match)
-	joined := errors.Join(errors.New("other error"), wrapped)
-	out, ok = AssertErrorAs[*WrappedError](mock, joined, "nested match")
-	AssertTrue(t, ok, "AssertErrorAs result with nested match")
-	AssertMustNotNil(t, out, "matched pointer")
-	AssertSame(t, wrapped, *out, "matched value")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-
-	mock.Reset()
-
-	// Test AssertErrorAs without match (failure)
-	out, ok = AssertErrorAs[*WrappedError](mock, baseErr, "no match")
-	AssertFalse(t, ok, "AssertErrorAs result without match")
-	AssertNil(t, out, "nil pointer on failure")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+// assertErrorAsTestCase states what AssertErrorAs answers for one
+// target type: a pointer to the match and true when the chain holds
+// one, nil and a report naming the target when it does not, the
+// target included when it is an interface and the zero value has no
+// dynamic type to print.
+type assertErrorAsTestCase[V error] struct {
+	err       error
+	want      V
+	wantError string
+	name      string
+	wantOK    bool
 }
 
-// Test AssertTypeIs
-func TestAssertTypeIs(t *testing.T) {
+func newAssertErrorAsTestCase[V error](name string, err error, want V) TestCase {
+	return assertErrorAsTestCase[V]{
+		err:    err,
+		want:   want,
+		name:   name,
+		wantOK: true,
+	}
+}
+
+func newAssertErrorAsTestCaseFail[V error](name string, err error,
+	wantError string) TestCase {
+	return assertErrorAsTestCase[V]{
+		err:       err,
+		wantError: wantError,
+		name:      name,
+	}
+}
+
+func (tc assertErrorAsTestCase[V]) Name() string {
+	return tc.name
+}
+
+func (tc assertErrorAsTestCase[V]) Test(t *testing.T) {
+	t.Helper()
 	mock := &MockT{}
 
-	// Test AssertTypeIs with correct type (success)
-	var val any = "hello"
-	result, ok := AssertTypeIs[string](mock, val, "type is test")
-	AssertTrue(t, ok, "AssertTypeIs ok with correct type")
-	AssertEqual(t, "hello", result, "AssertTypeIs result with correct type")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	out, ok := AssertErrorAs[V](mock, tc.err, "type")
+	if !tc.wantOK {
+		AssertNil(t, out, "value")
+		assertFailed(t, mock, ok, tc.wantError, "type")
+		return
+	}
 
-	mock.Reset()
+	AssertMustNotNil(t, out, "value")
+	AssertSame(t, tc.want, *out, "value")
+	assertPassed(t, mock, ok, "type")
+}
 
-	// Test AssertTypeIs with incorrect type (failure)
-	val = 42
-	result, ok = AssertTypeIs[string](mock, val, "type is not test")
-	AssertFalse(t, ok, "AssertTypeIs ok with incorrect type")
-	AssertEqual(t, "", result, "AssertTypeIs result with incorrect type")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+func assertErrorAsTestCases() []TestCase {
+	baseErr := errors.New("base error")
+	wrapped := &WrappedError{cause: baseErr, note: "note"}
+	joined := errors.Join(errors.New("other error"), wrapped)
+
+	return S(
+		newAssertErrorAsTestCase("direct match", wrapped, wrapped),
+		newAssertErrorAsTestCase("nested match", joined, wrapped),
+		newAssertErrorAsTestCaseFail[*WrappedError]("no match", baseErr,
+			"expected error of type *core.WrappedError"),
+		newAssertErrorAsTestCaseFail[Recovered]("interface target", baseErr,
+			"expected error of type core.Recovered"),
+	)
+}
+
+func TestAssertErrorAs(t *testing.T) {
+	RunTestCases(t, assertErrorAsTestCases())
+}
+
+// assertTypeIsTestCase states what AssertTypeIs answers for one target
+// type: the value and true when it is one, the zero value and a report
+// naming both types when it is not, the target included when it is an
+// interface and the zero value has no dynamic type to print.
+type assertTypeIsTestCase[V any] struct {
+	input     any
+	want      V
+	wantError string
+	name      string
+	wantOK    bool
+}
+
+func newAssertTypeIsTestCase[V any](name string, input any, want V) TestCase {
+	return assertTypeIsTestCase[V]{
+		input:  input,
+		want:   want,
+		name:   name,
+		wantOK: true,
+	}
+}
+
+func newAssertTypeIsTestCaseFail[V any](name string, input any,
+	wantError string) TestCase {
+	return assertTypeIsTestCase[V]{
+		input:     input,
+		wantError: wantError,
+		name:      name,
+	}
+}
+
+func (tc assertTypeIsTestCase[V]) Name() string {
+	return tc.name
+}
+
+func (tc assertTypeIsTestCase[V]) Test(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+
+	got, ok := AssertTypeIs[V](mock, tc.input, "type")
+	AssertEqual(t, tc.want, got, "value")
+	if tc.wantOK {
+		assertPassed(t, mock, ok, "type")
+	} else {
+		assertFailed(t, mock, ok, tc.wantError, "type")
+	}
+}
+
+func assertTypeIsTestCases() []TestCase {
+	err := errors.New("test error")
+
+	return S(
+		newAssertTypeIsTestCase("string", testHello, testHello),
+		newAssertTypeIsTestCase("error", err, err),
+		newAssertTypeIsTestCaseFail[string]("int to string", 42,
+			"expected type string, got int"),
+		newAssertTypeIsTestCaseFail[error]("int to error", 42,
+			"expected type error, got int"),
+	)
+}
+
+func TestAssertTypeIs(t *testing.T) {
+	RunTestCases(t, assertTypeIsTestCases())
 }
 
 // assertPanicTestCase for table-driven tests
@@ -609,6 +698,8 @@ func assertPanicTestCases() []assertPanicTestCase {
 			func() { panic("test panic") }, nil, "panic test", "test panic"),
 		newAssertPanicTestCaseReject("no panic fails",
 			func() {}, nil, "no panic test", "expected panic but got nil"),
+		newAssertPanicTestCaseReject("nil function",
+			nil, nil, "nil function test", "expected a function"),
 
 		// String matching tests
 		newAssertPanicTestCaseAccept("string substring match",
@@ -618,6 +709,11 @@ func assertPanicTestCases() []assertPanicTestCase {
 			`expected panic to contain "expected"`),
 		newAssertPanicTestCaseReject("empty substring",
 			func() { panic("any message") }, "", "empty substring test",
+			"expected a non-empty substring"),
+		// The call-site mistake is reported whatever fn does, not
+		// as "expected panic but got nil".
+		newAssertPanicTestCaseReject("empty substring without panic",
+			func() {}, "", "empty substring no panic test",
 			"expected a non-empty substring"),
 		newAssertPanicTestCaseAccept("non-string panic with string expected",
 			func() { panic(123) }, "123", "non-string test", "contains"),
@@ -660,6 +756,67 @@ func TestAssertPanic(t *testing.T) {
 	RunTestCases(t, assertPanicTestCases())
 }
 
+// assertAbortTestCase states what AssertPanic and AssertNoPanic do when
+// fn cuts the test short on the T they report to: the abort passes
+// through, the test is failed by fn alone, and the assertion neither
+// logs nor adds an error of its own.
+type assertAbortTestCase struct {
+	abort      func(T)
+	name       string
+	wantErrors int
+}
+
+var _ TestCase = assertAbortTestCase{}
+
+func (tc assertAbortTestCase) Name() string {
+	return tc.name
+}
+
+func (tc assertAbortTestCase) Test(t *testing.T) {
+	t.Helper()
+	tc.testThrough(t, "AssertPanic", func(mt T, fn func()) {
+		AssertPanic(mt, fn, nil, "aborted")
+	})
+	tc.testThrough(t, "AssertNoPanic", func(mt T, fn func()) {
+		AssertNoPanic(mt, fn, "aborted")
+	})
+}
+
+func (tc assertAbortTestCase) testThrough(t *testing.T, name string,
+	assert func(T, func())) {
+	t.Helper()
+	mock := &MockT{}
+	ok := mock.Run(name, func(mt T) {
+		assert(mt, func() { tc.abort(mt) })
+	})
+	AssertFalse(t, ok, "%s continued", name)
+	AssertTrue(t, mock.Failed(), "%s failed", name)
+	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "%s errors", name)
+	AssertEqual(t, 0, mock.NumLogs(), "%s logs", name)
+}
+
+func newAssertAbortTestCase(name string, abort func(T), wantErrors int) assertAbortTestCase {
+	return assertAbortTestCase{
+		abort:      abort,
+		name:       name,
+		wantErrors: wantErrors,
+	}
+}
+
+func assertAbortTestCases() []assertAbortTestCase {
+	return []assertAbortTestCase{
+		newAssertAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
+		newAssertAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
+		newAssertAbortTestCase("AssertMust", func(mt T) {
+			AssertMustTrue(mt, false, "must")
+		}, 1),
+	}
+}
+
+func TestAssertPanicAbort(t *testing.T) {
+	RunTestCases(t, assertAbortTestCases())
+}
+
 // Test AssertNoPanic
 func TestAssertNoPanic(t *testing.T) {
 	mock := &MockT{}
@@ -680,6 +837,13 @@ func TestAssertNoPanic(t *testing.T) {
 	result = AssertNoPanic(mock, func() { panic("unexpected") }, "panic test")
 	AssertFalse(t, result, "AssertNoPanic result with panic")
 	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+
+	mock.Reset()
+
+	// Test AssertNoPanic with a nil function (failure): the call-site
+	// mistake is reported as such, not as a panic.
+	result = AssertNoPanic(mock, nil, "nil function test")
+	assertFailed(t, mock, result, "expected a function", "nil function")
 }
 
 // Test RunConcurrentTest
@@ -1827,8 +1991,9 @@ func assertErrorContains(t *testing.T, mock *MockT, expected, desc string) {
 	}
 
 	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok for "+desc)
-	AssertTrue(t, strings.Contains(lastErr, expected), desc)
+	AssertMustTrue(t, ok, "%s recorded", desc)
+	AssertTrue(t, strings.Contains(lastErr, expected),
+		"%s: %q contains %q", desc, lastErr, expected)
 }
 
 // mustMessageAt returns the message at position i from one of MockT's At

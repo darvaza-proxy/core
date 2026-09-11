@@ -78,14 +78,14 @@ func TestAssertTrue(t *testing.T) {
 func TestAssertEqual(t *testing.T) {
     mock := &MockT{}
     result := AssertEqual(mock, 42, 42, "test")
-    AssertTrue(t, result, "should be true") // CIRCULAR!
+    AssertTrue(t, result, "result") // CIRCULAR!
 }
 
 // DON'T: Test AssertTrue using AssertTrue
 func TestAssertTrue(t *testing.T) {
     mock := &MockT{}
     result := AssertTrue(mock, true, "test")
-    AssertTrue(t, result, "should be true") // CIRCULAR!
+    AssertTrue(t, result, "result") // CIRCULAR!
 }
 ```
 
@@ -220,19 +220,19 @@ func TestMyAssertion(t *testing.T) {
     mock := &MockT{}
 
     // Test successful assertion
-    MyAssert(mock, true, "should pass")
-    AssertFalse(t, mock.HasErrors(), "no errors expected")
-    AssertTrue(t, mock.HasLogs(), "success should be logged")
+    MyAssert(mock, true, "pass")
+    AssertFalse(t, mock.HasErrors(), "errors")
+    AssertTrue(t, mock.HasLogs(), "logs")
 
     // Test failed assertion
     mock.Reset()
-    MyAssert(mock, false, "should fail")
-    AssertTrue(t, mock.HasErrors(), "error expected")
-    AssertTrue(t, mock.Failed(), "test should be marked as failed")
+    MyAssert(mock, false, "fail")
+    AssertTrue(t, mock.HasErrors(), "errors")
+    AssertTrue(t, mock.Failed(), "failed")
 
     lastErr, ok := mock.LastError()
-    AssertTrue(t, ok, "should have error message")
-    AssertContains(t, lastErr, "should fail", "error message content")
+    AssertTrue(t, ok, "error recorded")
+    AssertContains(t, lastErr, "fail", "error message content")
 }
 ```
 
@@ -281,12 +281,12 @@ func TestContextKey(t *testing.T) {
  // Test context operations
  ctx := key.WithValue(context.Background(), "test-value")
  value, ok := key.Get(ctx)
- AssertTrue(t, ok, "should retrieve value")
+ AssertTrue(t, ok, "found")
  AssertEqual(t, "test-value", value, "retrieved value")
 
  // Test wrong context
  _, ok = key.Get(context.Background())
- AssertFalse(t, ok, "should not find in empty context")
+ AssertFalse(t, ok, "found in empty context")
 }
 ```
 
@@ -305,12 +305,12 @@ func TestPanicError(t *testing.T) {
 
  // Test stack trace
  frames := panicErr.Frames()
- AssertTrue(t, len(frames) > 0, "should have stack frames")
+ AssertTrue(t, len(frames) > 0, "frames")
 
  // Test unwrapping
  cause := errors.New("root cause")
  wrappedErr := NewPanicError(cause, "wrapped panic")
- AssertErrorIs(t, wrappedErr, cause, "should unwrap to cause")
+ AssertErrorIs(t, wrappedErr, cause, "cause")
 }
 ```
 
@@ -333,7 +333,7 @@ func TestSpinLock(t *testing.T) {
  })
 
  AssertNoError(t, err, "concurrent test")
- AssertEqual(t, 1000, counter, "counter should be exactly 1000")
+ AssertEqual(t, 1000, counter, "counter")
 }
 ```
 
@@ -351,11 +351,9 @@ func TestGetIPAddresses(t *testing.T) {
   return
  }
 
- AssertTrue(t, len(addrs) >= 0, "should return slice")
-
  // Validate all addresses
  for i, addr := range addrs {
-  AssertTrue(t, addr.IsValid(), "address[%d] should be valid", i)
+  AssertTrue(t, addr.IsValid(), "address[%d] valid", i)
  }
 }
 ```
@@ -374,15 +372,15 @@ func TestAssertSliceEqual(t *testing.T) {
  a := S(1, 2, 3)
  b := S(1, 2, 3)
  result := AssertSliceEqual(mock, a, b, "equal slices")
- AssertTrue(t, result, "should return true")
- AssertTrue(t, mock.HasLogs(), "should log success")
+ AssertTrue(t, result, "result")
+ AssertTrue(t, mock.HasLogs(), "logs")
 
  // Test different slices
  mock.Reset()
  c := S(1, 2, 4)
  result = AssertSliceEqual(mock, a, c, "different slices")
- AssertFalse(t, result, "should return false")
- AssertTrue(t, mock.HasErrors(), "should log error")
+ AssertFalse(t, result, "result")
+ AssertTrue(t, mock.HasErrors(), "errors")
 }
 ```
 
@@ -401,8 +399,8 @@ func TestRunBenchmark(t *testing.T) {
   },
  )
 
- AssertNoError(t, err, "benchmark should run")
- AssertTrue(t, called, "benchmark function should be called")
+ AssertNoError(t, err, "benchmark")
+ AssertTrue(t, called, "called")
 }
 ```
 
@@ -541,7 +539,7 @@ func TestTestCaseCompliance(t *testing.T) {
  }
 
  // Test case should have test method
- AssertTrue(t, hasTestMethod(tc), "test case should have test method")
+ AssertTrue(t, hasTestMethod(tc), "test method")
 }
 
 func hasTestMethod(tc interface{}) bool {
@@ -596,19 +594,19 @@ func TestAssertEqualNilHandling(t *testing.T) {
 
  // Test nil vs nil
  result := AssertEqual(mock, nil, nil, "both nil")
- AssertTrue(t, result, "nil should equal nil")
+ AssertTrue(t, result, "result")
 
  // Test nil vs non-nil
  mock.Reset()
  result = AssertEqual(mock, nil, 42, "nil vs non-nil")
- AssertFalse(t, result, "nil should not equal non-nil")
+ AssertFalse(t, result, "result")
 
  // Test different nil types
  mock.Reset()
  var nilSlice []int
  var nilMap map[string]int
  result = AssertEqual(mock, nilSlice, nilMap, "different nil types")
- AssertFalse(t, result, "different nil types should not be equal")
+ AssertFalse(t, result, "result")
 }
 ```
 
