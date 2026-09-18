@@ -474,8 +474,8 @@ func TestAssertErrorIsFn(t *testing.T) {
 }
 
 // assertErrorAsTestCase states what AssertErrorAs answers for one
-// target type: a pointer to the match and true when the chain holds
-// one, nil and a report naming the target when it does not, the
+// target type: the match itself and true when the chain holds one,
+// the zero value and a report naming the target when it does not, the
 // target included when it is an interface and the zero value has no
 // dynamic type to print.
 type assertErrorAsTestCase[V error] struct {
@@ -519,8 +519,7 @@ func (tc assertErrorAsTestCase[V]) Test(t *testing.T) {
 		return
 	}
 
-	AssertMustNotNil(t, out, "value")
-	AssertSame(t, tc.want, *out, "value")
+	AssertSame(t, tc.want, out, "value")
 	assertPassed(t, mock, ok, "type")
 }
 
@@ -1860,7 +1859,7 @@ func testAssertMustErrorAs(t *testing.T) {
 
 	ok := mock.Run("success", func(mt T) {
 		out := AssertMustErrorAs[*WrappedError](mt, wrapped, "type should match")
-		AssertSame(mt, wrapped, *out, "matched value")
+		AssertSame(mt, wrapped, out, "matched value")
 		mt.Log(mustContinuationLog)
 	})
 	assertMustContinued(t, mock, ok)
@@ -1868,8 +1867,8 @@ func testAssertMustErrorAs(t *testing.T) {
 	mock.Reset()
 
 	ok = mock.Run("failure", func(mt T) {
-		AssertMustErrorAs[*WrappedError](mt, errors.New("plain"), "type should not match")
-		mt.Log("should not reach here")
+		out := AssertMustErrorAs[*WrappedError](mt, errors.New("plain"), "type should not match")
+		mt.Log("should not reach here", out)
 	})
 	assertMustAborted(t, mock, ok)
 }
