@@ -877,30 +877,28 @@ func AssertErrorIsFn(t T, err error, targetFn func(error) bool, name string, arg
 // the error interface — typically a pointer type; an interface type
 // needs to embed error, as net.Error does.
 // The name parameter can include printf-style formatting.
-// Returns a pointer to the matched value and a boolean indicating
-// success; the pointer is nil when the assertion failed.
+// Returns the matched value and a boolean indicating success; the
+// value is the zero value of U when the assertion failed.
 //
 // Example usage:
 //
 //	pathErr, ok := AssertErrorAs[*fs.PathError](t, err, "path error")
 //	valErr, ok := AssertErrorAs[*ValidationError](t, err, "validation for %s", field)
-func AssertErrorAs[U error](t T, err error, name string, args ...any) (*U, bool) {
+func AssertErrorAs[U error](t T, err error, name string, args ...any) (U, bool) {
 	t.Helper()
 	var result U
-	out := &result
 
 	ok := errors.As(err, &result)
 	if !ok {
 		doError(t, name, args, "expected error of type %s, got %T",
 			TypeName[U](), err)
-		out = nil
 	} else if reflect.DeepEqual(err, result) {
 		doLog(t, name, args, "%v is %T", err, result)
 	} else {
 		doLog(t, name, args, "%v contained %v", err, result)
 	}
 
-	return out, ok
+	return result, ok
 }
 
 // AssertTypeIs fails the test if value is not of the expected type.
@@ -1354,13 +1352,13 @@ func AssertMustErrorIsFn(t T, err error, targetFn func(error) bool, name string,
 
 // AssertMustErrorAs calls AssertErrorAs and t.FailNow() if the assertion fails.
 // This is a convenience function for tests that should terminate on assertion failure.
-// Returns a pointer to the matched value on success.
+// Returns the matched value on success.
 //
 // Example usage:
 //
 //	pathErr := AssertMustErrorAs[*fs.PathError](t, err, "path error")
 //	valErr := AssertMustErrorAs[*ValidationError](t, err, "validation for %s", field)
-func AssertMustErrorAs[U error](t T, err error, name string, args ...any) *U {
+func AssertMustErrorAs[U error](t T, err error, name string, args ...any) U {
 	t.Helper()
 	out, ok := AssertErrorAs[U](t, err, name, args...)
 	if !ok {
