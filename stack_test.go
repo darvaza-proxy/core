@@ -3,21 +3,20 @@ package core
 import (
 	"fmt"
 	"io"
-	"log"
-	"strings"
+	"runtime"
+	"strconv"
 	"testing"
 )
 
 // TestCase validations
 var _ TestCase = frameSplitNameTestCase{}
-var _ TestCase = frameNameTestCase{}
 var _ TestCase = framePkgNameTestCase{}
 var _ TestCase = framePkgFileTestCase{}
 var _ TestCase = frameFileLineTestCase{}
 var _ TestCase = frameFormatTestCase{}
+var _ TestCase = capturedFrameFormatTestCase{}
 var _ TestCase = stackFormatTestCase{}
 var _ TestCase = formatLineTestCase{}
-var _ TestCase = writeFormatTestCase{}
 var _ TestCase = writeFormatPanicsTestCase{}
 var _ TestCase = stackTraceMaxDepthTestCase{}
 
@@ -27,14 +26,10 @@ const (
 )
 
 func TestHere(t *testing.T) {
-	if s := fmt.Sprintf("%n", Here()); s != "TestHere" {
-		t.FailNow()
-	}
+	AssertMustEqual(t, "TestHere", fmt.Sprintf("%n", Here()), "Here")
 	for i := range MaxDepth {
 		f := deepHere(i)
-		if s := fmt.Sprintf("%n", f); s != "hereHere" {
-			t.FailNow()
-		}
+		AssertMustEqual(t, "hereHere", fmt.Sprintf("%n", f), "depth %v", i)
 	}
 }
 
@@ -50,18 +45,13 @@ func deepHere(depth int) *Frame {
 }
 
 func TestStackFrame(t *testing.T) {
-	if s := fmt.Sprintf("%n", StackFrame(0)); s != "TestStackFrame" {
-		log.Print(s)
-		t.FailNow()
-	}
+	AssertMustEqual(t, "TestStackFrame", fmt.Sprintf("%n", StackFrame(0)), "StackFrame(0)")
 
 	for i := range MaxTestDepth {
 		for j := range MaxTestSpace {
 			f := deepStackFrame(i, j)
-			if s := fmt.Sprintf("%n", f); s != "hereStackFrame" {
-				log.Print(s)
-				t.FailNow()
-			}
+			AssertMustEqual(t, "hereStackFrame", fmt.Sprintf("%n", f),
+				"depth %v space %v", i, j)
 		}
 	}
 }
@@ -86,9 +76,8 @@ func deepStackFrame(depth, space int) *Frame {
 
 func TestStackTrace(t *testing.T) {
 	stack := StackTrace(0)
-	if len(stack) < 2 || fmt.Sprintf("%n", stack[0]) != "TestStackTrace" {
-		t.Fatalf("StackTrace(%v): %s", 0, fmt.Sprintln(stack))
-	}
+	AssertMustTrue(t, len(stack) >= 2, "StackTrace(0) depth %v", len(stack))
+	AssertMustEqual(t, "TestStackTrace", fmt.Sprintf("%n", stack[0]), "StackTrace(0) bottom frame")
 
 	for i := range MaxTestDepth {
 		for j := range MaxTestSpace {
@@ -115,10 +104,14 @@ func testDeepStackTrace(t *testing.T, depth, space int) {
 		expectedCount: depth + 1, // deepStackTrace calls itself 'depth' times
 	}
 
-	if !validateStackTrace(stack, expectation) {
-		t.Fatalf("StackTrace(%v, %v): %v: %s",
-			depth, space, len(stack), fmt.Sprintf("%n", stack))
-	}
+	analysis := analyzeStackTrace(stack, expectation)
+
+	AssertMustEqual(t, 0, analysis.bottomPos, "StackTrace(%v, %v) %s position",
+		depth, space, expectation.bottomFunc)
+	AssertMustNotEqual(t, -1, analysis.topPos, "StackTrace(%v, %v) %s position",
+		depth, space, expectation.topFunc)
+	AssertMustEqual(t, expectation.expectedCount, analysis.recurringCount,
+		"StackTrace(%v, %v) %s count", depth, space, expectation.recurringFunc)
 }
 
 func deeperStackTrace(depth, skip int) Stack {
@@ -133,11 +126,6 @@ func deepStackTrace(depth, space int) Stack {
 		return deepStackTrace(depth-1, space)
 	}
 	return deeperStackTrace(space, space)
-}
-
-func validateStackTrace(stack Stack, expectation stackTraceExpectation) bool {
-	analysis := analyzeStackTrace(stack, expectation)
-	return validateStackAnalysis(analysis, expectation)
 }
 
 type stackAnalysis struct {
@@ -173,12 +161,6 @@ func analyzeFrame(analysis *stackAnalysis, frame Frame, position int, expectatio
 	}
 }
 
-func validateStackAnalysis(analysis stackAnalysis, expectation stackTraceExpectation) bool {
-	return analysis.bottomPos == 0 &&
-		analysis.topPos != -1 &&
-		analysis.recurringCount == expectation.expectedCount
-}
-
 // Test case for Frame.SplitName method
 type frameSplitNameTestCase struct {
 	name             string
@@ -194,7 +176,8 @@ func (tc frameSplitNameTestCase) Name() string {
 func (tc frameSplitNameTestCase) Test(t *testing.T) {
 	t.Helper()
 	pkgName, funcName := tc.frame.SplitName()
-	assertFrameNames(t, tc.expectedPkgName, tc.expectedFuncName, pkgName, funcName)
+	AssertEqual(t, tc.expectedPkgName, pkgName, "package name")
+	AssertEqual(t, tc.expectedFuncName, funcName, "function name")
 }
 
 func newFrameSplitNameTestCase(name string, frame *Frame, expectedPkgName,
@@ -217,56 +200,12 @@ func TestFrameSplitName(t *testing.T) {
 	RunTestCases(t, frameSplitNameTestCases())
 }
 
-func assertFrameNames(t *testing.T, expectedPkg, expectedFunc, actualPkg, actualFunc string) {
-	t.Helper()
-	if actualPkg != expectedPkg {
-		t.Errorf("Expected package name '%s', got '%s'", expectedPkg, actualPkg)
-	}
-	if actualFunc != expectedFunc {
-		t.Errorf("Expected function name '%s', got '%s'", expectedFunc, actualFunc)
-	}
-}
-
-// Test case for Frame.Name method
-type frameNameTestCase struct {
-	name     string
-	frame    *Frame
-	expected string
-}
-
-func (tc frameNameTestCase) Name() string {
-	return tc.name
-}
-
-func (tc frameNameTestCase) Test(t *testing.T) {
-	t.Helper()
-	if tc.frame == nil {
-		// Test nil Frame - create empty frame to test Name method
-		var frame Frame
-		AssertEqual(t, "", frame.Name(), "empty frame name")
-	} else {
-		AssertEqual(t, tc.expected, tc.frame.Name(), "frame name mismatch")
-	}
-}
-
-func newFrameNameTestCase(name string, frame *Frame, expected string) frameNameTestCase {
-	return frameNameTestCase{
-		name:     name,
-		frame:    frame,
-		expected: expected,
-	}
-}
-
-func frameNameTestCases() []frameNameTestCase {
-	return []frameNameTestCase{
-		newFrameNameTestCase("current function", Here(), "darvaza.org/core.frameNameTestCases"),
-		newFrameNameTestCase("nil frame", nil, ""),
-	}
-}
-
-// Test Frame.Name method (0% coverage)
+// Test Frame.Name for a populated frame and for the zero value.
 func TestFrameName(t *testing.T) {
-	RunTestCases(t, frameNameTestCases())
+	AssertEqual(t, "darvaza.org/core.TestFrameName", Here().Name(), "frame name")
+
+	var empty Frame
+	AssertEqual(t, "", empty.Name(), "empty frame name")
 }
 
 // Test case for Frame.PkgName method
@@ -282,7 +221,7 @@ func (tc framePkgNameTestCase) Name() string {
 
 func (tc framePkgNameTestCase) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.expected, tc.frame.PkgName(), "package name mismatch")
+	AssertEqual(t, tc.expected, tc.frame.PkgName(), "package name")
 }
 
 func newFramePkgNameTestCase(name string, frame *Frame, expected string) framePkgNameTestCase {
@@ -314,9 +253,7 @@ func TestFrameFile(t *testing.T) {
 	file := frame.File()
 
 	// Should contain the test file name
-	if !strings.Contains(file, "stack_test.go") {
-		t.Errorf("Expected file to contain 'stack_test.go', got '%s'", file)
-	}
+	AssertContains(t, file, "stack_test.go", "frame file")
 
 	// Test empty frame
 	emptyFrame := &Frame{file: ""}
@@ -340,7 +277,7 @@ func (tc framePkgFileTestCase) Name() string {
 
 func (tc framePkgFileTestCase) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.expected, tc.frame.PkgFile(), "PkgFile output mismatch")
+	AssertEqual(t, tc.expected, tc.frame.PkgFile(), "PkgFile")
 }
 
 func newFramePkgFileTestCase(name string, frame Frame, expected string) framePkgFileTestCase {
@@ -405,9 +342,7 @@ func TestFrameLine(t *testing.T) {
 	line := frame.Line()
 
 	// Should have a valid line number (greater than 0)
-	if line <= 0 {
-		t.Errorf("Expected positive line number, got %d", line)
-	}
+	AssertTrue(t, line > 0, "line %v positive", line)
 
 	// Test empty frame
 	emptyFrame := &Frame{line: 0}
@@ -431,23 +366,23 @@ func (tc frameFileLineTestCase) Name() string {
 
 func (tc frameFileLineTestCase) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.expected, tc.frame.FileLine(), "FileLine output mismatch")
+	AssertEqual(t, tc.expected, tc.frame.FileLine(), "FileLine")
 }
 
-func newFrameFileLineTestCase(name string, frame Frame, expected string) frameFileLineTestCase {
+func newFrameFileLineTestCase(name, file string, line int, expected string) frameFileLineTestCase {
 	return frameFileLineTestCase{
 		name:     name,
-		frame:    frame,
+		frame:    Frame{file: file, line: line},
 		expected: expected,
 	}
 }
 
 func frameFileLineTestCases() []frameFileLineTestCase {
 	return S(
-		newFrameFileLineTestCase("frame with line", Frame{file: "test.go", line: 42}, "test.go:42"),
-		newFrameFileLineTestCase("frame without line", Frame{file: "test.go", line: 0}, "test.go"),
-		newFrameFileLineTestCase("empty frame", Frame{file: "", line: 0}, ""),
-		newFrameFileLineTestCase("frame with negative line", Frame{file: "test.go", line: -1}, "test.go"),
+		newFrameFileLineTestCase("frame with line", "test.go", 42, "test.go:42"),
+		newFrameFileLineTestCase("frame without line", "test.go", 0, "test.go"),
+		newFrameFileLineTestCase("empty frame", "", 0, ""),
+		newFrameFileLineTestCase("frame with negative line", "test.go", -1, "test.go"),
 	)
 }
 
@@ -464,18 +399,10 @@ func TestFrameString(t *testing.T) {
 		line: 42,
 	}
 
-	// String() should be equivalent to %v format
-	expected := fmt.Sprintf("%v", frame)
-	actual := frame.String()
+	AssertEqual(t, "test.go:42", frame.String(), "String")
 
-	AssertEqual(t, expected, actual, "String format")
-
-	// Test with empty frame
-	emptyFrame := &Frame{}
-	expectedEmpty := fmt.Sprintf("%v", emptyFrame)
-	actualEmpty := emptyFrame.String()
-
-	AssertEqual(t, expectedEmpty, actualEmpty, "empty frame String")
+	var empty Frame
+	AssertEqual(t, ":0", empty.String(), "empty frame String")
 }
 
 // Test case for Frame.Format method
@@ -493,7 +420,7 @@ func (tc frameFormatTestCase) Name() string {
 func (tc frameFormatTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := fmt.Sprintf(tc.format, tc.frame)
-	AssertEqual(t, tc.expected, result, "format output mismatch")
+	AssertEqual(t, tc.expected, result, "formatted output")
 }
 
 func newFrameFormatTestCase(name string, frame *Frame, format, expected string) frameFormatTestCase {
@@ -541,12 +468,97 @@ func TestFrameFormat(t *testing.T) {
 	RunTestCases(t, frameFormatTestCases())
 }
 
+// capturedFrameFormatTestCase formats a frame captured from a real call,
+// where frameFormatTestCases builds its frames from literals.
+type capturedFrameFormatTestCase struct {
+	name     string
+	frame    *Frame
+	format   string
+	expected string
+}
+
+func (tc capturedFrameFormatTestCase) Name() string {
+	return tc.name
+}
+
+func (tc capturedFrameFormatTestCase) Test(t *testing.T) {
+	t.Helper()
+	result := fmt.Sprintf(tc.format, tc.frame)
+	AssertEqual(t, tc.expected, result, "formatted output")
+}
+
+func newCapturedFrameFormatTestCase(name string, frame *Frame,
+	format, expected string) capturedFrameFormatTestCase {
+	return capturedFrameFormatTestCase{
+		name:     name,
+		frame:    frame,
+		format:   format,
+		expected: expected,
+	}
+}
+
+// capturedFrame returns the frame StackFrame reports for the call site of
+// capturedFrame's caller, alongside the file and line runtime.Caller
+// reports for the same site. The two reach the runtime by different
+// routes, so the caller can state one against the other.
+func capturedFrame(t *testing.T) (*Frame, string, int) {
+	t.Helper()
+
+	frame := StackFrame(1)
+	_, file, line, ok := runtime.Caller(1)
+	AssertMustTrue(t, ok, "runtime.Caller")
+
+	return frame, file, line
+}
+
+func capturedFrameFormatTestCases(frame *Frame, file string,
+	line int) []capturedFrameFormatTestCase {
+	const funcName = "TestCapturedFrameFormat"
+	const fullName = "darvaza.org/core." + funcName
+	const baseFile = "stack_test.go"
+	const pkgFile = "darvaza.org/core/" + baseFile
+
+	lineText := strconv.Itoa(line)
+
+	return S(
+		newCapturedFrameFormatTestCase("file %s", frame, "%s", baseFile),
+		newCapturedFrameFormatTestCase("line %d", frame, "%d", lineText),
+		newCapturedFrameFormatTestCase("name %n", frame, "%n", funcName),
+		newCapturedFrameFormatTestCase("file:line %v", frame, "%v",
+			baseFile+":"+lineText),
+		newCapturedFrameFormatTestCase("file %+s", frame, "%+s",
+			fullName+"\n\t"+file),
+		newCapturedFrameFormatTestCase("name %+n", frame, "%+n", fullName),
+		newCapturedFrameFormatTestCase("file:line %+v", frame, "%+v",
+			fullName+"\n\t"+file+":"+lineText),
+		newCapturedFrameFormatTestCase("file %#s", frame, "%#s", pkgFile),
+		newCapturedFrameFormatTestCase("file:line %#v", frame, "%#v",
+			pkgFile+":"+lineText),
+	)
+}
+
+// Test Frame.Format against a captured frame. The expectations are built
+// from what runtime.Caller reports for the same call site, so the
+// preconditions state that frameForPC agrees with it on file and line —
+// the line being resolved there from the raw pc, where the name comes
+// from pc - 1.
+func TestCapturedFrameFormat(t *testing.T) {
+	frame, file, line := capturedFrame(t)
+
+	AssertMustNotNil(t, frame, "captured frame")
+	AssertMustEqual(t, file, frame.File(), "captured file")
+	AssertMustEqual(t, line, frame.Line(), "captured line")
+
+	RunTestCases(t, capturedFrameFormatTestCases(frame, file, line))
+}
+
 // Test case for Stack.Format method
 type stackFormatTestCase struct {
-	name     string
-	stack    Stack
-	format   string
-	contains []string
+	name      string
+	stack     Stack
+	format    string
+	contains  []string
+	wantEmpty bool
 }
 
 func (tc stackFormatTestCase) Name() string {
@@ -557,25 +569,40 @@ func (tc stackFormatTestCase) Test(t *testing.T) {
 	t.Helper()
 	result := fmt.Sprintf(tc.format, tc.stack)
 
-	// Special case for empty stack - check exact match
-	if len(tc.stack) == 0 && len(tc.contains) == 1 && tc.contains[0] == "" {
-		AssertEqual(t, "", result, "empty stack output")
+	if tc.wantEmpty {
+		AssertEqual(t, "", result, "output")
 		return
 	}
 
 	for _, expected := range tc.contains {
-		if !strings.Contains(result, expected) {
-			t.Errorf("Expected result to contain '%s', got '%s'", expected, result)
-		}
+		AssertContains(t, result, expected, "output")
 	}
 }
 
+// newStackFormatTestCase declares a row by the substrings the output must
+// contain, and every row must name at least one: an empty list would leave
+// the Test body asserting nothing at all.
 func newStackFormatTestCase(name string, stack Stack, format string, contains []string) stackFormatTestCase {
+	if len(contains) == 0 {
+		panic("stackFormatTestCase: every row must state a substring")
+	}
+
 	return stackFormatTestCase{
 		name:     name,
 		stack:    stack,
 		format:   format,
 		contains: contains,
+	}
+}
+
+// newStackFormatTestCaseEmpty expects the format to produce no output at all,
+// which no substring row can state: every string contains "".
+func newStackFormatTestCaseEmpty(name string, stack Stack, format string) stackFormatTestCase {
+	return stackFormatTestCase{
+		name:      name,
+		stack:     stack,
+		format:    format,
+		wantEmpty: true,
 	}
 }
 
@@ -596,7 +623,7 @@ func stackFormatTestCases() []stackFormatTestCase {
 				"\n[1/2] darvaza.org/core.func2\n\t/path/to/file2.go:20")),
 		newStackFormatTestCase("numbered name format %#+n", stack, "%#+n",
 			S("\n[0/2] darvaza.org/core.func1", "\n[1/2] darvaza.org/core.func2")),
-		newStackFormatTestCase("empty stack", emptyStack, "%+v", S("")),
+		newStackFormatTestCaseEmpty("empty stack", emptyStack, "%+v"),
 	)
 }
 
@@ -612,18 +639,9 @@ func TestStackString(t *testing.T) {
 		{name: "darvaza.org/core.func2", file: "/path/to/file2.go", line: 20},
 	}
 
-	// String() should be equivalent to %v format
-	expected := fmt.Sprintf("%v", stack)
-	actual := stack.String()
+	AssertEqual(t, "\nfile1.go:10\nfile2.go:20", stack.String(), "String")
 
-	AssertEqual(t, expected, actual, "String format")
-
-	// Test with empty stack
-	emptyStack := Stack{}
-	expectedEmpty := fmt.Sprintf("%v", emptyStack)
-	actualEmpty := emptyStack.String()
-
-	AssertEqual(t, expectedEmpty, actualEmpty, "empty stack String")
+	AssertEqual(t, "", Stack{}.String(), "empty stack String")
 }
 
 // Test case for formatLine function
@@ -661,50 +679,6 @@ func formatLineTestCases() []formatLineTestCase {
 // Test formatLine function directly (0% coverage)
 func TestFormatLineMethod(t *testing.T) {
 	RunTestCases(t, formatLineTestCases())
-}
-
-// Test case for writeFormat edge cases
-type writeFormatTestCase struct {
-	name   string
-	format string
-}
-
-func (tc writeFormatTestCase) Name() string {
-	return tc.name
-}
-
-func (tc writeFormatTestCase) Test(t *testing.T) {
-	t.Helper()
-	frame := &Frame{name: "test", file: "test.go", line: 10}
-	result := fmt.Sprintf(tc.format, frame)
-	// Just ensure it doesn't panic and produces some output
-	if result == "" {
-		t.Errorf("Expected non-empty result for format %s", tc.format)
-	}
-}
-
-func newWriteFormatTestCase(name, format string) writeFormatTestCase {
-	return writeFormatTestCase{
-		name:   name,
-		format: format,
-	}
-}
-
-func writeFormatTestCases() []writeFormatTestCase {
-	return S(
-		newWriteFormatTestCase("basic file", "%s"),
-		newWriteFormatTestCase("basic line", "%d"),
-		newWriteFormatTestCase("basic name", "%n"),
-		newWriteFormatTestCase("plus file", "%+s"),
-		newWriteFormatTestCase("plus name", "%+n"),
-		newWriteFormatTestCase("file:line", "%v"),
-		newWriteFormatTestCase("plus file:line", "%+v"),
-	)
-}
-
-// Test writeFormat error conditions for better coverage (60% -> higher)
-func TestWriteFormatEdgeCases(t *testing.T) {
-	RunTestCases(t, writeFormatTestCases())
 }
 
 // failingWriter returns a fixed (n, err) from every Write.

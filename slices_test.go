@@ -352,21 +352,12 @@ func TestSliceMap(t *testing.T) {
 		newSliceMapTestCase("single element", S(42), intToString, S("num_42")),
 		newSliceMapTestCase("multiple elements", S(1, 2, 3), intToString, S("num_1", "num_2", "num_3")),
 		newSliceMapTestCase("negative numbers", S(-1, 0, 1), intToString, S("num_-1", "num_0", "num_1")),
+		newSliceMapTestCase("empty slice", S[int](), intToString, nil),
+		newSliceMapTestCase("nil slice", nil, intToString, nil),
+		newSliceMapTestCase[int, string]("nil function", S(1, 2), nil, nil),
 	}
-
-	// Test empty slice separately
-	t.Run("empty slice", testSliceMapEmpty)
 
 	RunTestCases(t, testCases)
-}
-
-func testSliceMapEmpty(t *testing.T) {
-	t.Helper()
-	intToString := func(_ []string, i int) []string {
-		return S(fmt.Sprintf("num_%d", i))
-	}
-	result := SliceMap(S[int](), intToString)
-	AssertEqual(t, 0, len(result), "result slice length")
 }
 
 func testSliceMapDebug(t *testing.T) {

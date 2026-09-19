@@ -571,10 +571,7 @@ func TestMapListCopy(t *testing.T) {
 	// Verify contents
 	for key, srcList := range src {
 		dstList, ok := dst[key]
-		if !ok {
-			t.Errorf("MapListCopy missing key %q", key)
-			continue
-		}
+		AssertMustTrue(t, ok, "key %q copied", key)
 		AssertEqual(t, srcList.Len(), dstList.Len(), "list length[%q]", key)
 	}
 
