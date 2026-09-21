@@ -893,8 +893,8 @@ Order struct fields to minimise memory padding:
 ```go
 type testCase struct {
     // 8-byte fields first (pointers, interfaces, strings on 64-bit)
-    input    interface{}
-    expected interface{}
+    input    any
+    expected any
     name     string
 
     // 4-byte fields (int32, float32)
@@ -935,11 +935,11 @@ Use the benchmark utility for consistent setup:
 ```go
 func BenchmarkProcessing(b *testing.B) {
     err := core.RunBenchmark(b,
-        func() interface{} {
+        func() any {
             // Setup phase - not timed
             return createLargeDataset()
         },
-        func(data interface{}) {
+        func(data any) {
             // Execution phase - timed
             ProcessData(data.(*Dataset))
         },

@@ -477,7 +477,7 @@ func TestAsWithConcreteTypes(t *testing.T) {
 		t.Errorf("As[*int, *int](%p) = %p, %v; want %p, true", pi, v, ok, pi)
 	}
 
-	// Test interface{} to concrete type
+	// Test any to concrete type
 	var value any = testHello
 	if v, ok := As[any, string](value); !ok || v != testHello {
 		t.Errorf("As[any, string](%v) = %v, %v; want hello, true", value, v, ok)

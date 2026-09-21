@@ -390,10 +390,10 @@ func TestAssertSliceEqual(t *testing.T) {
 func TestRunBenchmark(t *testing.T) {
  called := false
  err := RunBenchmark(&testing.B{},
-  func() interface{} {
+  func() any {
    return "test data"
   },
-  func(data interface{}) {
+  func(data any) {
    called = true
    AssertEqual(t, "test data", data.(string), "benchmark data")
   },
@@ -542,7 +542,7 @@ func TestTestCaseCompliance(t *testing.T) {
  AssertTrue(t, hasTestMethod(tc), "test method")
 }
 
-func hasTestMethod(tc interface{}) bool {
+func hasTestMethod(tc any) bool {
  // Use reflection to verify test method exists
  // Implementation details...
  return true

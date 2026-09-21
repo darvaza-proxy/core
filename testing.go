@@ -1044,9 +1044,9 @@ func RunConcurrentTest(t T, numWorkers int, worker func(int) error) error {
 //
 // Example usage:
 //
-//	RunBenchmark(b, func() interface{} {
+//	RunBenchmark(b, func() any {
 //		return setupTestData()
-//	}, func(data interface{}) {
+//	}, func(data any) {
 //		processData(data)
 //	})
 func RunBenchmark(b *testing.B, setup func() any, fn func(any)) {
