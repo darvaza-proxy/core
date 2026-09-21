@@ -15,34 +15,40 @@ var (
 	_ TestCase = waitGroupOnErrorTestCase{}
 )
 
+// waitGroupGoTestCase states what Wait reports once a worker is done:
+// the error it ended with, nil where it ended cleanly. A worker that
+// panics is reported through the error it panicked with.
 type waitGroupGoTestCase struct {
-	fn          func() error
-	errorMsg    string
-	name        string
-	expectError bool
+	fn      func() error
+	wantErr error
+	name    string
 }
 
 // Factory function for waitGroupGoTestCase
-func newWaitGroupGoTestCase(name string, fn func() error, expectError bool, errorMsg string) waitGroupGoTestCase {
+func newWaitGroupGoTestCase(name string, fn func() error, wantErr error) waitGroupGoTestCase {
 	return waitGroupGoTestCase{
-		name:        name,
-		fn:          fn,
-		errorMsg:    errorMsg,
-		expectError: expectError,
+		fn:      fn,
+		wantErr: wantErr,
+		name:    name,
 	}
 }
 
-var waitGroupGoTestCases = []waitGroupGoTestCase{
-	newWaitGroupGoTestCase("successful worker", func() error {
-		return nil
-	}, false, ""),
-	newWaitGroupGoTestCase("worker with error", func() error {
-		return errors.New("worker error")
-	}, true, "worker error"),
-	newWaitGroupGoTestCase("worker with panic", func() error {
-		panic("worker panic")
-	}, true, ""), // Panic should be caught and converted to error
-	newWaitGroupGoTestCase("nil function", nil, false, ""),
+func waitGroupGoTestCases() []waitGroupGoTestCase {
+	workerErr := errors.New("worker error")
+	panicErr := errors.New("worker panic")
+
+	return S(
+		newWaitGroupGoTestCase("successful worker", func() error {
+			return nil
+		}, nil),
+		newWaitGroupGoTestCase("worker with error", func() error {
+			return workerErr
+		}, workerErr),
+		newWaitGroupGoTestCase("worker with panic", func() error {
+			panic(panicErr)
+		}, panicErr),
+		newWaitGroupGoTestCase("nil function", nil, nil),
+	)
 }
 
 func (tc waitGroupGoTestCase) Name() string {
@@ -54,84 +60,85 @@ func (tc waitGroupGoTestCase) Test(t *testing.T) {
 
 	var wg WaitGroup
 	wg.Go(tc.fn)
-	err := wg.Wait()
 
-	tc.handleAsyncError(t, &wg, &err)
-	tc.validateResult(t, err)
-}
-
-func (tc waitGroupGoTestCase) handleAsyncError(t *testing.T, wg *WaitGroup, err *error) {
-	t.Helper()
-	// Give a small delay for error reporting in case of async processing
-	if tc.expectError && *err == nil {
-		time.Sleep(1 * time.Millisecond)
-		*err = wg.Err()
-	}
-}
-
-func (tc waitGroupGoTestCase) validateResult(t *testing.T, err error) {
-	t.Helper()
-	if tc.expectError {
-		AssertError(t, err, "wait group error")
-		if tc.errorMsg != "" {
-			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
-		}
-	} else {
-		AssertNoError(t, err, "wait group")
-	}
+	AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
 }
 
 func TestWaitGroupGo(t *testing.T) {
-	RunTestCases(t, waitGroupGoTestCases)
+	RunTestCases(t, waitGroupGoTestCases())
 }
 
+// A worker that panics is reported as a *PanicError carrying what it
+// panicked with and the stack it was caught on.
+func TestWaitGroupGoPanic(t *testing.T) {
+	var wg WaitGroup
+	wg.Go(func() error {
+		// False positive: the rule guards sync.WaitGroup, and this
+		// WaitGroup recovering the panic is what is under test.
+		//revive:disable-next-line:forbidden-call-in-wg-go
+		panic("worker panic")
+	})
+
+	pe := AssertMustErrorAs[*PanicError](t, wg.Wait(), "error")
+	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
+	AssertEqual(t, "worker panic", payload.Error(), "payload")
+	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+}
+
+// waitGroupGoCatchTestCase states what the catch function leaves for
+// Wait to report: nil where it dismissed the worker's error, and the
+// error it returned or panicked with otherwise.
 type waitGroupGoCatchTestCase struct {
-	fn          func() error
-	catch       func(error) error
-	name        string
-	errorMsg    string
-	expectError bool
+	fn      func() error
+	catch   func(error) error
+	wantErr error
+	name    string
 }
 
 // Factory function for waitGroupGoCatchTestCase
 func newWaitGroupGoCatchTestCase(name string, fn func() error, catch func(error) error,
-	expectError bool, errorMsg string) waitGroupGoCatchTestCase {
+	wantErr error) waitGroupGoCatchTestCase {
 	return waitGroupGoCatchTestCase{
-		name:        name,
-		fn:          fn,
-		catch:       catch,
-		errorMsg:    errorMsg,
-		expectError: expectError,
+		fn:      fn,
+		catch:   catch,
+		wantErr: wantErr,
+		name:    name,
 	}
 }
 
-var waitGroupGoCatchTestCases = []waitGroupGoCatchTestCase{
-	newWaitGroupGoCatchTestCase("successful worker with catch", func() error {
-		return nil
-	}, func(_ error) error {
-		return nil
-	}, false, ""),
-	newWaitGroupGoCatchTestCase("worker error handled by catch", func() error {
-		return errors.New("worker error")
-	}, func(_ error) error {
-		return nil // catch dismisses the error
-	}, false, ""),
-	newWaitGroupGoCatchTestCase("worker error transformed by catch", func() error {
-		return errors.New("original error")
-	}, func(_ error) error {
-		return errors.New("transformed error")
-	}, true, "transformed error"),
-	newWaitGroupGoCatchTestCase("catch function panics", func() error {
-		return errors.New("worker error")
-	}, func(_ error) error {
-		panic("catch panic")
-	}, true, ""), // Don't check exact message as panic handling may vary
-	newWaitGroupGoCatchTestCase("nil function with catch", nil, func(err error) error {
-		return err
-	}, false, ""),
-	newWaitGroupGoCatchTestCase("worker error with nil catch", func() error {
-		return errors.New("worker error")
-	}, nil, true, "worker error"),
+func waitGroupGoCatchTestCases() []waitGroupGoCatchTestCase {
+	workerErr := errors.New("worker error")
+	transformedErr := errors.New("transformed error")
+	panicErr := errors.New("catch panic")
+
+	return S(
+		newWaitGroupGoCatchTestCase("successful worker with catch", func() error {
+			return nil
+		}, func(_ error) error {
+			return nil
+		}, nil),
+		newWaitGroupGoCatchTestCase("worker error handled by catch", func() error {
+			return workerErr
+		}, func(_ error) error {
+			return nil // catch dismisses the error
+		}, nil),
+		newWaitGroupGoCatchTestCase("worker error transformed by catch", func() error {
+			return workerErr
+		}, func(_ error) error {
+			return transformedErr
+		}, transformedErr),
+		newWaitGroupGoCatchTestCase("catch function panics", func() error {
+			return workerErr
+		}, func(_ error) error {
+			panic(panicErr)
+		}, panicErr),
+		newWaitGroupGoCatchTestCase("nil function with catch", nil, func(err error) error {
+			return err
+		}, nil),
+		newWaitGroupGoCatchTestCase("worker error with nil catch", func() error {
+			return workerErr
+		}, nil, workerErr),
+	)
 }
 
 func (tc waitGroupGoCatchTestCase) Name() string {
@@ -143,64 +150,73 @@ func (tc waitGroupGoCatchTestCase) Test(t *testing.T) {
 
 	var wg WaitGroup
 	wg.GoCatch(tc.fn, tc.catch)
-	err := wg.Wait()
 
-	tc.validateGoCatchResult(t, err)
-}
-
-func (tc waitGroupGoCatchTestCase) validateGoCatchResult(t *testing.T, err error) {
-	t.Helper()
-	if tc.expectError {
-		AssertError(t, err, "wait group catch error")
-		if tc.errorMsg != "" {
-			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
-		}
-	} else {
-		AssertNoError(t, err, "wait group catch")
-	}
+	AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
 }
 
 func TestWaitGroupGoCatch(t *testing.T) {
-	RunTestCases(t, waitGroupGoCatchTestCases)
+	RunTestCases(t, waitGroupGoCatchTestCases())
 }
 
+// A catch function that panics is reported the same way as a worker
+// that does.
+func TestWaitGroupGoCatchPanic(t *testing.T) {
+	var wg WaitGroup
+	wg.GoCatch(func() error {
+		return errors.New("worker error")
+	}, func(_ error) error {
+		panic("catch panic")
+	})
+
+	pe := AssertMustErrorAs[*PanicError](t, wg.Wait(), "error")
+	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
+	AssertEqual(t, "catch panic", payload.Error(), "payload")
+	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+}
+
+// waitGroupOnErrorTestCase states what the OnError filter leaves for
+// Wait to report across a set of workers: nil where it dismissed what
+// it was handed, and the error it returned otherwise.
 type waitGroupOnErrorTestCase struct {
 	onErrorHandler func(error) error
-	errorMsg       string
+	wantErr        error
 	name           string
 	workers        []func() error
-	expectError    bool
 }
 
 // Factory function for waitGroupOnErrorTestCase
 func newWaitGroupOnErrorTestCase(name string, workers []func() error,
-	onErrorHandler func(error) error, expectError bool, errorMsg string) waitGroupOnErrorTestCase {
+	onErrorHandler func(error) error, wantErr error) waitGroupOnErrorTestCase {
 	return waitGroupOnErrorTestCase{
+		onErrorHandler: onErrorHandler,
+		wantErr:        wantErr,
 		name:           name,
 		workers:        workers,
-		onErrorHandler: onErrorHandler,
-		errorMsg:       errorMsg,
-		expectError:    expectError,
 	}
 }
 
-var waitGroupOnErrorTestCases = []waitGroupOnErrorTestCase{
-	newWaitGroupOnErrorTestCase("successful workers with onError", []func() error{
-		func() error { return nil },
-		func() error { return nil },
-	}, func(err error) error {
-		return err
-	}, false, ""),
-	newWaitGroupOnErrorTestCase("error dismissed by onError filter", []func() error{
-		func() error { return errors.New("worker error") },
-	}, func(_ error) error {
-		return nil // onError filter dismisses the error
-	}, false, ""),
-	newWaitGroupOnErrorTestCase("error transformed by onError filter", []func() error{
-		func() error { return errors.New("original error") },
-	}, func(_ error) error {
-		return errors.New("filtered error")
-	}, true, "filtered error"),
+func waitGroupOnErrorTestCases() []waitGroupOnErrorTestCase {
+	workerErr := errors.New("worker error")
+	filteredErr := errors.New("filtered error")
+
+	return S(
+		newWaitGroupOnErrorTestCase("successful workers with onError", S(
+			func() error { return nil },
+			func() error { return nil },
+		), func(err error) error {
+			return err
+		}, nil),
+		newWaitGroupOnErrorTestCase("error dismissed by onError filter", S(
+			func() error { return workerErr },
+		), func(_ error) error {
+			return nil // onError filter dismisses the error
+		}, nil),
+		newWaitGroupOnErrorTestCase("error transformed by onError filter", S(
+			func() error { return workerErr },
+		), func(_ error) error {
+			return filteredErr
+		}, filteredErr),
+	)
 }
 
 func (tc waitGroupOnErrorTestCase) Name() string {
@@ -213,42 +229,15 @@ func (tc waitGroupOnErrorTestCase) Test(t *testing.T) {
 	var wg WaitGroup
 	wg.OnError(tc.onErrorHandler)
 
-	tc.runWorkers(t, &wg)
-	err := wg.Wait()
-	tc.handleOnErrorAsync(t, &wg, &err)
-	tc.validateOnErrorResult(t, err)
-}
-
-func (tc waitGroupOnErrorTestCase) runWorkers(t *testing.T, wg *WaitGroup) {
-	t.Helper()
 	for _, worker := range tc.workers {
 		wg.Go(worker)
 	}
-}
 
-func (tc waitGroupOnErrorTestCase) handleOnErrorAsync(t *testing.T, wg *WaitGroup, err *error) {
-	t.Helper()
-	// Give a small delay for error processing in case of async handling
-	if tc.expectError && *err == nil {
-		time.Sleep(1 * time.Millisecond)
-		*err = wg.Err()
-	}
-}
-
-func (tc waitGroupOnErrorTestCase) validateOnErrorResult(t *testing.T, err error) {
-	t.Helper()
-	if tc.expectError {
-		AssertError(t, err, "wait group on error")
-		if tc.errorMsg != "" {
-			AssertEqual(t, tc.errorMsg, err.Error(), "error message")
-		}
-	} else {
-		AssertNoError(t, err, "wait group on error")
-	}
+	AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
 }
 
 func TestWaitGroupOnError(t *testing.T) {
-	RunTestCases(t, waitGroupOnErrorTestCases)
+	RunTestCases(t, waitGroupOnErrorTestCases())
 }
 
 func TestWaitGroupDone(t *testing.T) {

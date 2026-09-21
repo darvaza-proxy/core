@@ -8,12 +8,13 @@ import (
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = assertEventuallyTestCase{}
-	_ TestCase = assertEventuallyContextTestCase{}
-	_ TestCase = assertChannelTestCase{}
-	_ TestCase = assertReceivesTestCase{}
 	_ TestCase = awaitCloseAtDeadlineTestCase{}
 	_ TestCase = receiveNAtDeadlineTestCase{}
+	_ TestCase = assertEventuallyTestCase{}
+	_ TestCase = assertEventuallyContextTestCase{}
+	_ TestCase = assertClosedTestCase{}
+	_ TestCase = assertOpenTestCase{}
+	_ TestCase = assertReceivesTestCase{}
 )
 
 // atDeadlineRuns is how many times each at-deadline row runs. With both
@@ -23,54 +24,6 @@ const atDeadlineRuns = 16
 
 // ms, the budgets, the predicate factories and the context setups live in
 // sync_test.go.
-
-// assertOutcome is what a row declares for the assertion under test:
-// whether it passes, and the essence of its failure message when it does
-// not.
-type assertOutcome struct {
-	failure string
-	pass    bool
-}
-
-func passes() assertOutcome {
-	return assertOutcome{pass: true}
-}
-
-func failsWith(failure string) assertOutcome {
-	return assertOutcome{failure: failure}
-}
-
-// TestAssertOutcome pins that pass is declared rather than derived from
-// failure: a failure declared without an essence stays a failure.
-func TestAssertOutcome(t *testing.T) {
-	AssertTrue(t, passes().pass, "passes")
-	AssertEqual(t, "", passes().failure, "passes essence")
-	AssertFalse(t, failsWith("closed").pass, "fails")
-	AssertEqual(t, "closed", failsWith("closed").failure, "fails essence")
-	AssertFalse(t, failsWith("").pass, "fails without essence")
-}
-
-// checkOutcome checks a bare assertion's result and its mock against the
-// declared outcome.
-func checkOutcome(t *testing.T, mock *MockT, result bool, want assertOutcome, desc string) {
-	t.Helper()
-	if want.pass {
-		assertPassed(t, mock, result, desc)
-		return
-	}
-	assertFailed(t, mock, result, want.failure, desc)
-}
-
-// checkMustOutcome checks a Must assertion run through MockT.Run against
-// the declared outcome.
-func checkMustOutcome(t *testing.T, mock *MockT, result bool, want assertOutcome) {
-	t.Helper()
-	if want.pass {
-		assertMustContinued(t, mock, result)
-		return
-	}
-	assertMustAborted(t, mock, result)
-}
 
 // The channel setups carry int values, numbered from 1 in send order, so a
 // row can declare what an assertion hands back.
@@ -214,22 +167,38 @@ func TestReceiveNAtDeadline(t *testing.T) {
 	))
 }
 
-// assertEventuallyTestCase exercises AssertEventually and its Must form on
-// the same predicate.
+// assertEventuallyTestCase exercises AssertEventually and its Must form
+// on the same predicate. A row states whether the assertion passes, and
+// the essence of the failure it reports where it does not.
 type assertEventuallyTestCase struct {
 	cond     func() func() bool
 	name     string
-	want     assertOutcome
+	failure  string
 	budgetMS int
+	wantPass bool
 }
 
+// newAssertEventuallyTestCase declares a row the assertion passes.
 func newAssertEventuallyTestCase(name string, cond func() func() bool,
-	budgetMS int, want assertOutcome) assertEventuallyTestCase {
+	budgetMS int) assertEventuallyTestCase {
 	return assertEventuallyTestCase{
 		name:     name,
 		cond:     cond,
 		budgetMS: budgetMS,
-		want:     want,
+		wantPass: true,
+	}
+}
+
+// newAssertEventuallyTestCaseFails declares a row the assertion fails,
+// with the essence of the failure it reports.
+func newAssertEventuallyTestCaseFails(name string, cond func() func() bool,
+	budgetMS int, failure string) assertEventuallyTestCase {
+	return assertEventuallyTestCase{
+		name:     name,
+		cond:     cond,
+		budgetMS: budgetMS,
+		failure:  failure,
+		wantPass: false,
 	}
 }
 
@@ -243,45 +212,77 @@ func (tc assertEventuallyTestCase) Test(t *testing.T) {
 
 	mock := &MockT{}
 	ok := AssertEventually(mock, tc.cond(), budget, "eventually")
-	checkOutcome(t, mock, ok, tc.want, "AssertEventually")
 
-	mock = &MockT{}
-	ok = mock.Run("must", func(mt T) {
+	mustMock := &MockT{}
+	mustOK := mustMock.Run("must", func(mt T) {
 		AssertMustEventually(mt, tc.cond(), budget, "eventually")
 		mt.Log(mustContinuationLog)
 	})
-	checkMustOutcome(t, mock, ok, tc.want)
+
+	if !tc.wantPass {
+		assertFailed(t, mock, ok, tc.failure, "AssertEventually")
+		assertMustAborted(t, mustMock, mustOK)
+		return
+	}
+
+	assertPassed(t, mock, ok, "AssertEventually")
+	assertMustContinued(t, mustMock, mustOK)
+}
+
+// assertEventuallyTestCases lists the predicates AssertEventually passes,
+// then the calls it fails. A nil predicate and a negative timeout are
+// call-site mistakes, named before the wait.
+func assertEventuallyTestCases() []assertEventuallyTestCase {
+	return S(
+		newAssertEventuallyTestCase("true immediately", alwaysTrue, shortBudgetMS),
+		newAssertEventuallyTestCase("becomes true within budget", flagFlip, shortBudgetMS),
+
+		newAssertEventuallyTestCaseFails("never true within budget", alwaysFalse,
+			tinyBudgetMS, "not true within"),
+		newAssertEventuallyTestCaseFails("nil predicate", noPredicate,
+			tinyBudgetMS, "nil predicate"),
+		newAssertEventuallyTestCaseFails("negative timeout", alwaysTrue,
+			-1, "negative timeout"),
+	)
 }
 
 func TestAssertEventually(t *testing.T) {
-	RunTestCases(t, S(
-		newAssertEventuallyTestCase("true immediately", alwaysTrue, shortBudgetMS, passes()),
-		newAssertEventuallyTestCase("becomes true within budget", flagFlip, shortBudgetMS, passes()),
-		newAssertEventuallyTestCase("never true within budget", alwaysFalse, tinyBudgetMS,
-			failsWith("not true within")),
-		newAssertEventuallyTestCase("nil predicate", noPredicate, tinyBudgetMS,
-			failsWith("nil predicate")),
-		newAssertEventuallyTestCase("negative timeout", alwaysTrue, -1,
-			failsWith("negative timeout")),
-	))
+	RunTestCases(t, assertEventuallyTestCases())
 }
 
-// assertEventuallyContextTestCase exercises AssertEventuallyContext and its
-// Must form on the same context setup and predicate.
+// assertEventuallyContextTestCase exercises AssertEventuallyContext and
+// its Must form on the same context setup and predicate. A row states
+// whether the assertion passes, and the essence of the failure it reports
+// where it does not.
 type assertEventuallyContextTestCase struct {
-	ctx  func(*testing.T) context.Context
-	cond func() func() bool
-	name string
-	want assertOutcome
+	ctx      func(*testing.T) context.Context
+	cond     func() func() bool
+	name     string
+	failure  string
+	wantPass bool
 }
 
+// newAssertEventuallyContextTestCase declares a row the assertion passes.
 func newAssertEventuallyContextTestCase(name string, ctx func(*testing.T) context.Context,
-	cond func() func() bool, want assertOutcome) assertEventuallyContextTestCase {
+	cond func() func() bool) assertEventuallyContextTestCase {
 	return assertEventuallyContextTestCase{
-		name: name,
-		ctx:  ctx,
-		cond: cond,
-		want: want,
+		name:     name,
+		ctx:      ctx,
+		cond:     cond,
+		wantPass: true,
+	}
+}
+
+// newAssertEventuallyContextTestCaseFails declares a row the assertion
+// fails, with the essence of the failure it reports.
+func newAssertEventuallyContextTestCaseFails(name string, ctx func(*testing.T) context.Context,
+	cond func() func() bool, failure string) assertEventuallyContextTestCase {
+	return assertEventuallyContextTestCase{
+		name:     name,
+		ctx:      ctx,
+		cond:     cond,
+		failure:  failure,
+		wantPass: false,
 	}
 }
 
@@ -294,32 +295,46 @@ func (tc assertEventuallyContextTestCase) Test(t *testing.T) {
 
 	mock := &MockT{}
 	ok := AssertEventuallyContext(mock, tc.ctx(t), tc.cond(), "eventually")
-	checkOutcome(t, mock, ok, tc.want, "AssertEventuallyContext")
 
-	mock = &MockT{}
-	ok = mock.Run("must", func(mt T) {
+	mustMock := &MockT{}
+	mustOK := mustMock.Run("must", func(mt T) {
 		AssertMustEventuallyContext(mt, tc.ctx(t), tc.cond(), "eventually")
 		mt.Log(mustContinuationLog)
 	})
-	checkMustOutcome(t, mock, ok, tc.want)
+
+	if !tc.wantPass {
+		assertFailed(t, mock, ok, tc.failure, "AssertEventuallyContext")
+		assertMustAborted(t, mustMock, mustOK)
+		return
+	}
+
+	assertPassed(t, mock, ok, "AssertEventuallyContext")
+	assertMustContinued(t, mustMock, mustOK)
+}
+
+// assertEventuallyContextTestCases lists the calls AssertEventuallyContext
+// passes, then the ones it fails. The nil-context row carries a predicate
+// that becomes true, since nothing else ends that wait.
+func assertEventuallyContextTestCases() []assertEventuallyContextTestCase {
+	return S(
+		newAssertEventuallyContextTestCase("true immediately",
+			ctxWithBudget(shortBudgetMS), alwaysTrue),
+		newAssertEventuallyContextTestCase("becomes true before the deadline",
+			ctxWithBudget(shortBudgetMS), flagFlip),
+		newAssertEventuallyContextTestCase("nil context",
+			ctxNil, flagFlip),
+
+		newAssertEventuallyContextTestCaseFails("never true before the deadline",
+			ctxWithBudget(tinyBudgetMS), alwaysFalse, "deadline exceeded"),
+		newAssertEventuallyContextTestCaseFails("cancelled before the call",
+			ctxCancelled, alwaysFalse, "context canceled"),
+		newAssertEventuallyContextTestCaseFails("nil predicate",
+			ctxWithBudget(tinyBudgetMS), noPredicate, "nil predicate"),
+	)
 }
 
 func TestAssertEventuallyContext(t *testing.T) {
-	// The nil-context row carries a predicate that becomes true, since
-	// nothing else ends that wait.
-	RunTestCases(t, S(
-		newAssertEventuallyContextTestCase("true immediately", ctxWithBudget(shortBudgetMS),
-			alwaysTrue, passes()),
-		newAssertEventuallyContextTestCase("becomes true before the deadline",
-			ctxWithBudget(shortBudgetMS), flagFlip, passes()),
-		newAssertEventuallyContextTestCase("never true before the deadline",
-			ctxWithBudget(tinyBudgetMS), alwaysFalse, failsWith("deadline exceeded")),
-		newAssertEventuallyContextTestCase("cancelled before the call", ctxCancelled,
-			alwaysFalse, failsWith("context canceled")),
-		newAssertEventuallyContextTestCase("nil context", ctxNil, flagFlip, passes()),
-		newAssertEventuallyContextTestCase("nil predicate", ctxWithBudget(tinyBudgetMS),
-			noPredicate, failsWith("nil predicate")),
-	))
+	RunTestCases(t, assertEventuallyContextTestCases())
 }
 
 // channelBudgetMS is the budget every channel row runs under. A settled
@@ -327,109 +342,200 @@ func TestAssertEventuallyContext(t *testing.T) {
 // the deadline are the only ones it paces, and it keeps them quick.
 const channelBudgetMS = tinyBudgetMS
 
-// assertChannelTestCase exercises AssertClosed and AssertOpen, with their
-// Must forms, on the same channel setup, so each row declares both
-// outcomes. Every call gets a fresh channel, since a receive would change
-// what the next call sees.
-type assertChannelTestCase struct {
-	setup  func() <-chan int
-	name   string
-	closed assertOutcome
-	open   assertOutcome
+// assertClosedTestCase exercises AssertClosed and its Must form on the
+// same channel setup. A row states whether the assertion passes, and the
+// essence of the failure it reports where it does not. Every call gets a
+// fresh channel, since a receive would change what the next call sees.
+type assertClosedTestCase struct {
+	setup    func() <-chan int
+	name     string
+	failure  string
+	wantPass bool
 }
 
-func newAssertChannelTestCase(name string, setup func() <-chan int,
-	closed, open assertOutcome) assertChannelTestCase {
-	return assertChannelTestCase{
-		name:   name,
-		setup:  setup,
-		closed: closed,
-		open:   open,
+// newAssertClosedTestCase declares a row the assertion passes.
+func newAssertClosedTestCase(name string, setup func() <-chan int) assertClosedTestCase {
+	return assertClosedTestCase{
+		name:     name,
+		setup:    setup,
+		wantPass: true,
 	}
 }
 
-func (tc assertChannelTestCase) Name() string {
+// newAssertClosedTestCaseFails declares a row the assertion fails, with
+// the essence of the failure it reports.
+func newAssertClosedTestCaseFails(name string, setup func() <-chan int,
+	failure string) assertClosedTestCase {
+	return assertClosedTestCase{
+		name:     name,
+		setup:    setup,
+		failure:  failure,
+		wantPass: false,
+	}
+}
+
+func (tc assertClosedTestCase) Name() string {
 	return tc.name
 }
 
-func (tc assertChannelTestCase) Test(t *testing.T) {
-	t.Helper()
-	tc.testClosed(t)
-	tc.testOpen(t)
-}
-
-func (tc assertChannelTestCase) testClosed(t *testing.T) {
+func (tc assertClosedTestCase) Test(t *testing.T) {
 	t.Helper()
 	budget := ms(channelBudgetMS)
 
 	mock := &MockT{}
 	ok := AssertClosed(mock, tc.setup(), budget, "closed")
-	checkOutcome(t, mock, ok, tc.closed, "AssertClosed")
 
-	mock = &MockT{}
-	ok = mock.Run("must", func(mt T) {
+	mustMock := &MockT{}
+	mustOK := mustMock.Run("must", func(mt T) {
 		AssertMustClosed(mt, tc.setup(), budget, "closed")
 		mt.Log(mustContinuationLog)
 	})
-	checkMustOutcome(t, mock, ok, tc.closed)
+
+	if !tc.wantPass {
+		assertFailed(t, mock, ok, tc.failure, "AssertClosed")
+		assertMustAborted(t, mustMock, mustOK)
+		return
+	}
+
+	assertPassed(t, mock, ok, "AssertClosed")
+	assertMustContinued(t, mustMock, mustOK)
 }
 
-func (tc assertChannelTestCase) testOpen(t *testing.T) {
+// assertClosedTestCases lists the channels AssertClosed passes, then the
+// ones it fails. Values never settle the verdict: a closed channel passes
+// whatever it held, and the report counts what was consumed on the way.
+func assertClosedTestCases() []assertClosedTestCase {
+	return S(
+		newAssertClosedTestCase("closed", chanClosed),
+		newAssertClosedTestCase("closed behind a value", chanClosedWithSends(1)),
+		newAssertClosedTestCase("closed behind values", chanClosedWithSends(3)),
+
+		newAssertClosedTestCaseFails("value sent", chanWithSends(1), "1 value consumed"),
+		newAssertClosedTestCaseFails("left open", chanOpen, "still open after"),
+		newAssertClosedTestCaseFails("nil channel", chanNil, "still open after"),
+	)
+}
+
+func TestAssertClosed(t *testing.T) {
+	RunTestCases(t, assertClosedTestCases())
+}
+
+// assertOpenTestCase exercises AssertOpen and its Must form on the same
+// channel setup. A row states whether the assertion passes, and the
+// essence of the failure it reports where it does not.
+type assertOpenTestCase struct {
+	setup    func() <-chan int
+	name     string
+	failure  string
+	wantPass bool
+}
+
+// newAssertOpenTestCase declares a row the assertion passes.
+func newAssertOpenTestCase(name string, setup func() <-chan int) assertOpenTestCase {
+	return assertOpenTestCase{
+		name:     name,
+		setup:    setup,
+		wantPass: true,
+	}
+}
+
+// newAssertOpenTestCaseFails declares a row the assertion fails, with the
+// essence of the failure it reports.
+func newAssertOpenTestCaseFails(name string, setup func() <-chan int,
+	failure string) assertOpenTestCase {
+	return assertOpenTestCase{
+		name:     name,
+		setup:    setup,
+		failure:  failure,
+		wantPass: false,
+	}
+}
+
+func (tc assertOpenTestCase) Name() string {
+	return tc.name
+}
+
+func (tc assertOpenTestCase) Test(t *testing.T) {
 	t.Helper()
 	budget := ms(channelBudgetMS)
 
 	mock := &MockT{}
 	ok := AssertOpen(mock, tc.setup(), budget, "open")
-	checkOutcome(t, mock, ok, tc.open, "AssertOpen")
 
-	mock = &MockT{}
-	ok = mock.Run("must", func(mt T) {
+	mustMock := &MockT{}
+	mustOK := mustMock.Run("must", func(mt T) {
 		AssertMustOpen(mt, tc.setup(), budget, "open")
 		mt.Log(mustContinuationLog)
 	})
-	checkMustOutcome(t, mock, ok, tc.open)
+
+	if !tc.wantPass {
+		assertFailed(t, mock, ok, tc.failure, "AssertOpen")
+		assertMustAborted(t, mustMock, mustOK)
+		return
+	}
+
+	assertPassed(t, mock, ok, "AssertOpen")
+	assertMustContinued(t, mustMock, mustOK)
 }
 
-func TestAssertClosedAndOpen(t *testing.T) {
-	// Values never settle the verdict: a closed channel passes whatever it
-	// held, an open one stays open whatever it held, and the report counts
-	// what was consumed on the way.
-	RunTestCases(t, S(
-		newAssertChannelTestCase("closed", chanClosed,
-			passes(), failsWith("closed after")),
-		newAssertChannelTestCase("closed behind a value", chanClosedWithSends(1),
-			passes(), failsWith("1 value consumed")),
-		newAssertChannelTestCase("closed behind values", chanClosedWithSends(3),
-			passes(), failsWith("3 values consumed")),
-		newAssertChannelTestCase("value sent", chanWithSends(1),
-			failsWith("1 value consumed"), passes()),
-		newAssertChannelTestCase("left open", chanOpen,
-			failsWith("still open after"), passes()),
-		newAssertChannelTestCase("nil channel", chanNil,
-			failsWith("still open after"), passes()),
-	))
+// assertOpenTestCases lists the channels AssertOpen passes, then the ones
+// it fails. An open channel stays open whatever it held, and a closed one
+// fails with a count of what was consumed on the way.
+func assertOpenTestCases() []assertOpenTestCase {
+	return S(
+		newAssertOpenTestCase("value sent", chanWithSends(1)),
+		newAssertOpenTestCase("left open", chanOpen),
+		newAssertOpenTestCase("nil channel", chanNil),
+
+		newAssertOpenTestCaseFails("closed", chanClosed, "closed after"),
+		newAssertOpenTestCaseFails("closed behind a value", chanClosedWithSends(1),
+			"1 value consumed"),
+		newAssertOpenTestCaseFails("closed behind values", chanClosedWithSends(3),
+			"3 values consumed"),
+	)
 }
 
-// assertReceivesTestCase exercises AssertReceives and its Must form on the
-// same channel setup, declaring the outcome and the values handed back.
-// Every call gets a fresh channel, since the assertion drains what it
-// receives.
+func TestAssertOpen(t *testing.T) {
+	RunTestCases(t, assertOpenTestCases())
+}
+
+// assertReceivesTestCase exercises AssertReceives and its Must form on
+// the same channel setup. A row states the values handed back, whether
+// the assertion passes, and the essence of the failure it reports where
+// it does not. Every call gets a fresh channel, since the assertion
+// drains what it receives.
 type assertReceivesTestCase struct {
-	setup func() <-chan int
-	name  string
-	want  assertOutcome
-	got   []int
-	n     int
+	setup    func() <-chan int
+	name     string
+	failure  string
+	got      []int
+	n        int
+	wantPass bool
 }
 
+// newAssertReceivesTestCase declares a row the assertion passes.
 func newAssertReceivesTestCase(name string, setup func() <-chan int,
-	n int, got []int, want assertOutcome) assertReceivesTestCase {
+	n int, got []int) assertReceivesTestCase {
 	return assertReceivesTestCase{
-		name:  name,
-		setup: setup,
-		n:     n,
-		got:   got,
-		want:  want,
+		name:     name,
+		setup:    setup,
+		n:        n,
+		got:      got,
+		wantPass: true,
+	}
+}
+
+// newAssertReceivesTestCaseFails declares a row the assertion fails, with
+// what it collected on the way and the essence of the failure it reports.
+func newAssertReceivesTestCaseFails(name string, setup func() <-chan int,
+	n int, got []int, failure string) assertReceivesTestCase {
+	return assertReceivesTestCase{
+		name:     name,
+		setup:    setup,
+		n:        n,
+		got:      got,
+		failure:  failure,
+		wantPass: false,
 	}
 }
 
@@ -443,36 +549,46 @@ func (tc assertReceivesTestCase) Test(t *testing.T) {
 
 	mock := &MockT{}
 	got, ok := AssertReceives(mock, tc.setup(), tc.n, budget, "ready")
-	checkOutcome(t, mock, ok, tc.want, "AssertReceives")
 	AssertSliceEqual(t, tc.got, got, "AssertReceives values")
 
-	got = nil
-	mock = &MockT{}
-	ok = mock.Run("must", func(mt T) {
-		got = AssertMustReceives(mt, tc.setup(), tc.n, budget, "ready")
+	var mustGot []int
+	mustMock := &MockT{}
+	mustOK := mustMock.Run("must", func(mt T) {
+		mustGot = AssertMustReceives(mt, tc.setup(), tc.n, budget, "ready")
 		mt.Log(mustContinuationLog)
 	})
-	checkMustOutcome(t, mock, ok, tc.want)
-	if ok {
-		AssertSliceEqual(t, tc.got, got, "AssertMustReceives values")
+
+	if !tc.wantPass {
+		assertFailed(t, mock, ok, tc.failure, "AssertReceives")
+		assertMustAborted(t, mustMock, mustOK)
+		return
 	}
+
+	assertPassed(t, mock, ok, "AssertReceives")
+	assertMustContinued(t, mustMock, mustOK)
+	AssertSliceEqual(t, tc.got, mustGot, "AssertMustReceives values")
+}
+
+// assertReceivesTestCases lists the channels AssertReceives passes, then
+// the ones it fails, each with the values it hands back. Every subject is
+// settled before the call: a row waiting on another goroutine can miss its
+// deadline on a busy machine.
+func assertReceivesTestCases() []assertReceivesTestCase {
+	return S(
+		newAssertReceivesTestCase("immediate full", chanWithSends(4), 4, S(1, 2, 3, 4)),
+		newAssertReceivesTestCase("zero expected", chanWithSends(0), 0, nil),
+
+		newAssertReceivesTestCaseFails("immediate partial", chanWithSends(3), 4,
+			S(1, 2, 3), "3 of 4 values within"),
+		newAssertReceivesTestCaseFails("closed before n", chanClosed, 3,
+			nil, "closed after 0 of 3"),
+		newAssertReceivesTestCaseFails("nil channel", chanNil, 1,
+			nil, "0 of 1 values within"),
+		newAssertReceivesTestCaseFails("negative expected", chanNil, -1,
+			nil, "negative count -1"),
+	)
 }
 
 func TestAssertReceives(t *testing.T) {
-	// Every subject is settled before the call. A row waiting on another
-	// goroutine can miss its deadline on a busy machine.
-	RunTestCases(t, S(
-		newAssertReceivesTestCase("immediate full", chanWithSends(4), 4,
-			S(1, 2, 3, 4), passes()),
-		newAssertReceivesTestCase("immediate partial", chanWithSends(3), 4,
-			S(1, 2, 3), failsWith("3 of 4 values within")),
-		newAssertReceivesTestCase("closed before n", chanClosed, 3,
-			nil, failsWith("closed after 0 of 3")),
-		newAssertReceivesTestCase("zero expected", chanWithSends(0), 0,
-			nil, passes()),
-		newAssertReceivesTestCase("nil channel", chanNil, 1,
-			nil, failsWith("0 of 1 values within")),
-		newAssertReceivesTestCase("negative expected", chanNil, -1,
-			nil, failsWith("negative count -1")),
-	))
+	RunTestCases(t, assertReceivesTestCases())
 }

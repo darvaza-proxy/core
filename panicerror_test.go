@@ -8,24 +8,58 @@ import (
 )
 
 // TestCase interface validations
-var _ TestCase = panicErrorMethodsTestCase{}
-var _ TestCase = panicErrorUnwrapTestCase{}
-var _ TestCase = newPanicErrorfTestCase{}
-var _ TestCase = panicFunctionsTestCase{}
-var _ TestCase = panicWrapFunctionsTestCase{}
-var _ TestCase = newUnreachableErrorTestCase{}
+var (
+	_ TestCase = panicErrorMethodsTestCase{}
+	_ TestCase = panicErrorUnwrapTestCase{}
+	_ TestCase = newPanicErrorfTestCase{}
+	_ TestCase = panicTestCase{}
+	_ TestCase = panicfTestCase{}
+	_ TestCase = newUnreachableErrorTestCase{}
+	_ TestCase = deeperTestCase{}
+	_ TestCase = negativeSkipTestCase{}
+)
 
+// panicErrorMethodsTestCase states what NewPanicError keeps and what it
+// changes: the payload comes back from Recovered as it went in, the
+// message renders it behind a "panic: " prefix, and a stack is captured
+// either way. A string payload is the exception — it becomes an error
+// carrying the same text — and the rows where that happens say so
+// through a factory of their own.
 type panicErrorMethodsTestCase struct {
-	name     string
-	payload  any
-	expected string
+	payload any
+	name    string
+	wantMsg string
+
+	wantConverted bool
 }
 
 var panicErrorMethodsTestCases = []panicErrorMethodsTestCase{
-	newPanicErrorMethodsTestCase("string payload", "test error", "test error"),
-	newPanicErrorMethodsTestCase("error payload", errors.New("wrapped error"), "wrapped error"),
+	newPanicErrorMethodsTestCaseString("string payload", "test error"),
+	newPanicErrorMethodsTestCase("error payload", errors.New("wrapped error"),
+		"wrapped error"),
 	newPanicErrorMethodsTestCase("int payload", 42, "42"),
 	newPanicErrorMethodsTestCase("nil payload", nil, "<nil>"),
+}
+
+func newPanicErrorMethodsTestCase(name string, payload any,
+	wantMsg string) panicErrorMethodsTestCase {
+	return panicErrorMethodsTestCase{
+		payload:       payload,
+		name:          name,
+		wantMsg:       wantMsg,
+		wantConverted: false,
+	}
+}
+
+// newPanicErrorMethodsTestCaseString declares a row whose payload is a
+// string, so the recovered value is an error carrying that same text.
+func newPanicErrorMethodsTestCaseString(name, payload string) panicErrorMethodsTestCase {
+	return panicErrorMethodsTestCase{
+		payload:       payload,
+		name:          name,
+		wantMsg:       payload,
+		wantConverted: true,
+	}
 }
 
 func (tc panicErrorMethodsTestCase) Name() string {
@@ -36,61 +70,21 @@ func (tc panicErrorMethodsTestCase) Test(t *testing.T) {
 	t.Helper()
 	pe := NewPanicError(0, tc.payload)
 
-	tc.testErrorMethod(t, pe)
-	tc.testRecoveredMethod(t, pe)
-	tc.testCallStackMethod(t, pe)
-}
+	AssertEqual(t, "panic: "+tc.wantMsg, pe.Error(), "message")
+	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 
-func (tc panicErrorMethodsTestCase) testErrorMethod(t *testing.T, pe *PanicError) {
-	t.Helper()
-	errorStr := pe.Error()
-	expectedError := fmt.Sprintf("panic: %s", tc.expected)
-	AssertEqual(t, expectedError, errorStr, "error message")
-}
-
-func (tc panicErrorMethodsTestCase) testRecoveredMethod(t *testing.T, pe *PanicError) {
-	t.Helper()
-	recovered := pe.Recovered()
-	if tc.payload == nil {
-		AssertNil(t, recovered, "nil payload recovered")
-	} else {
-		tc.validateRecoveredPayload(t, recovered)
+	got := pe.Recovered()
+	if tc.wantConverted {
+		err := AssertMustTypeIs[error](t, got, "payload is an error")
+		got = err.Error()
 	}
+
+	AssertEqual(t, tc.payload, got, "payload")
 }
 
-func (tc panicErrorMethodsTestCase) validateRecoveredPayload(t *testing.T, recovered any) {
-	t.Helper()
-	// For strings, they get converted to errors in NewPanicError
-	if s, ok := tc.payload.(string); ok {
-		tc.validateStringPayload(t, recovered, s)
-	} else {
-		AssertEqual(t, tc.payload, recovered, "recovered payload")
-	}
-}
-
-func (panicErrorMethodsTestCase) validateStringPayload(t *testing.T, recovered any, expectedStr string) {
-	t.Helper()
-	if err, ok := recovered.(error); ok {
-		AssertEqual(t, expectedStr, err.Error(), "string payload error")
-	} else {
-		t.Fatalf("expected error type for string payload, got %T", recovered)
-	}
-}
-
-func (panicErrorMethodsTestCase) testCallStackMethod(t *testing.T, pe *PanicError) {
-	t.Helper()
-	stack := pe.CallStack()
-	AssertTrue(t, len(stack) > 0, "non-empty stack trace")
-}
-
-// Factory function for panicErrorMethodsTestCase
-func newPanicErrorMethodsTestCase(name string, payload any, expected string) panicErrorMethodsTestCase {
-	return panicErrorMethodsTestCase{
-		name:     name,
-		payload:  payload,
-		expected: expected,
-	}
-}
+// namedString is a string by kind only, which NewPanicError does not
+// convert to an error.
+type namedString string
 
 type panicErrorUnwrapTestCase struct {
 	// Large fields - string headers and interface
@@ -105,6 +99,7 @@ type panicErrorUnwrapTestCase struct {
 var panicErrorUnwrapTestCases = []panicErrorUnwrapTestCase{
 	newPanicErrorUnwrapTestCase("error payload", errors.New("test error"), true, "test error"),
 	newPanicErrorUnwrapTestCase("string payload converts to error", "string error", true, "string error"),
+	newPanicErrorUnwrapTestCase("named string payload", namedString("string error"), false, ""),
 	newPanicErrorUnwrapTestCase("non-error payload", 42, false, ""),
 	newPanicErrorUnwrapTestCase("nil payload", nil, false, ""),
 }
@@ -230,139 +225,124 @@ func runNewPanicWrapfTest(t *testing.T) {
 	}
 }
 
-type panicFunctionsTestCase struct {
-	expected any
-	fn       func()
-	name     string
+// panicTestCase states what Panic raises: a *PanicError over a captured
+// stack carrying the payload it was given, with a string converted to
+// an error of the same text.
+type panicTestCase struct {
+	payload any
+	name    string
+
+	wantConverted bool
 }
 
-var panicFunctionsTestCases = []panicFunctionsTestCase{
-	newPanicFunctionsTestCase("Panic with string", func() {
-		Panic("test panic")
-	}, "test panic"),
-	newPanicFunctionsTestCase("Panic with error", func() {
-		Panic(errors.New("test error"))
-	}, "test error"),
-	newPanicFunctionsTestCase("Panicf without args", func() {
-		Panicf("simple panic")
-	}, "simple panic"),
-	newPanicFunctionsTestCase("Panicf with args", func() {
-		Panicf("panic %d: %s", 42, "test")
-	}, "panic 42: test"),
+var panicTestCases = []panicTestCase{
+	newPanicTestCaseString("string payload", "test panic"),
+	newPanicTestCase("named string payload", namedString("test panic")),
+	newPanicTestCase("error payload", errors.New("test error")),
+	newPanicTestCase("int payload", 42),
 }
 
-func (tc panicFunctionsTestCase) Name() string {
+func newPanicTestCase(name string, payload any) panicTestCase {
+	return panicTestCase{
+		payload:       payload,
+		name:          name,
+		wantConverted: false,
+	}
+}
+
+// newPanicTestCaseString declares a row whose payload is a string, so
+// the value recovered is an error carrying that same text.
+func newPanicTestCaseString(name, payload string) panicTestCase {
+	return panicTestCase{
+		payload:       payload,
+		name:          name,
+		wantConverted: true,
+	}
+}
+
+func (tc panicTestCase) Name() string {
 	return tc.name
 }
 
-func (tc panicFunctionsTestCase) Test(t *testing.T) {
+func (tc panicTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
-		r := recover()
-		tc.validatePanicFunction(t, r)
+		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
+		AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+
+		got := pe.Recovered()
+		if tc.wantConverted {
+			err := AssertMustTypeIs[error](t, got, "payload is an error")
+			got = err.Error()
+		}
+
+		AssertEqual(t, tc.payload, got, "payload")
 	}()
-	tc.fn()
+
+	Panic(tc.payload)
 }
 
-func (tc panicFunctionsTestCase) validatePanicFunction(t *testing.T, r any) {
-	t.Helper()
-	AssertNotNil(t, r, "panic occurred")
-
-	pe := tc.extractPanicError(t, r)
-	tc.validatePanicPayload(t, pe)
+// panicfTestCase states the same for Panicf, where the payload is always
+// the formatted message as an error.
+type panicfTestCase struct {
+	format  string
+	name    string
+	wantMsg string
+	args    []any
 }
 
-func (panicFunctionsTestCase) extractPanicError(t *testing.T, r any) *PanicError {
-	t.Helper()
-	pe, ok := r.(*PanicError)
-	if !ok {
-		t.Fatalf("expected PanicError, got %T", r)
-	}
-	return pe
+var panicfTestCases = []panicfTestCase{
+	newPanicfTestCase("no args", "simple panic", nil, "simple panic"),
+	newPanicfTestCase("with args", "panic %d: %s", S[any](42, "test"),
+		"panic 42: test"),
 }
 
-func (tc panicFunctionsTestCase) validatePanicPayload(t *testing.T, pe *PanicError) {
-	t.Helper()
-	panicValue := pe.Recovered()
-	if s, ok := tc.expected.(string); ok {
-		tc.validateStringPayload(t, panicValue, s)
-	} else {
-		AssertEqual(t, tc.expected, panicValue, "panic payload")
-	}
-}
-
-func (panicFunctionsTestCase) validateStringPayload(t *testing.T, panicValue any, expectedStr string) {
-	t.Helper()
-	if err, ok := panicValue.(error); ok {
-		AssertEqual(t, expectedStr, err.Error(), "panic error message")
-	} else {
-		t.Fatalf("expected error payload for string, got %T", panicValue)
+func newPanicfTestCase(name, format string, args []any,
+	wantMsg string) panicfTestCase {
+	return panicfTestCase{
+		format:  format,
+		name:    name,
+		wantMsg: wantMsg,
+		args:    args,
 	}
 }
 
-// Factory function for panicFunctionsTestCase
-func newPanicFunctionsTestCase(name string, fn func(), expected any) panicFunctionsTestCase {
-	return panicFunctionsTestCase{
-		name:     name,
-		fn:       fn,
-		expected: expected,
-	}
-}
-
-type panicWrapFunctionsTestCase struct {
-	fn          func(error)
-	originalErr error
-	name        string
-}
-
-func (tc panicWrapFunctionsTestCase) Name() string {
+func (tc panicfTestCase) Name() string {
 	return tc.name
 }
 
-func (tc panicWrapFunctionsTestCase) Test(t *testing.T) {
-	tc.runTest(t, tc.originalErr)
-}
-
-func (tc panicWrapFunctionsTestCase) runTest(t *testing.T, originalErr error) {
+func (tc panicfTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
-		r := recover()
-		tc.validateWrapFunction(t, r, originalErr)
+		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
+		err := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
+		AssertEqual(t, tc.wantMsg, err.Error(), "payload message")
+		AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 	}()
-	tc.fn(originalErr)
+
+	Panicf(tc.format, tc.args...)
 }
 
-func (tc panicWrapFunctionsTestCase) validateWrapFunction(t *testing.T, r any, originalErr error) {
+func runPanicWrapTest(t *testing.T) {
 	t.Helper()
-	AssertNotNil(t, r, "panic occurred")
+	defer func() {
+		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
+		AssertErrorIs(t, pe, errSentinel, "original error in chain")
+		AssertContains(t, pe.Error(), "wrap note", "message")
+	}()
 
-	pe := tc.extractWrapPanicError(t, r)
-	tc.validateUnwrapChain(t, pe, originalErr)
+	PanicWrap(errSentinel, "wrap note")
 }
 
-func (panicWrapFunctionsTestCase) extractWrapPanicError(t *testing.T, r any) *PanicError {
+func runPanicWrapfTest(t *testing.T) {
 	t.Helper()
-	pe, ok := r.(*PanicError)
-	if !ok {
-		t.Fatalf("expected PanicError, got %T", r)
-	}
-	return pe
-}
+	defer func() {
+		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
+		AssertErrorIs(t, pe, errSentinel, "original error in chain")
+		AssertContains(t, pe.Error(), "wrap note: 42", "message")
+	}()
 
-func (panicWrapFunctionsTestCase) validateUnwrapChain(t *testing.T, pe *PanicError, originalErr error) {
-	t.Helper()
-	unwrapped := pe.Unwrap()
-	AssertNotNil(t, unwrapped, "unwrapped error")
-	AssertTrue(t, errors.Is(unwrapped, originalErr), "original error in chain")
-}
-
-// Factory function for panicWrapFunctionsTestCase
-func newPanicWrapFunctionsTestCase(name string, fn func(error), originalErr error) panicWrapFunctionsTestCase {
-	return panicWrapFunctionsTestCase{
-		name:        name,
-		fn:          fn,
-		originalErr: originalErr,
-	}
+	PanicWrapf(errSentinel, "wrap %s: %d", "note", 42)
 }
 
 // newUnreachableErrorTestCase states NewUnreachableError's contract in
@@ -517,23 +497,20 @@ func TestNewPanicWrapf(t *testing.T) {
 	t.Run("NewPanicWrapf", runNewPanicWrapfTest)
 }
 
-func TestPanicFunctions(t *testing.T) {
-	RunTestCases(t, panicFunctionsTestCases)
+func TestPanic(t *testing.T) {
+	RunTestCases(t, panicTestCases)
 }
 
-func TestPanicWrapFunctions(t *testing.T) {
-	originalErr := errors.New("original error")
+func TestPanicf(t *testing.T) {
+	RunTestCases(t, panicfTestCases)
+}
 
-	testCases := []panicWrapFunctionsTestCase{
-		newPanicWrapFunctionsTestCase("PanicWrap", func(err error) {
-			PanicWrap(err, "wrap note")
-		}, originalErr),
-		newPanicWrapFunctionsTestCase("PanicWrapf", func(err error) {
-			PanicWrapf(err, "wrap %s: %d", "note", 42)
-		}, originalErr),
-	}
+func TestPanicWrap(t *testing.T) {
+	t.Run("PanicWrap", runPanicWrapTest)
+}
 
-	RunTestCases(t, testCases)
+func TestPanicWrapf(t *testing.T) {
+	t.Run("PanicWrapf", runPanicWrapfTest)
 }
 
 func TestNewUnreachableError(t *testing.T) {
@@ -543,8 +520,6 @@ func TestNewUnreachableError(t *testing.T) {
 func TestNewUnreachableErrorf(t *testing.T) {
 	t.Run("NewUnreachableErrorf", runNewUnreachableErrorfTest)
 }
-
-var _ TestCase = deeperTestCase{}
 
 // deeperTestCase pins the skip normalisation every panic constructor
 // applies. A negative skip is clamped to 1 rather than passed down to
@@ -623,8 +598,6 @@ func negativeSkipUnreachableErrorNoNote() error {
 func negativeSkipUnreachableErrorf() error {
 	return NewUnreachableErrorf(-1, errSentinel, "note %d", 42)
 }
-
-var _ TestCase = negativeSkipTestCase{}
 
 // negativeSkipTestCase states what the clamp is worth: 1 means the
 // constructor's immediate caller, so a negative skip attributes there

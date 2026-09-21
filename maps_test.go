@@ -7,15 +7,17 @@ import (
 )
 
 // TestCase interface validations
-var _ TestCase = keysTestCase{}
-var _ TestCase = sortedKeysTestCase{}
-var _ TestCase = sortedValuesTestCase{}
-var _ TestCase = sortedValuesCondTestCase{}
-var _ TestCase = mapValueTestCase{}
-var _ TestCase = mapContainsTestCase{}
-var _ TestCase = mapListContainsTestCase{}
-var _ TestCase = mapListForEachElementTestCase{}
-var _ TestCase = mapAllListContainsTestCase{}
+var (
+	_ TestCase = keysTestCase{}
+	_ TestCase = sortedKeysTestCase{}
+	_ TestCase = sortedValuesTestCase{}
+	_ TestCase = sortedValuesCondTestCase{}
+	_ TestCase = mapValueTestCase{}
+	_ TestCase = mapContainsTestCase{}
+	_ TestCase = mapListContainsTestCase{}
+	_ TestCase = mapListForEachElementTestCase{}
+	_ TestCase = mapAllListContainsTestCase{}
+)
 
 // keysTestCase tests Keys function
 type keysTestCase struct {
@@ -41,11 +43,6 @@ func (tc keysTestCase) Test(t *testing.T) {
 	got := Keys(tc.input)
 	AssertEqual(t, tc.expected, len(got), "Keys(%v)", tc.input)
 
-	tc.verifyAllKeysPresent(t, got)
-}
-
-func (tc keysTestCase) verifyAllKeysPresent(t *testing.T, got []string) {
-	t.Helper()
 	for k := range tc.input {
 		AssertTrue(t, SliceContains(got, k), "contains %v", k)
 	}
