@@ -38,6 +38,7 @@ Independent Base Functions:
 ├── AssertEventuallyContext (uses WaitForCondContext)
 ├── AssertClosed[U]         (uses select with a timeout)
 ├── AssertOpen[U]           (uses select with a timeout)
+├── AssertQuiet[U]          (uses select with a timeout)
 └── AssertReceives[U]       (uses select with a shared deadline)
 
 Derived Functions (depend on base functions):

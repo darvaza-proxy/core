@@ -9,11 +9,13 @@ import (
 // Compile-time verification that test case types implement TestCase interface
 var (
 	_ TestCase = awaitCloseAtDeadlineTestCase{}
+	_ TestCase = awaitQuietAtDeadlineTestCase{}
 	_ TestCase = receiveNAtDeadlineTestCase{}
 	_ TestCase = assertEventuallyTestCase{}
 	_ TestCase = assertEventuallyContextTestCase{}
 	_ TestCase = assertClosedTestCase{}
 	_ TestCase = assertOpenTestCase{}
+	_ TestCase = assertQuietTestCase{}
 	_ TestCase = assertReceivesTestCase{}
 )
 
@@ -55,6 +57,14 @@ func chanWithSends(n int) func() <-chan int {
 		}
 		return ch
 	}
+}
+
+// chanFirstTaken returns a channel filled with three values and the first
+// of them already taken, so the next one read is 2.
+func chanFirstTaken() <-chan int {
+	ch := chanWithSends(3)()
+	<-ch
+	return ch
 }
 
 // chanClosedWithSends returns a setup that fills a buffered channel with n
@@ -120,6 +130,94 @@ func TestAwaitCloseAtDeadline(t *testing.T) {
 		newAwaitCloseAtDeadlineTestCase("left open", chanOpen, 0, false),
 		newAwaitCloseAtDeadlineTestCase("nil channel", chanNil, 0, false),
 	))
+}
+
+// awaitQuietAtDeadlineTestCase exercises awaitQuiet with a deadline that
+// has already fired, so both select arms are ready: an event ch already
+// holds still settles the verdict, and only the first one is read.
+type awaitQuietAtDeadlineTestCase struct {
+	setup  func() <-chan int
+	name   string
+	got    int
+	quiet  bool
+	closed bool
+}
+
+// newAwaitQuietAtDeadlineTestCaseQuiet declares a channel with nothing to
+// read.
+func newAwaitQuietAtDeadlineTestCaseQuiet(name string,
+	setup func() <-chan int) awaitQuietAtDeadlineTestCase {
+	return awaitQuietAtDeadlineTestCase{
+		name:   name,
+		setup:  setup,
+		got:    0,
+		quiet:  true,
+		closed: false,
+	}
+}
+
+// newAwaitQuietAtDeadlineTestCaseClosed declares a channel whose close is
+// the first thing to read.
+func newAwaitQuietAtDeadlineTestCaseClosed(name string,
+	setup func() <-chan int) awaitQuietAtDeadlineTestCase {
+	return awaitQuietAtDeadlineTestCase{
+		name:   name,
+		setup:  setup,
+		got:    0,
+		quiet:  false,
+		closed: true,
+	}
+}
+
+// newAwaitQuietAtDeadlineTestCaseValue declares a channel whose first
+// event is the value got, whatever follows it.
+func newAwaitQuietAtDeadlineTestCaseValue(name string,
+	setup func() <-chan int, got int) awaitQuietAtDeadlineTestCase {
+	return awaitQuietAtDeadlineTestCase{
+		name:   name,
+		setup:  setup,
+		got:    got,
+		quiet:  false,
+		closed: false,
+	}
+}
+
+func (tc awaitQuietAtDeadlineTestCase) Name() string {
+	return tc.name
+}
+
+func (tc awaitQuietAtDeadlineTestCase) Test(t *testing.T) {
+	t.Helper()
+	for range atDeadlineRuns {
+		got, quiet, closed := awaitQuiet(tc.setup(), closedDeadline())
+		AssertEqual(t, tc.got, got, "got")
+		AssertEqual(t, tc.quiet, quiet, "quiet")
+		AssertEqual(t, tc.closed, closed, "closed")
+	}
+}
+
+// awaitQuietAtDeadlineTestCases lists the channels by their first event:
+// nothing, the close, then a value. A value ahead of the close is what the
+// verdict rests on, so a channel closed behind values reports the value.
+func awaitQuietAtDeadlineTestCases() []awaitQuietAtDeadlineTestCase {
+	return S(
+		newAwaitQuietAtDeadlineTestCaseQuiet("left open", chanOpen),
+		newAwaitQuietAtDeadlineTestCaseQuiet("nil channel", chanNil),
+
+		newAwaitQuietAtDeadlineTestCaseClosed("closed", chanClosed),
+
+		newAwaitQuietAtDeadlineTestCaseValue("value sent", chanWithSends(1), 1),
+		newAwaitQuietAtDeadlineTestCaseValue("values sent", chanWithSends(3), 1),
+		newAwaitQuietAtDeadlineTestCaseValue("values sent, first taken", chanFirstTaken, 2),
+		newAwaitQuietAtDeadlineTestCaseValue("closed behind a value",
+			chanClosedWithSends(1), 1),
+		newAwaitQuietAtDeadlineTestCaseValue("closed behind values",
+			chanClosedWithSends(3), 1),
+	)
+}
+
+func TestAwaitQuietAtDeadline(t *testing.T) {
+	RunTestCases(t, awaitQuietAtDeadlineTestCases())
 }
 
 // receiveNAtDeadlineTestCase exercises receiveN with a deadline that has
@@ -497,6 +595,100 @@ func assertOpenTestCases() []assertOpenTestCase {
 
 func TestAssertOpen(t *testing.T) {
 	RunTestCases(t, assertOpenTestCases())
+}
+
+// assertQuietTestCase exercises AssertQuiet and its Must form on the same
+// channel setup. A row states whether the assertion passes, and the
+// essence of the failure it reports where it does not.
+type assertQuietTestCase struct {
+	setup    func() <-chan int
+	name     string
+	failure  string
+	wantPass bool
+}
+
+// newAssertQuietTestCase declares a row the assertion passes.
+func newAssertQuietTestCase(name string, setup func() <-chan int) assertQuietTestCase {
+	return assertQuietTestCase{
+		name:     name,
+		setup:    setup,
+		wantPass: true,
+	}
+}
+
+// newAssertQuietTestCaseFails declares a row the assertion fails, with the
+// essence of the failure it reports.
+func newAssertQuietTestCaseFails(name string, setup func() <-chan int,
+	failure string) assertQuietTestCase {
+	return assertQuietTestCase{
+		name:     name,
+		setup:    setup,
+		failure:  failure,
+		wantPass: false,
+	}
+}
+
+func (tc assertQuietTestCase) Name() string {
+	return tc.name
+}
+
+func (tc assertQuietTestCase) Test(t *testing.T) {
+	t.Helper()
+	budget := ms(channelBudgetMS)
+
+	mock := &MockT{}
+	ok := AssertQuiet(mock, tc.setup(), budget, "quiet")
+
+	mustMock := &MockT{}
+	mustOK := mustMock.Run("must", func(mt T) {
+		AssertMustQuiet(mt, tc.setup(), budget, "quiet")
+		mt.Log(mustContinuationLog)
+	})
+
+	if !tc.wantPass {
+		assertFailed(t, mock, ok, tc.failure, "AssertQuiet")
+		assertMustAborted(t, mustMock, mustOK)
+		return
+	}
+
+	assertPassed(t, mock, ok, "AssertQuiet")
+	assertMustContinued(t, mustMock, mustOK)
+}
+
+// assertQuietTestCases lists the channels AssertQuiet passes, then the ones
+// it fails. The first event of either kind is the failure, and a value is
+// named rather than counted: where several wait, the report names the
+// first and leaves the rest unread.
+func assertQuietTestCases() []assertQuietTestCase {
+	return S(
+		newAssertQuietTestCase("left open", chanOpen),
+		newAssertQuietTestCase("nil channel", chanNil),
+
+		newAssertQuietTestCaseFails("closed", chanClosed, "closed after"),
+		newAssertQuietTestCaseFails("value sent", chanWithSends(1), "received 1 after"),
+		newAssertQuietTestCaseFails("values sent, first taken", chanFirstTaken,
+			"received 2 after"),
+		newAssertQuietTestCaseFails("closed behind a value", chanClosedWithSends(1),
+			"received 1 after"),
+		newAssertQuietTestCaseFails("closed behind values", chanClosedWithSends(3),
+			"received 1 after"),
+	)
+}
+
+func TestAssertQuiet(t *testing.T) {
+	RunTestCases(t, assertQuietTestCases())
+}
+
+// AssertQuiet reads the event it fails on and nothing past it, which is
+// where it parts from AssertOpen.
+func TestAssertQuietStopsAtFirstEvent(t *testing.T) {
+	ch := chanWithSends(3)()
+
+	mock := &MockT{}
+	ok := AssertQuiet(mock, ch, ms(channelBudgetMS), "quiet")
+
+	assertFailed(t, mock, ok, "received 1 after", "AssertQuiet")
+	AssertEqual(t, 2, len(ch), "left unread")
 }
 
 // assertReceivesTestCase exercises AssertReceives and its Must form on

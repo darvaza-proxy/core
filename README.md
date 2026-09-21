@@ -633,6 +633,9 @@ be diffed by eye.
   `AssertOpen[U](t, ch, timeout, name...)` - the channel closes within the
   timeout, or stays open for it. Values met on the way are consumed and
   counted in the report.
+* `AssertQuiet[U](t, ch, timeout, name...)` - nothing arrives within the
+  timeout, neither a value nor a close. It stops at the first event, which
+  the report names.
 * `AssertReceives[U](t, ch, n, timeout, name...)` - `n` values arrive
   within one shared timeout and are returned; a close before the n-th
   fails it.
@@ -689,6 +692,8 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
 * `AssertMustClosed[U](t, ch, timeout, name...)` /
   `AssertMustOpen[U](t, ch, timeout, name...)` - terminate on channel state
   mismatch.
+* `AssertMustQuiet[U](t, ch, timeout, name...)` - terminate when anything
+  arrives on the channel.
 * `AssertMustReceives[U](t, ch, n, timeout, name...)` - terminate when
   `n` values do not arrive; return the values received.
 

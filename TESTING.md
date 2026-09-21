@@ -210,6 +210,7 @@ core.AssertEventually(t, func() bool { return srv.Ready() }, time.Second, "ready
 core.AssertEventuallyContext(t, t.Context(), func() bool { return srv.Ready() }, "ready")
 core.AssertClosed(t, done, time.Second, "workers finished")
 core.AssertOpen(t, done, 10*time.Millisecond, "workers still running")
+core.AssertQuiet(t, acquired, 10*time.Millisecond, "token withheld")
 core.AssertReceives(t, ready, n, time.Second, "workers ready")
 ```
 
@@ -219,7 +220,21 @@ the channel's state whatever it held, and the values consumed on the way
 are counted in the report. They are for channels that signal by closing; a
 channel that carries values wants `AssertReceives`, which waits for `n`
 values under one shared timeout, returns them in arrival order, and fails
-on a close before the n-th. `AssertEventually` polls its predicate
+on a close before the n-th.
+
+`AssertQuiet` states that nothing arrives at all within the timeout, a
+value as much as a close. It is for a channel that signals by sending,
+where the thing under test is that the signal is withheld: a lock not yet
+granted, a waiter still blocked. `AssertOpen` cannot say that, since it
+consumes the value and passes. `AssertQuiet` stops at the first event
+rather than receiving past it, so at most one value is taken from the
+channel, and the report names it, or the close, with the time it took to
+arrive. A nil channel produces nothing and always passes. As with every
+assertion of an absence, the timeout is the whole of the evidence: keep it
+short enough not to slow the suite, and long enough that the event would
+have arrived had it been going to.
+
+`AssertEventually` polls its predicate
 every millisecond through `core.WaitForCond`, which is the same wait returned
 as a value, for a caller that wants to branch on it rather than assert it.
 `AssertEventuallyContext` does the same under a context, so a test polling
