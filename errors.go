@@ -8,7 +8,9 @@ import (
 )
 
 var (
-	// ErrNotImplemented indicates something hasn't been implemented yet
+	// ErrNotImplemented indicates something hasn't been implemented yet.
+	// The operation belongs here and the gap is the implementer's to
+	// close, which is where it parts from ErrUnsupported.
 	ErrNotImplemented = errors.New("not implemented")
 	// ErrTODO is like ErrNotImplemented but used especially to
 	// indicate something needs to be implemented
@@ -20,6 +22,13 @@ var (
 	// ErrInvalid indicates an argument isn't valid. It's an alias of
 	// [fs.ErrInvalid] so errors.Is matches across the boundary.
 	ErrInvalid = fs.ErrInvalid
+	// ErrUnsupported indicates an operation cannot be performed because
+	// the target doesn't support it, by design rather than for want of
+	// code: a caller can fall back, where ErrNotImplemented and ErrTODO
+	// report a gap to be closed. It's an alias of [errors.ErrUnsupported]
+	// so errors.Is matches across the boundary. Wrap it with context
+	// rather than returning it bare.
+	ErrUnsupported = errors.ErrUnsupported
 	// ErrUnknown indicates something isn't recognized
 	ErrUnknown = errors.New("unknown")
 	// ErrNilReceiver indicates a method was called over a nil instance

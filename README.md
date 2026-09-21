@@ -268,6 +268,9 @@ Predefined error values for common conditions:
 * `ErrExists` - resource already exists.
 * `ErrNotExists` - resource does not exist.
 * `ErrInvalid` - invalid input or state.
+* `ErrUnsupported` - operation the target does not support, by design
+  rather than for want of code; an alias of `errors.ErrUnsupported`.
+  `ErrNotImplemented` and `ErrTODO` do not match it.
 * `ErrUnknown` - unknown or unspecified error.
 * `ErrNilReceiver` - method called on nil receiver.
 * `ErrUnreachable` - indicates impossible condition.
