@@ -158,21 +158,21 @@ enhanced capabilities:
 #### MockT Usage Examples
 
 ```go
-func TestAssertEqual(t *testing.T) {
+func TestAssertContains(t *testing.T) {
  mock := &MockT{}
 
  // Test successful assertion
- result := AssertEqual(mock, 42, 42, "equality")
+ result := AssertContains(mock, "hello world", "world", "text")
  AssertTrue(t, result, "returns true")
  AssertTrue(t, mock.HasLogs(), "has logs")
 
  lastLog, ok := mock.LastLog()
  AssertTrue(t, ok, "has log")
- AssertContains(t, lastLog, "equality test: 42", "log content")
+ AssertEqual(t, `text: contains "world"`, lastLog, "log content")
 
  // Test failed assertion
  mock.Reset()
- result = AssertEqual(mock, 42, 24, "inequality")
+ result = AssertContains(mock, "hello world", "moon", "text")
  AssertFalse(t, result, "returns false")
  AssertTrue(t, mock.HasErrors(), "has errors")
 }
@@ -397,19 +397,19 @@ func TestAssertSliceEqual(t *testing.T) {
 
 ```go
 func TestRunBenchmark(t *testing.T) {
- called := false
- err := RunBenchmark(&testing.B{},
+ execCount := 0
+
+ RunBenchmark(&testing.B{N: 10},
   func() any {
    return "test data"
   },
   func(data any) {
-   called = true
-   AssertEqual(t, "test data", data.(string), "benchmark data")
+   AssertEqual(t, "test data", data, "benchmark data")
+   execCount++
   },
  )
 
- AssertNoError(t, err, "benchmark")
- AssertTrue(t, called, "called")
+ AssertEqual(t, 10, execCount, "execution count")
 }
 ```
 
