@@ -222,7 +222,8 @@ func TestSortedValuesUnlikelyCond(t *testing.T) {
 	AssertSliceEqual(t, expected4, got4, "SortedValuesUnlikelyCond nil predicate")
 }
 
-// mapValueTestCase tests MapValue function
+// mapValueTestCase tests MapValue by the value it returns and whether it
+// found the key.
 type mapValueTestCase struct {
 	name     string
 	m        map[string]int
@@ -230,13 +231,6 @@ type mapValueTestCase struct {
 	def      int
 	expected int
 	found    bool
-}
-
-var mapValueTestCases = []mapValueTestCase{
-	newMapValueTestCase("existing key", map[string]int{"a": 1, "b": 2}, "a", 99, 1),
-	newMapValueTestCase("missing key", map[string]int{"a": 1, "b": 2}, "c", 88, 88),
-	newMapValueTestCase("nil map", nil, "a", 77, 77),
-	newMapValueTestCase("zero value exists", map[string]int{"a": 0}, "a", 66, 0),
 }
 
 func (tc mapValueTestCase) Name() string {
@@ -247,25 +241,48 @@ func (tc mapValueTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, found := MapValue(tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.expected, got, "MapValue(%v, %q, %v) value", tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.found, found, "MapValue(%v, %q, %v) found", tc.m, tc.key, tc.def)
+	AssertEqual(t, tc.expected, got, "value")
+	AssertEqual(t, tc.found, found, "found")
 }
 
-// Factory function for mapValueTestCase
 func newMapValueTestCase(name string, m map[string]int, key string,
-	def int, expected int) mapValueTestCase {
+	def, expected int) mapValueTestCase {
 	return mapValueTestCase{
 		name:     name,
 		m:        m,
 		key:      key,
 		def:      def,
 		expected: expected,
-		found:    expected != def, // derive found from whether expected == def
+		found:    true,
 	}
 }
 
+// newMapValueTestCaseMissing declares a key the map does not hold, where
+// the default is the value MapValue must return.
+func newMapValueTestCaseMissing(name string, m map[string]int, key string,
+	def int) mapValueTestCase {
+	return mapValueTestCase{
+		name:     name,
+		m:        m,
+		key:      key,
+		def:      def,
+		expected: def,
+		found:    false,
+	}
+}
+
+func mapValueTestCases() []mapValueTestCase {
+	return S(
+		newMapValueTestCase("existing key", map[string]int{"a": 1, "b": 2}, "a", 99, 1),
+		newMapValueTestCase("zero value exists", map[string]int{"a": 0}, "a", 66, 0),
+		newMapValueTestCase("value equals default", map[string]int{"a": 66}, "a", 66, 66),
+		newMapValueTestCaseMissing("missing key", map[string]int{"a": 1, "b": 2}, "c", 88),
+		newMapValueTestCaseMissing("nil map", nil, "a", 77),
+	)
+}
+
 func TestMapValue(t *testing.T) {
-	RunTestCases(t, mapValueTestCases)
+	RunTestCases(t, mapValueTestCases())
 }
 
 // mapContainsTestCase tests MapContains function

@@ -9,6 +9,7 @@ import (
 // TestCase interface validations
 var (
 	_ TestCase = panicErrorMethodsTestCase{}
+	_ TestCase = panicErrorUnwrapErrorTestCase{}
 	_ TestCase = panicErrorUnwrapTestCase{}
 	_ TestCase = newPanicErrorfTestCase{}
 	_ TestCase = panicTestCase{}
@@ -99,22 +100,43 @@ func (tc panicErrorMethodsTestCase) Test(t *testing.T) {
 // convert to an error.
 type namedString string
 
-type panicErrorUnwrapTestCase struct {
-	// Large fields - string headers and interface
-	name          string
-	payload       any
-	expectedError string
-
-	// Small fields (1 byte) - boolean flags
-	expectUnwrap bool
+// panicErrorUnwrapErrorTestCase tests Unwrap on a payload that is an
+// error, which Unwrap returns as it is.
+type panicErrorUnwrapErrorTestCase struct {
+	err  error
+	name string
 }
 
-var panicErrorUnwrapTestCases = []panicErrorUnwrapTestCase{
-	newPanicErrorUnwrapTestCase("error payload", errors.New("test error"), true, "test error"),
-	newPanicErrorUnwrapTestCase("string payload converts to error", "string error", true, "string error"),
-	newPanicErrorUnwrapTestCase("named string payload", namedString("string error"), false, ""),
-	newPanicErrorUnwrapTestCase("non-error payload", 42, false, ""),
-	newPanicErrorUnwrapTestCase("nil payload", nil, false, ""),
+func (tc panicErrorUnwrapErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc panicErrorUnwrapErrorTestCase) Test(t *testing.T) {
+	t.Helper()
+	unwrapped := NewPanicError(0, tc.err).Unwrap()
+
+	AssertEqual(t, tc.err, unwrapped, "Unwrap")
+}
+
+func newPanicErrorUnwrapErrorTestCase(name string, err error) panicErrorUnwrapErrorTestCase {
+	if err == nil {
+		panic("panicErrorUnwrapErrorTestCase: every row must pass an error")
+	}
+
+	return panicErrorUnwrapErrorTestCase{
+		err:  err,
+		name: name,
+	}
+}
+
+// panicErrorUnwrapTestCase tests Unwrap on a string payload, made into
+// an error carrying the string as its message, or, where unwraps is
+// false, on one that is not an error and unwraps to nothing.
+type panicErrorUnwrapTestCase struct {
+	name    string
+	payload any
+	message string
+	unwraps bool
 }
 
 func (tc panicErrorUnwrapTestCase) Name() string {
@@ -123,27 +145,50 @@ func (tc panicErrorUnwrapTestCase) Name() string {
 
 func (tc panicErrorUnwrapTestCase) Test(t *testing.T) {
 	t.Helper()
-	pe := NewPanicError(0, tc.payload)
-	unwrapped := pe.Unwrap()
+	unwrapped := NewPanicError(0, tc.payload).Unwrap()
 
-	if !tc.expectUnwrap {
+	if !tc.unwraps {
 		AssertNil(t, unwrapped, "Unwrap")
 		return
 	}
 
 	AssertMustError(t, unwrapped, "Unwrap")
-	AssertEqual(t, tc.expectedError, unwrapped.Error(), "unwrapped")
+	AssertEqual(t, tc.message, unwrapped.Error(), "message")
 }
 
-// Factory function for panicErrorUnwrapTestCase
-func newPanicErrorUnwrapTestCase(name string, payload any,
-	expectUnwrap bool, expectedError string) panicErrorUnwrapTestCase {
+func newPanicErrorUnwrapTestCase(name, payload, message string) panicErrorUnwrapTestCase {
 	return panicErrorUnwrapTestCase{
-		name:          name,
-		payload:       payload,
-		expectUnwrap:  expectUnwrap,
-		expectedError: expectedError,
+		name:    name,
+		payload: payload,
+		message: message,
+		unwraps: true,
 	}
+}
+
+func newPanicErrorUnwrapTestCaseOpaque(name string, payload any) panicErrorUnwrapTestCase {
+	return panicErrorUnwrapTestCase{
+		name:    name,
+		payload: payload,
+		message: "",
+		unwraps: false,
+	}
+}
+
+func panicErrorUnwrapTestCases() []TestCase {
+	err := errors.New("test error")
+	// skipcq: GO-W1024 - Testing an error with an empty message
+	empty := errors.New("")
+
+	return S[TestCase](
+		newPanicErrorUnwrapErrorTestCase("error payload", err),
+		newPanicErrorUnwrapErrorTestCase("empty error payload", empty),
+		newPanicErrorUnwrapTestCase("string payload converts to error", "string error", "string error"),
+		newPanicErrorUnwrapTestCase("empty string payload", "", ""),
+		newPanicErrorUnwrapTestCaseOpaque("named string payload",
+			namedString("string error")),
+		newPanicErrorUnwrapTestCaseOpaque("non-error payload", 42),
+		newPanicErrorUnwrapTestCaseOpaque("nil payload", nil),
+	)
 }
 
 type newPanicErrorfTestCase struct {
@@ -766,7 +811,7 @@ func TestPanicErrorMethods(t *testing.T) {
 }
 
 func TestPanicErrorUnwrap(t *testing.T) {
-	RunTestCases(t, panicErrorUnwrapTestCases)
+	RunTestCases(t, panicErrorUnwrapTestCases())
 }
 
 func TestNewPanicErrorf(t *testing.T) {

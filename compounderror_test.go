@@ -2,7 +2,7 @@ package core
 
 import (
 	"errors"
-	"strings"
+	"fmt"
 	"testing"
 )
 
@@ -14,6 +14,7 @@ var (
 	_ TestCase = compoundErrorAsErrorTestCase{}
 	_ TestCase = compoundErrorAppendErrorTestCase{}
 	_ TestCase = compoundErrorAppendTestCase{}
+	_ TestCase = compoundErrorAppendUnchangedTestCase{}
 )
 
 // newCompoundErrorTestCase states what NewCompoundError collects from
@@ -394,85 +395,167 @@ func TestCompoundErrorAppendErrorWithUnwrappable(t *testing.T) {
 	}
 }
 
+// compoundErrorAppendTestCase tests Append by the one error it appends:
+// the row's error wrapped in the note rendered with its arguments, or
+// the note alone as an error of its own. A row with neither an error
+// nor a rendered note appends nothing.
 type compoundErrorAppendTestCase struct {
-	name        string
-	initial     []error
-	err         error
-	note        string
-	args        []any
-	expectedLen int
-	expectNote  bool
-}
-
-// newCompoundErrorAppendTestCase creates a new compoundErrorAppendTestCase
-//
-//revive:disable-next-line:argument-limit
-func newCompoundErrorAppendTestCase(name string, initial []error, err error, note string,
-	args []any, expectedLen int, expectNote bool) compoundErrorAppendTestCase {
-	return compoundErrorAppendTestCase{
-		name:        name,
-		initial:     initial,
-		err:         err,
-		note:        note,
-		args:        args,
-		expectedLen: expectedLen,
-		expectNote:  expectNote,
-	}
-}
-
-var compoundErrorAppendTestCases = []compoundErrorAppendTestCase{
-	newCompoundErrorAppendTestCase("nil error, empty note", S[error](), nil, "", nil, 0, false),
-	newCompoundErrorAppendTestCase("nil error, with note", S[error](), nil, "note only", nil, 1, true),
-	newCompoundErrorAppendTestCase("error without note", S[error](), errors.New("test error"), "", nil, 1, false),
-	newCompoundErrorAppendTestCase("error with note", S[error](), errors.New("test error"),
-		"wrapped note", nil, 1, true),
-	newCompoundErrorAppendTestCase("formatted note", S[error](), errors.New("test error"),
-		"wrapped %s: %d", S[any]("note", 42), 1, true),
+	err  error
+	name string
+	note string
+	want string
+	args []any
 }
 
 func (tc compoundErrorAppendTestCase) Name() string {
 	return tc.name
 }
 
-//revive:disable-next-line:cognitive-complexity
 func (tc compoundErrorAppendTestCase) Test(t *testing.T) {
 	t.Helper()
-	ce := &CompoundError{Errs: tc.initial}
+	ce := new(CompoundError)
 	result := ce.Append(tc.err, tc.note, tc.args...)
 
-	// Test method chaining
 	AssertSame(t, ce, result, "CompoundError instance")
-
-	// Test length
-	if !AssertEqual(t, tc.expectedLen, len(ce.Errs), "error count") {
+	// With neither an error nor a rendered note, nothing is appended.
+	if tc.err == nil && renderAppendNote(tc.note, tc.args) == "" {
+		AssertEqual(t, 0, len(ce.Errs), "error count")
 		return
 	}
 
-	if tc.expectedLen > 0 {
-		lastErr := ce.Errs[len(ce.Errs)-1]
-		if !AssertNotNil(t, lastErr, "last error") {
-			return
-		}
+	AssertMustEqual(t, 1, len(ce.Errs), "error count")
+	AssertMustError(t, ce.Errs[0], "appended error")
+	// A note alone is an error of its own, carrying no cause.
+	if tc.err != nil {
+		AssertErrorIs(t, ce.Errs[0], tc.err, "cause")
+	}
+	AssertEqual(t, tc.want, ce.Errs[0].Error(), "message")
+}
 
-		errorStr := lastErr.Error()
-		if tc.expectNote {
-			if tc.note != "" {
-				expectedNote := tc.note
-				if len(tc.args) > 0 {
-					expectedNote = "wrapped note: 42" // for the formatted case
-				}
-				foundExpected := strings.Contains(errorStr, expectedNote)
-				foundOriginal := strings.Contains(errorStr, tc.note)
-				if !AssertTrue(t, foundExpected || foundOriginal, "note in error string") {
-					return
-				}
-			}
-		}
+// renderAppendNote renders a note as Append does, formatting it only
+// when arguments are given.
+func renderAppendNote(note string, args []any) string {
+	if len(args) > 0 {
+		return fmt.Sprintf(note, args...)
+	}
+	return note
+}
+
+func newCompoundErrorAppendTestCase(name string, err error, note string, args []any,
+	want string) compoundErrorAppendTestCase {
+	if err == nil {
+		panic("compoundErrorAppendTestCase: every wrapping row must pass an error")
+	}
+	if renderAppendNote(note, args) == "" {
+		panic("compoundErrorAppendTestCase: every wrapping row must render a note")
+	}
+	if want == "" {
+		panic("compoundErrorAppendTestCase: every wrapping row must state its message")
+	}
+
+	return compoundErrorAppendTestCase{
+		err:  err,
+		name: name,
+		note: note,
+		want: want,
+		args: args,
 	}
 }
 
+func newCompoundErrorAppendTestCaseNote(name, note string, args []any,
+	want string) compoundErrorAppendTestCase {
+	if renderAppendNote(note, args) == "" {
+		panic("compoundErrorAppendTestCase: every note row must render a note")
+	}
+	if want == "" {
+		panic("compoundErrorAppendTestCase: every note row must state its message")
+	}
+
+	return compoundErrorAppendTestCase{
+		err:  nil,
+		name: name,
+		note: note,
+		want: want,
+		args: args,
+	}
+}
+
+func newCompoundErrorAppendTestCaseNothing(name, note string, args []any) compoundErrorAppendTestCase {
+	if renderAppendNote(note, args) != "" {
+		panic("compoundErrorAppendTestCase: every row appending nothing must render an empty note")
+	}
+
+	return compoundErrorAppendTestCase{
+		err:  nil,
+		name: name,
+		note: note,
+		want: "",
+		args: args,
+	}
+}
+
+// compoundErrorAppendUnchangedTestCase tests Append with an error and
+// no rendered note, which appends the error as it is.
+type compoundErrorAppendUnchangedTestCase struct {
+	err  error
+	name string
+	note string
+	args []any
+}
+
+func (tc compoundErrorAppendUnchangedTestCase) Name() string {
+	return tc.name
+}
+
+func (tc compoundErrorAppendUnchangedTestCase) Test(t *testing.T) {
+	t.Helper()
+	ce := new(CompoundError)
+	result := ce.Append(tc.err, tc.note, tc.args...)
+
+	AssertSame(t, ce, result, "CompoundError instance")
+	AssertMustEqual(t, 1, len(ce.Errs), "error count")
+	AssertEqual(t, tc.err, ce.Errs[0], "appended error")
+}
+
+func newCompoundErrorAppendUnchangedTestCase(name string, err error, note string,
+	args []any) compoundErrorAppendUnchangedTestCase {
+	if err == nil {
+		panic("compoundErrorAppendUnchangedTestCase: every row must pass an error")
+	}
+	if renderAppendNote(note, args) != "" {
+		panic("compoundErrorAppendUnchangedTestCase: every row must render an empty note")
+	}
+
+	return compoundErrorAppendUnchangedTestCase{
+		err:  err,
+		name: name,
+		note: note,
+		args: args,
+	}
+}
+
+func compoundErrorAppendTestCases() []TestCase {
+	err := errors.New("test error")
+	// skipcq: GO-W1024 - Testing an error with an empty message
+	empty := errors.New("")
+
+	return S[TestCase](
+		newCompoundErrorAppendUnchangedTestCase("error without note", err, "", nil),
+		newCompoundErrorAppendUnchangedTestCase("errors.New(\"\") without note", empty, "", nil),
+		newCompoundErrorAppendUnchangedTestCase("error, note rendering empty", err, "%s", S[any]("")),
+		newCompoundErrorAppendTestCase("error with note", err, "wrapped note", nil, "wrapped note: test error"),
+		newCompoundErrorAppendTestCase("error with formatted note", err, "wrapped %s: %d", S[any]("note", 42),
+			"wrapped note: 42: test error"),
+		newCompoundErrorAppendTestCaseNote("note only", "note only", nil, "note only"),
+		newCompoundErrorAppendTestCaseNote("note with verb, no arguments", "note %d", nil, "note %d"),
+		newCompoundErrorAppendTestCaseNote("formatted note only", "note %d", S[any](7), "note 7"),
+		newCompoundErrorAppendTestCaseNothing("nil error, empty note", "", nil),
+		newCompoundErrorAppendTestCaseNothing("nil error, note rendering empty", "%s", S[any]("")),
+	)
+}
+
 func TestCompoundErrorAppend(t *testing.T) {
-	RunTestCases(t, compoundErrorAppendTestCases)
+	RunTestCases(t, compoundErrorAppendTestCases())
 }
 
 func TestCompoundErrorAppendChaining(t *testing.T) {
