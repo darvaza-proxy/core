@@ -40,9 +40,16 @@ type panicErrorMethodsTestCase struct {
 
 var panicErrorMethodsTestCases = []panicErrorMethodsTestCase{
 	newPanicErrorMethodsTestCaseString("string payload", "test error"),
+	newPanicErrorMethodsTestCaseString("verb in string payload", "test %d error"),
+	newPanicErrorMethodsTestCaseString("empty string payload", ""),
+	newPanicErrorMethodsTestCase("named string payload",
+		namedString("test error"), "test error"),
 	newPanicErrorMethodsTestCase("error payload", errors.New("wrapped error"),
 		"wrapped error"),
 	newPanicErrorMethodsTestCase("int payload", 42, "42"),
+	newPanicErrorMethodsTestCase("stringer payload",
+		mockStringer{value: testHello}, testHello),
+	newPanicErrorMethodsTestCase("zero payload", false, "false"),
 	newPanicErrorMethodsTestCase("nil payload", nil, "<nil>"),
 }
 
@@ -81,6 +88,7 @@ func (tc panicErrorMethodsTestCase) Test(t *testing.T) {
 	got := pe.Recovered()
 	if tc.wantConverted {
 		err := AssertMustTypeIs[error](t, got, "payload is an error")
+		AssertSame(t, err, pe.Unwrap(), "Unwrap")
 		got = err.Error()
 	}
 
