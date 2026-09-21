@@ -12,17 +12,20 @@ import (
 )
 
 // TestCase validations
-var _ TestCase = zeroTestCase[int]{}
-var _ TestCase = zeroRefTestCase[int]{}
-var _ TestCase = isZeroTestCase{}
-var _ TestCase = isNilTestCase{}
-var _ TestCase = isNilVsIsZeroTestCase{}
-var _ TestCase = initializationSemanticsTestCase{}
-var _ TestCase = isSameTestCase{}
-var _ TestCase = isSameStackOverflowTestCase{}
-var _ TestCase = isZeroCustomInterfaceTestCase{}
-var _ TestCase = areComparableTestCase{}
-var _ TestCase = areEqualTestCase{}
+var (
+	_ TestCase = zeroTestCase[int]{}
+	_ TestCase = zeroRefTestCase[int]{}
+	_ TestCase = isZeroTestCase{}
+	_ TestCase = isNilTestCase{}
+	_ TestCase = isNilVsIsZeroTestCase{}
+	_ TestCase = initializationSemanticsTestCase{}
+	_ TestCase = isSameTestCase{}
+	_ TestCase = isSameStackOverflowTestCase{}
+	_ TestCase = isZeroCustomInterfaceTestCase{}
+	_ TestCase = areComparableTestCase{}
+	_ TestCase = comparableEqualTestCase{}
+	_ TestCase = areEqualTestCase{}
+)
 
 type zeroTestCase[T comparable] struct {
 	expected T
@@ -424,7 +427,7 @@ func (tc isNilTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	result := IsNil(tc.value)
-	AssertEqual(t, tc.expected, result, "IsNil result")
+	assertComparable(t, tc.expected, result, "IsNil result")
 }
 
 func newIsNilTestCase(name string, value any, expected bool) isNilTestCase {
@@ -494,8 +497,8 @@ func (tc isNilVsIsZeroTestCase) Test(t *testing.T) {
 	nilResult := IsNil(tc.value)
 	zeroResult := IsZero(tc.value)
 
-	AssertEqual(t, tc.expectedNil, nilResult, tc.description+" - IsNil result")
-	AssertEqual(t, tc.expectedZero, zeroResult, tc.description+" - IsZero result")
+	assertComparable(t, tc.expectedNil, nilResult, "%s - IsNil result", tc.description)
+	assertComparable(t, tc.expectedZero, zeroResult, "%s - IsZero result", tc.description)
 }
 
 func newIsNilVsIsZeroTestCase(name string, value any, expectedNil, expectedZero bool,
@@ -906,7 +909,7 @@ func (tc isSameTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	result := IsSame(tc.a, tc.b)
-	AssertEqual(t, tc.expected, result, tc.description)
+	assertComparable(t, tc.expected, result, "%s", tc.description)
 }
 
 func newIsSameTestCase(name string, a, b any, expected bool,
@@ -1312,7 +1315,7 @@ func (tc isSameStackOverflowTestCase) Test(t *testing.T) {
 
 	a, b := tc.setupFunc()
 	result := IsSame(a, b)
-	AssertEqual(t, tc.expected, result, tc.description)
+	assertComparable(t, tc.expected, result, "%s", tc.description)
 }
 
 func newIsSameStackOverflowTestCase(name string,
@@ -1572,7 +1575,7 @@ func (tc areComparableTestCase) Name() string { return tc.name }
 
 func (tc areComparableTestCase) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.want, AreComparable(tc.vvi...), "comparable")
+	assertComparable(t, tc.want, AreComparable(tc.vvi...), "comparable")
 }
 
 func newAreComparableTestCase(name string, vvi []any,
@@ -1610,6 +1613,88 @@ func TestAreComparable(t *testing.T) {
 	RunTestCases(t, areComparableTestCases())
 }
 
+// heldValues is comparable as a type, while == on two of them panics
+// once it reaches a field holding values of a non-comparable type.
+// Fields compare in order, and the first difference ends the comparison.
+type heldValues struct {
+	first  any
+	second any
+}
+
+// comparableEqualTestCase reads its results with plain checks:
+// comparableEqual sits under the assertions that would otherwise read
+// them.
+type comparableEqualTestCase struct {
+	a, b      any
+	name      string
+	wantEqual bool
+	wantKnown bool
+}
+
+func (tc comparableEqualTestCase) Name() string { return tc.name }
+
+func (tc comparableEqualTestCase) Test(t *testing.T) {
+	t.Helper()
+	equal, known := comparableEqual(tc.a, tc.b)
+	plainEqual(t, tc.wantEqual, equal, "equal")
+	plainEqual(t, tc.wantKnown, known, "known")
+}
+
+func newComparableEqualTestCase(name string, a, b any,
+	wantEqual, wantKnown bool) comparableEqualTestCase {
+	return comparableEqualTestCase{
+		name:      name,
+		a:         a,
+		b:         b,
+		wantEqual: wantEqual,
+		wantKnown: wantKnown,
+	}
+}
+
+func comparableEqualTestCases() []comparableEqualTestCase {
+	p := new(int)
+
+	return []comparableEqualTestCase{
+		newComparableEqualTestCase("equal ints", 42, 42, true, true),
+		newComparableEqualTestCase("unequal ints", 42, 43, false, true),
+		newComparableEqualTestCase("different types", 42, "42", false, true),
+		newComparableEqualTestCase("both nil", nil, nil, true, true),
+		newComparableEqualTestCase("nil vs typed nil",
+			nil, (*int)(nil), false, true),
+		newComparableEqualTestCase("NaN never equals",
+			math.NaN(), math.NaN(), false, true),
+		newComparableEqualTestCase("same pointer", p, p, true, true),
+		newComparableEqualTestCase("distinct pointers",
+			p, new(int), false, true),
+		newComparableEqualTestCase("slice vs int", S(1), 1, false, true),
+		newComparableEqualTestCase("slices panic", S(1), S(1), false, false),
+		newComparableEqualTestCase("held slices reached",
+			heldValues{1, S(1)}, heldValues{1, S(1)}, false, false),
+		newComparableEqualTestCase("held slices behind a difference",
+			heldValues{1, S(1)}, heldValues{2, S(1)}, false, true),
+	}
+}
+
+func TestComparableEqual(t *testing.T) {
+	RunTestCases(t, comparableEqualTestCases())
+}
+
+// TestComparableEqualTyped instantiates comparableEqual with the concrete
+// types the assertions use, where == cannot panic.
+func TestComparableEqualTyped(t *testing.T) {
+	equal, known := comparableEqual(true, true)
+	plainEqual(t, true, equal, "true, true equal")
+	plainEqual(t, true, known, "true, true known")
+
+	equal, known = comparableEqual(true, false)
+	plainEqual(t, false, equal, "true, false equal")
+	plainEqual(t, true, known, "true, false known")
+
+	equal, known = comparableEqual("a", "b")
+	plainEqual(t, false, equal, "a, b equal")
+	plainEqual(t, true, known, "a, b known")
+}
+
 type areEqualTestCase struct {
 	name      string
 	vvi       []any
@@ -1622,8 +1707,8 @@ func (tc areEqualTestCase) Name() string { return tc.name }
 func (tc areEqualTestCase) Test(t *testing.T) {
 	t.Helper()
 	is, known := AreEqual(tc.vvi...)
-	AssertEqual(t, tc.wantIs, is, "is")
-	AssertEqual(t, tc.wantKnown, known, "known")
+	assertComparable(t, tc.wantIs, is, "is")
+	assertComparable(t, tc.wantKnown, known, "known")
 }
 
 func newAreEqualTestCase(name string, vvi []any,
@@ -1655,6 +1740,10 @@ func areEqualComparableTestCases() []areEqualTestCase {
 			S[any](eqNeverComparable(1), eqNeverComparable(1)), true, true),
 		newAreEqualTestCase("false == with false Equal stays unequal",
 			S[any](eqNeverComparable(1), eqNeverComparable(2)), false, true),
+		newAreEqualTestCase("held slices reached stay unknown",
+			S[any](heldValues{1, S(1)}, heldValues{1, S(1)}), false, false),
+		newAreEqualTestCase("held slices behind a difference",
+			S[any](heldValues{1, S(1)}, heldValues{2, S(1)}), false, true),
 	}
 }
 
@@ -1763,12 +1852,12 @@ func TestAreEqualComparableEqualCalls(t *testing.T) {
 	eqNeverComparableCalls.Store(0)
 	is, _ := AreEqual(eqNeverComparable(1), eqNeverComparable(1))
 	AssertTrue(t, is, "true == equal")
-	AssertEqual(t, int64(0), eqNeverComparableCalls.Load(), "Equal skipped on true ==")
+	assertComparable(t, int64(0), eqNeverComparableCalls.Load(), "Equal skipped on true ==")
 
 	eqNeverComparableCalls.Store(0)
 	is, _ = AreEqual(eqNeverComparable(1), eqNeverComparable(2))
 	AssertFalse(t, is, "false == unequal")
-	AssertEqual(t, int64(1), eqNeverComparableCalls.Load(), "Equal consulted on false ==")
+	assertComparable(t, int64(1), eqNeverComparableCalls.Load(), "Equal consulted on false ==")
 }
 
 // Benchmarks

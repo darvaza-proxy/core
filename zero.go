@@ -413,6 +413,12 @@ func isComparableValue(v reflect.Value) bool {
 // identity (the same underlying data, as [IsSame] sees it), and by the
 // Equal method standing in for ==.
 //
+// A comparable type can still hold a value == panics on, as a struct
+// with an interface field holding a slice does. == is attempted all the
+// same: a difference found before that value settles the pair as
+// unequal, and a panic leaves the pair to the rules for values without
+// ==.
+//
 // Slices without a decisive Equal method are compared element by
 // element, one level deep: lengths must match, and each element pair
 // is decided by the same rules, except that nested slices are not
@@ -475,8 +481,9 @@ func areEqual2(a, b comparableValue, deep bool) (is, known bool) {
 		// both untyped nil
 		return true, true
 	case a.ok && b.ok:
-		// == decides; a false == still defers to an Equal method
-		return areEqualComparable(a.v, b.v)
+		// == is attempted; a false == still defers to an Equal
+		// method, and a panic to the rules for values without ==
+		return areEqualComparable(a.v, b.v, deep)
 	default:
 		return areEqualFallback(a.v, b.v, deep)
 	}
@@ -486,20 +493,26 @@ func areEqual2(a, b comparableValue, deep bool) (is, known bool) {
 // == is authoritative and skips the Equal method. A false == defers to
 // the Equal method, following the Equal(T) bool convention, so a type
 // whose == tests more than its own notion of equality still settles
-// correctly. Without a decisive Equal method, == stands.
-func areEqualComparable(va, vb reflect.Value) (is, known bool) {
-	if va.Interface() == vb.Interface() {
+// correctly. Without a decisive Equal method, == stands. Operands of a
+// comparable type holding a value == panics on are settled as those
+// without == are.
+func areEqualComparable(va, vb reflect.Value, deep bool) (is, known bool) {
+	switch equal, settled := comparableEqual(va.Interface(), vb.Interface()); {
+	case !settled:
+		// == panicked
+		return areEqualFallback(va, vb, deep)
+	case equal:
 		// authoritative
 		return true, true
-	}
+	default:
+		if is, known = equalMethod(va, vb); known {
+			// Equal rescues a pair == calls unequal
+			return is, true
+		}
 
-	if is, known = equalMethod(va, vb); known {
-		// Equal rescues a pair == calls unequal
-		return is, true
+		// == is authoritative when no Equal method decides
+		return false, true
 	}
-
-	// == is authoritative when no Equal method decides
-	return false, true
 }
 
 // areEqualFallback decides equality when == is unavailable: typed
@@ -617,13 +630,28 @@ func isEqualMethodType(mt, arg reflect.Type) bool {
 		mt.NumOut() == 1 && mt.Out(0).Kind() == reflect.Bool
 }
 
+// comparableEqual compares two values with ==. known is false when the
+// comparison panicked, which an interface holding a value of a
+// non-comparable type does.
+func comparableEqual[U comparable](a, b U) (equal, known bool) {
+	defer func() {
+		if recover() != nil {
+			equal, known = false, false
+		}
+	}()
+
+	return a == b, true
+}
+
 // comparableValue carries the reflection state of one [AreEqual]
 // operand so each value is reflected only once.
 type comparableValue struct {
 	t reflect.Type
 	v reflect.Value
-	// ok reports whether v supports direct == comparison via
-	// Interface().
+	// ok reports whether == can be attempted on v via Interface():
+	// its type is comparable and it can be unwrapped. A comparable
+	// type may still hold a value == panics on, which
+	// [comparableEqual] reports as unknown.
 	ok bool
 }
 
@@ -640,6 +668,6 @@ func newComparableValue(vi any) comparableValue {
 	return comparableValue{
 		t:  v.Type(),
 		v:  v,
-		ok: v.Comparable() && v.CanInterface(),
+		ok: v.Type().Comparable() && v.CanInterface(),
 	}
 }
