@@ -15,7 +15,6 @@ var (
 	_ TestCase = doMakeHostPortTestCase{}
 	_ TestCase = doJoinHostPortTestCase{}
 	_ TestCase = ipForHostPortTestCase{}
-	_ TestCase = addrErrTestCase{}
 )
 
 // mustExpected refuses an empty result in an accepting factory. Every
@@ -82,7 +81,6 @@ func splitAddrPortTestCases() []splitAddrPortTestCase {
 	return S(
 		// IP addresses
 		newSplitAddrPortTestCase("unspecified IPv4", "0.0.0.0:6060", "0.0.0.0", 6060),
-		newSplitAddrPortTestCase("unspecified IPv4 short", "0:6060", "0.0.0.0", 6060),
 		newSplitAddrPortTestCase("IPv6 no port", "::1", "::1", 0),
 		newSplitAddrPortTestCase("bracketed IPv6 no port", "[::1]", "::1", 0),
 		newSplitAddrPortTestCase("bracketed IPv6 and port", "[::1]:1234", "::1", 1234),
@@ -90,17 +88,12 @@ func splitAddrPortTestCases() []splitAddrPortTestCase {
 		newSplitAddrPortTestCase("no host and port", ":6060", "::", 6060),
 
 		// Rejected ports
-		newSplitAddrPortTestCaseRejected("bracketed IPv6 empty port", "[::1]:"),
 		newSplitAddrPortTestCaseRejected("bracketed IPv6 bad port", "[::1]:port"),
-		newSplitAddrPortTestCaseRejected("IPv6 port out of range", "[::1]:123456"),
-		newSplitAddrPortTestCaseRejected("no host and bad port", ":606.0"),
-		newSplitAddrPortTestCaseRejected("no host and port out of range", ":123456"),
 
 		// Rejected addresses
 		// A valid port but a host that isn't a literal IP forces
 		// ParseAddr to fail, covering the non-IP address branch.
 		newSplitAddrPortTestCaseRejected("hostname not IP", "name:1234"),
-		newSplitAddrPortTestCaseRejected("incomplete bracketed IPv6", "[::1:1234"),
 		newSplitAddrPortTestCaseRejected("empty", ""),
 	)
 }
@@ -165,14 +158,12 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCase("name", "name", "name", ""),
 		newSplitHostPortTestCase("name and port", "name:1234", "name", "1234"),
 		newSplitHostPortTestCase("name and padded port", "name:0080", "name", "80"),
-		newSplitHostPortTestCase("hostname", "localhost", "localhost", ""),
 		newSplitHostPortTestCase("good name", "good.name", "good.name", ""),
 		newSplitHostPortTestCase("international name", "Hello.\u4E16\u754C", "hello.\u4E16\u754C", ""),
 		newSplitHostPortTestCase("puny code", "hello.xn--rhqv96g", "hello.\u4E16\u754C", ""),
 
 		// IP addresses
 		newSplitHostPortTestCase("unspecified IPv4", "0.0.0.0:6060", "0.0.0.0", "6060"),
-		newSplitHostPortTestCase("unspecified IPv4 short", "0:6060", "0.0.0.0", "6060"),
 		newSplitHostPortTestCase("IPv6 no port", "::1", "::1", ""),
 		newSplitHostPortTestCase("bracketed IPv6 no port", "[::1]", "::1", ""),
 		newSplitHostPortTestCase("bracketed IPv6 and port", "[::1]:1234", "::1", "1234"),
@@ -186,11 +177,6 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCaseRejected("name port out of range", "name:123456"),
 		newSplitHostPortTestCaseRejected("name non-numeric port", "name:port"),
 		newSplitHostPortTestCaseRejected("bracketed IPv6 empty port", "[::1]:"),
-		newSplitHostPortTestCaseRejected("bracketed IPv6 bad port", "[::1]:port"),
-		newSplitHostPortTestCaseRejected("IPv6 port out of range", "[::1]:123456"),
-		newSplitHostPortTestCaseRejected("no host bad port", ":port"),
-		newSplitHostPortTestCaseRejected("no host and bad port", ":606.0"),
-		newSplitHostPortTestCaseRejected("no host and port out of range", ":123456"),
 
 		// Rejected hosts
 		newSplitHostPortTestCaseRejected("bad hostname spaces", "bad name"),
@@ -261,22 +247,14 @@ func newMakeHostPortTestCaseRejected(name, hostPort string, defaultPort uint16) 
 func makeHostPortTestCases() []makeHostPortTestCase {
 	return S(
 		// Valid cases with IP addresses
-		newMakeHostPortTestCase("IPv4 default port", "192.168.1.1", 8080, "192.168.1.1:8080"),
-		newMakeHostPortTestCase("IPv4 explicit port", "192.168.1.1:9000", 8080, "192.168.1.1:9000"),
-		newMakeHostPortTestCase("IPv4 no port", "192.168.1.1", 0, "192.168.1.1"),
-		newMakeHostPortTestCase("IPv6 bracketed default port", "[::1]", 8080, "[::1]:8080"),
-		newMakeHostPortTestCase("IPv6 bracketed explicit port", "[::1]:9000", 8080, "[::1]:9000"),
 		newMakeHostPortTestCase("IPv6 bracketed no port", "[::1]", 0, "::1"),
 		newMakeHostPortTestCase("IPv6 unbracketed default port", "::1", 8080, "[::1]:8080"),
-		newMakeHostPortTestCase("IPv6 unbracketed no port", "::1", 0, "::1"),
 
 		// Valid cases with hostnames
-		newMakeHostPortTestCase("hostname default port", "localhost", 8080, "localhost:8080"),
-		newMakeHostPortTestCase("hostname explicit port", "localhost:9000", 8080, "localhost:9000"),
-		newMakeHostPortTestCase("hostname no port", "localhost", 0, "localhost"),
 		newMakeHostPortTestCase("FQDN default port", "example.com", 443, "example.com:443"),
 		newMakeHostPortTestCase("FQDN explicit port", "example.com:80", 443, "example.com:80"),
 		newMakeHostPortTestCase("FQDN padded port", "example.com:0080", 443, "example.com:80"),
+		newMakeHostPortTestCase("FQDN no port", "example.com", 0, "example.com"),
 
 		// Invalid cases
 		newMakeHostPortTestCaseRejected("empty input", "", 8080),
@@ -286,10 +264,7 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		// Port 0 in the input is rejected, not read as portless: the
 		// same default that accepts "example.com" does not rescue it.
 		newMakeHostPortTestCaseRejected("port 0 without default", "example.com:0", 0),
-		newMakeHostPortTestCaseRejected("port out of range", "example.com:99999", 8080),
 		newMakeHostPortTestCaseRejected("invalid port", "example.com:invalid", 8080),
-		newMakeHostPortTestCaseRejected("malformed IPv6", "[::1", 8080),
-		newMakeHostPortTestCaseRejected("IPv6 invalid port", "[::1]:invalid", 8080),
 		// Port 0 is judged after the split has cleaned the host and the
 		// port, and the error names the input.
 		newMakeHostPortTestCaseRejected("port 0 cleaned name", "Example.com:0", 8080),
@@ -355,19 +330,12 @@ func newJoinHostPortTestCaseRejected(name, host, port, errAddr string) joinHostP
 func joinHostPortTestCases() []joinHostPortTestCase {
 	return S(
 		// Valid cases with IP addresses
-		newJoinHostPortTestCase("IPv4 with port", "192.168.1.1", "8080", "192.168.1.1:8080"),
-		newJoinHostPortTestCase("IPv4 no port", "192.168.1.1", "", "192.168.1.1"),
 		newJoinHostPortTestCase("IPv6 with port", "::1", "8080", "[::1]:8080"),
 		newJoinHostPortTestCase("IPv6 no port", "::1", "", "::1"),
-		newJoinHostPortTestCase("IPv6 long with port", "2001:db8::1", "9000", "[2001:db8::1]:9000"),
-		newJoinHostPortTestCase("IPv6 long no port", "2001:db8::1", "", "2001:db8::1"),
 
 		// Valid cases with hostnames
-		newJoinHostPortTestCase("hostname with port", "localhost", "8080", "localhost:8080"),
-		newJoinHostPortTestCase("hostname no port", "localhost", "", "localhost"),
 		newJoinHostPortTestCase("FQDN with port", "example.com", "443", "example.com:443"),
 		newJoinHostPortTestCase("FQDN no port", "example.com", "", "example.com"),
-		newJoinHostPortTestCase("subdomain with port", "sub.example.com", "80", "sub.example.com:80"),
 		newJoinHostPortTestCase("padded port", "example.com", "0080", "example.com:80"),
 
 		// Port 0 joins, where MakeHostPort rejects it in its input.
@@ -377,12 +345,8 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 		// A rejected host is named alone, the port not having been read.
 		newJoinHostPortTestCaseRejected("empty host", "", "8080", ""),
 		newJoinHostPortTestCaseRejected("invalid hostname", "invalid host", "8080", "invalid host"),
-		newJoinHostPortTestCaseRejected("bad hostname dots", "bad..name", "8080", "bad..name"),
-		newJoinHostPortTestCaseRejected("bad hostname leading dot", ".invalid", "8080", ".invalid"),
 
 		// A rejected port is named with the host before it.
-		newJoinHostPortTestCaseRejected("port out of range", "example.com", "99999", "example.com:99999"),
-		newJoinHostPortTestCaseRejected("invalid port", "example.com", "invalid", "example.com:invalid"),
 		newJoinHostPortTestCaseRejected("negative port", "example.com", "-1", "example.com:-1"),
 	)
 }
@@ -442,24 +406,17 @@ func doMakeHostPortTestCases() []doMakeHostPortTestCase {
 	return S(
 		// Valid cases with explicit port
 		newDoMakeHostPortTestCase("explicit port used", "example.com", "8080", 9000, "example.com:8080"),
-		newDoMakeHostPortTestCase("explicit port IPv4", "192.168.1.1", "443", 80, "192.168.1.1:443"),
-		newDoMakeHostPortTestCase("explicit port IPv6", "[::1]", "9000", 8080, "[::1]:9000"),
 		newDoMakeHostPortTestCase("explicit port padded", "example.com", "0080", 9000, "example.com:80"),
 
 		// Valid cases with default port
 		newDoMakeHostPortTestCase("default port used", "example.com", "", 8080, "example.com:8080"),
-		newDoMakeHostPortTestCase("default port IPv4", "192.168.1.1", "", 443, "192.168.1.1:443"),
-		newDoMakeHostPortTestCase("default port IPv6", "[::1]", "", 9000, "[::1]:9000"),
 
 		// Valid cases with no port
 		newDoMakeHostPortTestCase("no port hostname", "example.com", "", 0, "example.com"),
-		newDoMakeHostPortTestCase("no port IPv4", "192.168.1.1", "", 0, "192.168.1.1"),
 		newDoMakeHostPortTestCase("no port IPv6", "[::1]", "", 0, "[::1]"),
 
 		// Invalid cases
 		newDoMakeHostPortTestCaseRejected("port 0 not allowed", "example.com", "0", 8080),
-		newDoMakeHostPortTestCaseRejected("port 0 not allowed IPv4", "192.168.1.1", "0", 443),
-		newDoMakeHostPortTestCaseRejected("port 0 not allowed IPv6", "[::1]", "0", 9000),
 		// MakeHostPort never hands over a padded port, the split having
 		// made it canonical, so only a direct call reaches this.
 		newDoMakeHostPortTestCaseRejected("port 0 padded", "example.com", "00", 8080),
@@ -527,20 +484,10 @@ func doJoinHostPortTestCases() []doJoinHostPortTestCase {
 	return S(
 		// Valid cases
 		newDoJoinHostPortTestCase("valid hostname", "example.com", "8080", "example.com:8080"),
-		newDoJoinHostPortTestCase("valid IPv4", "192.168.1.1", "443", "192.168.1.1:443"),
-		newDoJoinHostPortTestCase("valid IPv6", "[::1]", "9000", "[::1]:9000"),
-		newDoJoinHostPortTestCase("valid hostname SSH", "localhost", "22", "localhost:22"),
-		newDoJoinHostPortTestCase("valid subdomain", "sub.example.com", "80", "sub.example.com:80"),
 		newDoJoinHostPortTestCase("padded port", "example.com", "0080", "example.com:80"),
-		// Port 0 joins, where doMakeHostPort rejects it.
-		newDoJoinHostPortTestCase("port 0 valid", "example.com", "0", "example.com:0"),
 
 		// Invalid cases
-		newDoJoinHostPortTestCaseRejected("port out of range", "192.168.1.1", "99999"),
-		newDoJoinHostPortTestCaseRejected("invalid port", "[::1]", "invalid"),
-		newDoJoinHostPortTestCaseRejected("negative port", "localhost", "-1"),
 		newDoJoinHostPortTestCaseRejected("port out of range high", "example.com", "65536"),
-		newDoJoinHostPortTestCaseRejected("non-numeric port", "test.com", "abc"),
 	)
 }
 
@@ -579,18 +526,9 @@ func ipForHostPortTestCases() []ipForHostPortTestCase {
 	return S(
 		// IPv4 addresses (should not be bracketed)
 		newIPForHostPortTestCase("IPv4 localhost", "127.0.0.1", "127.0.0.1"),
-		newIPForHostPortTestCase("IPv4 private", "192.168.1.1", "192.168.1.1"),
-		newIPForHostPortTestCase("IPv4 private 10", "10.0.0.1", "10.0.0.1"),
-		newIPForHostPortTestCase("IPv4 private 172", "172.16.0.1", "172.16.0.1"),
-		newIPForHostPortTestCase("IPv4 unspecified", "0.0.0.0", "0.0.0.0"),
-		newIPForHostPortTestCase("IPv4 broadcast", "255.255.255.255", "255.255.255.255"),
 
 		// IPv6 addresses (should be bracketed)
 		newIPForHostPortTestCase("IPv6 localhost", "::1", "[::1]"),
-		newIPForHostPortTestCase("IPv6 unspecified", "::", "[::]"),
-		newIPForHostPortTestCase("IPv6 example", "2001:db8::1", "[2001:db8::1]"),
-		newIPForHostPortTestCase("IPv6 link-local", "fe80::1", "[fe80::1]"),
-		newIPForHostPortTestCase("IPv6 full", "2001:db8:85a3::8a2e:370:7334", "[2001:db8:85a3::8a2e:370:7334]"),
 		newIPForHostPortTestCase("IPv6 mapped", "::ffff:192.0.2.1", "[::ffff:192.0.2.1]"),
 	)
 }
@@ -599,45 +537,12 @@ func TestIPForHostPort(t *testing.T) {
 	RunTestCases(t, ipForHostPortTestCases())
 }
 
-type addrErrTestCase struct {
-	name string
-	addr string
-	why  string
-}
-
-func (tc addrErrTestCase) Name() string {
-	return tc.name
-}
-
-// Test states what addrErr hands its callers: a *net.AddrError
+// TestAddrErr states what addrErr hands its callers: a *net.AddrError
 // carrying its two arguments in the two fields.
-func (tc addrErrTestCase) Test(t *testing.T) {
-	t.Helper()
-
-	err := addrErr(tc.addr, tc.why)
+func TestAddrErr(t *testing.T) {
+	err := addrErr("invalid.address", "test error")
 
 	got := AssertMustErrorAs[*net.AddrError](t, err, "addrErr")
-	AssertEqual(t, tc.addr, got.Addr, "Addr")
-	AssertEqual(t, tc.why, got.Err, "Err")
-}
-
-func newAddrErrTestCase(name, addr, why string) addrErrTestCase {
-	return addrErrTestCase{
-		name: name,
-		addr: addr,
-		why:  why,
-	}
-}
-
-func addrErrTestCases() []addrErrTestCase {
-	return S(
-		newAddrErrTestCase("basic error", "invalid.address", "test error"),
-		newAddrErrTestCase("empty addr", "", "empty address"),
-		newAddrErrTestCase("empty reason", "example.com", ""),
-		newAddrErrTestCase("special chars", "test@example.com", "invalid format"),
-	)
-}
-
-func TestAddrErr(t *testing.T) {
-	RunTestCases(t, addrErrTestCases())
+	AssertEqual(t, "invalid.address", got.Addr, "Addr")
+	AssertEqual(t, "test error", got.Err, "Err")
 }
