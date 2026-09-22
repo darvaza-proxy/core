@@ -73,14 +73,14 @@ func TestUserManager(t *testing.T) {
 Once the decision above qualifies the test as a genuine TestCase, the
 following structural requirements apply:
 
-1. **Interface Validation**: `var _ TestCase = ...` declarations for every
+1. **Interface Validation**: `var _ core.TestCase = ...` declarations for every
    test case type.
 2. **Factory Functions**: `newTestCaseTypeName()` for every TestCase type
    (decouples logical parameter order from memory-optimised field
    alignment).
 3. **Factory Usage**: Declare cases via factories, never naked struct
    literals.
-4. **RunTestCases**: Invoke the suite through `RunTestCases(t, cases)`; no
+4. **RunTestCases**: Invoke the suite through `core.RunTestCases(t, cases)`; no
    manual `for _, tc := range ...` loops.
 5. **Anonymous Functions**: Keep `t.Run` bodies to ≤3 lines; extract
    longer ones into named helper functions.
@@ -199,7 +199,7 @@ pathErr, ok := core.AssertErrorAs[*fs.PathError](t, err, "error type")
 result, ok := core.AssertTypeIs[MyType](t, value, "type cast")
 core.AssertContains(t, text, substring, "text content")
 core.AssertNotContain(t, text, substring, "text exclusion")
-core.AssertPanic(t, func() { panic("test") }, "panic")
+core.AssertPanic(t, func() { panic("test") }, "test", "panic")
 core.AssertNoPanic(t, func() { /* safe code */ }, "no panic")
 ```
 
@@ -210,6 +210,7 @@ core.AssertEventually(t, func() bool { return srv.Ready() }, time.Second, "ready
 core.AssertEventuallyContext(t, t.Context(), func() bool { return srv.Ready() }, "ready")
 core.AssertClosed(t, done, time.Second, "workers finished")
 core.AssertOpen(t, done, 10*time.Millisecond, "workers still running")
+core.AssertQuiet(t, acquired, 10*time.Millisecond, "token withheld")
 core.AssertReceives(t, ready, n, time.Second, "workers ready")
 ```
 
@@ -219,7 +220,21 @@ the channel's state whatever it held, and the values consumed on the way
 are counted in the report. They are for channels that signal by closing; a
 channel that carries values wants `AssertReceives`, which waits for `n`
 values under one shared timeout, returns them in arrival order, and fails
-on a close before the n-th. `AssertEventually` polls its predicate
+on a close before the n-th.
+
+`AssertQuiet` states that nothing arrives at all within the timeout, a
+value as much as a close. It is for a channel that signals by sending,
+where the thing under test is that the signal is withheld: a lock not yet
+granted, a waiter still blocked. `AssertOpen` cannot say that, since it
+consumes the value and passes. `AssertQuiet` stops at the first event
+rather than receiving past it, so at most one value is taken from the
+channel, and the report names it, or the close, with the time it took to
+arrive. A nil channel produces nothing and always passes. As with every
+assertion of an absence, the timeout is the whole of the evidence: keep it
+short enough not to slow the suite, and long enough that the event would
+have arrived had it been going to.
+
+`AssertEventually` polls its predicate
 every millisecond through `core.WaitForCond`, which is the same wait returned
 as a value, for a caller that wants to branch on it rather than assert it.
 `AssertEventuallyContext` does the same under a context, so a test polling
@@ -326,7 +341,7 @@ when using TestCase:
 
 ```go
 // Compile-time verification that test case types implement TestCase interface
-var _ TestCase = parseURLTestCase{}
+var _ core.TestCase = parseURLTestCase{}
 ```
 
 ### Step 2: Named TestCase Types (MANDATORY for table-driven tests)
@@ -799,7 +814,8 @@ functions decouple these two concerns:
 
 ```go
 type waitGroupGoTestCase struct {
-    // Memory-optimised field order (largest to smallest)
+    // Memory-optimised field order: pointers packed towards the
+    // front, the one-byte field last so padding falls at the end
     fn          func() error  // 8 bytes (function pointer)
     errorMsg    string        // 16 bytes (string header)
     name        string        // 16 bytes (string header)
@@ -813,10 +829,10 @@ func newWaitGroupGoTestCase(name string, fn func() error, expectError bool,
     return waitGroupGoTestCase{
         // Fields assigned in memory-optimised order, regardless of
         // parameter order
-        fn:          fn,          // Memory: first (largest)
+        fn:          fn,          // Memory: first
         errorMsg:    errorMsg,    // Memory: second
         name:        name,        // Memory: third
-        expectError: expectError, // Memory: last (smallest)
+        expectError: expectError, // Memory: last
     }
 }
 
@@ -892,9 +908,9 @@ Order struct fields to minimise memory padding:
 
 ```go
 type testCase struct {
-    // 8-byte fields first (pointers, interfaces, strings on 64-bit)
-    input    interface{}
-    expected interface{}
+    // 16-byte fields first (interfaces, strings on 64-bit)
+    input    any
+    expected any
     name     string
 
     // 4-byte fields (int32, float32)
@@ -906,9 +922,10 @@ type testCase struct {
 }
 ```
 
-Verify struct ordering via the probe-file workflow in `AGENTS.md`.
-Never run `fieldalignment -fix` against `./...` — it strips every
-comment from every touched file.
+Verify struct ordering via the probe-file workflow in
+[BUILDING.md](./BUILDING.md#field-alignment). Never run
+`fieldalignment -fix` against `./...` — it strips every comment from
+every touched file.
 
 ```bash
 go run golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest -fix .tmp/fieldalign.go
@@ -934,19 +951,16 @@ Use the benchmark utility for consistent setup:
 
 ```go
 func BenchmarkProcessing(b *testing.B) {
-    err := core.RunBenchmark(b,
-        func() interface{} {
+    core.RunBenchmark(b,
+        func() any {
             // Setup phase - not timed
             return createLargeDataset()
         },
-        func(data interface{}) {
+        func(data any) {
             // Execution phase - timed
             ProcessData(data.(*Dataset))
         },
     )
-    if err != nil {
-        b.Fatal(err)
-    }
 }
 ```
 
@@ -961,12 +975,12 @@ func TestMyAssertion(t *testing.T) {
     mock := &core.MockT{}
 
     // Test successful assertion
-    core.AssertEqual(mock, 42, 42, "equality")
+    core.AssertContains(mock, "hello world", "world", "text")
     core.AssertTrue(t, mock.HasLogs(), "has logs")
 
     lastLog, ok := mock.LastLog()
     core.AssertTrue(t, ok, "has log")
-    core.AssertContains(t, lastLog, "test equality: 42", "log content")
+    core.AssertEqual(t, `text: contains "world"`, lastLog, "log content")
 
     // Reset for next test
     mock.Reset()
@@ -1013,11 +1027,10 @@ func TestValidation(t *testing.T) {
 func TestErrorTypes(t *testing.T) {
     err := ProcessRequest(invalidData)
 
-    validationErr, ok := core.AssertTypeIs[*ValidationError](t, err, "cast")
-    if ok {
-        core.AssertEqual(t, "invalid field: name", validationErr.Message,
-            "message")
-    }
+    validationErr := core.AssertMustErrorAs[*ValidationError](t, err,
+        "error type")
+    core.AssertEqual(t, "invalid field: name", validationErr.Message,
+        "message")
 }
 ```
 
@@ -1152,7 +1165,7 @@ for _, tc := range testCases {
 }
 
 // DON'T: Missing interface validations for TestCase
-// (no var _ TestCase = ... declarations)
+// (no var _ core.TestCase = ... declarations)
 
 // DON'T: Missing factory functions for TestCase
 // (no newTestCaseTypeName() functions)
@@ -1173,7 +1186,7 @@ var complexTestCases = []myTestCase{
 
 ```go
 // DO: TestCase interface validations (for table-driven tests)
-var _ TestCase = myTestCase{}
+var _ core.TestCase = myTestCase{}
 
 // DO: Named TestCase types implementing TestCase interface
 type myTestCase struct {
@@ -1247,14 +1260,14 @@ func validationTestCases(fieldName string) []validationTestCase {
 Before committing table-driven test code using TestCase, verify ALL 6
 requirements:
 
-- [ ] **TestCase Interface Validations**: Added `var _ TestCase = ...` for
+- [ ] **TestCase Interface Validations**: Added `var _ core.TestCase = ...` for
       all TestCase types.
 - [ ] **Factory Functions**: Created `newTestCaseTypeName()` for all TestCase
       types.
 - [ ] **Factory Usage**: All TestCase declarations use factory functions
       (no naked struct literals).
 - [ ] **RunTestCases Usage**: All table-driven test functions use
-      `RunTestCases(t, cases)`.
+      `core.RunTestCases(t, cases)`.
 - [ ] **Anonymous Functions**: No `t.Run()` anonymous functions longer than
       3 lines.
 - [ ] **TestCase List Factories**: Complex TestCase generation uses

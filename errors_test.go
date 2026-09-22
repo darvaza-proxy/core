@@ -859,3 +859,16 @@ func TestErrInvalidAlias(t *testing.T) {
 	AssertErrorIs(t, os.ErrInvalid, ErrInvalid, "reverse match")
 	AssertEqual(t, "invalid argument", ErrInvalid.Error(), "message")
 }
+
+// Test ErrUnsupported is an alias of the standard sentinel, so errors.Is
+// matches across the boundary in both directions. A gap in the code is
+// not an unsupported operation, so ErrNotImplemented and ErrTODO stay
+// out of its chain.
+func TestErrUnsupportedAlias(t *testing.T) {
+	AssertSame(t, errors.ErrUnsupported, ErrUnsupported, "errors.ErrUnsupported identity")
+	AssertErrorIs(t, Wrap(errors.ErrUnsupported, "note"), ErrUnsupported, "match")
+	AssertErrorIs(t, Wrap(ErrUnsupported, "note"), errors.ErrUnsupported, "reverse match")
+
+	AssertNotErrorIs(t, ErrNotImplemented, ErrUnsupported, "ErrNotImplemented apart")
+	AssertNotErrorIs(t, ErrTODO, ErrUnsupported, "ErrTODO apart")
+}

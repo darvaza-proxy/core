@@ -78,12 +78,17 @@ func TestErrGroupSetDefaults(t *testing.T) {
 	RunTestCases(t, errGroupSetDefaultsTestCases())
 }
 
+// errGroupGoTestCase states what a worker's outcome does to the group:
+// whether Wait reports an error, and whether the group ends cancelled.
+// cancelManually marks the rows cancelled from outside rather than by
+// their own worker failing.
 type errGroupGoTestCase struct {
-	runFunc      func(context.Context) error
-	shutdownFunc func() error
-	name         string
-	expectError  bool
-	expectCancel bool
+	runFunc        func(context.Context) error
+	shutdownFunc   func() error
+	name           string
+	expectError    bool
+	expectCancel   bool
+	cancelManually bool
 }
 
 // newErrGroupGoTestCase creates a new errGroupGoTestCase
@@ -95,6 +100,8 @@ func newErrGroupGoTestCase(name string, runFunc func(context.Context) error,
 		shutdownFunc: shutdownFunc,
 		expectError:  expectError,
 		expectCancel: expectCancel,
+
+		cancelManually: false,
 	}
 }
 
@@ -110,10 +117,19 @@ func newErrGroupGoTestCaseError(name string, runFunc func(context.Context) error
 	return newErrGroupGoTestCase(name, runFunc, shutdownFunc, true, true)
 }
 
-// newErrGroupGoTestCaseCancel creates a test case expecting cancellation but no error
+// newErrGroupGoTestCaseCancel creates a test case cancelled from outside
+// the group part-way through, rather than by its own worker failing.
 func newErrGroupGoTestCaseCancel(name string, runFunc func(context.Context) error,
 	shutdownFunc func() error) errGroupGoTestCase {
-	return newErrGroupGoTestCase(name, runFunc, shutdownFunc, false, true)
+	return errGroupGoTestCase{
+		name:         name,
+		runFunc:      runFunc,
+		shutdownFunc: shutdownFunc,
+		expectError:  false,
+		expectCancel: true,
+
+		cancelManually: true,
+	}
 }
 
 var errGroupGoTestCases = []errGroupGoTestCase{
@@ -156,37 +172,21 @@ func (tc errGroupGoTestCase) Test(t *testing.T) {
 	var eg ErrGroup
 	eg.Go(tc.runFunc, tc.shutdownFunc)
 
-	tc.handleShutdownTests(&eg)
-	err := eg.Wait()
-	tc.checkError(t, err)
-	tc.checkCancellation(t, &eg)
-}
-
-func (tc errGroupGoTestCase) handleShutdownTests(eg *ErrGroup) {
-	if tc.name == "successful worker with shutdown" || tc.name == "worker with shutdown error" {
+	if tc.cancelManually {
 		go func() {
 			time.Sleep(10 * time.Millisecond)
 			eg.Cancel(errors.New("manual cancellation"))
 		}()
 	}
-}
 
-func (tc errGroupGoTestCase) checkError(t *testing.T, err error) {
-	t.Helper()
+	err := eg.Wait()
 	if tc.expectError {
 		AssertError(t, err, "error")
-	} else if errors.Is(err, context.Canceled) {
-		t.Log("context cancelled as expected")
 	} else {
 		AssertNoError(t, err, "no error")
 	}
-}
 
-func (tc errGroupGoTestCase) checkCancellation(t *testing.T, eg *ErrGroup) {
-	t.Helper()
-	if tc.expectCancel {
-		AssertTrue(t, eg.IsCancelled(), "group cancelled")
-	}
+	AssertEqual(t, tc.expectCancel, eg.IsCancelled(), "cancelled")
 }
 
 func TestErrGroupGo(t *testing.T) {
@@ -240,9 +240,6 @@ var errGroupGoCatchTestCases = []errGroupGoCatchTestCase{
 	}, func(_ context.Context, _ error) error {
 		return errors.New("transformed error")
 	}), // Transformed error should propagate
-	newErrGroupGoCatchTestCaseError("nil run function", nil, func(_ context.Context, err error) error {
-		return err
-	}), // Should panic and be caught
 }
 
 func (tc errGroupGoCatchTestCase) Name() string {
@@ -253,40 +250,28 @@ func (tc errGroupGoCatchTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	var eg ErrGroup
-
-	if tc.runFunc == nil {
-		tc.testNilFunction(t, &eg)
-		return
-	}
-
 	eg.GoCatch(tc.runFunc, tc.catchFunc)
+
 	err := eg.Wait()
-	tc.checkTestResult(t, err)
-}
-
-func (tc errGroupGoCatchTestCase) testNilFunction(t *testing.T, eg *ErrGroup) {
-	t.Helper()
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic for nil run function")
-		}
-	}()
-	eg.GoCatch(tc.runFunc, tc.catchFunc)
-}
-
-func (tc errGroupGoCatchTestCase) checkTestResult(t *testing.T, err error) {
-	t.Helper()
 	if tc.expectError {
-		if err == nil {
-			t.Errorf("Test case '%s': Expected error but got nil", tc.name)
-		}
-	} else if err != nil {
-		t.Errorf("Expected no error but got: %v", err)
+		AssertError(t, err, "error")
+	} else {
+		AssertNoError(t, err, "no error")
 	}
 }
 
 func TestErrGroupGoCatch(t *testing.T) {
 	RunTestCases(t, errGroupGoCatchTestCases)
+}
+
+// GoCatch refuses a nil run function outright rather than spawning a
+// worker that cannot run.
+func TestErrGroupGoCatchNilFunction(t *testing.T) {
+	var eg ErrGroup
+
+	AssertPanic(t, func() {
+		eg.GoCatch(nil, func(_ context.Context, err error) error { return err })
+	}, ErrInvalid, "panic")
 }
 
 func testErrGroupFirstCancellation(t *testing.T) {

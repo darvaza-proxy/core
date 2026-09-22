@@ -25,12 +25,11 @@ func Coalesce[T any](opts ...T) T {
 	return Zero[T](nil)
 }
 
-// revive:disable:flag-parameter
-
 // IIf returns one value or the other depending
 // on a condition.
+//
+//revive:disable-next-line:flag-parameter
 func IIf[T any](cond bool, yes, no T) T {
-	// revive:enable:flag-parameter
 	if cond {
 		return yes
 	}

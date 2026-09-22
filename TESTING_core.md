@@ -15,7 +15,13 @@ proper testing, especially when testing the assertion functions themselves.
 ### Function Dependencies
 
 ```text
+Trusted Ground (verified with plain checks on the real t):
+├── comparableEqual[U]      (== with the panic recovered as unknown)
+└── assertComparable[U]     (reports what comparableEqual decides)
+
 Independent Base Functions:
+├── AssertTrue              (uses assertComparable)
+├── AssertFalse             (uses assertComparable)
 ├── AssertEqual[T]          (uses AreEqual)
 ├── AssertNotEqual[T]       (uses AreEqual)
 ├── AssertSliceEqual[T]     (uses AreEqual)
@@ -38,33 +44,33 @@ Independent Base Functions:
 ├── AssertEventuallyContext (uses WaitForCondContext)
 ├── AssertClosed[U]         (uses select with a timeout)
 ├── AssertOpen[U]           (uses select with a timeout)
+├── AssertQuiet[U]          (uses select with a timeout)
 └── AssertReceives[U]       (uses select with a shared deadline)
-
-Derived Functions (depend on base functions):
-├── AssertTrue              → calls AssertEqual(t, true, value, ...)
-└── AssertFalse             → calls AssertEqual(t, false, value, ...)
 ```
+
+`comparableEqual` is `==` and a recover, and `AreEqual` attempts its
+comparisons through it as well. Its tests read their results with plain
+checks, so everything above it can rely on it as it relies on the `!=` of
+a plain check. `assertComparable` is private: it serves `AssertTrue`,
+`AssertFalse` and the tests of what `AssertEqual` is built on.
 
 ### Testing Implications
 
 **✅ Safe Testing Patterns:**
 
 ```go
-// Test base functions with MockT
+// Read a subject's results through something it does not use
 func TestAssertEqual(t *testing.T) {
     mock := &MockT{}
     result := AssertEqual(mock, 42, 42, "test")
-    // Use standard testing methods, not AssertTrue (which calls AssertEqual)
-    if !result {
-        t.Error("AssertEqual should return true")
-    }
+    // AssertTrue does not reach AssertEqual or AreEqual
+    AssertTrue(t, result, "result")
 }
 
-// Test derived functions knowing their dependencies
+// Where the subject is what the readers are built on, use plain checks
 func TestAssertTrue(t *testing.T) {
     mock := &MockT{}
     result := AssertTrue(mock, true, "test")
-    // This is safe because we're testing AssertTrue, not AssertEqual
     if !result {
         t.Error("AssertTrue should return true")
     }
@@ -74,11 +80,10 @@ func TestAssertTrue(t *testing.T) {
 **❌ Circular Testing Anti-Patterns:**
 
 ```go
-// DON'T: Test AssertEqual using AssertTrue (AssertTrue calls AssertEqual)
-func TestAssertEqual(t *testing.T) {
-    mock := &MockT{}
-    result := AssertEqual(mock, 42, 42, "test")
-    AssertTrue(t, result, "result") // CIRCULAR!
+// DON'T: Test AreEqual using AssertEqual (AssertEqual calls AreEqual)
+func TestAreEqual(t *testing.T) {
+    is, _ := AreEqual(42, 42)
+    AssertEqual(t, true, is, "is") // CIRCULAR!
 }
 
 // DON'T: Test AssertTrue using AssertTrue
@@ -93,8 +98,11 @@ func TestAssertTrue(t *testing.T) {
 
 The hierarchy exists for consistency and code reuse:
 
-1. **AssertTrue/AssertFalse → AssertEqual**: Ensures consistent formatting
-   and logging behaviour for boolean assertions.
+1. **Trusted Ground**: `comparableEqual` and `assertComparable` are small
+   enough to verify with plain checks, which gives the tests of everything
+   else a reader that shares only verified code with their subject.
+   `AssertTrue` and `AssertFalse` report with the wording of `AssertEqual`
+   without reaching `AreEqual`.
 
 2. **Independent Base Functions**: Provide fundamental comparison logic
    without dependencies on other assertion functions. Each base function
@@ -109,9 +117,10 @@ This design allows for:
 
 ### Testing Guidelines for Hierarchy
 
-1. **Test base functions first** using standard testing methods
-2. **Test derived functions** knowing their dependencies
-3. **Avoid circular testing** where functions test themselves
+1. **Test the trusted ground** with plain checks on the real `t`
+2. **Test everything else** through readers it does not use
+3. **Avoid circular testing**: a subject is never checked through itself
+   or through anything it uses internally, apart from the trusted ground
 4. **Use MockT appropriately** to capture assertion behaviour
 5. **Document the hierarchy** in tests for maintainability
 
@@ -149,21 +158,21 @@ enhanced capabilities:
 #### MockT Usage Examples
 
 ```go
-func TestAssertEqual(t *testing.T) {
+func TestAssertContains(t *testing.T) {
  mock := &MockT{}
 
  // Test successful assertion
- result := AssertEqual(mock, 42, 42, "equality")
+ result := AssertContains(mock, "hello world", "world", "text")
  AssertTrue(t, result, "returns true")
  AssertTrue(t, mock.HasLogs(), "has logs")
 
  lastLog, ok := mock.LastLog()
  AssertTrue(t, ok, "has log")
- AssertContains(t, lastLog, "equality test: 42", "log content")
+ AssertEqual(t, `text: contains "world"`, lastLog, "log content")
 
  // Test failed assertion
  mock.Reset()
- result = AssertEqual(mock, 42, 24, "inequality")
+ result = AssertContains(mock, "hello world", "moon", "text")
  AssertFalse(t, result, "returns false")
  AssertTrue(t, mock.HasErrors(), "has errors")
 }
@@ -388,19 +397,19 @@ func TestAssertSliceEqual(t *testing.T) {
 
 ```go
 func TestRunBenchmark(t *testing.T) {
- called := false
- err := RunBenchmark(&testing.B{},
-  func() interface{} {
+ execCount := 0
+
+ RunBenchmark(&testing.B{N: 10},
+  func() any {
    return "test data"
   },
-  func(data interface{}) {
-   called = true
-   AssertEqual(t, "test data", data.(string), "benchmark data")
+  func(data any) {
+   AssertEqual(t, "test data", data, "benchmark data")
+   execCount++
   },
  )
 
- AssertNoError(t, err, "benchmark")
- AssertTrue(t, called, "called")
+ AssertEqual(t, 10, execCount, "execution count")
 }
 ```
 
@@ -542,7 +551,7 @@ func TestTestCaseCompliance(t *testing.T) {
  AssertTrue(t, hasTestMethod(tc), "test method")
 }
 
-func hasTestMethod(tc interface{}) bool {
+func hasTestMethod(tc any) bool {
  // Use reflection to verify test method exists
  // Implementation details...
  return true

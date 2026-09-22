@@ -9,10 +9,13 @@ import (
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = (*mockTestCase)(nil)
-	_ TestCase = mockTMessageAtTestCase{}
+	_ TestCase = assertComparableTestCase{}
 	_ TestCase = assertErrorAsTestCase[*WrappedError]{}
 	_ TestCase = assertTypeIsTestCase[string]{}
+	_ TestCase = assertPanicTestCase{}
+	_ TestCase = assertAbortTestCase{}
+	_ TestCase = (*mockTestCase)(nil)
+	_ TestCase = mockTMessageAtTestCase{}
 )
 
 // Test MockT implementation
@@ -50,6 +53,100 @@ func TestS(t *testing.T) {
 	AssertSliceEqual(t, []int{42}, singleSlice, "S single element")
 }
 
+// plainEqual and plainContains check on the real t without any
+// assertion, for the tests of what the assertions are built on.
+//
+// revive:disable-next-line:flag-parameter
+func plainEqual(t *testing.T, expected, actual bool, desc string) {
+	t.Helper()
+	if expected != actual {
+		t.Errorf("%s: expected %v, got %v", desc, expected, actual)
+	}
+}
+
+func plainContains(t *testing.T, s, substr, desc string) {
+	t.Helper()
+	if substr == "" || !strings.Contains(s, substr) {
+		t.Errorf("%s: %q does not contain %q", desc, s, substr)
+	}
+}
+
+// assertComparableTestCase reads its results with plain checks:
+// assertComparable sits under AssertTrue and AssertFalse, which would
+// otherwise read them. A row states whether the assertion passes, and
+// the essence of what it logs or reports.
+type assertComparableTestCase struct {
+	expected any
+	actual   any
+	name     string
+	message  string
+	wantPass bool
+}
+
+// newAssertComparableTestCase declares a row the assertion passes, with
+// the essence of what it logs.
+func newAssertComparableTestCase(name string, expected, actual any,
+	message string) assertComparableTestCase {
+	return assertComparableTestCase{
+		name:     name,
+		expected: expected,
+		actual:   actual,
+		message:  message,
+		wantPass: true,
+	}
+}
+
+// newAssertComparableTestCaseFails declares a row the assertion fails,
+// with the essence of the failure it reports.
+func newAssertComparableTestCaseFails(name string, expected, actual any,
+	message string) assertComparableTestCase {
+	return assertComparableTestCase{
+		name:     name,
+		expected: expected,
+		actual:   actual,
+		message:  message,
+		wantPass: false,
+	}
+}
+
+func (tc assertComparableTestCase) Name() string { return tc.name }
+
+func (tc assertComparableTestCase) Test(t *testing.T) {
+	t.Helper()
+	mock := &MockT{}
+	ok := assertComparable(mock, tc.expected, tc.actual, "value %d", 1)
+
+	plainEqual(t, tc.wantPass, ok, "result")
+	plainEqual(t, !tc.wantPass, mock.HasErrors(), "errors")
+	plainEqual(t, tc.wantPass, mock.HasLogs(), "logs")
+
+	msg, _ := mock.LastLog()
+	if !tc.wantPass {
+		msg, _ = mock.LastError()
+	}
+	plainContains(t, msg, tc.message, "message")
+}
+
+func assertComparableTestCases() []assertComparableTestCase {
+	return S(
+		newAssertComparableTestCase("equal ints", 42, 42, "value 1: 42"),
+		newAssertComparableTestCase("equal bools", true, true, "value 1: true"),
+		newAssertComparableTestCase("both nil", nil, nil, "value 1: <nil>"),
+		newAssertComparableTestCaseFails("unequal ints", 42, 24,
+			"value 1: expected 42, got 24"),
+		newAssertComparableTestCaseFails("unequal bools", false, true,
+			"value 1: expected false, got true"),
+		newAssertComparableTestCaseFails("different types", 42, "42",
+			"value 1: expected 42, got 42"),
+		newAssertComparableTestCaseFails("slices undecided", S(1), S(1),
+			"value 1: undecided for []int"),
+	)
+}
+
+func TestAssertComparable(t *testing.T) {
+	RunTestCases(t, assertComparableTestCases())
+}
+
 // undecidedPair returns two values AreEqual cannot settle: maps are
 // not comparable, and nil, identity and Equal methods all fail to
 // decide them.
@@ -65,7 +162,7 @@ func TestAssertEqual(t *testing.T) {
 
 	lastLog, ok := mock.LastLog()
 	AssertTrue(t, ok, "LastLog ok on success")
-	AssertEqual(t, "equal test: 42", lastLog, "log message on success")
+	assertComparable(t, "equal test: 42", lastLog, "log message on success")
 
 	mock.Reset()
 	assertFailed(t, mock, AssertEqual(mock, 42, 24, "not equal test"),
@@ -623,9 +720,6 @@ type assertPanicTestCase struct {
 	expectResult bool
 }
 
-// Compile-time verification
-var _ TestCase = assertPanicTestCase{}
-
 func (tc assertPanicTestCase) Name() string {
 	return tc.name
 }
@@ -637,17 +731,12 @@ func (tc assertPanicTestCase) Test(t *testing.T) {
 	result := AssertPanic(mock, tc.panicFn, tc.expected, tc.desc)
 	AssertEqual(t, !result, mock.HasErrors(), "errors follow result")
 
-	if tc.expectResult {
-		assertPassed(t, mock, result, tc.desc)
-		tc.assertLogged(t, mock)
-	} else {
+	if !tc.expectResult {
 		assertFailed(t, mock, result, tc.message, tc.desc)
+		return
 	}
-}
 
-// assertLogged checks the message an accepted panic logged.
-func (tc assertPanicTestCase) assertLogged(t *testing.T, mock *MockT) {
-	t.Helper()
+	assertPassed(t, mock, result, tc.desc)
 
 	lastLog, ok := mock.LastLog()
 	AssertMustTrue(t, ok, "logged")
@@ -761,16 +850,17 @@ func TestAssertPanic(t *testing.T) {
 }
 
 // assertAbortTestCase states what AssertPanic and AssertNoPanic do when
-// fn cuts the test short on the T they report to: the abort passes
-// through, the test is failed by fn alone, and the assertion neither
-// logs nor adds an error of its own.
+// fn cuts the test short on the T the assertion reports to: the abort
+// passes through and is not mistaken for a panic, the test is failed by
+// fn alone, and the assertion neither logs nor adds an error of its own.
+// expectPanic is what the assertion under test expects of fn.
 type assertAbortTestCase struct {
 	abort      func(T)
 	name       string
 	wantErrors int
-}
 
-var _ TestCase = assertAbortTestCase{}
+	expectPanic bool
+}
 
 func (tc assertAbortTestCase) Name() string {
 	return tc.name
@@ -778,47 +868,64 @@ func (tc assertAbortTestCase) Name() string {
 
 func (tc assertAbortTestCase) Test(t *testing.T) {
 	t.Helper()
-	tc.testThrough(t, "AssertPanic", func(mt T, fn func()) {
-		AssertPanic(mt, fn, nil, "aborted")
-	})
-	tc.testThrough(t, "AssertNoPanic", func(mt T, fn func()) {
-		AssertNoPanic(mt, fn, "aborted")
-	})
-}
-
-func (tc assertAbortTestCase) testThrough(t *testing.T, name string,
-	assert func(T, func())) {
-	t.Helper()
 	mock := &MockT{}
-	ok := mock.Run(name, func(mt T) {
-		assert(mt, func() { tc.abort(mt) })
+	ok := mock.Run(tc.name, func(mt T) {
+		fn := func() { tc.abort(mt) }
+		if tc.expectPanic {
+			AssertPanic(mt, fn, nil, "aborted")
+		} else {
+			AssertNoPanic(mt, fn, "aborted")
+		}
 	})
-	AssertFalse(t, ok, "%s continued", name)
-	AssertTrue(t, mock.Failed(), "%s failed", name)
-	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "%s errors", name)
-	AssertEqual(t, 0, mock.NumLogs(), "%s logs", name)
+
+	AssertFalse(t, ok, "continued")
+	AssertTrue(t, mock.Failed(), "failed")
+	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
+	AssertEqual(t, 0, mock.NumLogs(), "logs")
 }
 
-func newAssertAbortTestCase(name string, abort func(T), wantErrors int) assertAbortTestCase {
+func newAssertPanicAbortTestCase(name string, abort func(T),
+	wantErrors int) assertAbortTestCase {
 	return assertAbortTestCase{
-		abort:      abort,
-		name:       name,
-		wantErrors: wantErrors,
+		abort:       abort,
+		name:        name,
+		wantErrors:  wantErrors,
+		expectPanic: true,
 	}
 }
 
-func assertAbortTestCases() []assertAbortTestCase {
-	return []assertAbortTestCase{
-		newAssertAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
-		newAssertAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
-		newAssertAbortTestCase("AssertMust", func(mt T) {
-			AssertMustTrue(mt, false, "must")
-		}, 1),
-	}
-}
+var assertPanicAbortTestCases = S(
+	newAssertPanicAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
+	newAssertPanicAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
+	newAssertPanicAbortTestCase("AssertMust", func(mt T) {
+		AssertMustTrue(mt, false, "must")
+	}, 1),
+)
 
 func TestAssertPanicAbort(t *testing.T) {
-	RunTestCases(t, assertAbortTestCases())
+	RunTestCases(t, assertPanicAbortTestCases)
+}
+
+func newAssertNoPanicAbortTestCase(name string, abort func(T),
+	wantErrors int) assertAbortTestCase {
+	return assertAbortTestCase{
+		abort:       abort,
+		name:        name,
+		wantErrors:  wantErrors,
+		expectPanic: false,
+	}
+}
+
+var assertNoPanicAbortTestCases = S(
+	newAssertNoPanicAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
+	newAssertNoPanicAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
+	newAssertNoPanicAbortTestCase("AssertMust", func(mt T) {
+		AssertMustTrue(mt, false, "must")
+	}, 1),
+)
+
+func TestAssertNoPanicAbort(t *testing.T) {
+	RunTestCases(t, assertNoPanicAbortTestCases)
 }
 
 // Test AssertNoPanic
@@ -2014,7 +2121,7 @@ func assertLastLog(t *testing.T, mock *MockT, expected, desc string) {
 	t.Helper()
 	lastLog, ok := mock.LastLog()
 	AssertTrue(t, ok, "%s last log", desc)
-	AssertEqual(t, expected, lastLog, "%s log message", desc)
+	assertComparable(t, expected, lastLog, "%s log message", desc)
 }
 
 // assertMustContinued checks that a Must assertion passed and let the
@@ -2028,7 +2135,7 @@ func assertMustContinued(t *testing.T, mock *MockT, ok bool) {
 
 	lastLog, hasLog := mock.LastLog()
 	AssertTrue(t, hasLog, "Should have logged the assertion")
-	AssertEqual(t, mustContinuationLog, lastLog, "Should reach continuation log")
+	assertComparable(t, mustContinuationLog, lastLog, "Should reach continuation log")
 }
 
 // mustContinuationLog is what every Must success case logs after the
@@ -2041,8 +2148,8 @@ func assertMustAborted(t *testing.T, mock *MockT, ok bool) {
 	t.Helper()
 	AssertFalse(t, ok, "Failure case should abort")
 	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 1, mock.NumErrors(), "Should have error from failed assertion")
-	AssertEqual(t, 0, mock.NumLogs(), "Should not reach continuation log")
+	assertComparable(t, 1, mock.NumErrors(), "Should have error from failed assertion")
+	assertComparable(t, 0, mock.NumLogs(), "Should not reach continuation log")
 }
 
 // assertPassed checks that an assertion reported success: it returned

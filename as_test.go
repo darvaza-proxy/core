@@ -6,99 +6,64 @@ import (
 	"testing"
 )
 
-var _ TestCase = asTestCase{}
-var _ TestCase = asFnTestCase{}
-var _ TestCase = sliceAsTestCase{}
-var _ TestCase = sliceAsFnTestCase{}
-var _ TestCase = asErrorTestCase{}
-var _ TestCase = asErrorsTestCase{}
+var (
+	_ TestCase = asTestCase[string]{}
+	_ TestCase = asFnTestCase{}
+	_ TestCase = sliceAsTestCase{}
+	_ TestCase = sliceAsFnTestCase{}
+	_ TestCase = asErrorTestCase{}
+	_ TestCase = asErrorsTestCase{}
+)
 
 const testHello = "hello"
 
-// asTestCase tests As function
-type asTestCase struct {
-	// Interface fields - input/output test data
+// asTestCase states what As does for one target type V: ok says whether
+// the input already held a V, and the value returned is that V when it
+// did, the zero value when it did not.
+type asTestCase[V any] struct {
 	input any
-	want  any
+	want  V
+	name  string
 
-	// String fields - test identification
-	name string
-
-	// Boolean fields (1 byte) - expected result flags
 	wantOK bool
 }
 
-// newAsTestCase creates a new asTestCase
-func newAsTestCase(name string, input, want any, wantOK bool) asTestCase {
-	return asTestCase{
-		name:   name,
+func newAsTestCase[V any](name string, input any, want V, wantOK bool) asTestCase[V] {
+	return asTestCase[V]{
 		input:  input,
 		want:   want,
+		name:   name,
 		wantOK: wantOK,
 	}
 }
 
-func (tc asTestCase) Name() string {
+func (tc asTestCase[V]) Name() string {
 	return tc.name
 }
 
-func (tc asTestCase) Test(t *testing.T) {
+func (tc asTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	switch want := tc.want.(type) {
-	case string:
-		tc.testStringConversion(t, want)
-	case int:
-		tc.testIntConversion(t, want)
-	case error:
-		tc.testErrorConversion(t, want)
-	default:
-		tc.testDefaultConversion(t)
-	}
+	got, ok := As[any, V](tc.input)
+	AssertEqual(t, tc.wantOK, ok, "ok")
+	AssertEqual(t, tc.want, got, "value")
 }
 
-func (tc asTestCase) testStringConversion(t *testing.T, want string) {
-	t.Helper()
-	got, ok := As[any, string](tc.input)
-	if ok != tc.wantOK {
-		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-	}
-	if got != want {
-		t.Errorf("As() got = %v, want %v", got, want)
-	}
-}
+// asTestCases compounds the rows of every target type into one table,
+// grouped by target: string, then int, then error.
+func asTestCases() []TestCase {
+	testErr := errors.New("test error")
 
-func (tc asTestCase) testIntConversion(t *testing.T, want int) {
-	t.Helper()
-	got, ok := As[any, int](tc.input)
-	if ok != tc.wantOK {
-		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-	}
-	if got != want {
-		t.Errorf("As() got = %v, want %v", got, want)
-	}
-}
-
-func (tc asTestCase) testErrorConversion(t *testing.T, want error) {
-	t.Helper()
-	got, ok := As[any, error](tc.input)
-	if ok != tc.wantOK {
-		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-	}
-	if ok && got.Error() != want.Error() {
-		t.Errorf("As() got = %v, want %v", got, want)
-	}
-}
-
-func (tc asTestCase) testDefaultConversion(t *testing.T) {
-	t.Helper()
-	// Test cases where conversion should fail
-	got, ok := As[any, string](tc.input)
-	if ok != tc.wantOK {
-		t.Errorf("As() ok = %v, want %v", ok, tc.wantOK)
-	}
-	if tc.wantOK && got != "" {
-		t.Errorf("As() got = %v, want zero value", got)
+	return []TestCase{
+		newAsTestCase("string to string", testHello, testHello, true),
+		newAsTestCase("int to string fails", 42, "", false),
+		newAsTestCase("nil to string", nil, "", false),
+		newAsTestCase("int to int", 42, 42, true),
+		newAsTestCase("string to int fails", testHello, 0, false),
+		newAsTestCase("nil to int", nil, 0, false),
+		newAsTestCase[error]("error to error", testErr, testErr, true),
+		newAsTestCase[error]("string to error fails", testHello, nil, false),
+		newAsTestCase[error]("nil to error", nil, nil, false),
 	}
 }
 
@@ -310,16 +275,7 @@ func (tc asErrorsTestCase) Test(t *testing.T) {
 }
 
 func TestAs(t *testing.T) {
-	testCases := []asTestCase{
-		newAsTestCase("string to string", testHello, testHello, true),
-		newAsTestCase("int to int", 42, 42, true),
-		newAsTestCase("error to error", errors.New("test error"), errors.New("test error"), true),
-		newAsTestCase("int to string fails", 42, "", false),
-		newAsTestCase("nil to string", nil, "", false),
-		newAsTestCase("nil to error", nil, error(nil), false),
-	}
-
-	RunTestCases(t, testCases)
+	RunTestCases(t, asTestCases())
 }
 
 func TestAsFn(t *testing.T) {
@@ -477,7 +433,7 @@ func TestAsWithConcreteTypes(t *testing.T) {
 		t.Errorf("As[*int, *int](%p) = %p, %v; want %p, true", pi, v, ok, pi)
 	}
 
-	// Test interface{} to concrete type
+	// Test any to concrete type
 	var value any = testHello
 	if v, ok := As[any, string](value); !ok || v != testHello {
 		t.Errorf("As[any, string](%v) = %v, %v; want hello, true", value, v, ok)

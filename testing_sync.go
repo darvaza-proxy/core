@@ -184,6 +184,59 @@ func consumedSuffix(n int) string {
 	}
 }
 
+// AssertQuiet fails the test if anything arrives on ch within timeout, a
+// value as much as a close. It stops at the first event rather than
+// receiving past it, which is where it parts from AssertOpen: a channel
+// that signals by sending fails here and passes there. A nil channel
+// produces nothing, so it always passes.
+// The name parameter can include printf-style formatting.
+// Returns true if the assertion passed, false otherwise.
+//
+// Example usage:
+//
+//	AssertQuiet(t, sem.Acquire(), 10*time.Millisecond, "token withheld")
+func AssertQuiet[U any](t T, ch <-chan U, timeout time.Duration,
+	name string, args ...any) bool {
+	t.Helper()
+	start := time.Now()
+	got, quiet, closed := awaitQuiet(ch, time.After(timeout))
+	switch {
+	case quiet:
+		doLog(t, name, args, "quiet for %v", time.Since(start))
+		return true
+	case closed:
+		doError(t, name, args, "closed after %v", time.Since(start))
+	default:
+		doError(t, name, args, "received %v after %v", got, time.Since(start))
+	}
+	return false
+}
+
+// awaitQuiet waits for the first event on ch until deadline fires. quiet
+// says nothing arrived; otherwise closed tells the close from a value, and
+// got carries the value. Once the deadline fires it takes what ch already
+// holds without waiting: the clock never outranks a subject that is already
+// ready.
+func awaitQuiet[U any](ch <-chan U, deadline <-chan time.Time) (got U, quiet, closed bool) {
+	select {
+	case v, ok := <-ch:
+		return v, false, !ok
+	case <-deadline:
+		return peekQuiet(ch)
+	}
+}
+
+// peekQuiet continues awaitQuiet without waiting, taking only an event ch
+// already holds.
+func peekQuiet[U any](ch <-chan U) (got U, quiet, closed bool) {
+	select {
+	case v, ok := <-ch:
+		return v, false, !ok
+	default:
+		return got, true, false
+	}
+}
+
 // AssertReceives fails the test unless n values arrive on ch within
 // timeout. The timeout covers the whole collection rather than each receive,
 // and ch closing before the n-th value counts as failure. Values already
@@ -312,6 +365,20 @@ func AssertMustOpen[U any](t T, ch <-chan U, timeout time.Duration,
 	name string, args ...any) {
 	t.Helper()
 	if !AssertOpen(t, ch, timeout, name, args...) {
+		t.FailNow()
+	}
+}
+
+// AssertMustQuiet calls AssertQuiet and t.FailNow() if the assertion fails.
+// This is a convenience function for tests that should terminate on assertion failure.
+//
+// Example usage:
+//
+//	AssertMustQuiet(t, sem.Acquire(), 10*time.Millisecond, "token withheld")
+func AssertMustQuiet[U any](t T, ch <-chan U, timeout time.Duration,
+	name string, args ...any) {
+	t.Helper()
+	if !AssertQuiet(t, ch, timeout, name, args...) {
 		t.FailNow()
 	}
 }

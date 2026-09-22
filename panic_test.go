@@ -7,96 +7,93 @@ import (
 )
 
 // Compile-time verification that test case types implement TestCase interface
-var _ TestCase = asRecoveredTestCase{}
-var _ TestCase = catcherDoTestCase{}
-var _ TestCase = catcherTryTestCase{}
-var _ TestCase = catchTestCase{}
-var _ TestCase = catchWithPanicRecoveryTestCase{}
-var _ TestCase = mustSuccessTestCase{}
-var _ TestCase = mustPanicTestCase{}
-var _ TestCase = maybeTestCase{}
-var _ TestCase = mustOKSuccessTestCase{}
-var _ TestCase = mustOKPanicTestCase{}
-var _ TestCase = maybeOKTestCase{}
-var _ TestCase = mustTSuccessTestCase{}
-var _ TestCase = mustTPanicTestCase{}
-var _ TestCase = mustTReasonTestCase[int]{}
-var _ TestCase = maybeTTestCase{}
+var (
+	_ TestCase = asRecoveredTestCase{}
+	_ TestCase = catcherDoTestCase{}
+	_ TestCase = catcherTryTestCase{}
+	_ TestCase = catchTestCase{}
+	_ TestCase = catchWithPanicRecoveryTestCase{}
+	_ TestCase = mustSuccessTestCase[int]{}
+	_ TestCase = mustPanicTestCase{}
+	_ TestCase = maybeTestCase[int]{}
+	_ TestCase = mustOKSuccessTestCase[int]{}
+	_ TestCase = mustOKPanicTestCase{}
+	_ TestCase = maybeOKTestCase[int]{}
+	_ TestCase = mustTSuccessTestCase[int]{}
+	_ TestCase = mustTPanicTestCase[int]{}
+	_ TestCase = mustTReasonTestCase[int]{}
+	_ TestCase = maybeTTestCase[int]{}
+)
 
+// asRecoveredTestCase states what AsRecovered wraps a payload in: a
+// Recovered carrying that same payload, with a string converted to an
+// error of the same text. A nil input and an already-recovered value
+// are neither of them payloads being wrapped, and have their own tests.
 type asRecoveredTestCase struct {
-	input    any
-	expected any
-	name     string
+	input any
+	name  string
+
+	wantConverted bool
 }
 
-func (tc asRecoveredTestCase) Name() string { return tc.name }
-
-func (tc asRecoveredTestCase) MustNil() bool { return IsNil(tc.input) }
-
-func newAsRecoveredTestCase(name string, input, expected any) asRecoveredTestCase {
+func newAsRecoveredTestCase(name string, input any) asRecoveredTestCase {
 	return asRecoveredTestCase{
-		name:     name,
-		input:    input,
-		expected: expected,
+		input:         input,
+		name:          name,
+		wantConverted: false,
+	}
+}
+
+// newAsRecoveredTestCaseString declares a row whose payload is a string,
+// so the value recovered is an error carrying that same text.
+func newAsRecoveredTestCaseString(name, payload string) asRecoveredTestCase {
+	return asRecoveredTestCase{
+		input:         payload,
+		name:          name,
+		wantConverted: true,
 	}
 }
 
 func asRecoveredTestCases() []asRecoveredTestCase {
-	var testError = errors.New("test error")
-	var panicError = NewPanicError(1, "wrapped error")
+	testErr := errors.New("test error")
 
 	return []asRecoveredTestCase{
-		newAsRecoveredTestCase("nil input", nil, nil),
-		newAsRecoveredTestCase("string panic", "test panic", "test panic"),
-		newAsRecoveredTestCase("error panic", testError, testError),
-		newAsRecoveredTestCase("int panic", 42, 42),
-		newAsRecoveredTestCase("already recovered", panicError, panicError),
+		newAsRecoveredTestCaseString("string payload", "test panic"),
+		newAsRecoveredTestCase("named string payload", namedString("test panic")),
+		newAsRecoveredTestCase("error payload", testErr),
+		newAsRecoveredTestCase("int payload", 42),
 	}
 }
+
+func (tc asRecoveredTestCase) Name() string { return tc.name }
 
 func (tc asRecoveredTestCase) Test(t *testing.T) {
 	t.Helper()
-	result := AsRecovered(tc.input)
+	rec := AssertMustTypeIs[Recovered](t, AsRecovered(tc.input), "result")
 
-	if tc.MustNil() {
-		AssertNil(t, result, "nil result")
-		return
+	got := rec.Recovered()
+	if tc.wantConverted {
+		err := AssertMustTypeIs[error](t, got, "payload is an error")
+		got = err.Error()
 	}
 
-	if AssertNotNil(t, result, "not nil result") {
-		err, ok := AssertTypeIs[Recovered](t, result, "recovered panic error")
-		if ok {
-			tc.testRecovered(t, err)
-		}
-	}
-}
-
-func (tc asRecoveredTestCase) testRecovered(t *testing.T, result Recovered) {
-	if expectedError, asIs := tc.expected.(Recovered); asIs {
-		// pass-through
-		AssertEqual(t, expectedError, result, "pass-through recovered")
-		return
-	}
-
-	// recovered
-	recovered := result.Recovered()
-	if s0, ok := tc.expected.(string); ok {
-		if s1, ok := recovered.(string); ok {
-			// string vs string
-			AssertEqual(t, s0, s1, "recovered string")
-		} else if err, ok := AssertTypeIs[error](t, recovered, "recovered error"); ok {
-			// special case of strings converted to errors
-			AssertEqual(t, s0, err.Error(), "recovered string")
-		}
-
-		return
-	}
-
-	AssertEqual(t, tc.expected, recovered, "recovered value")
+	AssertEqual(t, tc.input, got, "payload")
 }
 
 func TestAsRecovered(t *testing.T) {
 	RunTestCases(t, asRecoveredTestCases())
+}
+
+func TestAsRecoveredNil(t *testing.T) {
+	AssertNil(t, AsRecovered(nil), "result")
+}
+
+// AsRecovered hands back a value that is already Recovered rather than
+// wrapping it a second time.
+func TestAsRecoveredPassThrough(t *testing.T) {
+	var rec Recovered = NewPanicError(0, "wrapped error")
+
+	AssertSame(t, rec, AsRecovered(rec), "result")
 }
 
 type catcherDoTestCase struct {
@@ -406,82 +403,35 @@ func testMust[T any](v0 T, e0 error) (v1 T, e1 error) {
 	return v1, nil
 }
 
-// mustSuccessTestCase tests Must function success scenarios where no panic should occur.
-type mustSuccessTestCase struct {
-	// Large fields first - interfaces (8 bytes on 64-bit)
-	value any
-	err   error
-
-	// Small fields last - strings (16 bytes on 64-bit)
-	name string
+// mustSuccessTestCase states that Must returns its value untouched and
+// raises nothing when the error is nil. The value's type is the row's
+// type parameter.
+type mustSuccessTestCase[V any] struct {
+	value V
+	name  string
 }
 
-// newMustSuccessTestCase creates a new mustSuccessTestCase with the given parameters.
-// For success cases, err is always nil.
-func newMustSuccessTestCase(name string, value any) mustSuccessTestCase {
-	return mustSuccessTestCase{
+func newMustSuccessTestCase[V any](name string, value V) TestCase {
+	return mustSuccessTestCase[V]{
 		value: value,
-		err:   nil,
 		name:  name,
 	}
 }
 
-// test validates that Must returns the value unchanged when err is nil.
-func (tc mustSuccessTestCase) Name() string {
+func (tc mustSuccessTestCase[V]) Name() string {
 	return tc.name
 }
 
-func (tc mustSuccessTestCase) Test(t *testing.T) {
+func (tc mustSuccessTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	tc.testMustWithValue(t)
+	got, err := testMust(tc.value, nil)
+	AssertNoError(t, err, "no panic")
+	AssertEqual(t, tc.value, got, "value")
 }
 
-// testMustT is a generic test helper for Must function with comparable types.
-// It handles the common pattern of testing Must with a value and verifying
-// the result matches expectations.
-func testMustT[V comparable](t *testing.T, tc mustSuccessTestCase, value V) {
-	t.Helper()
-
-	got, err := testMust(value, tc.err)
-	AssertNoError(t, err, "Must success")
-	AssertEqual(t, value, got, "Must value")
-}
-
-// testMustSlice is a specialized test helper for Must function with slice types.
-func testMustSlice[V any](t *testing.T, tc mustSuccessTestCase, value []V) {
-	t.Helper()
-
-	got, err := testMust(value, tc.err)
-	AssertNoError(t, err, "Must success")
-	AssertSliceEqual(t, value, got, "Must slice")
-}
-
-// testMustWithValue dispatches to the appropriate test helper.
-func (tc mustSuccessTestCase) testMustWithValue(t *testing.T) {
-	t.Helper()
-
-	// Test with different types using type switches
-	switch v := tc.value.(type) {
-	case string:
-		testMustT(t, tc, v)
-	case int:
-		testMustT(t, tc, v)
-	case bool:
-		testMustT(t, tc, v)
-	case []int:
-		testMustSlice(t, tc, v)
-	case *int:
-		testMustT(t, tc, v)
-	case struct{ Name string }:
-		testMustT(t, tc, v)
-	default:
-		t.Errorf("unsupported test value type: %T", tc.value)
-	}
-}
-
-func TestMustSuccess(t *testing.T) {
-	testCases := []mustSuccessTestCase{
+func mustSuccessTestCases() []TestCase {
+	return []TestCase{
 		newMustSuccessTestCase("string success", "hello"),
 		newMustSuccessTestCase("int success", 42),
 		newMustSuccessTestCase("bool success", true),
@@ -489,8 +439,10 @@ func TestMustSuccess(t *testing.T) {
 		newMustSuccessTestCase("nil pointer success", (*int)(nil)),
 		newMustSuccessTestCase("struct success", struct{ Name string }{"test"}),
 	}
+}
 
-	RunTestCases(t, testCases)
+func TestMustSuccess(t *testing.T) {
+	RunTestCases(t, mustSuccessTestCases())
 }
 
 // mustPanicTestCase tests Must function panic scenarios where Must should panic.
@@ -542,60 +494,48 @@ func TestMustPanic(t *testing.T) {
 	RunTestCases(t, testCases)
 }
 
-type maybeTestCase struct {
-	// Large fields first - interfaces (8 bytes)
-	value any
+// maybeTestCase states that Maybe returns its value whatever the error
+// is, so the rows differ only in the value's type and whether an error
+// was there to be ignored.
+type maybeTestCase[V any] struct {
 	err   error
-
-	// Small fields last - string (16 bytes)
-	name string
+	value V
+	name  string
 }
 
-func newMaybeTestCase(name string, value any, err error) maybeTestCase {
-	return maybeTestCase{
-		name:  name,
-		value: value,
+func newMaybeTestCase[V any](name string, value V, err error) TestCase {
+	return maybeTestCase[V]{
 		err:   err,
+		value: value,
+		name:  name,
 	}
 }
 
-func (tc maybeTestCase) Name() string {
+func (tc maybeTestCase[V]) Name() string {
 	return tc.name
 }
 
-func (tc maybeTestCase) Test(t *testing.T) {
+func (tc maybeTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	// Test with different types using type switches
-	switch v := tc.value.(type) {
-	case string:
-		got := Maybe(v, tc.err)
-		AssertEqual(t, v, got, "Maybe string")
-	case int:
-		got := Maybe(v, tc.err)
-		AssertEqual(t, v, got, "Maybe int")
-	case *int:
-		got := Maybe(v, tc.err)
-		AssertEqual(t, v, got, "Maybe pointer")
-	case struct{ Name string }:
-		got := Maybe(v, tc.err)
-		AssertEqual(t, v, got, "Maybe struct")
-	default:
-		t.Errorf("unsupported test value type: %T", tc.value)
-	}
+	AssertEqual(t, tc.value, Maybe(tc.value, tc.err), "value")
 }
 
-func TestMaybe(t *testing.T) {
-	testCases := []maybeTestCase{
+func maybeTestCases() []TestCase {
+	return []TestCase{
 		newMaybeTestCase("string with nil error", "hello", nil),
 		newMaybeTestCase("string with error", "world", errors.New("ignored error")),
 		newMaybeTestCase("int with nil error", 42, nil),
 		newMaybeTestCase("int with error", 0, errors.New("another ignored error")),
-		newMaybeTestCase("nil pointer with error", (*int)(nil), errors.New("pointer error")),
-		newMaybeTestCase("struct with error", struct{ Name string }{"test"}, fmt.Errorf("formatted: %d", 123)),
+		newMaybeTestCase("nil pointer with error", (*int)(nil),
+			errors.New("pointer error")),
+		newMaybeTestCase("struct with error", struct{ Name string }{"test"},
+			fmt.Errorf("formatted: %d", 123)),
 	}
+}
 
-	RunTestCases(t, testCases)
+func TestMaybe(t *testing.T) {
+	RunTestCases(t, maybeTestCases())
 }
 
 // testMustOK is a helper to test MustOK function by catching panics.
@@ -612,81 +552,35 @@ func testMustOK[T any](v0 T, ok bool) (v1 T, e1 error) {
 	return v1, nil
 }
 
-// mustOKSuccessTestCase tests MustOK function success scenarios where no panic should occur.
-type mustOKSuccessTestCase struct {
-	// Large fields first - interfaces (8 bytes on 64-bit)
-	value any
-
-	// Small fields last - strings (16 bytes on 64-bit), bool (1 byte)
-	name string
-	ok   bool
+// mustOKSuccessTestCase states that MustOK returns its value untouched
+// and raises nothing when ok is true, with the value's type carried by
+// the row.
+type mustOKSuccessTestCase[V any] struct {
+	value V
+	name  string
 }
 
-// newMustOKSuccessTestCase creates a new mustOKSuccessTestCase with the given parameters.
-// For success cases, ok is always true.
-func newMustOKSuccessTestCase(name string, value any) mustOKSuccessTestCase {
-	return mustOKSuccessTestCase{
+func newMustOKSuccessTestCase[V any](name string, value V) TestCase {
+	return mustOKSuccessTestCase[V]{
 		value: value,
-		ok:    true,
 		name:  name,
 	}
 }
 
-func (tc mustOKSuccessTestCase) Name() string {
+func (tc mustOKSuccessTestCase[V]) Name() string {
 	return tc.name
 }
 
-func (tc mustOKSuccessTestCase) Test(t *testing.T) {
+func (tc mustOKSuccessTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	tc.testMustOKWithValue(t)
+	got, err := testMustOK(tc.value, true)
+	AssertNoError(t, err, "no panic")
+	AssertEqual(t, tc.value, got, "value")
 }
 
-// testMustOKT is a generic test helper for MustOK function with comparable types.
-// It handles the common pattern of testing MustOK with a value and verifying
-// the result matches expectations.
-func testMustOKT[V comparable](t *testing.T, tc mustOKSuccessTestCase, value V) {
-	t.Helper()
-
-	got, err := testMustOK(value, tc.ok)
-	AssertNoError(t, err, "MustOK success")
-	AssertEqual(t, value, got, "MustOK value")
-}
-
-// testMustOKSlice is a specialized test helper for MustOK function with slice types.
-func testMustOKSlice[V any](t *testing.T, tc mustOKSuccessTestCase, value []V) {
-	t.Helper()
-
-	got, err := testMustOK(value, tc.ok)
-	AssertNoError(t, err, "MustOK success")
-	AssertSliceEqual(t, value, got, "MustOK slice")
-}
-
-// testMustOKWithValue dispatches to the appropriate test helper.
-func (tc mustOKSuccessTestCase) testMustOKWithValue(t *testing.T) {
-	t.Helper()
-
-	// Test with different types using type switches
-	switch v := tc.value.(type) {
-	case string:
-		testMustOKT(t, tc, v)
-	case int:
-		testMustOKT(t, tc, v)
-	case bool:
-		testMustOKT(t, tc, v)
-	case []int:
-		testMustOKSlice(t, tc, v)
-	case *int:
-		testMustOKT(t, tc, v)
-	case struct{ Name string }:
-		testMustOKT(t, tc, v)
-	default:
-		t.Errorf("unsupported test value type: %T", tc.value)
-	}
-}
-
-func TestMustOKSuccess(t *testing.T) {
-	testCases := []mustOKSuccessTestCase{
+func mustOKSuccessTestCases() []TestCase {
+	return []TestCase{
 		newMustOKSuccessTestCase("string success", "hello"),
 		newMustOKSuccessTestCase("int success", 42),
 		newMustOKSuccessTestCase("bool success", true),
@@ -694,8 +588,10 @@ func TestMustOKSuccess(t *testing.T) {
 		newMustOKSuccessTestCase("nil pointer success", (*int)(nil)),
 		newMustOKSuccessTestCase("struct success", struct{ Name string }{"test"}),
 	}
+}
 
-	RunTestCases(t, testCases)
+func TestMustOKSuccess(t *testing.T) {
+	RunTestCases(t, mustOKSuccessTestCases())
 }
 
 // mustOKPanicTestCase tests MustOK function panic scenarios where MustOK should panic.
@@ -753,174 +649,133 @@ func TestMustOKPanic(t *testing.T) {
 	RunTestCases(t, testCases)
 }
 
-type maybeOKTestCase struct {
-	// Large fields first - interfaces (8 bytes)
-	value any
-
-	// Small fields last - string (16 bytes), bool (1 byte)
-	name string
-	ok   bool
+// maybeOKTestCase states that MaybeOK returns its value whatever ok
+// says, so the rows differ only in the value's type and the flag being
+// ignored.
+type maybeOKTestCase[V any] struct {
+	value V
+	name  string
+	ok    bool
 }
 
-func newMaybeOKTestCase(name string, value any, ok bool) maybeOKTestCase {
-	return maybeOKTestCase{
-		name:  name,
+func newMaybeOKTestCase[V any](name string, value V, ok bool) TestCase {
+	return maybeOKTestCase[V]{
 		value: value,
+		name:  name,
 		ok:    ok,
 	}
 }
 
-func (tc maybeOKTestCase) Name() string {
+func (tc maybeOKTestCase[V]) Name() string {
 	return tc.name
 }
 
-func (tc maybeOKTestCase) Test(t *testing.T) {
+func (tc maybeOKTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	// Test with different types using type switches
-	switch v := tc.value.(type) {
-	case string:
-		got := MaybeOK(v, tc.ok)
-		AssertEqual(t, v, got, "MaybeOK string")
-	case int:
-		got := MaybeOK(v, tc.ok)
-		AssertEqual(t, v, got, "MaybeOK int")
-	case *int:
-		got := MaybeOK(v, tc.ok)
-		AssertEqual(t, v, got, "MaybeOK pointer")
-	case struct{ Name string }:
-		got := MaybeOK(v, tc.ok)
-		AssertEqual(t, v, got, "MaybeOK struct")
-	default:
-		t.Errorf("unsupported test value type: %T", tc.value)
-	}
+	AssertEqual(t, tc.value, MaybeOK(tc.value, tc.ok), "value")
 }
 
-func TestMaybeOK(t *testing.T) {
-	testCases := []maybeOKTestCase{
+func maybeOKTestCases() []TestCase {
+	return []TestCase{
 		newMaybeOKTestCase("string with true", "hello", true),
 		newMaybeOKTestCase("string with false", "world", false),
 		newMaybeOKTestCase("int with true", 42, true),
 		newMaybeOKTestCase("int with false", 0, false),
 		newMaybeOKTestCase("nil pointer with false", (*int)(nil), false),
-		newMaybeOKTestCase("struct with false", struct{ Name string }{"test"}, false),
-	}
-
-	RunTestCases(t, testCases)
-}
-
-// Test cases for MustT function
-type mustTSuccessTestCase struct {
-	input    any
-	expected any
-	name     string
-}
-
-func newMustTSuccessTestCase(name string, input, expected any) mustTSuccessTestCase {
-	return mustTSuccessTestCase{
-		name:     name,
-		input:    input,
-		expected: expected,
+		newMaybeOKTestCase("struct with false", struct{ Name string }{"test"},
+			false),
 	}
 }
 
-func (tc mustTSuccessTestCase) Name() string {
+func TestMaybeOK(t *testing.T) {
+	RunTestCases(t, maybeOKTestCases())
+}
+
+// mustTSuccessTestCase states that MustT hands back the input as the
+// target type when it already holds one. The target is the row's type
+// parameter.
+type mustTSuccessTestCase[T any] struct {
+	input any
+	want  T
+	name  string
+}
+
+func newMustTSuccessTestCase[T any](name string, input any, want T) TestCase {
+	return mustTSuccessTestCase[T]{
+		input: input,
+		want:  want,
+		name:  name,
+	}
+}
+
+func (tc mustTSuccessTestCase[T]) Name() string {
 	return tc.name
 }
 
-func (tc mustTSuccessTestCase) Test(t *testing.T) {
+func (tc mustTSuccessTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
-	// Test successful type conversions that don't panic
-	switch expected := tc.expected.(type) {
-	case string:
-		got := MustT[string](tc.input)
-		AssertEqual(t, expected, got, "MustT to string")
-	case int:
-		got := MustT[int](tc.input)
-		AssertEqual(t, expected, got, "MustT to int")
-	case float64:
-		got := MustT[float64](tc.input)
-		AssertEqual(t, expected, got, "MustT to float64")
-	case error:
-		got := MustT[error](tc.input)
-		AssertEqual(t, expected, got, "MustT to error")
-	case fmt.Stringer:
-		got := MustT[fmt.Stringer](tc.input)
-		AssertEqual(t, expected.String(), got.String(), "MustT to fmt.Stringer")
-	default:
-		t.Errorf("unsupported expected type: %T", tc.expected)
+	AssertEqual(t, tc.want, MustT[T](tc.input), "value")
+}
+
+func mustTSuccessTestCases() []TestCase {
+	testErr := errors.New("test")
+	stringer := mockStringer{value: "test"}
+
+	return []TestCase{
+		newMustTSuccessTestCase[string]("string to string", "hello", "hello"),
+		newMustTSuccessTestCase[int]("int to int", 42, 42),
+		newMustTSuccessTestCase[float64]("float64 to float64", 3.14, 3.14),
+		newMustTSuccessTestCase[error]("error to error", testErr, testErr),
+		newMustTSuccessTestCase[fmt.Stringer]("stringer to fmt.Stringer",
+			stringer, stringer),
 	}
 }
 
 func TestMustTSuccess(t *testing.T) {
-	testErr := errors.New("test")
-	testCases := []mustTSuccessTestCase{
-		newMustTSuccessTestCase("string to string", "hello", "hello"),
-		newMustTSuccessTestCase("int to int", 42, 42),
-		newMustTSuccessTestCase("float64 to float64", 3.14, 3.14),
-		newMustTSuccessTestCase("error to error", testErr, testErr),
-		newMustTSuccessTestCase("string to fmt.Stringer",
-			mockStringer{value: "test"}, mockStringer{value: "test"}),
-	}
-
-	RunTestCases(t, testCases)
+	RunTestCases(t, mustTSuccessTestCases())
 }
 
-type mustTPanicTestCase struct {
-	input  any
-	target string // target type description for error message
-	name   string
+// mustTPanicTestCase states that MustT panics with ErrUnreachable when
+// the input does not hold the target type. The target is the row's type
+// parameter.
+type mustTPanicTestCase[T any] struct {
+	input any
+	name  string
 }
 
-func newMustTPanicTestCase(name, target string, input any) mustTPanicTestCase {
-	return mustTPanicTestCase{
-		name:   name,
-		target: target,
-		input:  input,
+func newMustTPanicTestCase[T any](name string, input any) TestCase {
+	return mustTPanicTestCase[T]{
+		input: input,
+		name:  name,
 	}
 }
 
-func (tc mustTPanicTestCase) Name() string {
+func (tc mustTPanicTestCase[T]) Name() string {
 	return tc.name
 }
 
-func (tc mustTPanicTestCase) Test(t *testing.T) {
+func (tc mustTPanicTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
-	// Test type conversions that should panic
-	switch tc.target {
-	case "string":
-		AssertPanic(t, func() {
-			_ = MustT[string](tc.input)
-		}, ErrUnreachable, "MustT should panic for invalid string conversion")
-	case "int":
-		AssertPanic(t, func() {
-			_ = MustT[int](tc.input)
-		}, ErrUnreachable, "MustT should panic for invalid int conversion")
-	case "error":
-		AssertPanic(t, func() {
-			_ = MustT[error](tc.input)
-		}, ErrUnreachable, "MustT should panic for invalid error conversion")
-	case "fmt.Stringer":
-		AssertPanic(t, func() {
-			_ = MustT[fmt.Stringer](tc.input)
-		}, ErrUnreachable, "MustT should panic for invalid fmt.Stringer conversion")
-	default:
-		t.Errorf("unsupported target type: %s", tc.target)
+	AssertPanic(t, func() {
+		_ = MustT[T](tc.input)
+	}, ErrUnreachable, "panic")
+}
+
+func mustTPanicTestCases() []TestCase {
+	return []TestCase{
+		newMustTPanicTestCase[string]("int to string", 42),
+		newMustTPanicTestCase[int]("string to int", "hello"),
+		newMustTPanicTestCase[error]("string to error", "not an error"),
+		newMustTPanicTestCase[fmt.Stringer]("int to fmt.Stringer", 42),
+		newMustTPanicTestCase[string]("nil to string", nil),
 	}
 }
 
 func TestMustTPanic(t *testing.T) {
-	testCases := []mustTPanicTestCase{
-		newMustTPanicTestCase("int to string", "string", 42),
-		newMustTPanicTestCase("string to int", "int", "hello"),
-		newMustTPanicTestCase("string to error", "error", "not an error"),
-		newMustTPanicTestCase("int to fmt.Stringer", "fmt.Stringer", 42),
-		newMustTPanicTestCase("nil to string", "string", nil),
-	}
-
-	RunTestCases(t, testCases)
+	RunTestCases(t, mustTPanicTestCases())
 }
 
 // mustTReasonTestCase states the reason MustT panics with for one
@@ -963,117 +818,57 @@ func TestMustTReason(t *testing.T) {
 	RunTestCases(t, testCases)
 }
 
-// Test cases for MaybeT function
-type maybeTTestCase struct {
-	input    any
-	target   string // target type description
-	expected any    // expected result (zero value if conversion fails)
-	name     string
+// maybeTTestCase states what MaybeT returns for one target type: the
+// input when it already holds a T, the zero value when it does not, and
+// never a panic. The target is the row's type parameter.
+type maybeTTestCase[T any] struct {
+	input any
+	want  T
+	name  string
 }
 
-func newMaybeTTestCase(name, target string, input, expected any) maybeTTestCase {
-	return maybeTTestCase{
-		name:     name,
-		target:   target,
-		input:    input,
-		expected: expected,
+func newMaybeTTestCase[T any](name string, input any, want T) TestCase {
+	return maybeTTestCase[T]{
+		input: input,
+		want:  want,
+		name:  name,
 	}
 }
 
-func (tc maybeTTestCase) Name() string {
+func (tc maybeTTestCase[T]) Name() string {
 	return tc.name
 }
 
-func (tc maybeTTestCase) Test(t *testing.T) {
+func (tc maybeTTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
-	// Test type conversions with MaybeT (never panics)
-	switch tc.target {
-	case "string":
-		tc.testString(t)
-	case "int":
-		tc.testInt(t)
-	case "error":
-		tc.testError(t)
-	case "fmt.Stringer":
-		tc.testStringer(t)
-	default:
-		t.Errorf("unsupported target type: %s", tc.target)
-	}
+	AssertEqual(t, tc.want, MaybeT[T](tc.input), "value")
 }
 
-func (tc maybeTTestCase) testString(t *testing.T) {
-	t.Helper()
-	got := MaybeT[string](tc.input)
-	expected, ok := tc.expected.(string)
-	if !ok {
-		t.Errorf("expected value is not a string: %T", tc.expected)
-		return
-	}
-	AssertEqual(t, expected, got, "MaybeT to string")
-}
+func maybeTTestCases() []TestCase {
+	testErr := errors.New("test")
+	stringer := mockStringer{value: "test"}
 
-func (tc maybeTTestCase) testInt(t *testing.T) {
-	t.Helper()
-	got := MaybeT[int](tc.input)
-	expected, ok := tc.expected.(int)
-	if !ok {
-		t.Errorf("expected value is not an int: %T", tc.expected)
-		return
-	}
-	AssertEqual(t, expected, got, "MaybeT to int")
-}
+	return []TestCase{
+		// the input already holds the target type
+		newMaybeTTestCase[string]("string to string", "hello", "hello"),
+		newMaybeTTestCase[int]("int to int", 42, 42),
+		newMaybeTTestCase[error]("error to error", testErr, testErr),
+		newMaybeTTestCase[fmt.Stringer]("stringer to fmt.Stringer", stringer,
+			stringer),
 
-func (tc maybeTTestCase) testError(t *testing.T) {
-	t.Helper()
-	got := MaybeT[error](tc.input)
-	if tc.expected == nil {
-		AssertNil(t, got, "MaybeT to error (nil)")
-	} else {
-		expected, ok := tc.expected.(error)
-		if !ok {
-			t.Errorf("expected value is not an error: %T", tc.expected)
-			return
-		}
-		AssertEqual(t, expected, got, "MaybeT to error")
-	}
-}
-
-func (tc maybeTTestCase) testStringer(t *testing.T) {
-	t.Helper()
-	got := MaybeT[fmt.Stringer](tc.input)
-	if tc.expected == nil {
-		AssertNil(t, got, "MaybeT to fmt.Stringer (nil)")
-	} else {
-		expected, ok := tc.expected.(fmt.Stringer)
-		if !ok {
-			t.Errorf("expected value is not a fmt.Stringer: %T", tc.expected)
-			return
-		}
-		AssertEqual(t, expected.String(), got.String(), "MaybeT to fmt.Stringer")
+		// it does not, so the zero value comes back
+		newMaybeTTestCase[string]("int to string", 42, ""),
+		newMaybeTTestCase[int]("string to int", "hello", 0),
+		newMaybeTTestCase[error]("string to error", "not an error", nil),
+		newMaybeTTestCase[fmt.Stringer]("int to fmt.Stringer", 42, nil),
+		newMaybeTTestCase[string]("nil to string", nil, ""),
+		newMaybeTTestCase[int]("nil to int", nil, 0),
 	}
 }
 
 func TestMaybeT(t *testing.T) {
-	testErr := errors.New("test")
-	testCases := []maybeTTestCase{
-		// Successful conversions
-		newMaybeTTestCase("string to string", "string", "hello", "hello"),
-		newMaybeTTestCase("int to int", "int", 42, 42),
-		newMaybeTTestCase("error to error", "error", testErr, testErr),
-		newMaybeTTestCase("stringer to stringer", "fmt.Stringer",
-			mockStringer{value: "test"}, mockStringer{value: "test"}),
-
-		// Failed conversions (should return zero values)
-		newMaybeTTestCase("int to string", "string", 42, ""),
-		newMaybeTTestCase("string to int", "int", "hello", 0),
-		newMaybeTTestCase("string to error", "error", "not an error", nil),
-		newMaybeTTestCase("int to fmt.Stringer", "fmt.Stringer", 42, nil),
-		newMaybeTTestCase("nil to string", "string", nil, ""),
-		newMaybeTTestCase("nil to int", "int", nil, 0),
-	}
-
-	RunTestCases(t, testCases)
+	RunTestCases(t, maybeTTestCases())
 }
 
 // Helper type for testing fmt.Stringer interface

@@ -2,19 +2,20 @@ package core
 
 import (
 	"net"
-	"net/netip"
 	"testing"
 )
 
 // Compile-time verification that test case types implement TestCase interface
-var _ TestCase = splitAddrPortCase{}
-var _ TestCase = splitHostPortCase{}
-var _ TestCase = makeHostPortCase{}
-var _ TestCase = joinHostPortCase{}
-var _ TestCase = doMakeHostPortCase{}
-var _ TestCase = doJoinHostPortCase{}
-var _ TestCase = ipForHostPortCase{}
-var _ TestCase = addrErrCase{}
+var (
+	_ TestCase = splitAddrPortCase{}
+	_ TestCase = splitHostPortCase{}
+	_ TestCase = makeHostPortCase{}
+	_ TestCase = joinHostPortCase{}
+	_ TestCase = doMakeHostPortCase{}
+	_ TestCase = doJoinHostPortCase{}
+	_ TestCase = ipForHostPortCase{}
+	_ TestCase = addrErrCase{}
+)
 
 type splitAddrPortCase struct {
 	name     string
@@ -28,24 +29,21 @@ func (tc splitAddrPortCase) Name() string {
 	return tc.name
 }
 
-func (tc splitAddrPortCase) matches(a netip.Addr, p uint16, err error) bool {
-	if err != nil {
-		return !tc.ok && !a.IsValid() && p == 0
-	}
-	return tc.ok && a.String() == tc.addr && p == tc.port
-}
-
 func (tc splitAddrPortCase) Test(t *testing.T) {
 	t.Helper()
 
-	a, p, err := SplitAddrPort(tc.addrPort)
-	if !tc.matches(a, p, err) {
-		// unexpected result
-		t.Errorf("SplitAddrPort(%q) -> %q, %q, %#v", tc.addrPort, a.String(), p, err)
-	} else {
-		// expected result
-		t.Logf("SplitAddrPort(%q) -> %q, %q, %#v", tc.addrPort, a.String(), p, err)
+	addr, port, err := SplitAddrPort(tc.addrPort)
+
+	if !tc.ok {
+		AssertError(t, err, "error")
+		AssertFalse(t, addr.IsValid(), "address")
+		AssertEqual(t, tc.port, port, "port")
+		return
 	}
+
+	AssertNoError(t, err, "no error")
+	AssertEqual(t, tc.addr, addr.String(), "address")
+	AssertEqual(t, tc.port, port, "port")
 }
 
 func newSplitAddrPortCase(name, addrPort, addr string, port uint16, ok bool) splitAddrPortCase {

@@ -787,11 +787,9 @@ func AssertNoPanic(t T, fn func(), name string, args ...any) (ok bool) {
 //
 //	AssertTrue(t, result, "operation succeeded")
 //	AssertTrue(t, isValid, "validation for %s", field)
-//
-// revive:disable-next-line:flag-parameter
 func AssertTrue(t T, value bool, name string, args ...any) bool {
 	t.Helper()
-	return AssertEqual(t, true, value, name, args...)
+	return assertComparable(t, true, value, name, args...)
 }
 
 // AssertFalse fails the test if value is not false.
@@ -802,11 +800,9 @@ func AssertTrue(t T, value bool, name string, args ...any) bool {
 //
 //	AssertFalse(t, hasError, "has error")
 //	AssertFalse(t, isEmpty, "container %s empty", name)
-//
-// revive:disable-next-line:flag-parameter
 func AssertFalse(t T, value bool, name string, args ...any) bool {
 	t.Helper()
-	return AssertEqual(t, false, value, name, args...)
+	return assertComparable(t, false, value, name, args...)
 }
 
 // AssertErrorIs fails the test if the error does not match the target error.
@@ -1044,9 +1040,9 @@ func RunConcurrentTest(t T, numWorkers int, worker func(int) error) error {
 //
 // Example usage:
 //
-//	RunBenchmark(b, func() interface{} {
+//	RunBenchmark(b, func() any {
 //		return setupTestData()
-//	}, func(data interface{}) {
+//	}, func(data any) {
 //		processData(data)
 //	})
 func RunBenchmark(b *testing.B, setup func() any, fn func(any)) {
@@ -1096,6 +1092,23 @@ func doError(t T, prefixFormat string, prefixArgs []any, messageFormat string, m
 // revive:disable-next-line:argument-limit
 func doLog(t T, prefixFormat string, prefixArgs []any, messageFormat string, messageArgs ...any) {
 	doMessage(t, t.Log, prefixFormat, prefixArgs, messageFormat, messageArgs...)
+}
+
+// assertComparable compares two values with == through [comparableEqual]
+// and reports as [AssertEqual] does, without reaching [AreEqual].
+func assertComparable[U comparable](t T, expected, actual U, name string, args ...any) bool {
+	t.Helper()
+	switch equal, known := comparableEqual(expected, actual); {
+	case !known:
+		doError(t, name, args, "undecided for %T, needs a deep comparison", actual)
+		return false
+	case !equal:
+		doError(t, name, args, "expected %v, got %v", expected, actual)
+		return false
+	default:
+		doLog(t, name, args, "%v", actual)
+		return true
+	}
 }
 
 func runWorkers(numWorkers int, worker func(int) error, errCh chan error) {
