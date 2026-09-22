@@ -164,6 +164,7 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		// Names
 		newSplitHostPortTestCase("name", "name", "name", ""),
 		newSplitHostPortTestCase("name and port", "name:1234", "name", "1234"),
+		newSplitHostPortTestCase("name and padded port", "name:0080", "name", "80"),
 		newSplitHostPortTestCase("hostname", "localhost", "localhost", ""),
 		newSplitHostPortTestCase("good name", "good.name", "good.name", ""),
 		newSplitHostPortTestCase("international name", "Hello.\u4E16\u754C", "hello.\u4E16\u754C", ""),
@@ -275,11 +276,13 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		newMakeHostPortTestCase("hostname no port", "localhost", 0, "localhost"),
 		newMakeHostPortTestCase("FQDN default port", "example.com", 443, "example.com:443"),
 		newMakeHostPortTestCase("FQDN explicit port", "example.com:80", 443, "example.com:80"),
+		newMakeHostPortTestCase("FQDN padded port", "example.com:0080", 443, "example.com:80"),
 
 		// Invalid cases
 		newMakeHostPortTestCaseRejected("empty input", "", 8080),
 		newMakeHostPortTestCaseRejected("invalid hostname", "invalid host", 8080),
 		newMakeHostPortTestCaseRejected("port 0 not allowed", "example.com:0", 8080),
+		newMakeHostPortTestCaseRejected("port 0 padded", "example.com:00", 8080),
 		// Port 0 in the input is rejected, not read as portless: the
 		// same default that accepts "example.com" does not rescue it.
 		newMakeHostPortTestCaseRejected("port 0 without default", "example.com:0", 0),
@@ -287,6 +290,10 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		newMakeHostPortTestCaseRejected("invalid port", "example.com:invalid", 8080),
 		newMakeHostPortTestCaseRejected("malformed IPv6", "[::1", 8080),
 		newMakeHostPortTestCaseRejected("IPv6 invalid port", "[::1]:invalid", 8080),
+		// Port 0 is judged after the split has cleaned the host and the
+		// port, and the error names the input.
+		newMakeHostPortTestCaseRejected("port 0 cleaned name", "Example.com:0", 8080),
+		newMakeHostPortTestCaseRejected("port 0 no host", ":0", 8080),
 	)
 }
 
@@ -361,6 +368,7 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 		newJoinHostPortTestCase("FQDN with port", "example.com", "443", "example.com:443"),
 		newJoinHostPortTestCase("FQDN no port", "example.com", "", "example.com"),
 		newJoinHostPortTestCase("subdomain with port", "sub.example.com", "80", "sub.example.com:80"),
+		newJoinHostPortTestCase("padded port", "example.com", "0080", "example.com:80"),
 
 		// Port 0 joins, where MakeHostPort rejects it in its input.
 		newJoinHostPortTestCase("port 0 valid", "example.com", "0", "example.com:0"),
@@ -399,17 +407,10 @@ func (tc doMakeHostPortTestCase) Name() string {
 func (tc doMakeHostPortTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got, err := doMakeHostPort(tc.host, tc.port, tc.defaultPort)
+	got, ok := doMakeHostPort(tc.host, tc.port, tc.defaultPort)
 
 	AssertEqual(t, tc.expected, got, "host:port")
-
-	if tc.rejected {
-		// A rejection names the host and port as given.
-		rejection := AssertMustErrorAs[*net.AddrError](t, err, "error")
-		AssertEqual(t, tc.host+":"+tc.port, rejection.Addr, "error address")
-	} else {
-		AssertNoError(t, err, "error")
-	}
+	AssertEqual(t, !tc.rejected, ok, "accepted")
 }
 
 // newDoMakeHostPortTestCase declares an accepted input by the host:port
@@ -426,7 +427,7 @@ func newDoMakeHostPortTestCase(name, host, port string, defaultPort uint16,
 }
 
 // newDoMakeHostPortTestCaseRejected declares an input doMakeHostPort
-// rejects, returning the empty string.
+// rejects, returning the empty string and false.
 func newDoMakeHostPortTestCaseRejected(name, host, port string, defaultPort uint16) doMakeHostPortTestCase {
 	return doMakeHostPortTestCase{
 		name:        name,
@@ -443,6 +444,7 @@ func doMakeHostPortTestCases() []doMakeHostPortTestCase {
 		newDoMakeHostPortTestCase("explicit port used", "example.com", "8080", 9000, "example.com:8080"),
 		newDoMakeHostPortTestCase("explicit port IPv4", "192.168.1.1", "443", 80, "192.168.1.1:443"),
 		newDoMakeHostPortTestCase("explicit port IPv6", "[::1]", "9000", 8080, "[::1]:9000"),
+		newDoMakeHostPortTestCase("explicit port padded", "example.com", "0080", 9000, "example.com:80"),
 
 		// Valid cases with default port
 		newDoMakeHostPortTestCase("default port used", "example.com", "", 8080, "example.com:8080"),
@@ -458,6 +460,12 @@ func doMakeHostPortTestCases() []doMakeHostPortTestCase {
 		newDoMakeHostPortTestCaseRejected("port 0 not allowed", "example.com", "0", 8080),
 		newDoMakeHostPortTestCaseRejected("port 0 not allowed IPv4", "192.168.1.1", "0", 443),
 		newDoMakeHostPortTestCaseRejected("port 0 not allowed IPv6", "[::1]", "0", 9000),
+		// MakeHostPort never hands over a padded port, the split having
+		// made it canonical, so only a direct call reaches this.
+		newDoMakeHostPortTestCaseRejected("port 0 padded", "example.com", "00", 8080),
+		// MakeHostPort never hands over a bad port, the split having
+		// refused it, so only a direct call reaches this.
+		newDoMakeHostPortTestCaseRejected("bad port", "example.com", "invalid", 8080),
 	)
 }
 
@@ -523,6 +531,7 @@ func doJoinHostPortTestCases() []doJoinHostPortTestCase {
 		newDoJoinHostPortTestCase("valid IPv6", "[::1]", "9000", "[::1]:9000"),
 		newDoJoinHostPortTestCase("valid hostname SSH", "localhost", "22", "localhost:22"),
 		newDoJoinHostPortTestCase("valid subdomain", "sub.example.com", "80", "sub.example.com:80"),
+		newDoJoinHostPortTestCase("padded port", "example.com", "0080", "example.com:80"),
 		// Port 0 joins, where doMakeHostPort rejects it.
 		newDoJoinHostPortTestCase("port 0 valid", "example.com", "0", "example.com:0"),
 

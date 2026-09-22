@@ -12,8 +12,10 @@ import (
 
 // MakeHostPort produces a validated host:port from an input string
 // optionally using the given default port when the string doesn't
-// specify one.
-// port 0 on the string input isn't considered valid.
+// specify one. The host comes back cleaned, an IPv6 address bracketed
+// when a port follows it, and the port in canonical decimal form.
+// Port 0 on the string input, in any spelling, isn't considered
+// valid, and the error names the input as given.
 //
 // Examples:
 //   - MakeHostPort("localhost", 8080) → "localhost:8080"
@@ -21,7 +23,9 @@ import (
 //   - MakeHostPort("192.168.1.1", 80) → "192.168.1.1:80"
 //   - MakeHostPort("::1", 443) → "[::1]:443"
 //   - MakeHostPort("example.com", 0) → "example.com"
+//   - MakeHostPort("example.com:0080", 0) → "example.com:80"
 //   - MakeHostPort("example.com:0", 80) → error (port 0 invalid)
+//   - MakeHostPort("example.com:00", 80) → error (port 0 invalid)
 func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	host, port, err := SplitHostPort(hostPort)
 	if err != nil {
@@ -43,31 +47,33 @@ func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 		host = ipForHostPort(ip)
 	}
 
-	return doMakeHostPort(host, port, defaultPort)
-}
-
-func doMakeHostPort(host, port string, defaultPort uint16) (string, error) {
-	var ok bool
-
-	switch {
-	case port == "":
-		if defaultPort == 0 {
-			// portless hostname
-			return host, nil
-		}
-		port = strconv.FormatUint(uint64(defaultPort), 10)
-		ok = true
-	case port != "0":
-		ok = true
-	default:
-	}
-
-	hostPort := host + ":" + port
+	s, ok := doMakeHostPort(host, port, defaultPort)
 	if !ok {
+		// port 0 in any spelling
 		return "", addrErr(hostPort, "invalid port")
 	}
 
-	return hostPort, nil
+	return s, nil
+}
+
+// doMakeHostPort joins a cleaned host and port, the port in canonical
+// decimal form, and reports false for a port it refuses.
+func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
+	if port == "" {
+		if defaultPort == 0 {
+			// portless hostname
+			return host, true
+		}
+		return host + ":" + formatPort(defaultPort), true
+	}
+
+	n, err := parsePort(port)
+	if err != nil || n == 0 {
+		// bad port, or 0 in any spelling
+		return "", false
+	}
+
+	return host + ":" + formatPort(n), true
 }
 
 // JoinHostPort is like the standard net.JoinHostPort, but
@@ -75,7 +81,10 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, error) {
 // if the port argument is empty.
 //
 // Unlike net.JoinHostPort, this function:
-//   - Validates hostname and port before joining
+//   - Validates the host and returns it cleaned: an IP in its
+//     canonical text, a name in Unicode
+//   - Validates the port is in range 0-65535 and joins it in
+//     canonical decimal form
 //   - Returns host without port if port is empty
 //   - Properly handles IPv6 addresses with bracketing
 //   - Supports international domain names
@@ -87,6 +96,7 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, error) {
 //   - JoinHostPort("192.168.1.1", "80") → "192.168.1.1:80"
 //   - JoinHostPort("::1", "443") → "[::1]:443"
 //   - JoinHostPort("::1", "") → "::1"
+//   - JoinHostPort("example.com", "0080") → "example.com:80"
 //   - JoinHostPort("example.com", "0") → "example.com:0" (port 0 allowed)
 //   - JoinHostPort("invalid host", "80") → error
 //   - JoinHostPort("example.com", "99999") → error (port out of range)
@@ -120,13 +130,13 @@ func JoinHostPort(host, port string) (string, error) {
 }
 
 func doJoinHostPort(host, port string) (string, error) {
-	hostPort := host + ":" + port
-	if !validPort(port) {
+	s, ok := canonicalPort(port)
+	if !ok {
 		// bad port
-		return "", addrErr(hostPort, "invalid port")
+		return "", addrErr(host+":"+port, "invalid port")
 	}
 
-	return hostPort, nil
+	return host + ":" + s, nil
 }
 
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
@@ -135,14 +145,17 @@ func doJoinHostPort(host, port string) (string, error) {
 //
 // Unlike net.SplitHostPort, this function:
 //   - Accepts hostport strings without port (returns empty port)
-//   - Validates the host is a valid IP address or hostname
-//   - Validates the port is a valid port number (1-65535)
+//   - Validates the host is a valid IP address or hostname, and returns
+//     it cleaned: an IP in its canonical text, a name in Unicode
+//   - Validates the port is in range 0-65535 and returns it in
+//     canonical decimal form
 //   - Properly handles IPv6 addresses with and without brackets
 //   - Supports international domain names with punycode conversion
 //   - Returns descriptive errors for invalid inputs
 //
 // Examples:
 //   - SplitHostPort("localhost:8080") → ("localhost", "8080", nil)
+//   - SplitHostPort("localhost:0080") → ("localhost", "80", nil)
 //   - SplitHostPort("localhost") → ("localhost", "", nil)
 //   - SplitHostPort("192.168.1.1:80") → ("192.168.1.1", "80", nil)
 //   - SplitHostPort("[::1]:443") → ("::1", "443", nil)
@@ -153,29 +166,31 @@ func doJoinHostPort(host, port string) (string, error) {
 //   - SplitHostPort("example.com:99999") → error (port out of range)
 func SplitHostPort(hostPort string) (host, port string, err error) {
 	host, port, err = splitHostPortUnsafe(hostPort)
-
-	switch {
-	case err != nil:
+	if err != nil {
 		// failed split
 		return "", "", err
-	case port != "" && !validPort(port):
-		// bad port
-		err = addrErr(hostPort, "invalid port")
-		return "", "", err
-	default:
-		if s, ok := validIP(host); ok {
-			// valid IP
-			return s, port, nil
-		}
-
-		if s, ok := validName(host); ok {
-			// valid name
-			return s, port, nil
-		}
-
-		err = addrErr(hostPort, "invalid address")
-		return "", "", err
 	}
+
+	if port != "" {
+		s, ok := canonicalPort(port)
+		if !ok {
+			// bad port
+			return "", "", addrErr(hostPort, "invalid port")
+		}
+		port = s
+	}
+
+	if s, ok := validIP(host); ok {
+		// valid IP
+		return s, port, nil
+	}
+
+	if s, ok := validName(host); ok {
+		// valid name
+		return s, port, nil
+	}
+
+	return "", "", addrErr(hostPort, "invalid address")
 }
 
 // SplitAddrPort splits a string containing an IP address and an optional port,
@@ -184,7 +199,8 @@ func SplitHostPort(hostPort string) (host, port string, err error) {
 // This function:
 //   - Accepts IP addresses with optional port numbers
 //   - Validates the address is a valid IPv4 or IPv6 address
-//   - Validates the port is in range 1-65535 (0 if no port specified)
+//   - Validates the port is in range 0-65535; the port is 0 when the
+//     string carries none, as it is when the string says 0
 //   - Properly handles IPv6 addresses with brackets
 //   - Returns zero values and error for invalid inputs
 //
@@ -302,9 +318,18 @@ func parsePort(s string) (uint16, error) {
 	return uint16(u64), nil
 }
 
-func validPort(s string) bool {
-	_, err := parsePort(s)
-	return err == nil
+func formatPort(n uint16) string {
+	return strconv.FormatUint(uint64(n), 10)
+}
+
+// canonicalPort validates a port string and returns it in canonical
+// decimal form, so a spelling such as "0080" comes back as "80".
+func canonicalPort(s string) (string, bool) {
+	n, err := parsePort(s)
+	if err != nil {
+		return "", false
+	}
+	return formatPort(n), true
 }
 
 func validIP(s string) (string, bool) {
