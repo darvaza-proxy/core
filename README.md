@@ -61,23 +61,30 @@ Generic type constraints for use with Go generics:
 
 ### Host/Port Functions
 
+Where the standard library only splits and joins, these validate and
+clean: the host comes back as canonical IP text or a Unicode name,
+and the port in canonical decimal form, so `0080` is returned as `80`.
+Port 0 is accepted everywhere but in `MakeHostPort`'s input.
+
 #### Parsing and Splitting
 
 * `SplitHostPort(hostport)` - enhanced version of `net.SplitHostPort` that
-  accepts portless strings and validates both host and port. Supports IPv6
-  addresses, international domain names, and descriptive error messages.
+  accepts portless strings and validates both host and port, returning
+  them cleaned. Supports IPv6 addresses, international domain names, and
+  descriptive error messages.
 * `SplitAddrPort(addrport)` - splits IP address and optional port into
   `netip.Addr` and `uint16`. Validates address format and port range
-  (1-65535), returns zero values for portless addresses.
+  (0-65535); the port is 0 when the string carries none.
 
 #### Joining and Construction
 
 * `JoinHostPort(host, port)` - enhanced version of `net.JoinHostPort` that
-  validates inputs and returns portless host when port is empty. Properly
-  handles IPv6 bracketing and international domain names.
+  validates inputs, joins the port in canonical form, and returns a
+  portless host when port is empty. Properly handles IPv6 bracketing and
+  international domain names.
 * `MakeHostPort(hostport, defaultPort)` - constructs validated host:port
-  string from input with optional default port. Rejects port 0 in input,
-  supports portless output when default is 0.
+  string from input with optional default port. Rejects port 0 in input
+  in any spelling, supports portless output when default is 0.
 * `AddrPort(v)` - extracts `netip.AddrPort` from various network types
   (`*net.TCPAddr`, `*net.UDPAddr`, etc.), returns `(AddrPort, bool)`.
 
