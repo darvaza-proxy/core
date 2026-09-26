@@ -41,7 +41,7 @@ func (sl *SpinLock) Unlock() {
 
 // WaitGroup is a safer way to run workers
 type WaitGroup struct {
-	err     atomic.Value
+	err     atomic.Pointer[error]
 	onError func(error) error
 	wg      sync.WaitGroup
 	mu      sync.Mutex
@@ -91,7 +91,7 @@ func (wg *WaitGroup) reportError(err error) {
 
 	// Store the first non-nil error
 	if err != nil {
-		wg.err.CompareAndSwap(nil, err)
+		wg.err.CompareAndSwap(nil, &err)
 	}
 }
 
@@ -115,8 +115,8 @@ func (wg *WaitGroup) Done() <-chan struct{} {
 
 // Err returns the first error
 func (wg *WaitGroup) Err() error {
-	if err, ok := wg.err.Load().(error); ok {
-		return err
+	if p := wg.err.Load(); p != nil {
+		return *p
 	}
 	return nil
 }
