@@ -327,8 +327,9 @@ func TestWaitGroupConcurrency(t *testing.T) {
 }
 
 // The first error stored survives: the workers failing after it, however
-// many at once, do not replace it. The first worker runs to Wait on its
-// own so that which error is first is not left to timing.
+// many at once and whatever their type, do not replace it. The first
+// worker runs to Wait on its own so that which error is first is not
+// left to timing.
 func TestWaitGroupFirstErrorWins(t *testing.T) {
 	first := errors.New("first")
 	later := errors.New("later")
@@ -337,8 +338,15 @@ func TestWaitGroupFirstErrorWins(t *testing.T) {
 	wg.Go(func() error { return first })
 	AssertErrorIs(t, wg.Wait(), first, "first error")
 
-	for range 3 {
-		wg.Go(func() error { return later })
+	for _, err := range S[error](
+		later,
+		StringError("later"),
+		Wrap(later, "wrapped"),
+		NewTimeoutError(later),
+		NewCompoundError(later),
+		NewPanicError(0, later),
+	) {
+		wg.Go(func() error { return err })
 	}
 	AssertErrorIs(t, wg.Wait(), first, "first error kept")
 }
