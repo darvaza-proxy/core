@@ -159,16 +159,21 @@ func TestWaitGroupGoCatch(t *testing.T) {
 }
 
 // A catch function that panics is reported the same way as a worker
-// that does.
+// that does, in place of the error it was handed.
 func TestWaitGroupGoCatchPanic(t *testing.T) {
+	workerErr := errors.New("worker error")
+
 	var wg WaitGroup
 	wg.GoCatch(func() error {
-		return errors.New("worker error")
+		return workerErr
 	}, func(_ error) error {
 		panic("catch panic")
 	})
 
-	pe := AssertMustErrorAs[*PanicError](t, wg.Wait(), "error")
+	err := wg.Wait()
+	AssertNotErrorIs(t, err, workerErr, "worker error")
+
+	pe := AssertMustErrorAs[*PanicError](t, err, "error")
 	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
 	AssertEqual(t, "catch panic", payload.Error(), "payload")
 	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")

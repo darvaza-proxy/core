@@ -695,14 +695,13 @@ func TestMapAllListForEach(t *testing.T) {
 	AssertEqual(t, 10, sum, "sum")
 
 	// Test early termination
-	sum = 0
-	MapAllListForEach(m, func(v int) bool {
-		sum += v
-		return v == 3 // stop at 3
+	var count int
+	MapAllListForEach(m, func(_ int) bool {
+		count++
+		return count == 2 // stop after 2
 	})
 
-	// Sum should be less than 10 due to early termination
-	AssertTrue(t, sum < 10, "MapAllListForEach early stop")
+	AssertEqual(t, 2, count, "early stop count")
 }
 
 func TestMapAllListForEachElement(t *testing.T) {
