@@ -755,9 +755,15 @@ Enhanced wait group with error handling:
 
 * `WaitGroup` - wait group that collects errors.
 * `.OnError(fn)` - set error handler.
-* `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`.
-* `.Wait()` - wait for completion.
+* `.Go(fn)` / `.GoCatch(fn, catch)` - run functions in `goroutines`,
+  catching panics.
+* `.Wait()` - wait for completion and return the first error.
+* `.Done()` - channel closed when all workers have finished.
 * `.Err()` - get first error.
+
+A failing worker does not stop the others. When it should, see
+[darvaza.org/x/sync/workgroup][x-sync-workgroup], whose `Group` cancels
+its tasks on the first error.
 
 ### Polling
 
@@ -775,10 +781,19 @@ Context-aware error group with cancellation:
 * `ErrGroup` - context-based error group.
 * `.SetDefaults()` - configure with defaults.
 * `.OnError(fn)` - set error handler.
-* `.Cancel()` / `.Context()` - cancellation control.
-* `.Go(fn)` / `.GoCatch(fn)` - run functions with context.
-* `.Wait()` - wait and return first error.
+* `.Cancel(cause)` / `.Context()` - cancellation control.
+* `.Go(run, shutdown)` / `.GoCatch(run, catch)` - run functions with
+  context.
+* `.Wait()` - wait and return the first worker error.
+* `.Err()` - the error that initiated the shutdown, including the cause
+  given to `.Cancel()`.
+* `.Done()` - channel closed when all workers have finished.
 * `.IsCancelled()` / `.Cancelled()` - check cancellation state.
+
+[darvaza.org/x/sync/workgroup][x-sync-workgroup] provides a counterpart,
+`Group`, that also runs an `OnCancel` handler once on any cancellation,
+pairs workers with a shutdown handler bounded by a grace period, offers
+`Close()`, and refuses new tasks once cancelled.
 
 ### Deprecated
 
@@ -829,6 +844,7 @@ make tidy   # Format and tidy (run before committing)
 [x-sync]: https://pkg.go.dev/darvaza.org/x/sync
 [x-sync-errors]: https://pkg.go.dev/darvaza.org/x/sync/errors#CompoundError
 [x-sync-spinlock]: https://pkg.go.dev/darvaza.org/x/sync/spinlock
+[x-sync-workgroup]: https://pkg.go.dev/darvaza.org/x/sync/workgroup#Group
 [x-text]: https://pkg.go.dev/darvaza.org/x/text
 [x-time]: https://pkg.go.dev/darvaza.org/x/time
 [x-tls]: https://pkg.go.dev/darvaza.org/x/tls
