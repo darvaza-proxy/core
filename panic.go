@@ -132,7 +132,7 @@ func Maybe[V any](value V, _ error) V {
 //	str := MustOK(As[any, string](v))  // panics if v is not a string
 //	result := MustOK(someFunc())  // panics if someFunc returns false for ok
 //
-// revive:disable-next-line:flag-parameter
+//revive:disable-next-line:flag-parameter
 func MustOK[V any](value V, ok bool) V {
 	if !ok {
 		panic(NewUnreachableError(1, errors.New("operation failed"), ""))
@@ -191,7 +191,7 @@ func MustT[T any](value any) T {
 //	num := MaybeT[int](value)     // zero if value is not an int
 //	reader := MaybeT[io.Reader](value)  // nil if value doesn't implement io.Reader
 func MaybeT[T any](value any) T {
-	// revive:disable-next-line:unchecked-type-assertion
+	//revive:disable-next-line:unchecked-type-assertion
 	result, _ := value.(T)
 	return result
 }

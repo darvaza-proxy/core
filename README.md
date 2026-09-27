@@ -1,8 +1,8 @@
 # Core helpers for darvaza.org projects
 
 [![Go Reference][godoc-badge]][godoc]
-[![Go Report Card][goreport-badge]][goreport]
 [![codecov][codecov-badge]][codecov]
+[![Socket Badge][socket-badge]][socket]
 
 This package contains simple mechanisms used by other darvaza.org
 projects. It's not allowed to have dependencies outside of Go's Standard
@@ -10,10 +10,10 @@ Library, and if something should be on a subdirectory, it shouldn't be here.
 
 [godoc]: https://pkg.go.dev/darvaza.org/core
 [godoc-badge]: https://pkg.go.dev/badge/darvaza.org/core.svg
-[goreport]: https://goreportcard.com/report/darvaza.org/core
-[goreport-badge]: https://goreportcard.com/badge/darvaza.org/core
 [codecov]: https://codecov.io/gh/darvaza-proxy/core
 [codecov-badge]: https://codecov.io/gh/darvaza-proxy/core/graph/badge.svg
+[socket]: https://socket.dev/go/package/darvaza.org/core
+[socket-badge]: https://socket.dev/api/badge/go/package/darvaza.org/core
 
 ## Type Constraints
 
@@ -322,9 +322,12 @@ The `CompoundError` type aggregates multiple errors:
 
 * Implements both `Unwrap() []error` and `Errors() []error` interfaces.
 * `NewCompoundError(errs...)` - collect errors as given, dropping nils.
-* `.AppendError(err)` / `.Append(errs...)` - add errors.
+* `.AppendError(errs...)` / `.Append(err, note, args...)` - add errors.
 * `.AsError()` - convert to single error or nil.
 * `.OK()` - check if no errors.
+
+For errors reported from several goroutines, see the concurrency-safe
+counterpart in [darvaza.org/x/sync/errors][x-sync-errors].
 
 ### Panic Handling
 
@@ -752,9 +755,15 @@ Enhanced wait group with error handling:
 
 * `WaitGroup` - wait group that collects errors.
 * `.OnError(fn)` - set error handler.
-* `.Go(fn)` / `.GoCatch(fn)` - run functions in `goroutines`.
-* `.Wait()` - wait for completion.
+* `.Go(fn)` / `.GoCatch(fn, catch)` - run functions in `goroutines`,
+  catching panics.
+* `.Wait()` - wait for completion and return the first error.
+* `.Done()` - channel closed when all workers have finished.
 * `.Err()` - get first error.
+
+A failing worker does not stop the others. When it should, see
+[darvaza.org/x/sync/workgroup][x-sync-workgroup], whose `Group` cancels
+its tasks on the first error.
 
 ### Polling
 
@@ -772,10 +781,19 @@ Context-aware error group with cancellation:
 * `ErrGroup` - context-based error group.
 * `.SetDefaults()` - configure with defaults.
 * `.OnError(fn)` - set error handler.
-* `.Cancel()` / `.Context()` - cancellation control.
-* `.Go(fn)` / `.GoCatch(fn)` - run functions with context.
-* `.Wait()` - wait and return first error.
+* `.Cancel(cause)` / `.Context()` - cancellation control.
+* `.Go(run, shutdown)` / `.GoCatch(run, catch)` - run functions with
+  context.
+* `.Wait()` - wait and return the first worker error.
+* `.Err()` - the error that initiated the shutdown, including the cause
+  given to `.Cancel()`.
+* `.Done()` - channel closed when all workers have finished.
 * `.IsCancelled()` / `.Cancelled()` - check cancellation state.
+
+[darvaza.org/x/sync/workgroup][x-sync-workgroup] provides a counterpart,
+`Group`, that also runs an `OnCancel` handler once on any cancellation,
+pairs workers with a shutdown handler bounded by a grace period, offers
+`Close()`, and refuses new tasks once cancelled.
 
 ### Deprecated
 
@@ -810,6 +828,8 @@ make tidy   # Format and tidy (run before committing)
 * [darvaza.org/x/fs][x-fs]
 * [darvaza.org/x/net][x-net]
 * [darvaza.org/x/sync][x-sync]
+* [darvaza.org/x/text][x-text]
+* [darvaza.org/x/time][x-time]
 * [darvaza.org/x/tls][x-tls]
 * [darvaza.org/x/web][x-web]
 
@@ -822,6 +842,10 @@ make tidy   # Format and tidy (run before committing)
 [x-fs]: https://pkg.go.dev/darvaza.org/x/fs
 [x-net]: https://pkg.go.dev/darvaza.org/x/net
 [x-sync]: https://pkg.go.dev/darvaza.org/x/sync
+[x-sync-errors]: https://pkg.go.dev/darvaza.org/x/sync/errors#CompoundError
 [x-sync-spinlock]: https://pkg.go.dev/darvaza.org/x/sync/spinlock
+[x-sync-workgroup]: https://pkg.go.dev/darvaza.org/x/sync/workgroup#Group
+[x-text]: https://pkg.go.dev/darvaza.org/x/text
+[x-time]: https://pkg.go.dev/darvaza.org/x/time
 [x-tls]: https://pkg.go.dev/darvaza.org/x/tls
 [x-web]: https://pkg.go.dev/darvaza.org/x/web
