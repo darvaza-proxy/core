@@ -810,6 +810,8 @@ make tidy   # Format and tidy (run before committing)
 * [darvaza.org/x/fs][x-fs]
 * [darvaza.org/x/net][x-net]
 * [darvaza.org/x/sync][x-sync]
+* [darvaza.org/x/text][x-text]
+* [darvaza.org/x/time][x-time]
 * [darvaza.org/x/tls][x-tls]
 * [darvaza.org/x/web][x-web]
 
@@ -823,5 +825,7 @@ make tidy   # Format and tidy (run before committing)
 [x-net]: https://pkg.go.dev/darvaza.org/x/net
 [x-sync]: https://pkg.go.dev/darvaza.org/x/sync
 [x-sync-spinlock]: https://pkg.go.dev/darvaza.org/x/sync/spinlock
+[x-text]: https://pkg.go.dev/darvaza.org/x/text
+[x-time]: https://pkg.go.dev/darvaza.org/x/time
 [x-tls]: https://pkg.go.dev/darvaza.org/x/tls
 [x-web]: https://pkg.go.dev/darvaza.org/x/web
