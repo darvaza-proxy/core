@@ -322,9 +322,12 @@ The `CompoundError` type aggregates multiple errors:
 
 * Implements both `Unwrap() []error` and `Errors() []error` interfaces.
 * `NewCompoundError(errs...)` - collect errors as given, dropping nils.
-* `.AppendError(err)` / `.Append(errs...)` - add errors.
+* `.AppendError(errs...)` / `.Append(err, note, args...)` - add errors.
 * `.AsError()` - convert to single error or nil.
 * `.OK()` - check if no errors.
+
+For errors reported from several goroutines, see the concurrency-safe
+counterpart in [darvaza.org/x/sync/errors][x-sync-errors].
 
 ### Panic Handling
 
@@ -824,6 +827,7 @@ make tidy   # Format and tidy (run before committing)
 [x-fs]: https://pkg.go.dev/darvaza.org/x/fs
 [x-net]: https://pkg.go.dev/darvaza.org/x/net
 [x-sync]: https://pkg.go.dev/darvaza.org/x/sync
+[x-sync-errors]: https://pkg.go.dev/darvaza.org/x/sync/errors#CompoundError
 [x-sync-spinlock]: https://pkg.go.dev/darvaza.org/x/sync/spinlock
 [x-text]: https://pkg.go.dev/darvaza.org/x/text
 [x-time]: https://pkg.go.dev/darvaza.org/x/time

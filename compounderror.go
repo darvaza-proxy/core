@@ -16,7 +16,10 @@ var (
 	_ Errors = (*CompoundError)(nil)
 )
 
-// A CompoundError can contain more that one error
+// A CompoundError can contain more than one error.
+//
+// It holds no lock; see [darvaza.org/x/sync/errors.CompoundError] for a
+// counterpart safe for concurrent use.
 type CompoundError struct {
 	Errs []error
 }
