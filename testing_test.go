@@ -56,7 +56,7 @@ func TestS(t *testing.T) {
 // plainEqual and plainContains check on the real t without any
 // assertion, for the tests of what the assertions are built on.
 //
-// revive:disable-next-line:flag-parameter
+//revive:disable-next-line:flag-parameter
 func plainEqual(t *testing.T, expected, actual bool, desc string) {
 	t.Helper()
 	if expected != actual {

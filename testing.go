@@ -1059,7 +1059,8 @@ func RunBenchmark(b *testing.B, setup func() any, fn func(any)) {
 // takes the shape "<prefix>: <body>". This shape is part of MockT's
 // observable contract — see MockT.LastError for how downstream tests rely
 // on it to verify name-forwarding through wrapper helpers.
-// revive:disable-next-line:argument-limit
+//
+//revive:disable-next-line:argument-limit
 func doMessage(
 	t T, outputFunc func(...any), prefixFormat string, prefixArgs []any,
 	messageFormat string, messageArgs ...any,
@@ -1089,7 +1090,8 @@ func doError(t T, prefixFormat string, prefixArgs []any, messageFormat string, m
 }
 
 // doLog reports a test log message with optional prefix formatting
-// revive:disable-next-line:argument-limit
+//
+//revive:disable-next-line:argument-limit
 func doLog(t T, prefixFormat string, prefixArgs []any, messageFormat string, messageArgs ...any) {
 	doMessage(t, t.Log, prefixFormat, prefixArgs, messageFormat, messageArgs...)
 }
@@ -1296,7 +1298,7 @@ func AssertMustNoPanic(t T, fn func(), name string, args ...any) {
 //	AssertMustTrue(t, result, "operation succeeded")
 //	AssertMustTrue(t, isValid, "validation for %s", field)
 //
-// revive:disable-next-line:flag-parameter
+//revive:disable-next-line:flag-parameter
 func AssertMustTrue(t T, value bool, name string, args ...any) {
 	t.Helper()
 	if !AssertTrue(t, value, name, args...) {
@@ -1312,7 +1314,7 @@ func AssertMustTrue(t T, value bool, name string, args ...any) {
 //	AssertMustFalse(t, hasError, "has error")
 //	AssertMustFalse(t, isEmpty, "container %s empty", name)
 //
-// revive:disable-next-line:flag-parameter
+//revive:disable-next-line:flag-parameter
 func AssertMustFalse(t T, value bool, name string, args ...any) {
 	t.Helper()
 	if !AssertFalse(t, value, name, args...) {
