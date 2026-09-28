@@ -285,6 +285,31 @@ func TestCatcherConcurrent(t *testing.T) {
 	}
 }
 
+// callerRecovered is a caller's own type implementing Recovered, which
+// AsRecovered passes through as it does a *PanicError.
+type callerRecovered struct {
+	payload any
+}
+
+func (r callerRecovered) Error() string  { return fmt.Sprint(r.payload) }
+func (r callerRecovered) Recovered() any { return r.payload }
+
+// The first panic caught survives: a later one, whatever type of
+// Recovered it arrives as, does not replace it.
+func TestCatcherFirstPanicWins(t *testing.T) {
+	var catcher Catcher
+
+	first := NewPanicError(0, "first")
+	_ = catcher.Try(func() error { panic(first) })
+	AssertSame(t, first, catcher.Recovered(), "first panic")
+
+	later := callerRecovered{payload: "later"}
+	AssertNoPanic(t, func() {
+		_ = catcher.Try(func() error { panic(later) })
+	}, "later panic")
+	AssertSame(t, first, catcher.Recovered(), "first panic kept")
+}
+
 type catchTestCase struct {
 	fn          func() error
 	name        string
