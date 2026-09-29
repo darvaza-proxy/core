@@ -19,6 +19,8 @@ var (
 	_ TestCase = panicfFromTestCase{}
 	_ TestCase = newUnreachableErrorTestCase{}
 	_ TestCase = newUnreachableErrorfTestCase{}
+	_ TestCase = panicUnreachableFromTestCase{}
+	_ TestCase = panicUnreachablefFromTestCase{}
 	_ TestCase = deeperTestCase{}
 	_ TestCase = negativeSkipTestCase{}
 )
@@ -652,6 +654,124 @@ func (tc newUnreachableErrorfTestCase) Test(t *testing.T) {
 	AssertContains(t, result.Error(), tc.wantMsg, "message")
 }
 
+// callPanicUnreachable and callPanicUnreachablef give the two functions
+// stable, named callers, so the stacks they capture start there.
+func callPanicUnreachable(err error, note string) {
+	PanicUnreachable(err, note)
+}
+
+func callPanicUnreachablef(err error, format string, args ...any) {
+	PanicUnreachablef(err, format, args...)
+}
+
+// callPanicUnreachableFromOuter and callPanicUnreachableFrom give
+// PanicUnreachableFrom two stable, named frames: a skip of 0 starts the
+// stack at the inner one, 1 at the outer.
+func callPanicUnreachableFromOuter(skip int, err error, note string) {
+	callPanicUnreachableFrom(skip, err, note)
+}
+
+func callPanicUnreachableFrom(skip int, err error, note string) {
+	PanicUnreachableFrom(skip, err, note)
+}
+
+// panicUnreachableFromTestCase states where the stack of the value
+// PanicUnreachableFrom raises starts for a given skip. Every row passes
+// the same error and note.
+type panicUnreachableFromTestCase struct {
+	name     string
+	wantFunc string
+	skip     int
+}
+
+func newPanicUnreachableFromTestCase(name string, skip int,
+	wantFunc string) panicUnreachableFromTestCase {
+	return panicUnreachableFromTestCase{
+		name:     name,
+		wantFunc: wantFunc,
+		skip:     skip,
+	}
+}
+
+func (tc panicUnreachableFromTestCase) Name() string {
+	return tc.name
+}
+
+func (tc panicUnreachableFromTestCase) Test(t *testing.T) {
+	t.Helper()
+	defer func() {
+		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
+		assertUnreachableChain(t, pe, errSentinel)
+		AssertContains(t, pe.Error(), "test note", "message")
+	}()
+
+	callPanicUnreachableFromOuter(tc.skip, errSentinel, "test note")
+}
+
+var panicUnreachableFromTestCases = []panicUnreachableFromTestCase{
+	newPanicUnreachableFromTestCase("no skip", 0,
+		"callPanicUnreachableFrom"),
+	newPanicUnreachableFromTestCase("one frame", 1,
+		"callPanicUnreachableFromOuter"),
+	newPanicUnreachableFromTestCase("negative skip", -1,
+		"callPanicUnreachableFrom"),
+}
+
+// callPanicUnreachablefFromOuter and callPanicUnreachablefFrom give
+// PanicUnreachablefFrom two stable, named frames: a skip of 0 starts the
+// stack at the inner one, 1 at the outer.
+func callPanicUnreachablefFromOuter(skip int, err error, format string,
+	args ...any) {
+	callPanicUnreachablefFrom(skip, err, format, args...)
+}
+
+func callPanicUnreachablefFrom(skip int, err error, format string,
+	args ...any) {
+	PanicUnreachablefFrom(skip, err, format, args...)
+}
+
+// panicUnreachablefFromTestCase states the same for
+// PanicUnreachablefFrom. Every row passes the same error and formats the
+// same note.
+type panicUnreachablefFromTestCase struct {
+	name     string
+	wantFunc string
+	skip     int
+}
+
+func newPanicUnreachablefFromTestCase(name string, skip int,
+	wantFunc string) panicUnreachablefFromTestCase {
+	return panicUnreachablefFromTestCase{
+		name:     name,
+		wantFunc: wantFunc,
+		skip:     skip,
+	}
+}
+
+func (tc panicUnreachablefFromTestCase) Name() string {
+	return tc.name
+}
+
+func (tc panicUnreachablefFromTestCase) Test(t *testing.T) {
+	t.Helper()
+	defer func() {
+		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
+		assertUnreachableChain(t, pe, errSentinel)
+		AssertContains(t, pe.Error(), "test note 42", "message")
+	}()
+
+	callPanicUnreachablefFromOuter(tc.skip, errSentinel, "test note %d", 42)
+}
+
+var panicUnreachablefFromTestCases = []panicUnreachablefFromTestCase{
+	newPanicUnreachablefFromTestCase("no skip", 0,
+		"callPanicUnreachablefFrom"),
+	newPanicUnreachablefFromTestCase("one frame", 1,
+		"callPanicUnreachablefFromOuter"),
+	newPanicUnreachablefFromTestCase("negative skip", -1,
+		"callPanicUnreachablefFrom"),
+}
+
 // Main test functions that call the helpers
 func TestPanicErrorMethods(t *testing.T) {
 	RunTestCases(t, panicErrorMethodsTestCases)
@@ -716,6 +836,36 @@ func TestNewUnreachableError(t *testing.T) {
 
 func TestNewUnreachableErrorf(t *testing.T) {
 	RunTestCases(t, newUnreachableErrorfTestCases)
+}
+
+// TestPanicUnreachable states that PanicUnreachable raises the
+// unreachable error for err and note, its stack starting at the caller.
+func TestPanicUnreachable(t *testing.T) {
+	defer func() {
+		pe := assertTopFrameIs(t, recover(), "callPanicUnreachable", 2)
+		assertUnreachableChain(t, pe, errSentinel)
+		AssertContains(t, pe.Error(), "test note", "message")
+	}()
+	callPanicUnreachable(errSentinel, "test note")
+}
+
+// TestPanicUnreachablef states the same for PanicUnreachablef, with the
+// note formatted.
+func TestPanicUnreachablef(t *testing.T) {
+	defer func() {
+		pe := assertTopFrameIs(t, recover(), "callPanicUnreachablef", 2)
+		assertUnreachableChain(t, pe, errSentinel)
+		AssertContains(t, pe.Error(), "test note 42", "message")
+	}()
+	callPanicUnreachablef(errSentinel, "test note %d", 42)
+}
+
+func TestPanicUnreachableFrom(t *testing.T) {
+	RunTestCases(t, panicUnreachableFromTestCases)
+}
+
+func TestPanicUnreachablefFrom(t *testing.T) {
+	RunTestCases(t, panicUnreachablefFromTestCases)
 }
 
 // deeperTestCase pins the skip normalisation every panic constructor
@@ -827,8 +977,8 @@ func (tc negativeSkipTestCase) Test(t *testing.T) {
 // negativeSkipTestCases covers the seven deeper call sites in the
 // constructors — verified by reverting each to skip+1 in turn and
 // checking a row failed. NewUnreachableError holds two of the seven, one
-// per arm, hence its two rows. PanicFrom and PanicfFrom have negative
-// rows in their own tables.
+// per arm, hence its two rows. The From functions have negative rows in
+// their own tables.
 func negativeSkipTestCases() []negativeSkipTestCase {
 	return []negativeSkipTestCase{
 		newNegativeSkipTestCase("NewPanicError",

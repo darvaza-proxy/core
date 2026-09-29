@@ -99,23 +99,29 @@ func TestMustNoErrorPreservesOriginal(t *testing.T) {
 	AssertPanic(t, fnNil, errNilPointer, "typed-nil err in chain")
 }
 
-// assertUnreachablePanicShape pins that r is a *PanicError chaining to
-// both ErrUnreachable and want. What the payload is assembled from is
-// NewUnreachableError's business; what callers depend on is that
-// [errors.Is] finds each of the two, so that is what this asserts.
-// errUnrelated pins the chain as discriminating rather than matching
-// anything put to it. Shared by the PanicShape tests for MustNoError,
-// MustNoErrorExcept and MustNoErrorExceptFn, whose three separate
-// NewUnreachableError calls take identical arguments, so a regression
-// in one would hit the others identically. r is the raw recovered
-// value, as assertTopFrameIs takes it: AsRecovered would wrap a
-// non-Recovered panic in a *PanicError, leaving the type assertion to
-// state what the line above it had just built.
+// assertUnreachablePanicShape pins that r is a *PanicError whose chain
+// assertUnreachableChain accepts. The PanicShape tests for the
+// MustNoError family share it, as their separate NewUnreachableError
+// calls take identical arguments, so a regression in one would hit the
+// others identically. r is the raw recovered value, as assertTopFrameIs
+// takes it: AsRecovered would wrap a non-Recovered panic in a
+// *PanicError, leaving the type assertion to state what the line above
+// it had just built.
 func assertUnreachablePanicShape(t T, r any, want error) {
 	t.Helper()
 	AssertMustNotNil(t, r, "recovered value")
 	pe := AssertMustTypeIs[*PanicError](t, r,
 		"recovered value is *PanicError")
+	assertUnreachableChain(t, pe, want)
+}
+
+// assertUnreachableChain pins that pe chains to both ErrUnreachable and
+// want. What the payload is assembled from is NewUnreachableError's
+// business; what callers depend on is that [errors.Is] finds each of the
+// two, so that is what this asserts. errUnrelated pins the chain as
+// discriminating rather than matching anything put to it.
+func assertUnreachableChain(t T, pe *PanicError, want error) {
+	t.Helper()
 	AssertErrorIs(t, pe, ErrUnreachable, "ErrUnreachable in chain")
 	AssertErrorIs(t, pe, want, "original error in chain")
 	AssertNotErrorIs(t, pe, errUnrelated, "unrelated error absent")

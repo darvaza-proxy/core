@@ -432,8 +432,13 @@ For indicating impossible code paths:
 
 * `NewUnreachableError()` - create unreachable error.
 * `NewUnreachableErrorf()` - create formatted unreachable error.
+* `PanicUnreachable()` / `PanicUnreachablef()` - panic with an unreachable
+  error, its stack starting at the caller.
+* `PanicUnreachableFrom()` / `PanicUnreachablefFrom()` - panic with an
+  unreachable error, its stack starting a given number of frames above the
+  caller.
 
-These create `PanicError` instances with stack traces.
+The constructors create `PanicError` instances with stack traces.
 
 ### Temporary and Timeout Errors
 

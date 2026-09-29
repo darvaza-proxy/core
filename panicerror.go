@@ -158,6 +158,32 @@ func NewUnreachableError(skip int, err error, note string) error {
 	return NewPanicWrap(deeper(skip), err, note)
 }
 
+// PanicUnreachable emits the PanicError [NewUnreachableError] makes of err
+// and note, its stack starting at the caller.
+func PanicUnreachable(err error, note string) {
+	PanicUnreachableFrom(1, err, note)
+}
+
+// PanicUnreachableFrom emits the PanicError [NewUnreachableError] makes of
+// err and note, its stack starting skip frames above the caller: 0 is
+// PanicUnreachableFrom's own caller.
+func PanicUnreachableFrom(skip int, err error, note string) {
+	panic(NewUnreachableError(deeper(skip), err, note))
+}
+
+// PanicUnreachablef emits the PanicError [NewUnreachableErrorf] makes of
+// err and a formatted note, its stack starting at the caller.
+func PanicUnreachablef(err error, format string, args ...any) {
+	PanicUnreachablefFrom(1, err, format, args...)
+}
+
+// PanicUnreachablefFrom emits the PanicError [NewUnreachableErrorf] makes
+// of err and a formatted note, its stack starting skip frames above the
+// caller: 0 is PanicUnreachablefFrom's own caller.
+func PanicUnreachablefFrom(skip int, err error, format string, args ...any) {
+	panic(NewUnreachableErrorf(deeper(skip), err, format, args...))
+}
+
 // deeper accounts for the frame of the function calling it, so a skip of
 // 0 attributes to that function's own caller. A negative skip clamps to
 // 1, that same caller, instead of reaching [StackTrace], which rejects it
