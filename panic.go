@@ -31,7 +31,7 @@ func AsRecovered(rvr any) Recovered {
 
 // Catcher is a runner that catches panics
 type Catcher struct {
-	recovered atomic.Value
+	recovered atomic.Pointer[Recovered]
 }
 
 // Do calls a function, returning its organic error,
@@ -57,7 +57,7 @@ func (p *Catcher) Try(fn func() error) error {
 	if fn != nil {
 		defer func() {
 			if err := AsRecovered(recover()); err != nil {
-				p.recovered.CompareAndSwap(nil, err)
+				p.recovered.CompareAndSwap(nil, &err)
 			}
 		}()
 
@@ -69,8 +69,8 @@ func (p *Catcher) Try(fn func() error) error {
 // Recovered returns the error corresponding to a
 // panic when the Catcher was running a function
 func (p *Catcher) Recovered() Recovered {
-	if err, ok := p.recovered.Load().(Recovered); ok {
-		return err
+	if r := p.recovered.Load(); r != nil {
+		return *r
 	}
 	return nil
 }
