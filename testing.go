@@ -275,9 +275,12 @@ func (m *MockT) Run(_ string, f func(T)) (ok bool) {
 	}
 
 	defer func() {
-		if r := recover(); r != nil && r != errMockTFailNow {
-			// Re-panic if it's not our FailNow error
-			panic(r)
+		if r := recover(); r != nil {
+			if r != errMockTFailNow {
+				// Re-panic if it's not our FailNow error
+				panic(r)
+			}
+			ok = !m.Failed()
 		}
 	}()
 
