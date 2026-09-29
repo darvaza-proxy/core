@@ -101,7 +101,7 @@ func TestMustNoErrorPreservesOriginal(t *testing.T) {
 
 // assertUnreachablePanicShape pins that r is a *PanicError whose chain
 // assertUnreachableChain accepts. The PanicShape tests for the
-// MustNoError family share it, as their separate NewUnreachableError
+// MustNoError family share it, as their separate PanicUnreachableFrom
 // calls take identical arguments, so a regression in one would hit the
 // others identically. r is the raw recovered value, as assertTopFrameIs
 // takes it: AsRecovered would wrap a non-Recovered panic in a
@@ -377,7 +377,7 @@ func TestMustNoErrorExceptFnUnreachablePanicShape(t *testing.T) {
 // callMustNoError is a thin wrapper around MustNoError used as a
 // stable, named caller for the stack-skip verification tests. The
 // captured top frame of the panic value should resolve to this
-// function, not to MustNoError or NewUnreachableError.
+// function, not to MustNoError or PanicUnreachableFrom.
 func callMustNoError(err error) {
 	MustNoError(err)
 }
@@ -422,8 +422,8 @@ func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) *PanicError {
 
 // TestMustNoErrorStack verifies the captured call stack of the panic
 // value lands at the immediate caller (callMustNoError) and not
-// inside MustNoError or NewUnreachableError. Pins the skip=1
-// argument to NewUnreachableError. The minDepth of 2 ensures the
+// inside MustNoError or PanicUnreachableFrom. Pins the skip=1
+// argument to PanicUnreachableFrom. The minDepth of 2 ensures the
 // wrapper sits above at least the test caller — a future change that
 // truncates the stack to a single frame would fail here.
 func TestMustNoErrorStack(t *testing.T) {
