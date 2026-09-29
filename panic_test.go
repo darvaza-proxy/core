@@ -904,3 +904,62 @@ type mockStringer struct {
 func (ms mockStringer) String() string {
 	return ms.value
 }
+
+// Benchmarks
+//
+// These take a failed Must apart one step at a time. Catch on its own
+// sets the floor. A plain panic makes AsRecovered wrap the payload, and
+// Panic builds the PanicError at the panic site instead; either way one
+// stack trace is captured. Must adds ErrUnreachable and its annotation on
+// top of that capture. Every panic carries the same error.
+
+var (
+	errBenchPanic = errors.New("benchmark panic")
+	// errBenchNil stays nil. Being a variable, it keeps the compiler from
+	// folding Must's check away as it would a literal nil.
+	errBenchNil error
+)
+
+func BenchmarkMust(b *testing.B) {
+	for b.Loop() {
+		_ = Must(42, errBenchNil)
+	}
+}
+
+func BenchmarkCatch(b *testing.B) {
+	for b.Loop() {
+		_ = Catch(benchReturnNil)
+	}
+}
+
+func BenchmarkCatchPanic(b *testing.B) {
+	for b.Loop() {
+		_ = Catch(benchPanic)
+	}
+}
+
+func BenchmarkCatchPanicError(b *testing.B) {
+	for b.Loop() {
+		_ = Catch(benchPanicError)
+	}
+}
+
+func BenchmarkCatchMust(b *testing.B) {
+	for b.Loop() {
+		_ = Catch(benchMustFail)
+	}
+}
+
+func benchReturnNil() error { return nil }
+
+func benchPanic() error { panic(errBenchPanic) }
+
+func benchPanicError() error {
+	Panic(errBenchPanic)
+	return nil
+}
+
+func benchMustFail() error {
+	_ = Must(42, errBenchPanic)
+	return nil
+}
