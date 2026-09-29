@@ -57,7 +57,10 @@ func (p *Catcher) Try(fn func() error) error {
 	if fn != nil {
 		defer func() {
 			if err := AsRecovered(recover()); err != nil {
-				p.recovered.CompareAndSwap(nil, &err)
+				// storing the address of a copy made here, rather than
+				// of err, keeps a call that does not panic off the heap.
+				stored := err
+				p.recovered.CompareAndSwap(nil, &stored)
 			}
 		}()
 
