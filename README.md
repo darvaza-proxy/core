@@ -431,7 +431,7 @@ panics through `ErrUnreachable` rather than returning a value:
 For indicating impossible code paths:
 
 * `NewUnreachableError()` - create unreachable error.
-* `NewUnreachableErrorf(format, args...)` - create formatted unreachable error.
+* `NewUnreachableErrorf()` - create formatted unreachable error.
 
 These create `PanicError` instances with stack traces.
 

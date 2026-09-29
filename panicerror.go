@@ -133,8 +133,13 @@ func PanicWrapf(err error, format string, args ...any) {
 }
 
 // NewUnreachableErrorf creates a new annotated ErrUnreachable with callstack.
+// The note is formatted only when there are arguments.
 func NewUnreachableErrorf(skip int, err error, format string, args ...any) error {
-	return NewUnreachableError(deeper(skip), err, fmt.Sprintf(format, args...))
+	note := format
+	if len(args) > 0 {
+		note = fmt.Sprintf(format, args...)
+	}
+	return NewUnreachableError(deeper(skip), err, note)
 }
 
 // NewUnreachableError creates a new annotated ErrUnreachable with callstack.

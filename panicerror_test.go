@@ -18,6 +18,7 @@ var (
 	_ TestCase = panicfTestCase{}
 	_ TestCase = panicfFromTestCase{}
 	_ TestCase = newUnreachableErrorTestCase{}
+	_ TestCase = newUnreachableErrorfTestCase{}
 	_ TestCase = deeperTestCase{}
 	_ TestCase = negativeSkipTestCase{}
 )
@@ -612,44 +613,43 @@ func newNewUnreachableErrorTestCase(name string, err error, note string,
 	}
 }
 
-func runNewUnreachableErrorfTest(t *testing.T) {
-	err := errors.New("test error")
-	format := "formatted %s: %d"
-	args := S[any]("note", 42)
+// newUnreachableErrorfTestCase states what note NewUnreachableErrorf
+// gives the error it builds: the format as it is when there are no
+// arguments, formatted otherwise.
+type newUnreachableErrorfTestCase struct {
+	name    string
+	format  string
+	wantMsg string
+	args    []any
+}
 
-	result := NewUnreachableErrorf(0, err, format, args...)
+var newUnreachableErrorfTestCases = []newUnreachableErrorfTestCase{
+	newNewUnreachableErrorfTestCase("no args", "100% sure", nil,
+		"100% sure"),
+	newNewUnreachableErrorfTestCase("with args", "formatted %s: %d",
+		S[any]("note", 42), "formatted note: 42"),
+}
 
-	if result == nil {
-		t.Fatal("expected non-nil error, got nil")
+func newNewUnreachableErrorfTestCase(name, format string, args []any,
+	wantMsg string) newUnreachableErrorfTestCase {
+	return newUnreachableErrorfTestCase{
+		name:    name,
+		format:  format,
+		wantMsg: wantMsg,
+		args:    args,
 	}
+}
 
-	// Test that it's a PanicError
-	pe, ok := result.(*PanicError)
-	if !ok {
-		t.Fatalf("expected PanicError, got %T", result)
-	}
+func (tc newUnreachableErrorfTestCase) Name() string {
+	return tc.name
+}
 
-	// Test that ErrUnreachable is in the chain
-	if !errors.Is(result, ErrUnreachable) {
-		t.Fatal("expected ErrUnreachable in error chain")
-	}
+func (tc newUnreachableErrorfTestCase) Test(t *testing.T) {
+	t.Helper()
+	result := NewUnreachableErrorf(0, errSentinel, tc.format, tc.args...)
 
-	// Test that original error is in the chain
-	if !errors.Is(result, err) {
-		t.Fatal("expected original error in error chain")
-	}
-
-	// Test formatted message
-	errorStr := result.Error()
-	if !strings.Contains(errorStr, "formatted note: 42") {
-		t.Fatalf("expected formatted message in error, got '%s'", errorStr)
-	}
-
-	// Test stack trace
-	stack := pe.CallStack()
-	if len(stack) == 0 {
-		t.Fatal("expected non-empty stack trace")
-	}
+	assertUnreachablePanicShape(t, result, errSentinel)
+	AssertContains(t, result.Error(), tc.wantMsg, "message")
 }
 
 // Main test functions that call the helpers
@@ -715,7 +715,7 @@ func TestNewUnreachableError(t *testing.T) {
 }
 
 func TestNewUnreachableErrorf(t *testing.T) {
-	t.Run("NewUnreachableErrorf", runNewUnreachableErrorfTest)
+	RunTestCases(t, newUnreachableErrorfTestCases)
 }
 
 // deeperTestCase pins the skip normalisation every panic constructor
