@@ -86,9 +86,19 @@ func NewPanicWrapf(skip int, err error, format string, args ...any) *PanicError 
 	}
 }
 
-// Panic emits a PanicError with the given payload
+// Panic emits a PanicError with the given payload. A *PanicError payload
+// is raised as it is, keeping the stack it already carries, and a nil one
+// counts as no payload.
 func Panic(payload any) {
-	panic(NewPanicError(1, payload))
+	pe, ok := payload.(*PanicError)
+	if pe == nil {
+		if ok {
+			// a nil *PanicError carries nothing
+			payload = nil
+		}
+		pe = NewPanicError(1, payload)
+	}
+	panic(pe)
 }
 
 // Panicf emits a PanicError with a formatted string as payload

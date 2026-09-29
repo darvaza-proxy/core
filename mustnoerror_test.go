@@ -388,8 +388,8 @@ func callMustNoErrorExceptFn(err error, check func(error) bool) {
 	MustNoErrorExceptFn(err, check)
 }
 
-// assertTopFrameIs recovers a panic, asserts the value is a
-// *PanicError, and pins:
+// assertTopFrameIs takes a recovered panic value, asserts it is a
+// *PanicError, returned for further checks, and pins:
 //
 //   - the top frame's FuncName is wantFunc — catches a stack that
 //     lands inside the helper itself (skip too small) or skips past
@@ -402,7 +402,7 @@ func callMustNoErrorExceptFn(err error, check func(error) bool) {
 // Fatal rather than logging silently. The t parameter is T (not
 // *testing.T) so a MockT can drive the negative meta-test rows in
 // TestAssertTopFrameIs.
-func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) {
+func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) *PanicError {
 	t.Helper()
 	AssertMustNotNil(t, r, "recovered value")
 	pe := AssertMustTypeIs[*PanicError](t, r,
@@ -411,6 +411,7 @@ func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) {
 	AssertMustTrue(t, len(stack) >= minDepth,
 		"stack depth >= %d (got %d)", minDepth, len(stack))
 	AssertMustEqual(t, wantFunc, stack[0].FuncName(), "top frame")
+	return pe
 }
 
 // TestMustNoErrorStack verifies the captured call stack of the panic
@@ -421,7 +422,7 @@ func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) {
 // truncates the stack to a single frame would fail here.
 func TestMustNoErrorStack(t *testing.T) {
 	defer func() {
-		assertTopFrameIs(t, recover(), "callMustNoError", 2)
+		_ = assertTopFrameIs(t, recover(), "callMustNoError", 2)
 	}()
 	callMustNoError(errSentinel)
 }
@@ -430,7 +431,7 @@ func TestMustNoErrorStack(t *testing.T) {
 // stack lands at the immediate caller, the same way as MustNoError.
 func TestMustNoErrorExceptStack(t *testing.T) {
 	defer func() {
-		assertTopFrameIs(t, recover(), "callMustNoErrorExcept", 2)
+		_ = assertTopFrameIs(t, recover(), "callMustNoErrorExcept", 2)
 	}()
 	callMustNoErrorExcept(errSentinel, errOther)
 }
@@ -439,7 +440,7 @@ func TestMustNoErrorExceptStack(t *testing.T) {
 // stack lands at the immediate caller, the same way as MustNoError.
 func TestMustNoErrorExceptFnStack(t *testing.T) {
 	defer func() {
-		assertTopFrameIs(t, recover(), "callMustNoErrorExceptFn", 2)
+		_ = assertTopFrameIs(t, recover(), "callMustNoErrorExceptFn", 2)
 	}()
 	callMustNoErrorExceptFn(errSentinel, matchesOther)
 }
@@ -457,17 +458,17 @@ func recoverValidPanic() (r any) {
 }
 
 // runAssertTopFrameIs runs assertTopFrameIs against a MockT and
-// swallows the panic raised by MockT.Fatal/FailNow. Returns the
-// MockT so the caller can assert Failed(). Named return is required
-// so the MockT survives a recovered panic in the deferred handler —
-// without it the function would return a nil *MockT after the
-// recover.
+// swallows the panic raised by MockT.Fatal/FailNow. Returns what the
+// helper returned, nil when it halted, and the MockT so the caller can
+// assert Failed(). Named returns are required so the MockT survives a
+// recovered panic in the deferred handler — without them the function
+// would return a nil *MockT after the recover.
 func runAssertTopFrameIs(r any, wantFunc string,
-	minDepth int) (mock *MockT) {
+	minDepth int) (pe *PanicError, mock *MockT) {
 	mock = &MockT{}
 	defer func() { _ = recover() }()
-	assertTopFrameIs(mock, r, wantFunc, minDepth)
-	return mock
+	pe = assertTopFrameIs(mock, r, wantFunc, minDepth)
+	return pe, mock
 }
 
 // assertTopFrameTestCase exercises assertTopFrameIs across both the
@@ -477,7 +478,8 @@ func runAssertTopFrameIs(r any, wantFunc string,
 // that each Must-* check actually halts the MockT via Fatal when
 // violated. Without the positive row a regression like
 // "assertTopFrameIs always calls Fatal" would pass the negative rows
-// silently.
+// silently. A passing row also states that the helper returns the
+// *PanicError it was given, and a failing one that it returns nothing.
 type assertTopFrameTestCase struct {
 	name string
 
@@ -503,9 +505,14 @@ func (tc assertTopFrameTestCase) Name() string { return tc.name }
 
 func (tc assertTopFrameTestCase) Test(t *testing.T) {
 	t.Helper()
-	mock := runAssertTopFrameIs(tc.r, tc.wantFunc, tc.minDepth)
+	pe, mock := runAssertTopFrameIs(tc.r, tc.wantFunc, tc.minDepth)
 	AssertMustEqual(t, tc.wantFailed, mock.Failed(),
 		"MockT.Failed()")
+	if tc.wantFailed {
+		AssertNil(t, pe, "returned")
+	} else {
+		AssertSame(t, tc.r, pe, "returned")
+	}
 }
 
 var _ TestCase = assertTopFrameTestCase{}

@@ -13,6 +13,7 @@ var (
 	_ TestCase = panicErrorUnwrapTestCase{}
 	_ TestCase = newPanicErrorfTestCase{}
 	_ TestCase = panicTestCase{}
+	_ TestCase = panicStackTestCase{}
 	_ TestCase = panicfTestCase{}
 	_ TestCase = newUnreachableErrorTestCase{}
 	_ TestCase = deeperTestCase{}
@@ -282,6 +283,64 @@ func (tc panicTestCase) Test(t *testing.T) {
 	Panic(tc.payload)
 }
 
+// callPanic gives Panic a stable, named caller, so a stack Panic
+// captures itself starts here.
+func callPanic(payload any) {
+	Panic(payload)
+}
+
+// newPanicPayload builds a *PanicError whose stack starts here, apart
+// from any stack Panic would capture.
+func newPanicPayload() *PanicError {
+	return NewPanicError(0, errSentinel)
+}
+
+// panicStackTestCase states where the stack of the value Panic raises
+// starts, and what payload it carries. A *PanicError payload is raised
+// as it is, so its own stack and payload come back; a nil one counts as
+// no payload.
+type panicStackTestCase struct {
+	payload     any
+	wantPayload any
+	name        string
+	wantFunc    string
+}
+
+func newPanicStackTestCase(name string, payload, wantPayload any,
+	wantFunc string) panicStackTestCase {
+	return panicStackTestCase{
+		payload:     payload,
+		wantPayload: wantPayload,
+		name:        name,
+		wantFunc:    wantFunc,
+	}
+}
+
+func (tc panicStackTestCase) Name() string {
+	return tc.name
+}
+
+func (tc panicStackTestCase) Test(t *testing.T) {
+	t.Helper()
+	defer func() {
+		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
+		AssertEqual(t, tc.wantPayload, pe.Recovered(), "payload")
+	}()
+
+	callPanic(tc.payload)
+}
+
+func panicStackTestCases() []panicStackTestCase {
+	return []panicStackTestCase{
+		newPanicStackTestCase("error payload",
+			errSentinel, errSentinel, "callPanic"),
+		newPanicStackTestCase("PanicError payload",
+			newPanicPayload(), errSentinel, "newPanicPayload"),
+		newPanicStackTestCase("nil PanicError payload",
+			(*PanicError)(nil), nil, "callPanic"),
+	}
+}
+
 // panicfTestCase states the same for Panicf, where the payload is always
 // the formatted message as an error.
 type panicfTestCase struct {
@@ -501,6 +560,10 @@ func TestPanic(t *testing.T) {
 	RunTestCases(t, panicTestCases)
 }
 
+func TestPanicStack(t *testing.T) {
+	RunTestCases(t, panicStackTestCases())
+}
+
 func TestPanicf(t *testing.T) {
 	RunTestCases(t, panicfTestCases)
 }
@@ -624,7 +687,7 @@ func (tc negativeSkipTestCase) Name() string {
 
 func (tc negativeSkipTestCase) Test(t *testing.T) {
 	t.Helper()
-	assertTopFrameIs(t, tc.recovered, tc.wantFunc, 2)
+	_ = assertTopFrameIs(t, tc.recovered, tc.wantFunc, 2)
 }
 
 // negativeSkipTestCases covers every one of the seven deeper call
