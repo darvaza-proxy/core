@@ -46,13 +46,14 @@ type T interface {
 // MockT is a mock implementation of the T interface for testing purposes.
 // It collects error and log messages instead of reporting them to the testing framework.
 //
-// MockT supports all standard testing methods including Fatal/Fatalf which panic
-// with a special error that can be caught by the Run method. This allows testing
-// of assertion functions and other utilities that may call Fatal methods.
+// MockT's FailNow, and the Fatal methods built on it, stop the test by
+// unwinding to the Run method. This allows testing of assertion functions
+// and other utilities that may stop a test.
 //
-// The Run method executes test functions and recovers from FailNow/Fatal panics,
-// making it ideal for testing assertion functions where you need to verify both
-// success and failure scenarios without terminating the test runner.
+// The Run method executes test functions and returns where they stop the
+// test, making it ideal for testing assertion functions where you need to
+// verify both success and failure scenarios without terminating the test
+// runner.
 type MockT struct {
 	Errors       []string
 	Logs         []string
@@ -104,14 +105,14 @@ func (m *MockT) Logf(format string, args ...any) {
 	m.Logs = append(m.Logs, msg)
 }
 
-// Fatal implements the T interface and collects error messages, then panics.
+// Fatal implements the T interface and collects error messages, then stops the test.
 // It combines Error and FailNow functionality.
 func (m *MockT) Fatal(args ...any) {
 	m.Error(args...)
 	m.FailNow()
 }
 
-// Fatalf implements the T interface and collects formatted error messages, then panics.
+// Fatalf implements the T interface and collects formatted error messages, then stops the test.
 // It combines Errorf and FailNow functionality.
 func (m *MockT) Fatalf(format string, args ...any) {
 	m.Errorf(format, args...)
@@ -125,7 +126,7 @@ func (m *MockT) Fail() {
 	m.failed = true
 }
 
-// FailNow implements the T interface and marks the test as failed, then panics.
+// FailNow implements the T interface and marks the test as failed, then stops it.
 func (m *MockT) FailNow() {
 	m.Fail()
 	panic(errMockTFailNow)
@@ -244,8 +245,10 @@ func (m *MockT) Reset() {
 }
 
 // Run runs the test function f with the MockT instance and returns whether it passed.
-// It recovers from FailNow/Fatal panics and returns false if the test failed or panicked.
-// Non-FailNow panics are re-thrown. Returns false for nil MockT or nil function.
+// It returns where f stops the test, through FailNow directly or through
+// Fatal, and returns false if the test failed. Failed carries over from
+// earlier runs until Reset. Panics in f are re-thrown. Returns false for nil
+// MockT or nil function.
 //
 // Run catches FailNow on the goroutine running f, so, as with testing.T,
 // it belongs there; called from another goroutine, it ends the test binary.
@@ -254,7 +257,7 @@ func (m *MockT) Reset() {
 //
 //	mock := &MockT{}
 //	ok := mock.Run("test assertion", func(t T) {
-//		AssertEqual(t, 1, 2, "value") // This calls t.Fatal internally
+//		AssertMustEqual(t, 1, 2, "value") // reports, then calls t.FailNow
 //	})
 //	// ok == false, mock.Failed() == true, mock.Errors contains failure message
 //

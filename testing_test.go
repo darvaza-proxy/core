@@ -1496,6 +1496,18 @@ func TestMockTRun(t *testing.T) {
 	})
 }
 
+// Run reports Failed as it stands, so a failure in an earlier run
+// carries over until Reset: a passing body run after it returns false.
+func TestMockTRunCarriesOver(t *testing.T) {
+	mock := &MockT{}
+	mock.Run("fails", func(mt T) { mt.FailNow() })
+	AssertMustTrue(t, mock.Failed(), "failed before")
+
+	ok := mock.Run("passes", func(mt T) { mt.Log("passed") })
+	AssertFalse(t, ok, "passed")
+	AssertTrue(t, mock.Failed(), "failed")
+}
+
 func TestMockTRunNilChecks(t *testing.T) {
 	// Test nil MockT
 	var mock *MockT
