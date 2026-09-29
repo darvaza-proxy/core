@@ -337,6 +337,8 @@ The `PanicError` type wraps panic values with stack traces:
 * `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics.
 * `Panic()` / `Panicf()` / `PanicWrap()` / `PanicWrapf()` - panic with
   `PanicError`.
+* `PanicFrom()` / `PanicfFrom()` - panic with `PanicError`, its stack
+  starting a given number of frames above the caller.
 
 Panic recovery utilities:
 

@@ -90,20 +90,35 @@ func NewPanicWrapf(skip int, err error, format string, args ...any) *PanicError 
 // is raised as it is, keeping the stack it already carries, and a nil one
 // counts as no payload.
 func Panic(payload any) {
+	PanicFrom(1, payload)
+}
+
+// PanicFrom emits a PanicError with the given payload, as [Panic] does,
+// its stack starting skip frames above the caller: 0 is PanicFrom's own
+// caller. A *PanicError payload keeps the stack it already carries,
+// whatever the skip.
+func PanicFrom(skip int, payload any) {
 	pe, ok := payload.(*PanicError)
 	if pe == nil {
 		if ok {
 			// a nil *PanicError carries nothing
 			payload = nil
 		}
-		pe = NewPanicError(1, payload)
+		pe = NewPanicError(deeper(skip), payload)
 	}
 	panic(pe)
 }
 
 // Panicf emits a PanicError with a formatted string as payload
 func Panicf(format string, args ...any) {
-	panic(NewPanicErrorf(1, format, args...))
+	PanicfFrom(1, format, args...)
+}
+
+// PanicfFrom emits a PanicError with a formatted string as payload, its
+// stack starting skip frames above the caller: 0 is PanicfFrom's own
+// caller.
+func PanicfFrom(skip int, format string, args ...any) {
+	panic(NewPanicErrorf(deeper(skip), format, args...))
 }
 
 // PanicWrap emits a PanicError wrapping an annotated error.
@@ -138,9 +153,9 @@ func NewUnreachableError(skip int, err error, note string) error {
 	return NewPanicWrap(deeper(skip), err, note)
 }
 
-// deeper accounts for the frame of the constructor doing the capturing,
-// so a skip of 0 attributes to that constructor's own caller. A negative
-// skip clamps to 1 instead of reaching [StackTrace], which rejects it
+// deeper accounts for the frame of the function calling it, so a skip of
+// 0 attributes to that function's own caller. A negative skip clamps to
+// 1, that same caller, instead of reaching [StackTrace], which rejects it
 // and captures nothing.
 func deeper(skip int) int {
 	if skip < 0 {
