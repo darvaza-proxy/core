@@ -16,6 +16,7 @@ var (
 	_ TestCase = assertAbortTestCase{}
 	_ TestCase = (*mockTestCase)(nil)
 	_ TestCase = mockTMessageAtTestCase{}
+	_ TestCase = mockTRunTestCase{}
 )
 
 // Test MockT implementation
@@ -1422,61 +1423,76 @@ func TestAssertNotSame(t *testing.T) {
 	AssertFalse(t, mock.HasLogs(), "no logs on slice failure")
 }
 
-func TestMockTFatal(t *testing.T) {
-	mock := &MockT{}
-
-	// Test Fatal panics and records error
-	ok := mock.Run("fatal test", func(mt T) {
-		mt.Fatal("test fatal message")
-	})
-
-	AssertFalse(t, ok, "Fatal should cause test to fail")
-	AssertTrue(t, mock.Failed(), "Fatal should mark test as failed")
-	AssertEqual(t, 1, mock.NumErrors(), "Fatal should record error")
-	AssertEqual(t, "test fatal message", mustMessageAt(t, mock.ErrorAt, 0, "Fatal error"),
-		"Fatal error message")
+// mockTRunTestCase tests the result MockT.Run reports for a test body,
+// and what the body's calls left recorded in the MockT.
+type mockTRunTestCase struct {
+	fn           func(T)
+	name         string
+	expectErrors []string
+	expectLogs   []string
+	expectFailed bool
 }
 
-func TestMockTFatalf(t *testing.T) {
-	mock := &MockT{}
-
-	// Test Fatalf panics and records formatted error
-	ok := mock.Run("fatalf test", func(mt T) {
-		mt.Fatalf("test %s message %d", "fatalf", 42)
-	})
-
-	AssertFalse(t, ok, "Fatalf should cause test to fail")
-	AssertTrue(t, mock.Failed(), "Fatalf should mark test as failed")
-	AssertEqual(t, 1, mock.NumErrors(), "Fatalf should record error")
-	AssertEqual(t, "test fatalf message 42", mustMessageAt(t, mock.ErrorAt, 0, "Fatalf error"),
-		"Fatalf error message")
+// newMockTRunTestCase declares a body under which Run passes, with the
+// logs it leaves.
+func newMockTRunTestCase(name string, fn func(T),
+	expectLogs []string) mockTRunTestCase {
+	return mockTRunTestCase{
+		fn:           fn,
+		name:         name,
+		expectErrors: nil,
+		expectLogs:   expectLogs,
+		expectFailed: false,
+	}
 }
 
-func TestMockTFailNow(t *testing.T) {
-	mock := &MockT{}
-
-	// Test FailNow panics and marks as failed
-	ok := mock.Run("FailNow test", func(mt T) {
-		mt.FailNow()
-	})
-
-	AssertFalse(t, ok, "FailNow should cause test to fail")
-	AssertTrue(t, mock.Failed(), "FailNow should mark test as failed")
-	AssertEqual(t, 0, mock.NumErrors(), "FailNow should not record error")
+// newMockTRunTestCaseFails declares a body under which Run fails, with
+// the errors and logs it leaves.
+func newMockTRunTestCaseFails(name string, fn func(T),
+	expectErrors, expectLogs []string) mockTRunTestCase {
+	return mockTRunTestCase{
+		fn:           fn,
+		name:         name,
+		expectErrors: expectErrors,
+		expectLogs:   expectLogs,
+		expectFailed: true,
+	}
 }
 
-func TestMockTRunSuccess(t *testing.T) {
+func (tc mockTRunTestCase) Name() string {
+	return tc.name
+}
+
+func (tc mockTRunTestCase) Test(t *testing.T) {
+	t.Helper()
 	mock := &MockT{}
+	ok := mock.Run(tc.name, tc.fn)
 
-	// Test successful run
-	ok := mock.Run("success test", func(mt T) {
-		mt.Log("test passed")
+	AssertEqual(t, !tc.expectFailed, ok, "result")
+	AssertEqual(t, tc.expectFailed, mock.Failed(), "Failed()")
+	AssertSliceEqual(t, tc.expectErrors, mock.Errors, "errors")
+	AssertSliceEqual(t, tc.expectLogs, mock.Logs, "logs")
+}
+
+func TestMockTRun(t *testing.T) {
+	RunTestCases(t, []mockTRunTestCase{
+		newMockTRunTestCase("Log", func(mt T) { mt.Log("logged") },
+			S("logged")),
+		newMockTRunTestCase("Logf", func(mt T) { mt.Logf("logged %d", 42) },
+			S("logged 42")),
+		newMockTRunTestCaseFails("Fail", func(mt T) { mt.Fail(); mt.Log("continued") },
+			nil, S("continued")),
+		newMockTRunTestCaseFails("FailNow", func(mt T) { mt.FailNow(); mt.Log("continued") },
+			nil, nil),
+		newMockTRunTestCaseFails("Error", func(mt T) { mt.Error("error"); mt.Log("continued") },
+			S("error"), S("continued")),
+		newMockTRunTestCaseFails("Errorf", func(mt T) { mt.Errorf("error %d", 42); mt.Log("continued") },
+			S("error 42"), S("continued")),
+		newMockTRunTestCaseFails("Fatal", func(mt T) { mt.Fatal("fatal"); mt.Log("continued") },
+			S("fatal"), nil),
+		newMockTRunTestCaseFails("Fatalf", func(mt T) { mt.Fatalf("fatal %d", 42); mt.Log("continued") },
+			S("fatal 42"), nil),
 	})
-
-	AssertTrue(t, ok, "Successful test should return true")
-	AssertFalse(t, mock.Failed(), "Successful test should not be marked as failed")
-	AssertEqual(t, 1, mock.NumLogs(), "Should record log message")
-	AssertEqual(t, "test passed", mustMessageAt(t, mock.LogAt, 0, "log"), "Log message content")
 }
 
 func TestMockTRunNilChecks(t *testing.T) {
