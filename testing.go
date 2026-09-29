@@ -35,9 +35,9 @@ type T interface {
 // MockT is a mock implementation of the T interface for testing purposes.
 // It collects error and log messages instead of reporting them to the testing framework.
 //
-// MockT supports all standard testing methods including Fatal/Fatalf which panic
-// with a special error that can be caught by the Run method. This allows testing
-// of assertion functions and other utilities that may call Fatal methods.
+// MockT's Fatal/Fatalf panic with a sentinel that the Run method recovers.
+// This allows testing of assertion functions and other utilities that may
+// call Fatal methods.
 //
 // The Run method executes test functions and recovers from FailNow/Fatal panics,
 // making it ideal for testing assertion functions where you need to verify both
@@ -233,14 +233,14 @@ func (m *MockT) Reset() {
 }
 
 // Run runs the test function f with the MockT instance and returns whether it passed.
-// It recovers from FailNow/Fatal panics and returns false if the test failed or panicked.
+// It recovers from FailNow/Fatal panics and returns false if the test failed.
 // Non-FailNow panics are re-thrown. Returns false for nil MockT or nil function.
 //
 // This method is ideal for testing assertion functions that may call Fatal/FailNow:
 //
 //	mock := &MockT{}
 //	ok := mock.Run("test assertion", func(t T) {
-//		AssertEqual(t, 1, 2, "value") // This calls t.Fatal internally
+//		AssertMustEqual(t, 1, 2, "value") // reports, then calls t.FailNow
 //	})
 //	// ok == false, mock.Failed() == true, mock.Errors contains failure message
 //
