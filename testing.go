@@ -107,23 +107,15 @@ func (m *MockT) Logf(format string, args ...any) {
 // Fatal implements the T interface and collects error messages, then panics.
 // It combines Error and FailNow functionality.
 func (m *MockT) Fatal(args ...any) {
-	msg := fmt.Sprint(args...)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.Errors = append(m.Errors, msg)
-	m.failed = true
-	panic(errMockTFailNow)
+	m.Error(args...)
+	m.FailNow()
 }
 
 // Fatalf implements the T interface and collects formatted error messages, then panics.
 // It combines Errorf and FailNow functionality.
 func (m *MockT) Fatalf(format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.Errors = append(m.Errors, msg)
-	m.failed = true
-	panic(errMockTFailNow)
+	m.Errorf(format, args...)
+	m.FailNow()
 }
 
 // Fail implements the T interface and marks the test as failed.
