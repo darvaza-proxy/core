@@ -641,6 +641,9 @@ be diffed by eye.
   (value, ok).
 * `AssertPanic(t, fn, expectedPanic, name...)` /
   `AssertNoPanic(t, fn, name...)` - panic testing with type-aware matching.
+* `AssertTopFrame(t, v, want, name...)` - the call stack `v` carries (a
+  recovered `PanicError`, for one) starts at the function `want`, named as
+  `Frame.FuncName()` names it.
 
 #### Channel and Timing Assertions
 
@@ -703,6 +706,8 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
   failure, returns cast value.
 * `AssertMustPanic(t, fn, expectedPanic, name...)` /
   `AssertMustNoPanic(t, fn, name...)` - terminate on panic expectation mismatch.
+* `AssertMustTopFrame(t, v, want, name...)` - terminate when the call stack
+  starts at another function, or `v` carries none.
 * `AssertMustSame(t, expected, actual, name...)` /
   `AssertMustNotSame(t, expected, actual, name...)` - terminate on same-ness
   mismatch.

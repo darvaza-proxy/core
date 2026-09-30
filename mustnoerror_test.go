@@ -397,9 +397,9 @@ func callMustNoErrorExceptFn(err error, check func(error) bool) {
 // assertTopFrameIs takes a recovered panic value, asserts it is a
 // *PanicError, returned for further checks, and pins:
 //
-//   - the top frame's FuncName is wantFunc — catches a stack that
-//     lands inside the helper itself (skip too small) or skips past
-//     the wrapper (skip too large);
+//   - the top frame is wantFunc, through AssertMustTopFrame — catches
+//     a stack that lands inside the helper itself (skip too small) or
+//     skips past the wrapper (skip too large);
 //   - the captured stack has at least minDepth frames — guards
 //     against a future change that truncates the stack and makes
 //     the top-frame assertion vacuous.
@@ -416,7 +416,7 @@ func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) *PanicError {
 	stack := pe.CallStack()
 	AssertMustTrue(t, len(stack) >= minDepth,
 		"stack depth >= %d (got %d)", minDepth, len(stack))
-	AssertMustEqual(t, wantFunc, stack[0].FuncName(), "top frame")
+	AssertMustTopFrame(t, pe, wantFunc, "top frame")
 	return pe
 }
 
@@ -477,7 +477,7 @@ func runAssertTopFrameIs(r any, wantFunc string,
 	return pe, mock
 }
 
-// assertTopFrameTestCase exercises assertTopFrameIs across both the
+// assertTopFrameIsTestCase exercises assertTopFrameIs across both the
 // happy path (valid input — wantFailed false) and each of the
 // precondition violations (wantFailed true). The positive row pins
 // that the helper does not spuriously fail; the negative rows pin
@@ -486,7 +486,7 @@ func runAssertTopFrameIs(r any, wantFunc string,
 // "assertTopFrameIs always calls Fatal" would pass the negative rows
 // silently. A passing row also states that the helper returns the
 // *PanicError it was given, and a failing one that it returns nothing.
-type assertTopFrameTestCase struct {
+type assertTopFrameIsTestCase struct {
 	name string
 
 	r        any
@@ -496,9 +496,9 @@ type assertTopFrameTestCase struct {
 	wantFailed bool
 }
 
-func newAssertTopFrameTestCase(name string, r any, wantFunc string,
-	minDepth int, wantFailed bool) assertTopFrameTestCase {
-	return assertTopFrameTestCase{
+func newAssertTopFrameIsTestCase(name string, r any, wantFunc string,
+	minDepth int, wantFailed bool) assertTopFrameIsTestCase {
+	return assertTopFrameIsTestCase{
 		name:       name,
 		r:          r,
 		wantFunc:   wantFunc,
@@ -507,9 +507,9 @@ func newAssertTopFrameTestCase(name string, r any, wantFunc string,
 	}
 }
 
-func (tc assertTopFrameTestCase) Name() string { return tc.name }
+func (tc assertTopFrameIsTestCase) Name() string { return tc.name }
 
-func (tc assertTopFrameTestCase) Test(t *testing.T) {
+func (tc assertTopFrameIsTestCase) Test(t *testing.T) {
 	t.Helper()
 	pe, mock := runAssertTopFrameIs(tc.r, tc.wantFunc, tc.minDepth)
 	AssertMustEqual(t, tc.wantFailed, mock.Failed(),
@@ -521,19 +521,19 @@ func (tc assertTopFrameTestCase) Test(t *testing.T) {
 	}
 }
 
-var _ TestCase = assertTopFrameTestCase{}
+var _ TestCase = assertTopFrameIsTestCase{}
 
-func assertTopFrameTestCases(validPanic any) []assertTopFrameTestCase {
-	return []assertTopFrameTestCase{
-		newAssertTopFrameTestCase("valid input passes",
+func assertTopFrameIsTestCases(validPanic any) []assertTopFrameIsTestCase {
+	return []assertTopFrameIsTestCase{
+		newAssertTopFrameIsTestCase("valid input passes",
 			validPanic, "callMustNoError", 2, false),
-		newAssertTopFrameTestCase("nil recovered",
+		newAssertTopFrameIsTestCase("nil recovered",
 			nil, "callMustNoError", 2, true),
-		newAssertTopFrameTestCase("non-PanicError type",
+		newAssertTopFrameIsTestCase("non-PanicError type",
 			errOther, "callMustNoError", 2, true),
-		newAssertTopFrameTestCase("wrong frame name",
+		newAssertTopFrameIsTestCase("wrong frame name",
 			validPanic, "nonExistent", 2, true),
-		newAssertTopFrameTestCase("depth too shallow",
+		newAssertTopFrameIsTestCase("depth too shallow",
 			validPanic, "callMustNoError", 9999, true),
 	}
 }
@@ -547,5 +547,5 @@ func assertTopFrameTestCases(validPanic any) []assertTopFrameTestCase {
 func TestAssertTopFrameIs(t *testing.T) {
 	validPanic := recoverValidPanic()
 	AssertMustNotNil(t, validPanic, "captured valid panic")
-	RunTestCases(t, assertTopFrameTestCases(validPanic))
+	RunTestCases(t, assertTopFrameIsTestCases(validPanic))
 }
