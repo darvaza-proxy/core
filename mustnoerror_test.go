@@ -99,23 +99,29 @@ func TestMustNoErrorPreservesOriginal(t *testing.T) {
 	AssertPanic(t, fnNil, errNilPointer, "typed-nil err in chain")
 }
 
-// assertUnreachablePanicShape pins that r is a *PanicError chaining to
-// both ErrUnreachable and want. What the payload is assembled from is
-// NewUnreachableError's business; what callers depend on is that
-// [errors.Is] finds each of the two, so that is what this asserts.
-// errUnrelated pins the chain as discriminating rather than matching
-// anything put to it. Shared by the PanicShape tests for MustNoError,
-// MustNoErrorExcept and MustNoErrorExceptFn, whose three separate
-// NewUnreachableError calls take identical arguments, so a regression
-// in one would hit the others identically. r is the raw recovered
-// value, as assertTopFrameIs takes it: AsRecovered would wrap a
-// non-Recovered panic in a *PanicError, leaving the type assertion to
-// state what the line above it had just built.
+// assertUnreachablePanicShape pins that r is a *PanicError whose chain
+// assertUnreachableChain accepts. The PanicShape tests for the
+// MustNoError family share it, as their separate PanicUnreachableFrom
+// calls take identical arguments, so a regression in one would hit the
+// others identically. r is the raw recovered value, as assertTopFrameIs
+// takes it: AsRecovered would wrap a non-Recovered panic in a
+// *PanicError, leaving the type assertion to state what the line above
+// it had just built.
 func assertUnreachablePanicShape(t T, r any, want error) {
 	t.Helper()
 	AssertMustNotNil(t, r, "recovered value")
 	pe := AssertMustTypeIs[*PanicError](t, r,
 		"recovered value is *PanicError")
+	assertUnreachableChain(t, pe, want)
+}
+
+// assertUnreachableChain pins that pe chains to both ErrUnreachable and
+// want. What the payload is assembled from is NewUnreachableError's
+// business; what callers depend on is that [errors.Is] finds each of the
+// two, so that is what this asserts. errUnrelated pins the chain as
+// discriminating rather than matching anything put to it.
+func assertUnreachableChain(t T, pe *PanicError, want error) {
+	t.Helper()
 	AssertErrorIs(t, pe, ErrUnreachable, "ErrUnreachable in chain")
 	AssertErrorIs(t, pe, want, "original error in chain")
 	AssertNotErrorIs(t, pe, errUnrelated, "unrelated error absent")
@@ -371,7 +377,7 @@ func TestMustNoErrorExceptFnUnreachablePanicShape(t *testing.T) {
 // callMustNoError is a thin wrapper around MustNoError used as a
 // stable, named caller for the stack-skip verification tests. The
 // captured top frame of the panic value should resolve to this
-// function, not to MustNoError or NewUnreachableError.
+// function, not to MustNoError or PanicUnreachableFrom.
 func callMustNoError(err error) {
 	MustNoError(err)
 }
@@ -388,12 +394,12 @@ func callMustNoErrorExceptFn(err error, check func(error) bool) {
 	MustNoErrorExceptFn(err, check)
 }
 
-// assertTopFrameIs recovers a panic, asserts the value is a
-// *PanicError, and pins:
+// assertTopFrameIs takes a recovered panic value, asserts it is a
+// *PanicError, returned for further checks, and pins:
 //
-//   - the top frame's FuncName is wantFunc — catches a stack that
-//     lands inside the helper itself (skip too small) or skips past
-//     the wrapper (skip too large);
+//   - the top frame is wantFunc, through AssertMustTopFrame — catches
+//     a stack that lands inside the helper itself (skip too small) or
+//     skips past the wrapper (skip too large);
 //   - the captured stack has at least minDepth frames — guards
 //     against a future change that truncates the stack and makes
 //     the top-frame assertion vacuous.
@@ -402,7 +408,7 @@ func callMustNoErrorExceptFn(err error, check func(error) bool) {
 // Fatal rather than logging silently. The t parameter is T (not
 // *testing.T) so a MockT can drive the negative meta-test rows in
 // TestAssertTopFrameIs.
-func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) {
+func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) *PanicError {
 	t.Helper()
 	AssertMustNotNil(t, r, "recovered value")
 	pe := AssertMustTypeIs[*PanicError](t, r,
@@ -410,18 +416,19 @@ func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) {
 	stack := pe.CallStack()
 	AssertMustTrue(t, len(stack) >= minDepth,
 		"stack depth >= %d (got %d)", minDepth, len(stack))
-	AssertMustEqual(t, wantFunc, stack[0].FuncName(), "top frame")
+	AssertMustTopFrame(t, pe, wantFunc, "top frame")
+	return pe
 }
 
 // TestMustNoErrorStack verifies the captured call stack of the panic
 // value lands at the immediate caller (callMustNoError) and not
-// inside MustNoError or NewUnreachableError. Pins the skip=1
-// argument to NewUnreachableError. The minDepth of 2 ensures the
+// inside MustNoError or PanicUnreachableFrom. Pins the skip=1
+// argument to PanicUnreachableFrom. The minDepth of 2 ensures the
 // wrapper sits above at least the test caller — a future change that
 // truncates the stack to a single frame would fail here.
 func TestMustNoErrorStack(t *testing.T) {
 	defer func() {
-		assertTopFrameIs(t, recover(), "callMustNoError", 2)
+		_ = assertTopFrameIs(t, recover(), "callMustNoError", 2)
 	}()
 	callMustNoError(errSentinel)
 }
@@ -430,7 +437,7 @@ func TestMustNoErrorStack(t *testing.T) {
 // stack lands at the immediate caller, the same way as MustNoError.
 func TestMustNoErrorExceptStack(t *testing.T) {
 	defer func() {
-		assertTopFrameIs(t, recover(), "callMustNoErrorExcept", 2)
+		_ = assertTopFrameIs(t, recover(), "callMustNoErrorExcept", 2)
 	}()
 	callMustNoErrorExcept(errSentinel, errOther)
 }
@@ -439,7 +446,7 @@ func TestMustNoErrorExceptStack(t *testing.T) {
 // stack lands at the immediate caller, the same way as MustNoError.
 func TestMustNoErrorExceptFnStack(t *testing.T) {
 	defer func() {
-		assertTopFrameIs(t, recover(), "callMustNoErrorExceptFn", 2)
+		_ = assertTopFrameIs(t, recover(), "callMustNoErrorExceptFn", 2)
 	}()
 	callMustNoErrorExceptFn(errSentinel, matchesOther)
 }
@@ -457,28 +464,29 @@ func recoverValidPanic() (r any) {
 }
 
 // runAssertTopFrameIs runs assertTopFrameIs against a MockT and
-// swallows the panic raised by MockT.Fatal/FailNow. Returns the
-// MockT so the caller can assert Failed(). Named return is required
-// so the MockT survives a recovered panic in the deferred handler —
-// without it the function would return a nil *MockT after the
-// recover.
+// swallows the panic raised by MockT.Fatal/FailNow. Returns what the
+// helper returned, nil when it halted, and the MockT so the caller can
+// assert Failed(). Named returns are required so the MockT survives a
+// recovered panic in the deferred handler — without them the function
+// would return a nil *MockT after the recover.
 func runAssertTopFrameIs(r any, wantFunc string,
-	minDepth int) (mock *MockT) {
+	minDepth int) (pe *PanicError, mock *MockT) {
 	mock = &MockT{}
 	defer func() { _ = recover() }()
-	assertTopFrameIs(mock, r, wantFunc, minDepth)
-	return mock
+	pe = assertTopFrameIs(mock, r, wantFunc, minDepth)
+	return pe, mock
 }
 
-// assertTopFrameTestCase exercises assertTopFrameIs across both the
+// assertTopFrameIsTestCase exercises assertTopFrameIs across both the
 // happy path (valid input — wantFailed false) and each of the
 // precondition violations (wantFailed true). The positive row pins
 // that the helper does not spuriously fail; the negative rows pin
 // that each Must-* check actually halts the MockT via Fatal when
 // violated. Without the positive row a regression like
 // "assertTopFrameIs always calls Fatal" would pass the negative rows
-// silently.
-type assertTopFrameTestCase struct {
+// silently. A passing row also states that the helper returns the
+// *PanicError it was given, and a failing one that it returns nothing.
+type assertTopFrameIsTestCase struct {
 	name string
 
 	r        any
@@ -488,9 +496,9 @@ type assertTopFrameTestCase struct {
 	wantFailed bool
 }
 
-func newAssertTopFrameTestCase(name string, r any, wantFunc string,
-	minDepth int, wantFailed bool) assertTopFrameTestCase {
-	return assertTopFrameTestCase{
+func newAssertTopFrameIsTestCase(name string, r any, wantFunc string,
+	minDepth int, wantFailed bool) assertTopFrameIsTestCase {
+	return assertTopFrameIsTestCase{
 		name:       name,
 		r:          r,
 		wantFunc:   wantFunc,
@@ -499,28 +507,33 @@ func newAssertTopFrameTestCase(name string, r any, wantFunc string,
 	}
 }
 
-func (tc assertTopFrameTestCase) Name() string { return tc.name }
+func (tc assertTopFrameIsTestCase) Name() string { return tc.name }
 
-func (tc assertTopFrameTestCase) Test(t *testing.T) {
+func (tc assertTopFrameIsTestCase) Test(t *testing.T) {
 	t.Helper()
-	mock := runAssertTopFrameIs(tc.r, tc.wantFunc, tc.minDepth)
+	pe, mock := runAssertTopFrameIs(tc.r, tc.wantFunc, tc.minDepth)
 	AssertMustEqual(t, tc.wantFailed, mock.Failed(),
 		"MockT.Failed()")
+	if tc.wantFailed {
+		AssertNil(t, pe, "returned")
+	} else {
+		AssertSame(t, tc.r, pe, "returned")
+	}
 }
 
-var _ TestCase = assertTopFrameTestCase{}
+var _ TestCase = assertTopFrameIsTestCase{}
 
-func assertTopFrameTestCases(validPanic any) []assertTopFrameTestCase {
-	return []assertTopFrameTestCase{
-		newAssertTopFrameTestCase("valid input passes",
+func assertTopFrameIsTestCases(validPanic any) []assertTopFrameIsTestCase {
+	return []assertTopFrameIsTestCase{
+		newAssertTopFrameIsTestCase("valid input passes",
 			validPanic, "callMustNoError", 2, false),
-		newAssertTopFrameTestCase("nil recovered",
+		newAssertTopFrameIsTestCase("nil recovered",
 			nil, "callMustNoError", 2, true),
-		newAssertTopFrameTestCase("non-PanicError type",
+		newAssertTopFrameIsTestCase("non-PanicError type",
 			errOther, "callMustNoError", 2, true),
-		newAssertTopFrameTestCase("wrong frame name",
+		newAssertTopFrameIsTestCase("wrong frame name",
 			validPanic, "nonExistent", 2, true),
-		newAssertTopFrameTestCase("depth too shallow",
+		newAssertTopFrameIsTestCase("depth too shallow",
 			validPanic, "callMustNoError", 9999, true),
 	}
 }
@@ -534,5 +547,5 @@ func assertTopFrameTestCases(validPanic any) []assertTopFrameTestCase {
 func TestAssertTopFrameIs(t *testing.T) {
 	validPanic := recoverValidPanic()
 	AssertMustNotNil(t, validPanic, "captured valid panic")
-	RunTestCases(t, assertTopFrameTestCases(validPanic))
+	RunTestCases(t, assertTopFrameIsTestCases(validPanic))
 }

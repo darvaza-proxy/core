@@ -40,6 +40,7 @@ Independent Base Functions:
 ├── AssertTypeIs[T]         (uses type assertion)
 ├── AssertPanic             (uses recover mechanism)
 ├── AssertNoPanic           (uses recover mechanism)
+├── AssertTopFrame          (uses the CallStacker interface)
 ├── AssertEventually        (uses WaitForCond)
 ├── AssertEventuallyContext (uses WaitForCondContext)
 ├── AssertClosed[U]         (uses select with a timeout)

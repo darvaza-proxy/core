@@ -201,7 +201,14 @@ core.AssertContains(t, text, substring, "text content")
 core.AssertNotContain(t, text, substring, "text exclusion")
 core.AssertPanic(t, func() { panic("test") }, "test", "panic")
 core.AssertNoPanic(t, func() { /* safe code */ }, "no panic")
+core.AssertTopFrame(t, recovered, "callPanic", "panic stack")
 ```
+
+`AssertTopFrame` states which function a call stack starts at, such as
+the stack of a recovered `PanicError`. It compares the name
+`Frame.FuncName()` gives the top frame, which is the short name: a method
+is named without its type and a closure by its generated `funcN`, so a
+named wrapper gives a test a stable caller to name.
 
 **Channel and Timing Assertions:**
 

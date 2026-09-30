@@ -86,14 +86,39 @@ func NewPanicWrapf(skip int, err error, format string, args ...any) *PanicError 
 	}
 }
 
-// Panic emits a PanicError with the given payload
+// Panic emits a PanicError with the given payload. A *PanicError payload
+// is raised as it is, keeping the stack it already carries, and a nil one
+// counts as no payload.
 func Panic(payload any) {
-	panic(NewPanicError(1, payload))
+	PanicFrom(1, payload)
+}
+
+// PanicFrom emits a PanicError with the given payload, as [Panic] does,
+// its stack starting skip frames above the caller: 0 is PanicFrom's own
+// caller. A *PanicError payload keeps the stack it already carries,
+// whatever the skip.
+func PanicFrom(skip int, payload any) {
+	pe, ok := payload.(*PanicError)
+	if pe == nil {
+		if ok {
+			// a nil *PanicError carries nothing
+			payload = nil
+		}
+		pe = NewPanicError(deeper(skip), payload)
+	}
+	panic(pe)
 }
 
 // Panicf emits a PanicError with a formatted string as payload
 func Panicf(format string, args ...any) {
-	panic(NewPanicErrorf(1, format, args...))
+	PanicfFrom(1, format, args...)
+}
+
+// PanicfFrom emits a PanicError with a formatted string as payload, its
+// stack starting skip frames above the caller: 0 is PanicfFrom's own
+// caller.
+func PanicfFrom(skip int, format string, args ...any) {
+	panic(NewPanicErrorf(deeper(skip), format, args...))
 }
 
 // PanicWrap emits a PanicError wrapping an annotated error.
@@ -108,8 +133,13 @@ func PanicWrapf(err error, format string, args ...any) {
 }
 
 // NewUnreachableErrorf creates a new annotated ErrUnreachable with callstack.
+// The note is formatted only when there are arguments.
 func NewUnreachableErrorf(skip int, err error, format string, args ...any) error {
-	return NewUnreachableError(deeper(skip), err, fmt.Sprintf(format, args...))
+	note := format
+	if len(args) > 0 {
+		note = fmt.Sprintf(format, args...)
+	}
+	return NewUnreachableError(deeper(skip), err, note)
 }
 
 // NewUnreachableError creates a new annotated ErrUnreachable with callstack.
@@ -128,9 +158,35 @@ func NewUnreachableError(skip int, err error, note string) error {
 	return NewPanicWrap(deeper(skip), err, note)
 }
 
-// deeper accounts for the frame of the constructor doing the capturing,
-// so a skip of 0 attributes to that constructor's own caller. A negative
-// skip clamps to 1 instead of reaching [StackTrace], which rejects it
+// PanicUnreachable emits the PanicError [NewUnreachableError] makes of err
+// and note, its stack starting at the caller.
+func PanicUnreachable(err error, note string) {
+	PanicUnreachableFrom(1, err, note)
+}
+
+// PanicUnreachableFrom emits the PanicError [NewUnreachableError] makes of
+// err and note, its stack starting skip frames above the caller: 0 is
+// PanicUnreachableFrom's own caller.
+func PanicUnreachableFrom(skip int, err error, note string) {
+	panic(NewUnreachableError(deeper(skip), err, note))
+}
+
+// PanicUnreachablef emits the PanicError [NewUnreachableErrorf] makes of
+// err and a formatted note, its stack starting at the caller.
+func PanicUnreachablef(err error, format string, args ...any) {
+	PanicUnreachablefFrom(1, err, format, args...)
+}
+
+// PanicUnreachablefFrom emits the PanicError [NewUnreachableErrorf] makes
+// of err and a formatted note, its stack starting skip frames above the
+// caller: 0 is PanicUnreachablefFrom's own caller.
+func PanicUnreachablefFrom(skip int, err error, format string, args ...any) {
+	panic(NewUnreachableErrorf(deeper(skip), err, format, args...))
+}
+
+// deeper accounts for the frame of the function calling it, so a skip of
+// 0 attributes to that function's own caller. A negative skip clamps to
+// 1, that same caller, instead of reaching [StackTrace], which rejects it
 // and captures nothing.
 func deeper(skip int) int {
 	if skip < 0 {

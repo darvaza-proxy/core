@@ -91,7 +91,10 @@ func (wg *WaitGroup) reportError(err error) {
 
 	// Store the first non-nil error
 	if err != nil {
-		wg.err.CompareAndSwap(nil, &err)
+		// storing the address of a copy made here, rather than of
+		// err, keeps an error onError drops off the heap.
+		stored := err
+		wg.err.CompareAndSwap(nil, &stored)
 	}
 }
 

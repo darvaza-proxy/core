@@ -13,7 +13,10 @@ type Recovered interface {
 }
 
 // AsRecovered receives the value from recover()
-// and wraps it as a Recovered error
+// and wraps it as a Recovered error. Called by the deferred function, it
+// starts the stack of a wrapped value at the function that panicked,
+// past the runtime's frames that raised the panic and ran the deferred
+// call.
 func AsRecovered(rvr any) Recovered {
 	if rvr == nil {
 		// no panic
@@ -26,7 +29,18 @@ func AsRecovered(rvr any) Recovered {
 	}
 
 	// wrap it
-	return NewPanicError(2, rvr)
+	pe := NewPanicError(2, rvr)
+	pe.stack = dropRuntimeFrames(pe.stack)
+	return pe
+}
+
+// dropRuntimeFrames returns st without the frames of package runtime at
+// its top.
+func dropRuntimeFrames(st Stack) Stack {
+	for len(st) > 0 && st[0].PkgName() == "runtime" {
+		st = st[1:]
+	}
+	return st
 }
 
 // Catcher is a runner that catches panics
@@ -57,7 +71,10 @@ func (p *Catcher) Try(fn func() error) error {
 	if fn != nil {
 		defer func() {
 			if err := AsRecovered(recover()); err != nil {
-				p.recovered.CompareAndSwap(nil, &err)
+				// storing the address of a copy made here, rather than
+				// of err, keeps a call that does not panic off the heap.
+				stored := err
+				p.recovered.CompareAndSwap(nil, &stored)
 			}
 		}()
 
@@ -96,7 +113,7 @@ func Catch(fn func() error) error {
 //	data := Must(json.Marshal(obj))  // panics if marshal fails
 func Must[V any](value V, err error) V {
 	if err != nil {
-		panic(NewUnreachableError(1, err, ""))
+		PanicUnreachableFrom(1, err, "")
 	}
 	return value
 }
@@ -135,7 +152,7 @@ func Maybe[V any](value V, _ error) V {
 //revive:disable-next-line:flag-parameter
 func MustOK[V any](value V, ok bool) V {
 	if !ok {
-		panic(NewUnreachableError(1, errors.New("operation failed"), ""))
+		PanicUnreachableFrom(1, errors.New("operation failed"), "")
 	}
 	return value
 }
@@ -174,7 +191,7 @@ func MustT[T any](value any) T {
 	result, ok := value.(T)
 	if !ok {
 		err := fmt.Errorf("failed to convert %T to %s", value, TypeName[T]())
-		panic(NewUnreachableError(1, err, ""))
+		PanicUnreachableFrom(1, err, "")
 	}
 	return result
 }
@@ -210,7 +227,7 @@ func MaybeT[T any](value any) T {
 // caller, not to this helper.
 func MustNoError(err error) {
 	if err != nil {
-		panic(NewUnreachableError(1, err, ""))
+		PanicUnreachableFrom(1, err, "")
 	}
 }
 
@@ -233,7 +250,7 @@ func MustNoErrorExcept(err error, allowed ...error) {
 	case len(allowed) > 0 && IsError(err, allowed...):
 		return
 	default:
-		panic(NewUnreachableError(1, err, ""))
+		PanicUnreachableFrom(1, err, "")
 	}
 }
 
@@ -255,6 +272,6 @@ func MustNoErrorExceptFn(err error, check func(error) bool) {
 	case check != nil && IsErrorFn(check, err):
 		return
 	default:
-		panic(NewUnreachableError(1, err, ""))
+		PanicUnreachableFrom(1, err, "")
 	}
 }

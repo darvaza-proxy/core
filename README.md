@@ -337,6 +337,8 @@ The `PanicError` type wraps panic values with stack traces:
 * `NewPanicWrap()` / `NewPanicWrapf()` - wrap existing errors as panics.
 * `Panic()` / `Panicf()` / `PanicWrap()` / `PanicWrapf()` - panic with
   `PanicError`.
+* `PanicFrom()` / `PanicfFrom()` - panic with `PanicError`, its stack
+  starting a given number of frames above the caller.
 
 Panic recovery utilities:
 
@@ -429,9 +431,14 @@ panics through `ErrUnreachable` rather than returning a value:
 For indicating impossible code paths:
 
 * `NewUnreachableError()` - create unreachable error.
-* `NewUnreachableErrorf(format, args...)` - create formatted unreachable error.
+* `NewUnreachableErrorf()` - create formatted unreachable error.
+* `PanicUnreachable()` / `PanicUnreachablef()` - panic with an unreachable
+  error, its stack starting at the caller.
+* `PanicUnreachableFrom()` / `PanicUnreachablefFrom()` - panic with an
+  unreachable error, its stack starting a given number of frames above the
+  caller.
 
-These create `PanicError` instances with stack traces.
+The constructors create `PanicError` instances with stack traces.
 
 ### Temporary and Timeout Errors
 
@@ -634,6 +641,9 @@ be diffed by eye.
   (value, ok).
 * `AssertPanic(t, fn, expectedPanic, name...)` /
   `AssertNoPanic(t, fn, name...)` - panic testing with type-aware matching.
+* `AssertTopFrame(t, v, want, name...)` - the call stack `v` carries (a
+  recovered `PanicError`, for one) starts at the function `want`, named as
+  `Frame.FuncName()` names it.
 
 #### Channel and Timing Assertions
 
@@ -696,6 +706,8 @@ methods terminate execution, similar to `t.Error()` vs `t.Fatal()`.
   failure, returns cast value.
 * `AssertMustPanic(t, fn, expectedPanic, name...)` /
   `AssertMustNoPanic(t, fn, name...)` - terminate on panic expectation mismatch.
+* `AssertMustTopFrame(t, v, want, name...)` - terminate when the call stack
+  starts at another function, or `v` carries none.
 * `AssertMustSame(t, expected, actual, name...)` /
   `AssertMustNotSame(t, expected, actual, name...)` - terminate on same-ness
   mismatch.
