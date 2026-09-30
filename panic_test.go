@@ -414,6 +414,58 @@ func TestCatchWithPanicRecovery(t *testing.T) {
 	RunTestCases(t, catchWithPanicRecoveryTestCases())
 }
 
+var _ TestCase = catchStackTestCase{}
+
+// catchStackTestCase states where the stack of a panic Catch recovers
+// starts: at the function that panicked, past the runtime's frames.
+type catchStackTestCase struct {
+	fn       func() error
+	name     string
+	wantFunc string
+}
+
+func newCatchStackTestCase(name string, fn func() error,
+	wantFunc string) catchStackTestCase {
+	return catchStackTestCase{
+		fn:       fn,
+		name:     name,
+		wantFunc: wantFunc,
+	}
+}
+
+func (tc catchStackTestCase) Name() string {
+	return tc.name
+}
+
+func (tc catchStackTestCase) Test(t *testing.T) {
+	t.Helper()
+	_ = assertTopFrameIs(t, Catch(tc.fn), tc.wantFunc, 2)
+}
+
+// panicPlain panics with a plain value, not a PanicError.
+func panicPlain() error {
+	panic(errSentinel)
+}
+
+// panicMapAssign writes to m, which a nil m turns into a panic the
+// runtime raises.
+func panicMapAssign(m map[string]int) error {
+	m["key"] = 1
+	return nil
+}
+
+func catchStackTestCases() []catchStackTestCase {
+	return S(
+		newCatchStackTestCase("plain panic", panicPlain, "panicPlain"),
+		newCatchStackTestCase("runtime panic",
+			func() error { return panicMapAssign(nil) }, "panicMapAssign"),
+	)
+}
+
+func TestCatchStack(t *testing.T) {
+	RunTestCases(t, catchStackTestCases())
+}
+
 // testMust is a helper to test Must function by catching panics.
 // It wraps Must calls in panic recovery to allow testing both success
 // and panic scenarios. Returns the value and any recovered panic as an error.

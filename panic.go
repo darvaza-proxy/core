@@ -13,7 +13,10 @@ type Recovered interface {
 }
 
 // AsRecovered receives the value from recover()
-// and wraps it as a Recovered error
+// and wraps it as a Recovered error. Called by the deferred function, it
+// starts the stack of a wrapped value at the function that panicked,
+// past the runtime's frames that raised the panic and ran the deferred
+// call.
 func AsRecovered(rvr any) Recovered {
 	if rvr == nil {
 		// no panic
@@ -26,7 +29,18 @@ func AsRecovered(rvr any) Recovered {
 	}
 
 	// wrap it
-	return NewPanicError(2, rvr)
+	pe := NewPanicError(2, rvr)
+	pe.stack = dropRuntimeFrames(pe.stack)
+	return pe
+}
+
+// dropRuntimeFrames returns st without the frames of package runtime at
+// its top.
+func dropRuntimeFrames(st Stack) Stack {
+	for len(st) > 0 && st[0].PkgName() == "runtime" {
+		st = st[1:]
+	}
+	return st
 }
 
 // Catcher is a runner that catches panics
