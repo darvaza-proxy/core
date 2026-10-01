@@ -327,10 +327,10 @@ The coverage system provides comprehensive testing:
 GitHub Actions workflows provide:
 
 - **Build Testing**: Tests across Go 1.25 and 1.26.
-- **Cross-platform Testing**: `platforms.yml` vets every `GOOS` and runs
-  the test and race suites natively on Linux, macOS and Windows. The
-  macOS and Windows jobs are gated behind the cheap Linux ones, so a
-  compile error fails fast without billing the premium runners.
+- **Cross-platform Testing**: `platforms.yml` vets the windows and darwin
+  targets and runs the test and race suites natively on Linux, macOS and
+  Windows. The macOS and Windows jobs are gated behind the Linux ones,
+  so a cross-compile or Linux failure skips them.
 - **Coverage Reporting**: Automatic Codecov uploads.
 - **Dependency Updates**: Automated Renovate PRs.
 - **Branch Protection**: Ignores WIP branches.
