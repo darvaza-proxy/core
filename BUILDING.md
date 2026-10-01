@@ -70,8 +70,7 @@ project-root/
     ├── cspell.json           # Spell checking configuration
     ├── markdownlint.json     # Markdown linting configuration
     ├── languagetool.cfg      # Grammar checking configuration
-    ├── revive.toml           # Additional Go linting rules
-    └── README-coverage.md    # Coverage system documentation
+    └── revive.toml           # Additional Go linting rules
 ```
 
 ## Key Build Scripts
@@ -135,12 +134,33 @@ REVIVE_CONF      ?= $(TOOLSDIR)/$(REVIVE_CONF_FILE)
 
 ### Coverage System (`make_coverage.sh`)
 
-Coverage testing for individual modules:
+Coverage testing for one module, from two perspectives:
 
-- Tests single module with `-covermode=atomic` for atomic coverage.
-- Generates multiple output formats (`.prof`, `.func`, `.html`, `.stdout`).
+- **Integration coverage**: one `go test -coverpkg=./...` run over the
+  whole module, so a package is credited with the lines other packages'
+  tests reach as well.
+- **Self-coverage**: one run per package, counting only what its own
+  tests reach. The per-package profiles are merged into one for the
+  module.
+
+Each package is reported as `94.4% (21.4%)`: its self-coverage, then the
+share of the module's statements its tests reach in the integration run.
+A package with no self-coverage figure, or a zero one, shows the
+integration figure alone.
+
+- Usage:
+  `make_coverage.sh <module_name> <module_dir> <coverage_dir> [flags...]`,
+  where any flags are passed to `go test`, and `GO` is read from the
+  environment. The generated `coverage` rules pass `GOTEST_FLAGS` as
+  those flags.
+- Runs with `-covermode=atomic`.
+- Writes the profiles `coverage_<name>.prof` and
+  `coverage_<name>_self.prof`, each with a `.func` report and its
+  `go test` output in a `.stdout` file beside it, and the HTML report
+  `coverage_<name>.html` from the self-coverage profile.
 - Uses `go -C` for proper directory handling.
-- Filtered test output on failure.
+- When the integration run fails, shows a filtered tail of its output and
+  stops; the full output stays in `coverage_<name>.stdout`.
 
 ### Coverage Merge Utility (`merge_coverage.sh`)
 
@@ -155,10 +175,13 @@ Standalone utility for merging coverage profiles:
 
 Codecov integration for monorepo coverage:
 
-- Generates the upload script (no `codecov.yml`).
+- Generates the upload script.
 - One call per module with module-specific flags.
-- Relies on Codecov's automatic configuration detection.
-- File naming: `coverage_${name}.prof`.
+- Uploads a module's self-coverage profile, `coverage_<name>_self.prof`,
+  when it holds data; otherwise its integration profile,
+  `coverage_<name>.prof`; otherwise nothing.
+- Relies on Codecov's automatic configuration detection, and on
+  `CODECOV_TOKEN` in the environment.
 
 ## Temporary Directory (`.tmp/`)
 
@@ -169,7 +192,11 @@ The `.tmp/` directory contains generated files and build artefacts:
 - **`index`**: Module discovery results from `gen_index.sh`.
 - **`gen.mk`**: Generated Makefile rules included by main Makefile.
 - **`languagetool-dict.txt`**: Auto-generated dictionary from cspell words.
-- **`coverage/`**: Directory containing coverage reports and upload scripts.
+- **`coverage/`**: Coverage data. For each module, the integration and
+  self-coverage profiles, function reports and `go test` output, the HTML
+  report, and a `coverage_<name>/` tree of per-package profiles. Beside
+  them, the repository-wide `coverage.out` and `coverage_self.out` that
+  `merged-coverage` writes, and the `codecov.sh` upload script.
 
 ### Gitignore Integration
 
@@ -242,7 +269,10 @@ Automated dependency updates:
 - **`tidy`**: Format, lint, and validate code.
 - **`generate`**: Run `go:generate` directives.
 - **`coverage`**: Run tests with coverage collection per module.
-- **`codecov`**: Generate Codecov configuration and coverage data.
+- **`merged-coverage`**: Run `coverage`, then merge the modules' profiles
+  into repository-wide `coverage.out` and `coverage_self.out`.
+- **`codecov`**: Run `merged-coverage` and generate the Codecov upload
+  script, `codecov.sh`.
 - **`race`**: Run tests with race detection enabled per module.
 
 ### Per-Module Targets
@@ -289,8 +319,8 @@ The coverage system provides comprehensive testing:
 1. **Module Discovery**: Finds all Go modules automatically.
 2. **Individual Testing**: Tests each module with full coverage.
 3. **Progress Reporting**: Shows real-time progress and coverage percentages.
-4. **Failure Handling**: Continues testing other modules if one fails.
-5. **Report Generation**: Creates merged coverage reports.
+4. **Report Generation**: `merged-coverage` merges the modules' profiles
+   into repository-wide reports.
 
 ### CI/CD Integration
 
@@ -329,6 +359,18 @@ make test GOTEST_FLAGS="-coverprofile=coverage.out"
 
 # Run benchmarks
 make test GOTEST_FLAGS="-bench=. -benchmem"
+```
+
+`test`, `race` and `coverage` all splice `GOTEST_FLAGS` into their
+recipe, so make expands it first and the shell reads it after. Write a
+`$` in a pattern as `$$`, and quote a pattern that holds shell syntax,
+such as `|` or `(`, or spaces. From an interactive shell, wrap the whole
+assignment in single quotes, or that shell expands `$$` to its own
+process ID before make sees it:
+
+```bash
+make test GOTEST_FLAGS='-run "^TestSpecific$$" -v'
+make coverage GOTEST_FLAGS='-run "^$$" -bench "^Benchmark(Foo|Bar)$$" -benchmem'
 ```
 
 ## Code Quality Standards
@@ -448,8 +490,6 @@ Monorepo coverage provides:
 
 - **Per-Module Reports**: Individual coverage for each module.
 - **Unified Reporting**: Combined coverage across all modules.
-- **Flag Attribution**: Proper Codecov flag assignment.
-- **Path Mapping**: Accurate coverage attribution.
 
 ## Usage Examples
 
@@ -512,8 +552,9 @@ make check-grammar
 - **`GOTEST_FLAGS`**: Additional test flags.
 - **`GOUP_FLAGS`**: Flags for dependency updates (default: `-v`).
 - **`GOVET_FLAGS`**: Additional vet flags (default: `-v`).
-- **`COVERAGE_HTML`**: Generate HTML coverage reports.
 - **`JQ`**: JSON processor command.
+- **`CODECOV_TOKEN`**: Codecov upload token, read by the Codecov CLI that
+  `codecov.sh` runs.
 
 ### Tool Overrides
 

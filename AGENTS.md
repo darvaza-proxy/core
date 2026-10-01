@@ -11,8 +11,6 @@ repository. For developers and general project information, please refer to
 - [BUILDING.md](BUILDING.md) — Shared build-system reference for all
   darvaza.org projects (make targets, tooling, linting, CI, pre-commit
   workflow, troubleshooting).
-- [internal/build/README-coverage.md](internal/build/README-coverage.md) —
-  Coverage system documentation.
 - [TESTING.md](TESTING.md) — Testing patterns and guidelines for all
   darvaza.org projects.
 - [TESTING_core.md](TESTING_core.md) — Core-specific testing patterns.
@@ -83,6 +81,8 @@ Full reference in [BUILDING.md](BUILDING.md). Key sections:
   targets.
 - [Test Execution Options](BUILDING.md#test-execution-options) —
   `GOTEST_FLAGS` semantics; the generated `test` rule passes `-count=1`.
+- [Coverage System](BUILDING.md#coverage-system-make_coveragesh) —
+  integration and self-coverage, the report format and output files.
 - [Code Quality Standards](BUILDING.md#code-quality-standards) — revive
   linting limits (function length, complexity, argument counts).
 - [Field Alignment](BUILDING.md#field-alignment) — safe `fieldalignment`
