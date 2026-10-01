@@ -148,9 +148,11 @@ share of the module's statements its tests reach in the integration run.
 A package with no self-coverage figure, or a zero one, shows the
 integration figure alone.
 
-- Usage: `make_coverage.sh <module_name> <module_dir> <coverage_dir>`;
-  `GO` and any additional `go test` flags in `GOTEST_FLAGS` are read
-  from the environment.
+- Usage:
+  `make_coverage.sh <module_name> <module_dir> <coverage_dir> [flags...]`,
+  where any flags are passed to `go test`, and `GO` is read from the
+  environment. The generated `coverage` rules pass `GOTEST_FLAGS` as
+  those flags.
 - Runs with `-covermode=atomic`.
 - Writes the profiles `coverage_<name>.prof` and
   `coverage_<name>_self.prof`, each with a `.func` report and its
@@ -357,6 +359,18 @@ make test GOTEST_FLAGS="-coverprofile=coverage.out"
 
 # Run benchmarks
 make test GOTEST_FLAGS="-bench=. -benchmem"
+```
+
+`test`, `race` and `coverage` all splice `GOTEST_FLAGS` into their
+recipe, so make expands it first and the shell reads it after. Write a
+`$` in a pattern as `$$`, and quote a pattern that holds shell syntax,
+such as `|` or `(`, or spaces. From an interactive shell, wrap the whole
+assignment in single quotes, or that shell expands `$$` to its own
+process ID before make sees it:
+
+```bash
+make test GOTEST_FLAGS='-run "^TestSpecific$$" -v'
+make coverage GOTEST_FLAGS='-run "^$$" -bench "^Benchmark(Foo|Bar)$$" -benchmem'
 ```
 
 ## Code Quality Standards
