@@ -13,7 +13,7 @@ Library, and if something should be on a subdirectory, it shouldn't be here.
 [codecov]: https://codecov.io/gh/darvaza-proxy/core
 [codecov-badge]: https://codecov.io/gh/darvaza-proxy/core/graph/badge.svg
 [socket]: https://socket.dev/go/package/darvaza.org/core
-[socket-badge]: https://socket.dev/api/badge/go/package/darvaza.org/core
+[socket-badge]: https://badge.socket.dev/go/package/darvaza.org/core
 
 ## Type Constraints
 
