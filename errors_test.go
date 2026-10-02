@@ -872,3 +872,8 @@ func TestErrUnsupportedAlias(t *testing.T) {
 	AssertNotErrorIs(t, ErrNotImplemented, ErrUnsupported, "ErrNotImplemented apart")
 	AssertNotErrorIs(t, ErrTODO, ErrUnsupported, "ErrTODO apart")
 }
+
+// Test ErrTODO is an ErrNotImplemented, so errors.Is matches it as one.
+func TestErrTODO(t *testing.T) {
+	AssertErrorIs(t, ErrTODO, ErrNotImplemented, "ErrNotImplemented match")
+}

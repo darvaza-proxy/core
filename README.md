@@ -13,7 +13,7 @@ Library, and if something should be on a subdirectory, it shouldn't be here.
 [codecov]: https://codecov.io/gh/darvaza-proxy/core
 [codecov-badge]: https://codecov.io/gh/darvaza-proxy/core/graph/badge.svg
 [socket]: https://socket.dev/go/package/darvaza.org/core
-[socket-badge]: https://socket.dev/api/badge/go/package/darvaza.org/core
+[socket-badge]: https://badge.socket.dev/go/package/darvaza.org/core
 
 ## Type Constraints
 
@@ -270,13 +270,14 @@ Key distinctions from `IsZero`:
 
 Predefined error values for common conditions:
 
-* `ErrNotImplemented` - functionality not yet implemented.
-* `ErrTODO` - placeholder for future implementation.
+* `ErrNotImplemented` - a gap: an operation that could be implemented but
+  isn't.
+* `ErrTODO` - a gap meant to be closed soon; matches `ErrNotImplemented`.
 * `ErrExists` - resource already exists.
 * `ErrNotExists` - resource does not exist.
 * `ErrInvalid` - invalid input or state.
-* `ErrUnsupported` - operation the target does not support, by design
-  rather than for want of code; an alias of `errors.ErrUnsupported`.
+* `ErrUnsupported` - an operation that can't reasonably be implemented
+  for the target, not a gap; an alias of `errors.ErrUnsupported`.
   `ErrNotImplemented` and `ErrTODO` do not match it.
 * `ErrUnknown` - unknown or unspecified error.
 * `ErrNilReceiver` - method called on nil receiver.
