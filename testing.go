@@ -15,8 +15,8 @@ var errMockTFailNow = errors.New("MockT.FailNow")
 // MockT stops a test, through FailNow, matching through [errors.Is] so
 // that a wrapped value counts too. Code that recovers panics around a
 // function that may be handed a MockT passes such a value on with
-// panic, as AssertPanic and AssertNoPanic do, so the stop reaches
-// MockT.Run.
+// panic, as AssertPanic, AssertNoPanic and Catcher.Try do, so the stop
+// reaches MockT.Run.
 func IsMockTAbort(recovered any) bool {
 	err, ok := recovered.(error)
 	return ok && errors.Is(err, errMockTFailNow)
@@ -254,6 +254,9 @@ func (m *MockT) Reset() {
 // Run runs the test function f with the MockT instance and returns whether it passed.
 // It recovers from FailNow/Fatal panics and returns false if the test failed or panicked.
 // Non-FailNow panics are re-thrown. Returns false for nil MockT or nil function.
+//
+// Run catches FailNow on the goroutine running f, so, as with testing.T,
+// it belongs there; called from another goroutine, it ends the test binary.
 //
 // This method is ideal for testing assertion functions that may call Fatal/FailNow:
 //
