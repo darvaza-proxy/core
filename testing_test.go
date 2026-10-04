@@ -14,6 +14,7 @@ var (
 	_ TestCase = assertTypeIsTestCase[string]{}
 	_ TestCase = assertPanicTestCase{}
 	_ TestCase = assertAbortTestCase{}
+	_ TestCase = isMockTAbortTestCase{}
 	_ TestCase = (*mockTestCase)(nil)
 	_ TestCase = mockTMessageAtTestCase{}
 )
@@ -1502,6 +1503,71 @@ func TestMockTRunPanicPropagation(t *testing.T) {
 			panic("custom panic")
 		})
 	}, "custom panic", "Non-FailNow panics should be propagated")
+}
+
+// isMockTAbortTestCase states which recovered values IsMockTAbort takes
+// for MockT stopping a test: the one its stopping methods raise, wrapped
+// or not, and nothing else, an error of the same text included.
+type isMockTAbortTestCase struct {
+	recovered any
+	name      string
+	want      bool
+}
+
+// newIsMockTAbortTestCase declares a value MockT raises to stop a test.
+func newIsMockTAbortTestCase(name string,
+	recovered any) isMockTAbortTestCase {
+	return isMockTAbortTestCase{
+		recovered: recovered,
+		name:      name,
+		want:      true,
+	}
+}
+
+// newIsMockTAbortTestCaseOther declares a value that is not MockT
+// stopping a test.
+func newIsMockTAbortTestCaseOther(name string,
+	recovered any) isMockTAbortTestCase {
+	return isMockTAbortTestCase{
+		recovered: recovered,
+		name:      name,
+		want:      false,
+	}
+}
+
+func (tc isMockTAbortTestCase) Name() string {
+	return tc.name
+}
+
+func (tc isMockTAbortTestCase) Test(t *testing.T) {
+	t.Helper()
+	AssertEqual(t, tc.want, IsMockTAbort(tc.recovered), "aborted")
+}
+
+// recoverFrom calls fn and returns what it panicked with, nil if it
+// returned.
+func recoverFrom(fn func()) (recovered any) {
+	defer func() { recovered = recover() }()
+	fn()
+	return nil
+}
+
+func isMockTAbortTestCases() []isMockTAbortTestCase {
+	failNow := recoverFrom(func() { (&MockT{}).FailNow() })
+
+	return []isMockTAbortTestCase{
+		newIsMockTAbortTestCase("FailNow", failNow),
+		newIsMockTAbortTestCase("wrapped",
+			Wrap(MustT[error](failNow), "wrapped")),
+		newIsMockTAbortTestCase("recovered", AsRecovered(failNow)),
+		newIsMockTAbortTestCaseOther("nil", nil),
+		newIsMockTAbortTestCaseOther("another error", errors.New("another")),
+		newIsMockTAbortTestCaseOther("same text", errors.New("MockT.FailNow")),
+	}
+}
+
+func TestIsMockTAbort(t *testing.T) {
+	RunTestCases(t, isMockTAbortTestCases())
 }
 
 // Test early abort pattern: if !Assert() { FailNow() }

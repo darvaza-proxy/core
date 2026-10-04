@@ -562,6 +562,10 @@ library tests and external library users.
   `LastError()`, `LastLog()`, `NumErrors()`, `NumLogs()`, `ErrorAt(i)`,
   `LogAt(i)`, `NumHelperCalls()`), reset capabilities, and full
   Fatal/FailNow support with panic recovery via the `Run()` method.
+* `IsMockTAbort(recovered)` - reports whether a value recovered from a
+  panic, wrapped or not, is `MockT` stopping a test, for code that
+  recovers panics around a function that may be handed a `MockT` to pass
+  on.
 
 ### Cross-Compatible Test Functions
 

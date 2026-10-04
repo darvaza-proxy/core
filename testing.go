@@ -11,6 +11,17 @@ import (
 
 var errMockTFailNow = errors.New("MockT.FailNow")
 
+// IsMockTAbort reports whether a value recovered from a panic is how
+// MockT stops a test, through FailNow, matching through [errors.Is] so
+// that a wrapped value counts too. Code that recovers panics around a
+// function that may be handed a MockT passes such a value on with
+// panic, as AssertPanic and AssertNoPanic do, so the stop reaches
+// MockT.Run.
+func IsMockTAbort(recovered any) bool {
+	err, ok := recovered.(error)
+	return ok && errors.Is(err, errMockTFailNow)
+}
+
 // Compile-time verification that our types implement the T interface
 var (
 	_ T = (*testing.T)(nil)
@@ -275,7 +286,7 @@ func (m *MockT) Run(_ string, f func(T)) (ok bool) {
 	}
 
 	defer func() {
-		if r := recover(); r != nil && r != errMockTFailNow {
+		if r := recover(); r != nil && !IsMockTAbort(r) {
 			// Re-panic if it's not our FailNow error
 			panic(r)
 		}
@@ -649,7 +660,7 @@ func AssertPanic(t T, fn func(), expectedPanic any, name string, args ...any) (o
 
 	defer func() {
 		recovered := recover()
-		if recovered == errMockTFailNow {
+		if IsMockTAbort(recovered) {
 			// fn cut the test short through MockT; pass the
 			// abort on to MockT.Run rather than report it.
 			panic(recovered)
@@ -764,7 +775,7 @@ func AssertNoPanic(t T, fn func(), name string, args ...any) (ok bool) {
 	defer func() {
 		recovered := recover()
 		switch {
-		case recovered == errMockTFailNow:
+		case IsMockTAbort(recovered):
 			// fn cut the test short through MockT; pass the
 			// abort on to MockT.Run rather than report it.
 			panic(recovered)
