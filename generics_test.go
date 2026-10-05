@@ -180,25 +180,28 @@ type testStruct struct {
 	Count int
 }
 
-var coalesceStructTestCases = []coalesceTestCase[testStruct]{
-	newCoalesceTestCase("all zero", S(testStruct{}, testStruct{}, testStruct{}), testStruct{}),
-	newCoalesceTestCase("first non-zero", S(
-		testStruct{},
-		testStruct{Value: "hello", Count: 42},
-		testStruct{},
-		testStruct{Value: "world", Count: 100},
-	), testStruct{Value: "hello", Count: 42}),
-	newCoalesceTestCase("partial zero struct", S(
-		testStruct{},
-		testStruct{Value: "hello"},
-		testStruct{Count: 42},
-		testStruct{Value: "world", Count: 100},
-	), testStruct{Value: "hello"}),
-	newCoalesceTestCase("empty inputs", S[testStruct](), testStruct{}),
+func newTestStruct(value string, count int) testStruct {
+	return testStruct{
+		Value: value,
+		Count: count,
+	}
+}
+
+func coalesceStructTestCases() []coalesceTestCase[testStruct] {
+	var zero testStruct
+	first, last := newTestStruct("hello", 42), newTestStruct("world", 100)
+	noCount, noValue := newTestStruct("hello", 0), newTestStruct("", 42)
+
+	return []coalesceTestCase[testStruct]{
+		newCoalesceTestCase("all zero", S(zero, zero, zero), zero),
+		newCoalesceTestCase("first non-zero", S(zero, first, zero, last), first),
+		newCoalesceTestCase("partial zero struct", S(zero, noCount, noValue, last), noCount),
+		newCoalesceTestCase("empty inputs", S[testStruct](), zero),
+	}
 }
 
 func TestCoalesceStruct(t *testing.T) {
-	RunTestCases(t, coalesceStructTestCases)
+	RunTestCases(t, coalesceStructTestCases())
 }
 
 // Additional test cases for different numeric types
@@ -398,27 +401,20 @@ func newIIfStructTestCase(name string, cond bool, yes, no, expected testStruct) 
 	}
 }
 
-var iifStructTestCases = []iifStructTestCase{
-	newIIfStructTestCase("true condition", true,
-		testStruct{Value: "hello", Count: 42},
-		testStruct{Value: "world", Count: 100},
-		testStruct{Value: "hello", Count: 42}),
-	newIIfStructTestCase("false condition", false,
-		testStruct{Value: "hello", Count: 42},
-		testStruct{Value: "world", Count: 100},
-		testStruct{Value: "world", Count: 100}),
-	newIIfStructTestCase("true with zero", true,
-		testStruct{},
-		testStruct{Value: "world", Count: 100},
-		testStruct{}),
-	newIIfStructTestCase("false with zero", false,
-		testStruct{Value: "hello", Count: 42},
-		testStruct{},
-		testStruct{}),
+func iifStructTestCases() []iifStructTestCase {
+	var zero testStruct
+	yes, no := newTestStruct("hello", 42), newTestStruct("world", 100)
+
+	return []iifStructTestCase{
+		newIIfStructTestCase("true condition", true, yes, no, yes),
+		newIIfStructTestCase("false condition", false, yes, no, no),
+		newIIfStructTestCase("true with zero", true, zero, no, zero),
+		newIIfStructTestCase("false with zero", false, yes, zero, zero),
+	}
 }
 
 func TestIIfStruct(t *testing.T) {
-	RunTestCases(t, iifStructTestCases)
+	RunTestCases(t, iifStructTestCases())
 }
 
 // Test IIf with function evaluation (ensure both branches are evaluated before selection)

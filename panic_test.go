@@ -817,21 +817,23 @@ func (tc mustTestCase[V]) Test(t *testing.T) {
 }
 
 func mustTestCases() []TestCase {
+	var nilPtr *int
+	slice, named := S(1, 2, 3), newNameStruct()
+
 	return []TestCase{
 		newMustTestCase("string", testHello),
 		newMustTestCase("int", 42),
 		newMustTestCase("bool", true),
-		newMustTestCase("slice", S(1, 2, 3)),
-		newMustTestCase("nil pointer", (*int)(nil)),
-		newMustTestCase("struct", struct{ Name string }{"test"}),
+		newMustTestCase("slice", slice),
+		newMustTestCase("nil pointer", nilPtr),
+		newMustTestCase("struct", named),
 
 		newMustTestCasePanic("string with error", testHello, errSentinel),
 		newMustTestCasePanic("int with error", 42, errSentinel),
 		newMustTestCasePanic("bool with error", true, errSentinel),
-		newMustTestCasePanic("slice with error", S(1, 2, 3), errSentinel),
-		newMustTestCasePanic("nil pointer with error", (*int)(nil), errSentinel),
-		newMustTestCasePanic("struct with error", struct{ Name string }{"test"},
-			errSentinel),
+		newMustTestCasePanic("slice with error", slice, errSentinel),
+		newMustTestCasePanic("nil pointer with error", nilPtr, errSentinel),
+		newMustTestCasePanic("struct with error", named, errSentinel),
 	}
 }
 
@@ -874,7 +876,7 @@ func maybeTestCases() []TestCase {
 		newMaybeTestCase("int with error", 0, errors.New("another ignored error")),
 		newMaybeTestCase("nil pointer with error", (*int)(nil),
 			errors.New("pointer error")),
-		newMaybeTestCase("struct with error", struct{ Name string }{"test"},
+		newMaybeTestCase("struct with error", newNameStruct(),
 			fmt.Errorf("formatted: %d", 123)),
 	}
 }
@@ -947,20 +949,23 @@ func (tc mustOKTestCase[V]) Test(t *testing.T) {
 }
 
 func mustOKTestCases() []TestCase {
+	var nilPtr *int
+	slice, named := S(1, 2, 3), newNameStruct()
+
 	return []TestCase{
 		newMustOKTestCase("string", testHello),
 		newMustOKTestCase("int", 42),
 		newMustOKTestCase("bool", true),
-		newMustOKTestCase("slice", S(1, 2, 3)),
-		newMustOKTestCase("nil pointer", (*int)(nil)),
-		newMustOKTestCase("struct", struct{ Name string }{"test"}),
+		newMustOKTestCase("slice", slice),
+		newMustOKTestCase("nil pointer", nilPtr),
+		newMustOKTestCase("struct", named),
 
 		newMustOKTestCasePanic("string not ok", testHello),
 		newMustOKTestCasePanic("int not ok", 42),
 		newMustOKTestCasePanic("bool not ok", false),
-		newMustOKTestCasePanic("slice not ok", S(1, 2, 3)),
-		newMustOKTestCasePanic("nil pointer not ok", (*int)(nil)),
-		newMustOKTestCasePanic("struct not ok", struct{ Name string }{"test"}),
+		newMustOKTestCasePanic("slice not ok", slice),
+		newMustOKTestCasePanic("nil pointer not ok", nilPtr),
+		newMustOKTestCasePanic("struct not ok", named),
 	}
 }
 
@@ -1002,7 +1007,7 @@ func maybeOKTestCases() []TestCase {
 		newMaybeOKTestCase("int with true", 42, true),
 		newMaybeOKTestCase("int with false", 0, false),
 		newMaybeOKTestCase("nil pointer with false", (*int)(nil), false),
-		newMaybeOKTestCase("struct with false", struct{ Name string }{"test"},
+		newMaybeOKTestCase("struct with false", newNameStruct(),
 			false),
 	}
 }
@@ -1090,7 +1095,7 @@ func (tc mustTTestCase[T]) Test(t *testing.T) {
 // mustTValueTestCases are the rows where the input holds the target
 // type. The zero value is a result there, not the mark of a failure.
 func mustTValueTestCases() []TestCase {
-	stringer := mockStringer{value: "test"}
+	stringer := newMockStringer("test")
 
 	return []TestCase{
 		newMustTTestCase[string]("string to string", testHello, testHello),
@@ -1160,7 +1165,7 @@ func (tc maybeTTestCase[T]) Test(t *testing.T) {
 
 func maybeTTestCases() []TestCase {
 	testErr := errors.New("test")
-	stringer := mockStringer{value: "test"}
+	stringer := newMockStringer("test")
 
 	return []TestCase{
 		// the input already holds the target type
@@ -1193,8 +1198,18 @@ type mockStringer struct {
 	value string
 }
 
+func newMockStringer(value string) mockStringer {
+	return mockStringer{value: value}
+}
+
 func (ms mockStringer) String() string {
 	return ms.value
+}
+
+// newNameStruct returns the anonymous struct the Must and Maybe tables
+// pass as their struct value.
+func newNameStruct() struct{ Name string } {
+	return struct{ Name string }{Name: "test"}
 }
 
 // Benchmarks
