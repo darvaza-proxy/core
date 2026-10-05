@@ -994,27 +994,32 @@ func TestMyAssertion(t *testing.T) {
 }
 ```
 
-### Testing Fatal/FailNow Scenarios
+### Testing Fatal/FailNow and Skip/SkipNow Scenarios
 
-MockT supports testing functions that call Fatal/FailNow methods via the `Run()`
-method, which recovers from FailNow panics:
+MockT supports testing functions that call Fatal/FailNow or Skip/SkipNow
+methods via the `Run()` method, which returns where they stop the test:
 
 ```go
 func TestAssertionFailure(t *testing.T) {
     mock := &core.MockT{}
 
-    // Test assertion that calls Fatal internally
+    // AssertMustEqual reports, then calls FailNow; Run returns there
     ok := mock.Run("failing assertion", func(mt core.T) {
-        core.AssertEqual(mt, 1, 2, "should fail")
-        // This would call mt.Fatal() internally if we used:
-        // if !core.AssertEqual(mt, 1, 2, "should fail") { mt.FailNow() }
+        core.AssertMustEqual(mt, 1, 2, "value")
+        mt.Log("continued") // not reached
     })
 
-    core.AssertFalse(t, ok, "assertion should fail")
-    core.AssertTrue(t, mock.Failed(), "mock should be marked as failed")
-    core.AssertTrue(t, mock.HasErrors(), "should have error message")
+    core.AssertFalse(t, ok, "passed")
+    core.AssertTrue(t, mock.Failed(), "failed")
+    core.AssertEqual(t, 1, mock.NumErrors(), "errors")
+    core.AssertEqual(t, 0, mock.NumLogs(), "logs")
 }
 ```
+
+A skip stops the test the same way without failing it: `Run` returns true
+for a function that only skips, and `mock.Skipped()` reports the skip.
+`Failed()` and `Skipped()` carry over from one `Run` to the next until
+`Reset()`.
 
 ## Error Testing Patterns
 

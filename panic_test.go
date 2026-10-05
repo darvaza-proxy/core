@@ -11,6 +11,7 @@ var (
 	_ TestCase = asRecoveredTestCase{}
 	_ TestCase = catcherDoTestCase{}
 	_ TestCase = catcherTryTestCase{}
+	_ TestCase = catcherAbortTestCase{}
 	_ TestCase = catchTestCase{}
 	_ TestCase = catchWithPanicRecoveryTestCase{}
 	_ TestCase = mustSuccessTestCase[int]{}
@@ -308,6 +309,163 @@ func TestCatcherFirstPanicWins(t *testing.T) {
 		_ = catcher.Try(func() error { panic(later) })
 	}, "later panic")
 	AssertSame(t, first, catcher.Recovered(), "first panic kept")
+}
+
+// catcherAbortTestCase states what Catcher.Try does with what fn does
+// to the test through MockT: an abort is not a panic, so it passes
+// through to MockT.Run and cuts the body short after Try, and the
+// Catcher records nothing either way.
+type catcherAbortTestCase struct {
+	fn         func(T)
+	name       string
+	wantErrors int
+	wantLogs   int
+
+	wantAborted bool
+	wantFailed  bool
+	wantSkipped bool
+}
+
+func (tc catcherAbortTestCase) Name() string {
+	return tc.name
+}
+
+func (tc catcherAbortTestCase) Test(t *testing.T) {
+	t.Helper()
+	var catcher Catcher
+	var continued bool
+	mock := &MockT{}
+	ok := mock.Run(tc.name, func(mt T) {
+		_ = catcher.Try(func() error {
+			tc.fn(mt)
+			return nil
+		})
+		continued = true
+	})
+
+	AssertEqual(t, !tc.wantFailed, ok, "passed")
+	AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
+	AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
+	AssertEqual(t, !tc.wantAborted, continued, "continued")
+	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
+	AssertEqual(t, tc.wantLogs, mock.NumLogs(), "logs")
+	AssertNil(t, catcher.Recovered(), "recovered")
+}
+
+// newCatcherAbortTestCase is a row whose abort fails the test and cuts
+// it short, recording wantErrors on the way.
+func newCatcherAbortTestCase(name string, abort func(T),
+	wantErrors int) catcherAbortTestCase {
+	return catcherAbortTestCase{
+		fn:          abort,
+		name:        name,
+		wantErrors:  wantErrors,
+		wantLogs:    0,
+		wantAborted: true,
+		wantFailed:  true,
+		wantSkipped: false,
+	}
+}
+
+// newCatcherAbortTestCaseContinues is a row whose function fails the
+// test without cutting it short, recording wantErrors on the way.
+func newCatcherAbortTestCaseContinues(name string, fn func(T),
+	wantErrors int) catcherAbortTestCase {
+	return catcherAbortTestCase{
+		fn:          fn,
+		name:        name,
+		wantErrors:  wantErrors,
+		wantLogs:    0,
+		wantAborted: false,
+		wantFailed:  true,
+		wantSkipped: false,
+	}
+}
+
+// newCatcherAbortTestCaseSkips is a row whose abort skips the test,
+// recording wantLogs on the way.
+func newCatcherAbortTestCaseSkips(name string, abort func(T),
+	wantLogs int) catcherAbortTestCase {
+	return catcherAbortTestCase{
+		fn:          abort,
+		name:        name,
+		wantErrors:  0,
+		wantLogs:    wantLogs,
+		wantAborted: true,
+		wantFailed:  false,
+		wantSkipped: true,
+	}
+}
+
+// newCatcherAbortTestCaseFailsSkips is a row whose abort fails the test
+// and then skips it, recording wantErrors and wantLogs on the way.
+func newCatcherAbortTestCaseFailsSkips(name string, abort func(T),
+	wantErrors, wantLogs int) catcherAbortTestCase {
+	return catcherAbortTestCase{
+		fn:          abort,
+		name:        name,
+		wantErrors:  wantErrors,
+		wantLogs:    wantLogs,
+		wantAborted: true,
+		wantFailed:  true,
+		wantSkipped: true,
+	}
+}
+
+var catcherAbortTestCases = S(
+	newCatcherAbortTestCaseContinues("Fail", func(mt T) { mt.Fail() }, 0),
+	newCatcherAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
+	newCatcherAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
+	newCatcherAbortTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow() }, 0),
+	newCatcherAbortTestCaseSkips("Skip", func(mt T) { mt.Skip("skip") }, 1),
+	newCatcherAbortTestCaseFailsSkips("Fail then SkipNow",
+		func(mt T) { mt.Fail(); mt.SkipNow() }, 0, 0),
+)
+
+func TestCatcherAbort(t *testing.T) {
+	RunTestCases(t, catcherAbortTestCases)
+}
+
+// Catcher.Do reaches fn through Try, so an abort inside it passes on to
+// MockT.Run as well, and the Catcher records nothing.
+func TestCatcherDoAbort(t *testing.T) {
+	var catcher Catcher
+	var continued bool
+	mock := &MockT{}
+	ok := mock.Run("Do", func(mt T) {
+		_ = catcher.Do(func() error {
+			mt.FailNow()
+			return nil
+		})
+		continued = true
+	})
+
+	AssertFalse(t, ok, "passed")
+	AssertTrue(t, mock.Failed(), "failed")
+	AssertFalse(t, continued, "continued")
+	AssertEqual(t, 0, mock.NumErrors(), "errors")
+	AssertEqual(t, 0, mock.NumLogs(), "logs")
+	AssertNil(t, catcher.Recovered(), "recovered")
+}
+
+// Catch reaches fn through a Catcher, so an abort inside it passes on to
+// MockT.Run as well.
+func TestCatchAbort(t *testing.T) {
+	var continued bool
+	mock := &MockT{}
+	ok := mock.Run("Catch", func(mt T) {
+		_ = Catch(func() error {
+			mt.FailNow()
+			return nil
+		})
+		continued = true
+	})
+
+	AssertFalse(t, ok, "passed")
+	AssertTrue(t, mock.Failed(), "failed")
+	AssertFalse(t, continued, "continued")
+	AssertEqual(t, 0, mock.NumErrors(), "errors")
+	AssertEqual(t, 0, mock.NumLogs(), "logs")
 }
 
 type catchTestCase struct {

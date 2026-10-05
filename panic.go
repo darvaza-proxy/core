@@ -66,21 +66,30 @@ func (p *Catcher) Do(fn func() error) error {
 }
 
 // Try calls a function, returning its organic error,
-// or storing the recovered error for later consumption
+// or storing the recovered error for later consumption.
+// A FailNow or SkipNow that fn calls through [MockT] is not a
+// panic, and passes through.
 func (p *Catcher) Try(fn func() error) error {
-	if fn != nil {
-		defer func() {
-			if err := AsRecovered(recover()); err != nil {
-				// storing the address of a copy made here, rather than
-				// of err, keeps a call that does not panic off the heap.
-				stored := err
-				p.recovered.CompareAndSwap(nil, &stored)
-			}
-		}()
-
-		return fn()
+	if fn == nil {
+		return nil
 	}
-	return nil
+
+	defer func() {
+		recovered := recover()
+		if IsMockTAbort(recovered) {
+			// fn cut the test short through MockT; pass the
+			// abort on to MockT.Run rather than catch it.
+			panic(recovered)
+		}
+		if err := AsRecovered(recovered); err != nil {
+			// storing the address of a copy made here, rather than
+			// of err, keeps a call that does not panic off the heap.
+			stored := err
+			p.recovered.CompareAndSwap(nil, &stored)
+		}
+	}()
+
+	return fn()
 }
 
 // Recovered returns the error corresponding to a
