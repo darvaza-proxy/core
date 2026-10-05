@@ -841,9 +841,9 @@ func TestMust(t *testing.T) {
 	RunTestCases(t, mustTestCases())
 }
 
-// maybeTestCase states that Maybe returns its value whatever the error
-// is, so the rows differ only in the value's type and whether an error
-// was there to be ignored.
+// maybeTestCase states that Maybe returns its value without panicking
+// whatever the error is, so the rows differ only in the value's type and
+// whether an error was there to be ignored.
 type maybeTestCase[V any] struct {
 	err   error
 	value V
@@ -865,7 +865,13 @@ func (tc maybeTestCase[V]) Name() string {
 func (tc maybeTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	AssertEqual(t, tc.value, Maybe(tc.value, tc.err), "value")
+	var got V
+	err := Catch(func() error {
+		got = Maybe(tc.value, tc.err)
+		return nil
+	})
+	AssertNoError(t, err, "no panic")
+	AssertEqual(t, tc.value, got, "value")
 }
 
 func maybeTestCases() []TestCase {
@@ -980,9 +986,9 @@ func TestMustOK(t *testing.T) {
 	RunTestCases(t, mustOKTestCases())
 }
 
-// maybeOKTestCase states that MaybeOK returns its value whatever ok
-// says, so the rows differ only in the value's type and the flag being
-// ignored.
+// maybeOKTestCase states that MaybeOK returns its value without panicking
+// whatever ok says, so the rows differ only in the value's type and the
+// flag being ignored.
 type maybeOKTestCase[V any] struct {
 	value V
 	name  string
@@ -1004,7 +1010,13 @@ func (tc maybeOKTestCase[V]) Name() string {
 func (tc maybeOKTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	AssertEqual(t, tc.value, MaybeOK(tc.value, tc.ok), "value")
+	var got V
+	err := Catch(func() error {
+		got = MaybeOK(tc.value, tc.ok)
+		return nil
+	})
+	AssertNoError(t, err, "no panic")
+	AssertEqual(t, tc.value, got, "value")
 }
 
 func maybeOKTestCases() []TestCase {
