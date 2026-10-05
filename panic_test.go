@@ -869,15 +869,22 @@ func (tc maybeTestCase[V]) Test(t *testing.T) {
 }
 
 func maybeTestCases() []TestCase {
+	var nilPtr *int
+	slice, named := S(1, 2, 3), newNameStruct()
+
 	return []TestCase{
-		newMaybeTestCase("string with nil error", "hello", nil),
-		newMaybeTestCase("string with error", "world", errors.New("ignored error")),
+		newMaybeTestCase("string with nil error", testHello, nil),
+		newMaybeTestCase("string with error", testHello, errSentinel),
 		newMaybeTestCase("int with nil error", 42, nil),
-		newMaybeTestCase("int with error", 0, errors.New("another ignored error")),
-		newMaybeTestCase("nil pointer with error", (*int)(nil),
-			errors.New("pointer error")),
-		newMaybeTestCase("struct with error", newNameStruct(),
-			fmt.Errorf("formatted: %d", 123)),
+		newMaybeTestCase("int with error", 42, errSentinel),
+		newMaybeTestCase("bool with nil error", true, nil),
+		newMaybeTestCase("bool with error", true, errSentinel),
+		newMaybeTestCase("slice with nil error", slice, nil),
+		newMaybeTestCase("slice with error", slice, errSentinel),
+		newMaybeTestCase("nil pointer with nil error", nilPtr, nil),
+		newMaybeTestCase("nil pointer with error", nilPtr, errSentinel),
+		newMaybeTestCase("struct with nil error", named, nil),
+		newMaybeTestCase("struct with error", named, errSentinel),
 	}
 }
 
@@ -1001,14 +1008,22 @@ func (tc maybeOKTestCase[V]) Test(t *testing.T) {
 }
 
 func maybeOKTestCases() []TestCase {
+	var nilPtr *int
+	slice, named := S(1, 2, 3), newNameStruct()
+
 	return []TestCase{
-		newMaybeOKTestCase("string with true", "hello", true),
-		newMaybeOKTestCase("string with false", "world", false),
+		newMaybeOKTestCase("string with true", testHello, true),
+		newMaybeOKTestCase("string with false", testHello, false),
 		newMaybeOKTestCase("int with true", 42, true),
-		newMaybeOKTestCase("int with false", 0, false),
-		newMaybeOKTestCase("nil pointer with false", (*int)(nil), false),
-		newMaybeOKTestCase("struct with false", newNameStruct(),
-			false),
+		newMaybeOKTestCase("int with false", 42, false),
+		newMaybeOKTestCase("bool with true", true, true),
+		newMaybeOKTestCase("bool with false", true, false),
+		newMaybeOKTestCase("slice with true", slice, true),
+		newMaybeOKTestCase("slice with false", slice, false),
+		newMaybeOKTestCase("nil pointer with true", nilPtr, true),
+		newMaybeOKTestCase("nil pointer with false", nilPtr, false),
+		newMaybeOKTestCase("struct with true", named, true),
+		newMaybeOKTestCase("struct with false", named, false),
 	}
 }
 
