@@ -3,7 +3,6 @@ package core
 import (
 	"net"
 	"net/netip"
-	"reflect"
 	"testing"
 )
 
@@ -71,17 +70,12 @@ func (tc parseAddrTestCase) Test(t *testing.T) {
 
 	got, err := ParseAddr(tc.input)
 	if tc.wantErr {
-		if err == nil {
-			t.Error("Expected error but got nil")
-		}
-	} else {
-		if err != nil {
-			t.Errorf("Expected no error but got: %v", err)
-		}
-		if got != tc.want {
-			t.Errorf("Expected %v, got %v", tc.want, got)
-		}
+		AssertError(t, err, "error")
+		return
 	}
+
+	AssertNoError(t, err, "parse")
+	AssertEqual(t, tc.want, got, "address")
 }
 
 func TestParseAddr(t *testing.T) {
@@ -183,12 +177,8 @@ func (tc addrFromNetIPTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, ok := AddrFromNetIP(tc.input)
-	if ok != tc.ok {
-		t.Errorf("Expected ok=%v, got %v", tc.ok, ok)
-	}
-	if ok && got != tc.want {
-		t.Errorf("Expected %v, got %v", tc.want, got)
-	}
+	AssertEqual(t, tc.ok, ok, "ok")
+	AssertEqual(t, tc.want, got, "address")
 }
 
 func TestAddrFromNetIP(t *testing.T) {
@@ -211,12 +201,11 @@ func testSpecificInvalidInterface(t *testing.T) {
 	t.Helper()
 	// Try with a non-existent interface
 	_, err := GetStringIPAddresses("invalid-interface-name")
-	if err == nil {
-		t.Error("Expected error for invalid interface")
-	}
+	AssertError(t, err, "invalid interface")
 }
 
 func testLoopbackInterface(t *testing.T) {
+	t.Helper()
 	// Most systems have a loopback interface
 	loopbackNames := S("lo", "lo0", "Loopback Pseudo-Interface 1")
 
@@ -226,9 +215,7 @@ func testLoopbackInterface(t *testing.T) {
 		if err == nil {
 			found = true
 			// Should have at least one address (127.0.0.1 or ::1)
-			if len(addrs) == 0 {
-				t.Errorf("Expected at least one address for loopback interface %s", name)
-			}
+			AssertTrue(t, len(addrs) > 0, "loopback addresses")
 			break
 		}
 	}
@@ -248,15 +235,12 @@ func testAllStringInterfaces(t *testing.T) {
 	}
 
 	// At least check it returns a slice (could be empty)
-	if addrs == nil {
-		t.Error("Expected non-nil slice")
-	}
+	AssertNotNil(t, addrs, "addresses")
 
 	// Verify all returned addresses are valid strings
 	for _, addr := range addrs {
-		if _, err := netip.ParseAddr(addr); err != nil {
-			t.Errorf("Invalid address string: %s", addr)
-		}
+		_, err := netip.ParseAddr(addr)
+		AssertNoError(t, err, "parse")
 	}
 }
 
@@ -276,24 +260,18 @@ func testAllNetIPInterfaces(t *testing.T) {
 	}
 
 	// At least check it returns a slice (could be empty)
-	if addrs == nil {
-		t.Error("Expected non-nil slice")
-	}
+	AssertNotNil(t, addrs, "addresses")
 
 	// Verify all returned addresses are valid net.IP
 	for _, addr := range addrs {
-		if len(addr) == 0 {
-			t.Error("Got nil or empty net.IP")
-		}
+		AssertTrue(t, len(addr) > 0, "net.IP length")
 	}
 }
 
 func testInvalidNetIPInterface(t *testing.T) {
 	t.Helper()
 	_, err := GetNetIPAddresses("invalid-interface-name")
-	if err == nil {
-		t.Error("Expected error for invalid interface")
-	}
+	AssertError(t, err, "invalid interface")
 }
 
 // Test GetIPAddresses
@@ -312,15 +290,11 @@ func testAllIPAddressInterfaces(t *testing.T) {
 	}
 
 	// At least check it returns a slice (could be empty)
-	if addrs == nil {
-		t.Error("Expected non-nil slice")
-	}
+	AssertNotNil(t, addrs, "addresses")
 
 	// Verify all returned addresses are valid
 	for _, addr := range addrs {
-		if !addr.IsValid() {
-			t.Error("Got invalid netip.Addr")
-		}
+		AssertTrue(t, addr.IsValid(), "address validity")
 	}
 }
 
@@ -334,9 +308,7 @@ func testMultipleInterfacesWithError(t *testing.T) {
 
 	// Mix valid and invalid interface names
 	_, err = GetIPAddresses(ifaces[0], "invalid-interface-name")
-	if err == nil {
-		t.Error("Expected error when one interface doesn't exist")
-	}
+	AssertError(t, err, "mixed valid and invalid interfaces")
 }
 
 // Test GetInterfacesNames
@@ -400,22 +372,13 @@ func testExclusionRemovesInterfaces(t *testing.T) {
 	// Exclude the first interface
 	excluded := all[0]
 	filtered, err := GetInterfacesNames(excluded)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
+	AssertMustNoError(t, err, "GetInterfacesNames")
 
 	// Should have one less interface
-	if len(filtered) != len(all)-1 {
-		t.Errorf("Expected %d interfaces, got %d", len(all)-1, len(filtered))
-	}
+	AssertEqual(t, len(all)-1, len(filtered), "interface count")
 
 	// Verify the excluded interface is not present
-	for _, name := range filtered {
-		if name == excluded {
-			t.Errorf("Found excluded interface %s in result", excluded)
-		}
-	}
+	AssertFalse(t, SliceContains(filtered, excluded), "contains interface %q", excluded)
 }
 
 // Test internal helper functions
@@ -430,9 +393,7 @@ func TestAsStringIPAddresses(t *testing.T) {
 	result := asStringIPAddresses(addrs...)
 	expected := S("192.168.1.1", "2001:db8::1", "10.0.0.1")
 
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Expected %v, got %v", expected, result)
-	}
+	AssertSliceEqual(t, expected, result, "addresses")
 }
 
 func TestAsNetIPAddresses(t *testing.T) {
@@ -490,18 +451,12 @@ func TestAppendNetIPAsIP(t *testing.T) {
 
 	result := appendNetIPAsIP(out, addrs...)
 
-	// Should have 2 valid addresses
-	if len(result) != 2 {
-		t.Errorf("Expected 2 addresses, got %d", len(result))
-	}
-
-	// Verify the addresses
-	if result[0] != netip.MustParseAddr("192.168.1.1") {
-		t.Errorf("Expected first address to be 192.168.1.1, got %v", result[0])
-	}
-	if result[1] != netip.MustParseAddr("10.0.0.0") {
-		t.Errorf("Expected second address to be 10.0.0.0, got %v", result[1])
-	}
+	// Should have 2 valid addresses, the TCPAddr and the nil IP skipped
+	expected := S(
+		netip.MustParseAddr("192.168.1.1"),
+		netip.MustParseAddr("10.0.0.0"),
+	)
+	AssertSliceEqual(t, expected, result, "addresses")
 }
 
 // Benchmarks

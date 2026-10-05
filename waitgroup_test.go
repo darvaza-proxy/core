@@ -159,16 +159,21 @@ func TestWaitGroupGoCatch(t *testing.T) {
 }
 
 // A catch function that panics is reported the same way as a worker
-// that does.
+// that does, in place of the error it was handed.
 func TestWaitGroupGoCatchPanic(t *testing.T) {
+	workerErr := errors.New("worker error")
+
 	var wg WaitGroup
 	wg.GoCatch(func() error {
-		return errors.New("worker error")
+		return workerErr
 	}, func(_ error) error {
 		panic("catch panic")
 	})
 
-	pe := AssertMustErrorAs[*PanicError](t, wg.Wait(), "error")
+	err := wg.Wait()
+	AssertNotErrorIs(t, err, workerErr, "worker error")
+
+	pe := AssertMustErrorAs[*PanicError](t, err, "error")
 	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
 	AssertEqual(t, "catch panic", payload.Error(), "payload")
 	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
@@ -256,25 +261,13 @@ func TestWaitGroupDone(t *testing.T) {
 	done := wg.Done()
 
 	// Should not be closed yet
-	select {
-	case <-done:
-		AssertTrue(t, false, "done channel timing")
-	case <-time.After(5 * time.Millisecond):
-		// Expected
-	}
+	AssertOpen(t, done, 5*time.Millisecond, "done before the workers finish")
 
 	// Wait for completion
-	select {
-	case <-done:
-		// Expected
-	case <-time.After(100 * time.Millisecond):
-		t.Error("Done channel never closed")
-	}
+	AssertClosed(t, done, 100*time.Millisecond, "done after the workers finish")
 
 	// Verify Wait() also works
-	if err := wg.Wait(); err != nil {
-		t.Errorf("Expected no error from Wait(), got: %v", err)
-	}
+	AssertNoError(t, wg.Wait(), "wait")
 }
 
 func testWaitGroupErrNoError(t *testing.T) {
@@ -374,9 +367,7 @@ func TestWaitGroupWithContext(t *testing.T) {
 	})
 
 	err := wg.Wait()
-	if err == nil {
-		t.Error("Expected context timeout error")
-	}
+	AssertError(t, err, "context timeout")
 }
 
 func TestWaitGroupOnErrorCalledForAllErrors(t *testing.T) {
@@ -405,18 +396,14 @@ func TestWaitGroupOnErrorCalledForAllErrors(t *testing.T) {
 
 	// Wait for all workers to complete
 	err := wg.Wait()
-	if err == nil {
-		t.Error("Expected an error but got nil")
-	}
+	AssertError(t, err, "wait")
 
 	// Check how many times onError was called
 	mu.Lock()
 	count := callCount
 	mu.Unlock()
 
-	if count != 3 {
-		t.Errorf("Expected onError to be called 3 times, but it was called %d times", count)
-	}
+	AssertEqual(t, 3, count, "onError calls")
 }
 
 func TestWaitGroupOnErrorCalledForMixedResults(t *testing.T) {
@@ -450,16 +437,12 @@ func TestWaitGroupOnErrorCalledForMixedResults(t *testing.T) {
 
 	// Wait for all workers to complete
 	err := wg.Wait()
-	if err == nil {
-		t.Error("Expected an error but got nil")
-	}
+	AssertError(t, err, "wait")
 
 	// Check how many times onError was called
 	mu.Lock()
 	count := callCount
 	mu.Unlock()
 
-	if count != 2 {
-		t.Errorf("Expected onError to be called 2 times (for 2 errors), but it was called %d times", count)
-	}
+	AssertEqual(t, 2, count, "onError calls")
 }

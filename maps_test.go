@@ -222,7 +222,8 @@ func TestSortedValuesUnlikelyCond(t *testing.T) {
 	AssertSliceEqual(t, expected4, got4, "SortedValuesUnlikelyCond nil predicate")
 }
 
-// mapValueTestCase tests MapValue function
+// mapValueTestCase tests MapValue by the value it returns and whether it
+// found the key.
 type mapValueTestCase struct {
 	name     string
 	m        map[string]int
@@ -230,13 +231,6 @@ type mapValueTestCase struct {
 	def      int
 	expected int
 	found    bool
-}
-
-var mapValueTestCases = []mapValueTestCase{
-	newMapValueTestCase("existing key", map[string]int{"a": 1, "b": 2}, "a", 99, 1),
-	newMapValueTestCase("missing key", map[string]int{"a": 1, "b": 2}, "c", 88, 88),
-	newMapValueTestCase("nil map", nil, "a", 77, 77),
-	newMapValueTestCase("zero value exists", map[string]int{"a": 0}, "a", 66, 0),
 }
 
 func (tc mapValueTestCase) Name() string {
@@ -247,25 +241,48 @@ func (tc mapValueTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got, found := MapValue(tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.expected, got, "MapValue(%v, %q, %v) value", tc.m, tc.key, tc.def)
-	AssertEqual(t, tc.found, found, "MapValue(%v, %q, %v) found", tc.m, tc.key, tc.def)
+	AssertEqual(t, tc.expected, got, "value")
+	AssertEqual(t, tc.found, found, "found")
 }
 
-// Factory function for mapValueTestCase
 func newMapValueTestCase(name string, m map[string]int, key string,
-	def int, expected int) mapValueTestCase {
+	def, expected int) mapValueTestCase {
 	return mapValueTestCase{
 		name:     name,
 		m:        m,
 		key:      key,
 		def:      def,
 		expected: expected,
-		found:    expected != def, // derive found from whether expected == def
+		found:    true,
 	}
 }
 
+// newMapValueTestCaseMissing declares a key the map does not hold, where
+// the default is the value MapValue must return.
+func newMapValueTestCaseMissing(name string, m map[string]int, key string,
+	def int) mapValueTestCase {
+	return mapValueTestCase{
+		name:     name,
+		m:        m,
+		key:      key,
+		def:      def,
+		expected: def,
+		found:    false,
+	}
+}
+
+func mapValueTestCases() []mapValueTestCase {
+	return S(
+		newMapValueTestCase("existing key", map[string]int{"a": 1, "b": 2}, "a", 99, 1),
+		newMapValueTestCase("zero value exists", map[string]int{"a": 0}, "a", 66, 0),
+		newMapValueTestCase("value equals default", map[string]int{"a": 66}, "a", 66, 66),
+		newMapValueTestCaseMissing("missing key", map[string]int{"a": 1, "b": 2}, "c", 88),
+		newMapValueTestCaseMissing("nil map", nil, "a", 77),
+	)
+}
+
 func TestMapValue(t *testing.T) {
-	RunTestCases(t, mapValueTestCases)
+	RunTestCases(t, mapValueTestCases())
 }
 
 // mapContainsTestCase tests MapContains function
@@ -276,11 +293,15 @@ type mapContainsTestCase struct {
 	expected bool
 }
 
-var mapContainsTestCases = []mapContainsTestCase{
-	newMapContainsTestCase("existing key", map[string]any{"a": 1, "b": "two"}, "a", true),
-	newMapContainsTestCase("missing key", map[string]any{"a": 1, "b": "two"}, "c", false),
-	newMapContainsTestCase("nil map", nil, "a", false),
-	newMapContainsTestCase("nil value exists", map[string]any{"a": nil}, "a", true),
+func mapContainsTestCases() []mapContainsTestCase {
+	m := map[string]any{"a": 1, "b": "two"}
+
+	return []mapContainsTestCase{
+		newMapContainsTestCase("existing key", m, "a", true),
+		newMapContainsTestCase("missing key", m, "c", false),
+		newMapContainsTestCase("nil map", nil, "a", false),
+		newMapContainsTestCase("nil value exists", map[string]any{"a": nil}, "a", true),
+	}
 }
 
 func newMapContainsTestCase(name string, m map[string]any, key string, expected bool) mapContainsTestCase {
@@ -304,7 +325,7 @@ func (tc mapContainsTestCase) Test(t *testing.T) {
 }
 
 func TestMapContains(t *testing.T) {
-	RunTestCases(t, mapContainsTestCases)
+	RunTestCases(t, mapContainsTestCases())
 }
 
 func TestMapListInsert(t *testing.T) {
@@ -394,20 +415,26 @@ func TestMapListContainsFn(t *testing.T) {
 		id   int
 	}
 
+	newCustomType := func(id int, name string) customType {
+		return customType{id: id, name: name}
+	}
+
+	first := newCustomType(1, "one")
+
 	m := make(map[string]*list.List)
-	MapListAppend(m, "key1", customType{id: 1, name: "one"})
-	MapListAppend(m, "key1", customType{id: 2, name: "two"})
+	MapListAppend(m, "key1", first)
+	MapListAppend(m, "key1", newCustomType(2, "two"))
 
 	eq := func(a, b customType) bool { return a.id == b.id }
 
 	// Test existing value
-	AssertTrue(t, MapListContainsFn(m, "key1", customType{id: 1, name: "different"}, eq), "MapListContainsFn")
+	AssertTrue(t, MapListContainsFn(m, "key1", newCustomType(1, "different"), eq), "MapListContainsFn")
 
 	// Test missing value
-	AssertFalse(t, MapListContainsFn(m, "key1", customType{id: 3, name: "three"}, eq), "MapListContainsFn missing")
+	AssertFalse(t, MapListContainsFn(m, "key1", newCustomType(3, "three"), eq), "MapListContainsFn missing")
 
 	// Test nil eq function
-	AssertFalse(t, MapListContainsFn(m, "key1", customType{id: 1, name: "one"}, nil), "MapListContainsFn nil eq")
+	AssertFalse(t, MapListContainsFn(m, "key1", first, nil), "MapListContainsFn nil eq")
 }
 
 func TestMapListInsertUnique(t *testing.T) {
@@ -568,10 +595,8 @@ func TestMapListCopy(t *testing.T) {
 	// Verify contents
 	for key, srcList := range src {
 		dstList, ok := dst[key]
-		if !ok {
-			t.Errorf("MapListCopy missing key %q", key)
-			continue
-		}
+		AssertMustTrue(t, ok, "key %q copied", key)
+		AssertMustNotNil(t, dstList, "key %q list", key)
 		AssertEqual(t, srcList.Len(), dstList.Len(), "list length[%q]", key)
 	}
 
@@ -596,9 +621,11 @@ func TestMapListCopyFn(t *testing.T) {
 	})
 
 	// Verify transformation
-	el := dst["key1"].Front()
-	v, ok := el.Value.(data)
-	AssertTrue(t, ok, "MapListCopyFn type check")
+	copied := dst["key1"]
+	AssertMustNotNil(t, copied, "key1 copied")
+	el := copied.Front()
+	AssertMustNotNil(t, el, "first element")
+	v := AssertMustTypeIs[data](t, el.Value, "first element value")
 	AssertEqual(t, "a-copy", v.value, "transformed value")
 
 	// Test filtering
@@ -606,7 +633,9 @@ func TestMapListCopyFn(t *testing.T) {
 		return v, v.value != "b" // exclude "b"
 	})
 
-	AssertEqual(t, 1, dst2["key1"].Len(), "filtered length")
+	filtered := dst2["key1"]
+	AssertMustNotNil(t, filtered, "key1 filtered")
+	AssertEqual(t, 1, filtered.Len(), "filtered length")
 }
 
 type mapAllListContainsTestCase struct {
@@ -693,14 +722,13 @@ func TestMapAllListForEach(t *testing.T) {
 	AssertEqual(t, 10, sum, "sum")
 
 	// Test early termination
-	sum = 0
-	MapAllListForEach(m, func(v int) bool {
-		sum += v
-		return v == 3 // stop at 3
+	var count int
+	MapAllListForEach(m, func(_ int) bool {
+		count++
+		return count == 2 // stop after 2
 	})
 
-	// Sum should be less than 10 due to early termination
-	AssertTrue(t, sum < 10, "MapAllListForEach early stop")
+	AssertEqual(t, 2, count, "early stop count")
 }
 
 func TestMapAllListForEachElement(t *testing.T) {

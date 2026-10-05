@@ -72,9 +72,7 @@ func (tc coalesceTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
 	got := Coalesce(tc.inputs...)
-	if got != tc.expected {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "Coalesce")
 }
 
 // Factory function for coalesceTestCase
@@ -138,18 +136,7 @@ func (tc coalescePointerTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
 	got := Coalesce(tc.inputs...)
-
-	// Compare pointer values
-	if tc.expected == nil && got == nil {
-		return
-	}
-	if tc.expected == nil || got == nil {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, got, tc.expected)
-		return
-	}
-	if *got != *tc.expected {
-		t.Errorf("Coalesce(%v) = %v, want %v", tc.inputs, *got, *tc.expected)
-	}
+	AssertSame(t, tc.expected, got, "Coalesce")
 }
 
 // Factory function for coalescePointerTestCase
@@ -165,18 +152,26 @@ func intPtr(v int) *int {
 	return &v
 }
 
-var coalescePointerTestCases = []coalescePointerTestCase[int]{
-	newCoalescePointerTestCase("all nil", S[*int](nil, nil, nil), nil),
-	newCoalescePointerTestCase("first non-nil", S(nil, intPtr(42), nil, intPtr(100)), intPtr(42)),
-	newCoalescePointerTestCase("last non-nil", S(nil, nil, nil, intPtr(100)), intPtr(100)),
-	newCoalescePointerTestCase("single value", S(intPtr(42)), intPtr(42)),
-	newCoalescePointerTestCase("single nil", S[*int](nil), nil),
-	newCoalescePointerTestCase("empty inputs", S[*int](), nil),
-	newCoalescePointerTestCase("zero value pointer is not nil", S(nil, intPtr(0), nil, intPtr(100)), intPtr(0)),
+// coalescePointerTestCases pairs each row with the input pointer it
+// expects back, rather than with a separately allocated one of equal
+// value, so that the identity Coalesce promises is what the rows
+// declare.
+func coalescePointerTestCases() []coalescePointerTestCase[int] {
+	first, last, zero := intPtr(42), intPtr(100), intPtr(0)
+
+	return []coalescePointerTestCase[int]{
+		newCoalescePointerTestCase("all nil", S[*int](nil, nil, nil), nil),
+		newCoalescePointerTestCase("first non-nil", S(nil, first, nil, last), first),
+		newCoalescePointerTestCase("last non-nil", S(nil, nil, nil, last), last),
+		newCoalescePointerTestCase("single value", S(first), first),
+		newCoalescePointerTestCase("single nil", S[*int](nil), nil),
+		newCoalescePointerTestCase("empty inputs", S[*int](), nil),
+		newCoalescePointerTestCase("zero value pointer is not nil", S(nil, zero, nil, last), zero),
+	}
 }
 
 func TestCoalescePointer(t *testing.T) {
-	RunTestCases(t, coalescePointerTestCases)
+	RunTestCases(t, coalescePointerTestCases())
 }
 
 // testStruct for testing struct coalescing
@@ -185,25 +180,28 @@ type testStruct struct {
 	Count int
 }
 
-var coalesceStructTestCases = []coalesceTestCase[testStruct]{
-	newCoalesceTestCase("all zero", S(testStruct{}, testStruct{}, testStruct{}), testStruct{}),
-	newCoalesceTestCase("first non-zero", S(
-		testStruct{},
-		testStruct{Value: "hello", Count: 42},
-		testStruct{},
-		testStruct{Value: "world", Count: 100},
-	), testStruct{Value: "hello", Count: 42}),
-	newCoalesceTestCase("partial zero struct", S(
-		testStruct{},
-		testStruct{Value: "hello"},
-		testStruct{Count: 42},
-		testStruct{Value: "world", Count: 100},
-	), testStruct{Value: "hello"}),
-	newCoalesceTestCase("empty inputs", S[testStruct](), testStruct{}),
+func newTestStruct(value string, count int) testStruct {
+	return testStruct{
+		Value: value,
+		Count: count,
+	}
+}
+
+func coalesceStructTestCases() []coalesceTestCase[testStruct] {
+	var zero testStruct
+	first, last := newTestStruct("hello", 42), newTestStruct("world", 100)
+	noCount, noValue := newTestStruct("hello", 0), newTestStruct("", 42)
+
+	return []coalesceTestCase[testStruct]{
+		newCoalesceTestCase("all zero", S(zero, zero, zero), zero),
+		newCoalesceTestCase("first non-zero", S(zero, first, zero, last), first),
+		newCoalesceTestCase("partial zero struct", S(zero, noCount, noValue, last), noCount),
+		newCoalesceTestCase("empty inputs", S[testStruct](), zero),
+	}
 }
 
 func TestCoalesceStruct(t *testing.T) {
-	RunTestCases(t, coalesceStructTestCases)
+	RunTestCases(t, coalesceStructTestCases())
 }
 
 // Additional test cases for different numeric types
@@ -250,13 +248,11 @@ func (tc iifTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifTestCase
-func newIifTestCase(name string, cond bool, yes, no, expected int) iifTestCase {
+func newIIfTestCase(name string, cond bool, yes, no, expected int) iifTestCase {
 	return iifTestCase{
 		name:     name,
 		cond:     cond,
@@ -267,13 +263,13 @@ func newIifTestCase(name string, cond bool, yes, no, expected int) iifTestCase {
 }
 
 var iifTestCases = []iifTestCase{
-	newIifTestCase("true condition", true, 42, 100, 42),
-	newIifTestCase("false condition", false, 42, 100, 100),
-	newIifTestCase("true with zeros", true, 0, 100, 0),
-	newIifTestCase("false with zeros", false, 42, 0, 0),
-	newIifTestCase("same values", true, 42, 42, 42),
-	newIifTestCase("negative values true", true, -42, -100, -42),
-	newIifTestCase("negative values false", false, -42, -100, -100),
+	newIIfTestCase("true condition", true, 42, 100, 42),
+	newIIfTestCase("false condition", false, 42, 100, 100),
+	newIIfTestCase("true with zeros", true, 0, 100, 0),
+	newIIfTestCase("false with zeros", false, 42, 0, 0),
+	newIIfTestCase("same values", true, 42, 42, 42),
+	newIIfTestCase("negative values true", true, -42, -100, -42),
+	newIIfTestCase("negative values false", false, -42, -100, -100),
 }
 
 func TestIIfInt(t *testing.T) {
@@ -297,13 +293,11 @@ func (tc iifStringTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStringTestCase
-func newIifStringTestCase(name string, cond bool, yes, no, expected string) iifStringTestCase {
+func newIIfStringTestCase(name string, cond bool, yes, no, expected string) iifStringTestCase {
 	return iifStringTestCase{
 		name:     name,
 		cond:     cond,
@@ -314,11 +308,11 @@ func newIifStringTestCase(name string, cond bool, yes, no, expected string) iifS
 }
 
 var iifStringTestCases = []iifStringTestCase{
-	newIifStringTestCase("true condition", true, "hello", "world", "hello"),
-	newIifStringTestCase("false condition", false, "hello", "world", "world"),
-	newIifStringTestCase("true with empty", true, "", "world", ""),
-	newIifStringTestCase("false with empty", false, "hello", "", ""),
-	newIifStringTestCase("same values", true, "same", "same", "same"),
+	newIIfStringTestCase("true condition", true, "hello", "world", "hello"),
+	newIIfStringTestCase("false condition", false, "hello", "world", "world"),
+	newIIfStringTestCase("true with empty", true, "", "world", ""),
+	newIIfStringTestCase("false with empty", false, "hello", "", ""),
+	newIIfStringTestCase("same values", true, "same", "same", "same"),
 }
 
 func TestIIfString(t *testing.T) {
@@ -342,22 +336,11 @@ func (tc iifPointerTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-
-	// Compare pointer values
-	if tc.expected == nil && got == nil {
-		return
-	}
-	if tc.expected == nil || got == nil {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, got, tc.expected)
-		return
-	}
-	if *got != *tc.expected {
-		t.Errorf("IIf(%v, %v, %v) = %v, want %v", tc.cond, tc.yes, tc.no, *got, *tc.expected)
-	}
+	AssertSame(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifPointerTestCase
-func newIifPointerTestCase(name string, cond bool, yes, no, expected *int) iifPointerTestCase {
+func newIIfPointerTestCase(name string, cond bool, yes, no, expected *int) iifPointerTestCase {
 	return iifPointerTestCase{
 		name:     name,
 		cond:     cond,
@@ -367,17 +350,24 @@ func newIifPointerTestCase(name string, cond bool, yes, no, expected *int) iifPo
 	}
 }
 
-var iifPointerTestCases = []iifPointerTestCase{
-	newIifPointerTestCase("true condition", true, intPtr(42), intPtr(100), intPtr(42)),
-	newIifPointerTestCase("false condition", false, intPtr(42), intPtr(100), intPtr(100)),
-	newIifPointerTestCase("true with nil", true, nil, intPtr(100), nil),
-	newIifPointerTestCase("false with nil", false, intPtr(42), nil, nil),
-	newIifPointerTestCase("both nil true", true, nil, nil, nil),
-	newIifPointerTestCase("both nil false", false, nil, nil, nil),
+// iifPointerTestCases declares as the expectation the very pointer IIf
+// should hand back, since IIf returns one of its arguments and identity
+// is what says which.
+func iifPointerTestCases() []iifPointerTestCase {
+	yes, no := intPtr(42), intPtr(100)
+
+	return []iifPointerTestCase{
+		newIIfPointerTestCase("true condition", true, yes, no, yes),
+		newIIfPointerTestCase("false condition", false, yes, no, no),
+		newIIfPointerTestCase("true with nil", true, nil, no, nil),
+		newIIfPointerTestCase("false with nil", false, yes, nil, nil),
+		newIIfPointerTestCase("both nil true", true, nil, nil, nil),
+		newIIfPointerTestCase("both nil false", false, nil, nil, nil),
+	}
 }
 
 func TestIIfPointer(t *testing.T) {
-	RunTestCases(t, iifPointerTestCases)
+	RunTestCases(t, iifPointerTestCases())
 }
 
 // iifStructTestCase tests IIf with structs
@@ -397,13 +387,11 @@ func (tc iifStructTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	got := IIf(tc.cond, tc.yes, tc.no)
-	if got != tc.expected {
-		t.Errorf("IIf(%v, %+v, %+v) = %+v, want %+v", tc.cond, tc.yes, tc.no, got, tc.expected)
-	}
+	AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStructTestCase
-func newIifStructTestCase(name string, cond bool, yes, no, expected testStruct) iifStructTestCase {
+func newIIfStructTestCase(name string, cond bool, yes, no, expected testStruct) iifStructTestCase {
 	return iifStructTestCase{
 		name:     name,
 		cond:     cond,
@@ -413,27 +401,20 @@ func newIifStructTestCase(name string, cond bool, yes, no, expected testStruct) 
 	}
 }
 
-var iifStructTestCases = []iifStructTestCase{
-	newIifStructTestCase("true condition", true,
-		testStruct{Value: "hello", Count: 42},
-		testStruct{Value: "world", Count: 100},
-		testStruct{Value: "hello", Count: 42}),
-	newIifStructTestCase("false condition", false,
-		testStruct{Value: "hello", Count: 42},
-		testStruct{Value: "world", Count: 100},
-		testStruct{Value: "world", Count: 100}),
-	newIifStructTestCase("true with zero", true,
-		testStruct{},
-		testStruct{Value: "world", Count: 100},
-		testStruct{}),
-	newIifStructTestCase("false with zero", false,
-		testStruct{Value: "hello", Count: 42},
-		testStruct{},
-		testStruct{}),
+func iifStructTestCases() []iifStructTestCase {
+	var zero testStruct
+	yes, no := newTestStruct("hello", 42), newTestStruct("world", 100)
+
+	return []iifStructTestCase{
+		newIIfStructTestCase("true condition", true, yes, no, yes),
+		newIIfStructTestCase("false condition", false, yes, no, no),
+		newIIfStructTestCase("true with zero", true, zero, no, zero),
+		newIIfStructTestCase("false with zero", false, yes, zero, zero),
+	}
 }
 
 func TestIIfStruct(t *testing.T) {
-	RunTestCases(t, iifStructTestCases)
+	RunTestCases(t, iifStructTestCases())
 }
 
 // Test IIf with function evaluation (ensure both branches are evaluated before selection)
@@ -445,19 +426,11 @@ func TestIIfEvaluation(t *testing.T) {
 	no := evaluateNoFunction(&calledNo)
 
 	// Both should be evaluated before IIf is called
-	if !calledYes || !calledNo {
-		t.Errorf("Functions not evaluated before IIf call: yes=%v, no=%v", calledYes, calledNo)
-	}
+	AssertTrue(t, calledYes, "yes evaluated")
+	AssertTrue(t, calledNo, "no evaluated")
 
-	result := IIf(true, yes, no)
-	if result != 42 {
-		t.Errorf("IIf(true, 42, 100) = %v, want 42", result)
-	}
-
-	result = IIf(false, yes, no)
-	if result != 100 {
-		t.Errorf("IIf(false, 42, 100) = %v, want 100", result)
-	}
+	AssertEqual(t, 42, IIf(true, yes, no), "IIf true")
+	AssertEqual(t, 100, IIf(false, yes, no), "IIf false")
 }
 
 func evaluateYesFunction(called *bool) int {

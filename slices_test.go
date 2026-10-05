@@ -84,39 +84,28 @@ func eq[T Ordered](a, b T) bool {
 	return a == b
 }
 
-func cmp[T Ordered](a, b T) int {
-	switch {
-	case a == b:
-		return 0
-	case a < b:
-		return -1
-	default:
-		return 1
-	}
-}
-
+// The unique helpers keep the first occurrence of each element in its
+// place, so the expectations are in input order and compared as they are.
 func testSliceUnique[T Ordered](t *testing.T, before, after []T) {
-	SliceSort(after, cmp[T])
+	t.Helper()
 
 	s := SliceUnique(before)
-	SliceSort(s, cmp[T])
 	AssertSliceEqual(t, after, s, "SliceUnique")
 
 	s = SliceUniqueFn(before, eq[T])
-	SliceSort(s, cmp[T])
 	AssertSliceEqual(t, after, s, "SliceUniqueFn")
 
 	s = SliceCopyFn(before, nil)
 	s2 := SliceUniquify(&s)
-	SliceSort(s, cmp[T])
 	AssertSliceEqual(t, after, s, "SliceUniquify")
-	AssertSliceEqual(t, s, s2, "return value")
+	AssertSliceEqual(t, after, s2, "return value")
+	AssertSame(t, s, s2, "same slice")
 
 	s = SliceCopy(before)
 	s2 = SliceUniquifyFn(&s, eq[T])
-	SliceSort(s, cmp[T])
 	AssertSliceEqual(t, after, s, "SliceUniquifyFn")
-	AssertSliceEqual(t, s, s2, "return value")
+	AssertSliceEqual(t, after, s2, "return value")
+	AssertSame(t, s, s2, "same slice")
 }
 
 func TestSliceUniqueInt(t *testing.T) {
@@ -339,44 +328,65 @@ func newSliceMapTestCase[T1, T2 any](name string, input []T1, fn func([]T2, T1) 
 }
 
 func TestSliceMap(t *testing.T) {
+	t.Run("int to string", runTestSliceMapIntToString)
+	t.Run("string to int", runTestSliceMapStringToInt)
+}
+
+func runTestSliceMapIntToString(t *testing.T) {
+	t.Helper()
+
 	// Simple transformation: returns one element per input
 	intToString := func(_ []string, i int) []string {
 		return S(fmt.Sprintf("num_%d", i))
 	}
 
-	// Simple case first
-	t.Run("debug", testSliceMapDebug)
-
-	// Test simple mapping
 	testCases := []sliceMapTestCase[int, string]{
 		newSliceMapTestCase("single element", S(42), intToString, S("num_42")),
 		newSliceMapTestCase("multiple elements", S(1, 2, 3), intToString, S("num_1", "num_2", "num_3")),
 		newSliceMapTestCase("negative numbers", S(-1, 0, 1), intToString, S("num_-1", "num_0", "num_1")),
+		newSliceMapTestCase("empty slice", S[int](), intToString, nil),
+		newSliceMapTestCase("nil slice", nil, intToString, nil),
+		newSliceMapTestCase[int, string]("nil function", S(1, 2), nil, nil),
 	}
-
-	// Test empty slice separately
-	t.Run("empty slice", testSliceMapEmpty)
 
 	RunTestCases(t, testCases)
 }
 
-func testSliceMapEmpty(t *testing.T) {
+func runTestSliceMapStringToInt(t *testing.T) {
 	t.Helper()
-	intToString := func(_ []string, i int) []string {
-		return S(fmt.Sprintf("num_%d", i))
-	}
-	result := SliceMap(S[int](), intToString)
-	AssertEqual(t, 0, len(result), "result slice length")
-}
 
-func testSliceMapDebug(t *testing.T) {
-	t.Helper()
-	debug := func(partial []int, i int) []int {
-		t.Logf("partial=%v, i=%d", partial, i)
-		return S(i)
+	// Maps each string to its length and drops the empty ones, so a row
+	// can state a result shorter than its input and one that is nil
+	// though both the input and the function are not.
+	lengths := func(_ []int, s string) []int {
+		if s == "" {
+			return nil
+		}
+		return S(len(s))
 	}
-	result := SliceMap(S(1, 2, 3), debug)
-	t.Logf("result=%v", result)
+
+	// Adds each length to the sum of the result so far, so a row can
+	// state that partial holds what was mapped before the element.
+	running := func(partial []int, s string) []int {
+		var sum int
+		for _, n := range partial {
+			sum += n
+		}
+		return S(sum + len(s))
+	}
+
+	testCases := []sliceMapTestCase[string, int]{
+		newSliceMapTestCase("single element", S("hello"), lengths, S(5)),
+		newSliceMapTestCase("multiple elements", S("a", "bb", "ccc"), lengths, S(1, 2, 3)),
+		newSliceMapTestCase("running total", S("a", "bb", "ccc"), running, S(1, 3, 7)),
+		newSliceMapTestCase("element dropped", S("a", "", "ccc"), lengths, S(1, 3)),
+		newSliceMapTestCase("every element dropped", S("", ""), lengths, nil),
+		newSliceMapTestCase("empty slice", S[string](), lengths, nil),
+		newSliceMapTestCase("nil slice", nil, lengths, nil),
+		newSliceMapTestCase[string, int]("nil function", S("a"), nil, nil),
+	}
+
+	RunTestCases(t, testCases)
 }
 
 // Test cases for SliceReversed function
@@ -393,12 +403,11 @@ func (tc sliceReversedTestCase) Name() string {
 func (tc sliceReversedTestCase) Test(t *testing.T) {
 	t.Helper()
 
+	original := SliceCopy(tc.input)
+
 	result := SliceReversed(tc.input)
 	AssertSliceEqual(t, tc.expected, result, "SliceReversed")
-
-	// Verify original slice is unchanged
-	originalCopy := SliceCopy(tc.input)
-	AssertSliceEqual(t, originalCopy, tc.input, "original unchanged")
+	AssertSliceEqual(t, original, tc.input, "original unchanged")
 }
 
 // Factory function for sliceReversedTestCase
@@ -791,10 +800,14 @@ type sliceReplaceFnNilFnTestCase struct {
 
 func (tc sliceReplaceFnNilFnTestCase) Name() string { return tc.name }
 
+// A nil function returns the slice it was given, untouched.
 func (tc sliceReplaceFnNilFnTestCase) Test(t *testing.T) {
 	t.Helper()
+	original := SliceCopy(tc.in)
+
 	result := SliceReplaceFn(tc.in, nil)
-	AssertSliceEqual(t, tc.in, result, "SliceReplaceFn nil fn is NO-OP")
+	AssertSame(t, tc.in, result, "same slice")
+	AssertSliceEqual(t, original, result, "unchanged")
 }
 
 func newSliceReplaceFnNilFnTestCase(name string, in []int) sliceReplaceFnNilFnTestCase {
@@ -804,6 +817,8 @@ func newSliceReplaceFnNilFnTestCase(name string, in []int) sliceReplaceFnNilFnTe
 func TestSliceReplaceFnNilFn(t *testing.T) {
 	RunTestCases(t, []sliceReplaceFnNilFnTestCase{
 		newSliceReplaceFnNilFnTestCase("non-empty", S(1, 2, 3)),
-		newSliceReplaceFnNilFnTestCase("empty", S[int]()),
+		// IsSame compares a slice by its backing array, which an empty
+		// slice only has when it was given capacity.
+		newSliceReplaceFnNilFnTestCase("empty", make([]int, 0, 1)),
 	})
 }
