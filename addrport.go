@@ -28,26 +28,17 @@ func AddrPort(v any) (netip.AddrPort, bool) {
 	}
 
 	// via interfaces
-	if p, ok := v.(interface {
-		AddrPort() netip.AddrPort
-	}); ok {
+	switch p := v.(type) {
+	case interface{ AddrPort() netip.AddrPort }:
 		return validAddrPort(p.AddrPort())
-	}
-
-	if p, ok := v.(interface {
-		Addr() net.Addr
-	}); ok {
+	case interface{ Addr() net.Addr }:
 		return AddrPort(p.Addr())
-	}
-
-	if p, ok := v.(interface {
-		RemoteAddr() net.Addr
-	}); ok {
+	case interface{ RemoteAddr() net.Addr }:
 		return AddrPort(p.RemoteAddr())
+	default:
+		// sorry
+		return netip.AddrPort{}, false
 	}
-
-	// sorry
-	return netip.AddrPort{}, false
 }
 
 // validAddrPort passes a valid AddrPort through and discards an invalid one,
