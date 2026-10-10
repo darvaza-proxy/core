@@ -12,10 +12,12 @@ import (
 
 // MakeHostPort produces a validated host:port from an input string
 // optionally using the given default port when the string doesn't
-// specify one. The host comes back cleaned, an IPv6 address bracketed
-// when a port follows it, and the port in canonical decimal form.
-// Port 0 on the string input, in any spelling, isn't considered
-// valid, and the error names the input as given.
+// specify one. The result is an address to advertise, which the other
+// side splits with SplitHostPort. The host comes back cleaned, an IPv6
+// address bracketed when a port follows it, and the port in canonical
+// decimal form. Port 0 in the input, in any spelling, asks for a random
+// port, which only a listener learns once it binds, so the input is
+// refused, and the error names it as given.
 //
 // Examples:
 //   - MakeHostPort("localhost", 8080) → "localhost:8080"
@@ -141,7 +143,7 @@ func doJoinHostPort(host, port string) (string, error) {
 
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
 // port isn't part of the string and it validates it if present.
-// SplitHostPort will also validate the host is a valid IP or name
+// SplitHostPort will also validate the host is a valid IP or name.
 //
 // Unlike net.SplitHostPort, this function:
 //   - Accepts hostport strings without port (returns empty port)
