@@ -10,12 +10,13 @@ import (
 	"golang.org/x/net/idna"
 )
 
-// MakeHostPort produces a validated host:port from an input string
-// optionally using the given default port when the string doesn't
-// specify one. The host comes back cleaned, an IPv6 address bracketed
-// when a port follows it, and the port in canonical decimal form.
-// Port 0 on the string input, in any spelling, isn't considered
-// valid, and the error names the input as given.
+// MakeHostPort turns a configured address into one to advertise,
+// filling in the default port when the input names none. The other side
+// splits it with SplitHostPort. The host comes back cleaned, an IPv6
+// address bracketed when a port follows it, and the port in canonical
+// decimal form. Port 0 in the input, in any spelling, leaves the port
+// to be picked when a listener binds, a value MakeHostPort has no way
+// to fill, so the input is refused, and the error names it as given.
 //
 // Examples:
 //   - MakeHostPort("localhost", 8080) → "localhost:8080"
@@ -78,11 +79,12 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
 
 // JoinHostPort is like the standard net.JoinHostPort, but
 // it validates the host name and port, and returns it portless
-// if the port argument is empty.
+// if the port argument is empty. SplitHostPort splits the result
+// back into its host and port.
 //
 // Unlike net.JoinHostPort, this function:
 //   - Validates the host and returns it cleaned: an IP in its
-//     canonical text, a name in Unicode
+//     canonical text, a name in Unicode and in lower case
 //   - Validates the port is in range 0-65535 and joins it in
 //     canonical decimal form
 //   - Returns host without port if port is empty
@@ -141,12 +143,13 @@ func doJoinHostPort(host, port string) (string, error) {
 
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
 // port isn't part of the string and it validates it if present.
-// SplitHostPort will also validate the host is a valid IP or name
+// SplitHostPort will also validate the host is a valid IP or name.
 //
 // Unlike net.SplitHostPort, this function:
-//   - Accepts hostport strings without port (returns empty port)
+//   - Accepts host:port strings without port (returns empty port)
 //   - Validates the host is a valid IP address or hostname, and returns
-//     it cleaned: an IP in its canonical text, a name in Unicode
+//     it cleaned: an IP in its canonical text, a name in Unicode and in
+//     lower case
 //   - Validates the port is in range 0-65535 and returns it in
 //     canonical decimal form
 //   - Properly handles IPv6 addresses with and without brackets

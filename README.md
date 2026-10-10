@@ -61,20 +61,27 @@ Generic type constraints for use with Go generics:
 
 ### Host/Port Functions
 
-Where the standard library only splits and joins, these validate and
-clean: the host comes back as canonical IP text or a Unicode name,
-and the port in canonical decimal form, so `0080` is returned as `80`.
-Port 0 is accepted everywhere but in `MakeHostPort`'s input.
+Where the standard library only splits and joins, `SplitHostPort`,
+`SplitAddrPort`, `JoinHostPort` and `MakeHostPort` also validate and
+clean. `SplitHostPort`, `JoinHostPort` and `MakeHostPort` return the
+host as canonical IP text or a Unicode name in lower case, and the port
+in canonical decimal form, so `0080` is returned as `80`. `SplitAddrPort`
+takes an IP address rather than a name, and returns it as a `netip.Addr`
+with the port as a `uint16`. Port 0 is accepted everywhere but in
+`MakeHostPort`'s input, where it leaves the port to be picked when a
+listener binds, a value `MakeHostPort` has no way to fill.
 
 #### Parsing and Splitting
 
-* `SplitHostPort(hostport)` - enhanced version of `net.SplitHostPort` that
+* `SplitHostPort(hostPort)` - enhanced version of `net.SplitHostPort` that
   accepts portless strings and validates both host and port, returning
   them cleaned. Supports IPv6 addresses, international domain names, and
   descriptive error messages.
-* `SplitAddrPort(addrport)` - splits IP address and optional port into
+* `SplitAddrPort(addrPort)` - splits IP address and optional port into
   `netip.Addr` and `uint16`. Validates address format and port range
   (0-65535); the port is 0 when the string carries none.
+* `AddrPort(v)` - extracts `netip.AddrPort` from various network types
+  (`*net.TCPAddr`, `*net.UDPAddr`, etc.), returns `(AddrPort, bool)`.
 
 #### Joining and Construction
 
@@ -82,11 +89,9 @@ Port 0 is accepted everywhere but in `MakeHostPort`'s input.
   validates inputs, joins the port in canonical form, and returns a
   portless host when port is empty. Properly handles IPv6 bracketing and
   international domain names.
-* `MakeHostPort(hostport, defaultPort)` - constructs validated host:port
+* `MakeHostPort(hostPort, defaultPort)` - constructs validated host:port
   string from input with optional default port. Rejects port 0 in input
   in any spelling, supports portless output when default is 0.
-* `AddrPort(v)` - extracts `netip.AddrPort` from various network types
-  (`*net.TCPAddr`, `*net.UDPAddr`, etc.), returns `(AddrPort, bool)`.
 
 ### Interface Functions
 
