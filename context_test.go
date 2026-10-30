@@ -1,4 +1,4 @@
-package core
+package core_test
 
 import (
 	"context"
@@ -6,18 +6,20 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = withTimeoutNewTestCase[withTimeoutArgs]{}
-	_ TestCase = withTimeoutClampedTestCase[withTimeoutArgs]{}
-	_ TestCase = withTimeoutParentTestCase[withTimeoutArgs]{}
-	_ TestCase = withTimeoutNewTestCase[withTimeoutCauseArgs]{}
-	_ TestCase = withTimeoutClampedTestCase[withTimeoutCauseArgs]{}
-	_ TestCase = withTimeoutParentTestCase[withTimeoutCauseArgs]{}
-	_ TestCase = contextKeyGetTestCase{}
-	_ TestCase = contextKeyStringTestCase[int]{}
+	_ core.TestCase = withTimeoutNewTestCase[withTimeoutArgs]{}
+	_ core.TestCase = withTimeoutClampedTestCase[withTimeoutArgs]{}
+	_ core.TestCase = withTimeoutParentTestCase[withTimeoutArgs]{}
+	_ core.TestCase = withTimeoutNewTestCase[withTimeoutCauseArgs]{}
+	_ core.TestCase = withTimeoutClampedTestCase[withTimeoutCauseArgs]{}
+	_ core.TestCase = withTimeoutParentTestCase[withTimeoutCauseArgs]{}
+	_ core.TestCase = contextKeyGetTestCase{}
+	_ core.TestCase = contextKeyStringTestCase[int]{}
 )
 
 // contextKeyStringTestCase states how one key renders: String is the
@@ -25,14 +27,14 @@ var (
 // included when the zero value has no dynamic type to print. A nil
 // key has no name, and renders as the typed nil conversion.
 type contextKeyStringTestCase[T any] struct {
-	key    *ContextKey[T]
+	key    *core.ContextKey[T]
 	want   string
 	wantGo string
 	name   string
 }
 
-func newContextKeyStringTestCase[T any](name string, key *ContextKey[T],
-	want, wantGo string) TestCase {
+func newContextKeyStringTestCase[T any](name string, key *core.ContextKey[T],
+	want, wantGo string) core.TestCase {
 	return contextKeyStringTestCase[T]{
 		key:    key,
 		want:   want,
@@ -47,54 +49,54 @@ func (tc contextKeyStringTestCase[T]) Name() string {
 
 func (tc contextKeyStringTestCase[T]) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.want, tc.key.String(), "String")
-	AssertEqual(t, tc.wantGo, tc.key.GoString(), "GoString")
+	core.AssertEqual(t, tc.want, tc.key.String(), "String")
+	core.AssertEqual(t, tc.wantGo, tc.key.GoString(), "GoString")
 }
 
-func contextKeyStringTestCases() []TestCase {
-	return S(
-		newContextKeyStringTestCase("concrete type", NewContextKey[int]("k0"),
+func contextKeyStringTestCases() []core.TestCase {
+	return core.S(
+		newContextKeyStringTestCase("concrete type", core.NewContextKey[int]("k0"),
 			"k0", `core.NewContextKey[int]("k0")`),
 		newContextKeyStringTestCase("interface type",
-			NewContextKey[fmt.Stringer]("k1"),
+			core.NewContextKey[fmt.Stringer]("k1"),
 			"k1", `core.NewContextKey[fmt.Stringer]("k1")`),
-		newContextKeyStringTestCase("nil key", (*ContextKey[int])(nil),
+		newContextKeyStringTestCase("nil key", (*core.ContextKey[int])(nil),
 			"<nil>", "(*core.ContextKey[int])(nil)"),
 	)
 }
 
 func TestContextKeyString(t *testing.T) {
-	RunTestCases(t, contextKeyStringTestCases())
+	core.RunTestCases(t, contextKeyStringTestCases())
 }
 
 // TestContextKeyWithValueNilReceiver states that a nil key refuses
 // the value rather than storing it where Get cannot find it.
 func TestContextKeyWithValueNilReceiver(t *testing.T) {
-	AssertPanic(t, func() {
-		(*ContextKey[int])(nil).WithValue(context.Background(), 1)
-	}, ErrNilReceiver, "nil key")
+	core.AssertPanic(t, func() {
+		(*core.ContextKey[int])(nil).WithValue(context.Background(), 1)
+	}, core.ErrNilReceiver, "nil key")
 }
 
 func TestNewContextKey(t *testing.T) {
-	k0 := NewContextKey[int]("k0")
+	k0 := core.NewContextKey[int]("k0")
 
 	// new context
 	ctx0 := k0.WithValue(context.TODO(), 123)
 	v0, ok := k0.Get(ctx0)
-	AssertTrue(t, ok, "context value found")
-	AssertEqual(t, 123, v0, "value")
+	core.AssertTrue(t, ok, "context value found")
+	core.AssertEqual(t, 123, v0, "value")
 	// wrong context
 	_, ok = k0.Get(context.TODO())
-	AssertFalse(t, ok, "wrong context")
+	core.AssertFalse(t, ok, "wrong context")
 	// sub-context
 	ctx1 := k0.WithValue(ctx0, 456)
 	v1, ok := k0.Get(ctx1)
-	AssertTrue(t, ok, "sub-context value found")
-	AssertEqual(t, 456, v1, "sub-context")
+	core.AssertTrue(t, ok, "sub-context value found")
+	core.AssertEqual(t, 456, v1, "sub-context")
 	// parent-context
 	v, ok := k0.Get(ctx0)
-	AssertTrue(t, ok, "parent context value found")
-	AssertEqual(t, v0, v, "parent value")
+	core.AssertTrue(t, ok, "parent context value found")
+	core.AssertEqual(t, v0, v, "parent value")
 }
 
 // withTimeoutArgs holds what a row passes to WithTimeout.
@@ -119,7 +121,7 @@ func (a withTimeoutArgs) run(t *testing.T) (ctx context.Context, before, after t
 
 	var cancel context.CancelFunc
 	before = time.Now()
-	ctx, cancel = WithTimeout(a.parent, a.timeout)
+	ctx, cancel = core.WithTimeout(a.parent, a.timeout)
 	after = time.Now()
 	t.Cleanup(cancel)
 	return ctx, before, after
@@ -146,7 +148,7 @@ func (a withTimeoutCauseArgs) run(t *testing.T) (ctx context.Context, before, af
 
 	var cancel context.CancelFunc
 	before = time.Now()
-	ctx, cancel = WithTimeoutCause(a.parent, a.timeout, a.cause)
+	ctx, cancel = core.WithTimeoutCause(a.parent, a.timeout, a.cause)
 	after = time.Now()
 	t.Cleanup(cancel)
 	return ctx, before, after
@@ -182,11 +184,11 @@ func (tc withTimeoutNewTestCase[C]) Test(t *testing.T) {
 	ctx, before, after := tc.call.run(t)
 	a := tc.call.args()
 
-	AssertNotEqual(t, a.parent, ctx, "new context")
+	core.AssertNotEqual(t, a.parent, ctx, "new context")
 	deadline, ok := ctx.Deadline()
-	AssertMustTrue(t, ok, "deadline set")
-	AssertFalse(t, deadline.Before(before.Add(a.timeout)), "deadline not before timeout")
-	AssertFalse(t, deadline.After(after.Add(a.timeout)), "deadline not after timeout")
+	core.AssertMustTrue(t, ok, "deadline set")
+	core.AssertFalse(t, deadline.Before(before.Add(a.timeout)), "deadline not before timeout")
+	core.AssertFalse(t, deadline.After(after.Add(a.timeout)), "deadline not after timeout")
 }
 
 // withTimeoutClampedTestCase tests a call returning a new context that
@@ -204,12 +206,12 @@ func (tc withTimeoutClampedTestCase[C]) Test(t *testing.T) {
 	ctx, _, _ := tc.call.run(t)
 	a := tc.call.args()
 
-	AssertNotEqual(t, a.parent, ctx, "new context")
+	core.AssertNotEqual(t, a.parent, ctx, "new context")
 	want, ok := a.parent.Deadline()
-	AssertMustTrue(t, ok, "parent deadline")
+	core.AssertMustTrue(t, ok, "parent deadline")
 	deadline, ok := ctx.Deadline()
-	AssertMustTrue(t, ok, "deadline set")
-	AssertEqual(t, want, deadline, "parent's deadline kept")
+	core.AssertMustTrue(t, ok, "deadline set")
+	core.AssertEqual(t, want, deadline, "parent's deadline kept")
 }
 
 // withTimeoutParentTestCase tests a call on a timeout that is not
@@ -230,29 +232,29 @@ func (tc withTimeoutParentTestCase[C]) Test(t *testing.T) {
 	// AssertSame never holds for context.Background(), an empty
 	// struct value; AssertEqual compares it by value, and the
 	// pointer contexts these rows use by identity.
-	AssertEqual(t, tc.want, ctx, "parent returned")
+	core.AssertEqual(t, tc.want, ctx, "parent returned")
 }
 
-func newWithTimeoutTestCase(parent context.Context, name string, timeout time.Duration) TestCase {
+func newWithTimeoutTestCase(parent context.Context, name string, timeout time.Duration) core.TestCase {
 	return withTimeoutNewTestCase[withTimeoutArgs]{
 		call: newWithTimeoutArgs(parent, name, timeout),
 	}
 }
 
-func newWithTimeoutTestCaseClamped(parent context.Context, name string, timeout time.Duration) TestCase {
+func newWithTimeoutTestCaseClamped(parent context.Context, name string, timeout time.Duration) core.TestCase {
 	return withTimeoutClampedTestCase[withTimeoutArgs]{
 		call: newWithTimeoutArgs(parent, name, timeout),
 	}
 }
 
-func newWithTimeoutTestCaseParent(parent context.Context, name string, timeout time.Duration) TestCase {
+func newWithTimeoutTestCaseParent(parent context.Context, name string, timeout time.Duration) core.TestCase {
 	return withTimeoutParentTestCase[withTimeoutArgs]{
 		want: parent,
 		call: newWithTimeoutArgs(parent, name, timeout),
 	}
 }
 
-func newWithTimeoutTestCaseBackground(name string, timeout time.Duration) TestCase {
+func newWithTimeoutTestCaseBackground(name string, timeout time.Duration) core.TestCase {
 	var nilCtx context.Context
 	return withTimeoutParentTestCase[withTimeoutArgs]{
 		want: context.Background(),
@@ -269,14 +271,14 @@ func expiringContext(t *testing.T) context.Context {
 	return ctx
 }
 
-func withTimeoutTestCases(t *testing.T) []TestCase {
+func withTimeoutTestCases(t *testing.T) []core.TestCase {
 	t.Helper()
 
 	var nilCtx context.Context
 	ctx := context.Background()
 	expiring := expiringContext(t)
 
-	return S[TestCase](
+	return core.S[core.TestCase](
 		// A new context
 		newWithTimeoutTestCase(ctx, "positive duration", time.Millisecond),
 		newWithTimeoutTestCase(ctx, "large duration", time.Hour),
@@ -294,25 +296,25 @@ func withTimeoutTestCases(t *testing.T) []TestCase {
 func testWithTimeoutExpiration(t *testing.T) {
 	t.Helper()
 
-	ctx, cancel := WithTimeout(context.Background(), 10*time.Millisecond)
+	ctx, cancel := core.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	AssertMustClosed(t, ctx.Done(), 100*time.Millisecond, "done")
-	AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
+	core.AssertMustClosed(t, ctx.Done(), 100*time.Millisecond, "done")
+	core.AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
 }
 
 func testWithTimeoutCancellation(t *testing.T) {
 	t.Helper()
 
-	ctx, cancel := WithTimeout(context.Background(), time.Hour)
+	ctx, cancel := core.WithTimeout(context.Background(), time.Hour)
 
-	AssertOpen(t, ctx.Done(), 0, "done before cancel")
+	core.AssertOpen(t, ctx.Done(), 0, "done before cancel")
 	cancel()
-	AssertClosed(t, ctx.Done(), 0, "done after cancel")
+	core.AssertClosed(t, ctx.Done(), 0, "done after cancel")
 }
 
 func TestWithTimeout(t *testing.T) {
-	RunTestCases(t, withTimeoutTestCases(t))
+	core.RunTestCases(t, withTimeoutTestCases(t))
 
 	// Test timeout expiration
 	t.Run("timeout expiration", testWithTimeoutExpiration)
@@ -322,21 +324,21 @@ func TestWithTimeout(t *testing.T) {
 }
 
 func newWithTimeoutCauseTestCase(parent context.Context, name string,
-	timeout time.Duration, cause error) TestCase {
+	timeout time.Duration, cause error) core.TestCase {
 	return withTimeoutNewTestCase[withTimeoutCauseArgs]{
 		call: newWithTimeoutCauseArgs(parent, name, timeout, cause),
 	}
 }
 
 func newWithTimeoutCauseTestCaseClamped(parent context.Context, name string,
-	timeout time.Duration, cause error) TestCase {
+	timeout time.Duration, cause error) core.TestCase {
 	return withTimeoutClampedTestCase[withTimeoutCauseArgs]{
 		call: newWithTimeoutCauseArgs(parent, name, timeout, cause),
 	}
 }
 
 func newWithTimeoutCauseTestCaseParent(parent context.Context, name string,
-	timeout time.Duration, cause error) TestCase {
+	timeout time.Duration, cause error) core.TestCase {
 	return withTimeoutParentTestCase[withTimeoutCauseArgs]{
 		want: parent,
 		call: newWithTimeoutCauseArgs(parent, name, timeout, cause),
@@ -344,7 +346,7 @@ func newWithTimeoutCauseTestCaseParent(parent context.Context, name string,
 }
 
 func newWithTimeoutCauseTestCaseBackground(name string, timeout time.Duration,
-	cause error) TestCase {
+	cause error) core.TestCase {
 	var nilCtx context.Context
 	return withTimeoutParentTestCase[withTimeoutCauseArgs]{
 		want: context.Background(),
@@ -352,7 +354,7 @@ func newWithTimeoutCauseTestCaseBackground(name string, timeout time.Duration,
 	}
 }
 
-func withTimeoutCauseTestCases(t *testing.T) []TestCase {
+func withTimeoutCauseTestCases(t *testing.T) []core.TestCase {
 	t.Helper()
 
 	var nilCtx context.Context
@@ -360,7 +362,7 @@ func withTimeoutCauseTestCases(t *testing.T) []TestCase {
 	expiring := expiringContext(t)
 	cause := errors.New("test cause")
 
-	return S[TestCase](
+	return core.S[core.TestCase](
 		// A new context
 		newWithTimeoutCauseTestCase(ctx, "positive duration", time.Millisecond, cause),
 		newWithTimeoutCauseTestCase(ctx, "large duration", time.Hour, cause),
@@ -380,16 +382,16 @@ func testWithTimeoutCauseExpiration(t *testing.T) {
 	t.Helper()
 
 	testErr := errors.New("custom timeout cause")
-	ctx, cancel := WithTimeoutCause(context.Background(), 10*time.Millisecond, testErr)
+	ctx, cancel := core.WithTimeoutCause(context.Background(), 10*time.Millisecond, testErr)
 	defer cancel()
 
-	AssertMustClosed(t, ctx.Done(), 100*time.Millisecond, "done")
-	AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
-	AssertSame(t, testErr, context.Cause(ctx), "cause")
+	core.AssertMustClosed(t, ctx.Done(), 100*time.Millisecond, "done")
+	core.AssertEqual(t, context.DeadlineExceeded, ctx.Err(), "timeout error")
+	core.AssertSame(t, testErr, context.Cause(ctx), "cause")
 }
 
 func TestWithTimeoutCause(t *testing.T) {
-	RunTestCases(t, withTimeoutCauseTestCases(t))
+	core.RunTestCases(t, withTimeoutCauseTestCases(t))
 
 	// Test timeout expiration with cause
 	t.Run("timeout expiration with cause", testWithTimeoutCauseExpiration)
@@ -398,14 +400,14 @@ func TestWithTimeoutCause(t *testing.T) {
 // Test cases for ContextKey Get function
 type contextKeyGetTestCase struct {
 	ctx           context.Context
-	key           *ContextKey[int]
+	key           *core.ContextKey[int]
 	name          string
 	expectedValue int
 	expectedOK    bool
 }
 
 // newContextKeyGetTestCase creates a new contextKeyGetTestCase
-func newContextKeyGetTestCase(ctx context.Context, name string, key *ContextKey[int],
+func newContextKeyGetTestCase(ctx context.Context, name string, key *core.ContextKey[int],
 	expectedValue int, expectedOk bool) contextKeyGetTestCase {
 	return contextKeyGetTestCase{
 		ctx:           ctx,
@@ -424,21 +426,21 @@ func (tc contextKeyGetTestCase) Test(t *testing.T) {
 	t.Helper()
 
 	value, ok := tc.key.Get(tc.ctx)
-	AssertEqual(t, tc.expectedValue, value, "Get value")
-	AssertEqual(t, tc.expectedOK, ok, "Get ok result")
+	core.AssertEqual(t, tc.expectedValue, value, "Get value")
+	core.AssertEqual(t, tc.expectedOK, ok, "Get ok result")
 }
 
 func contextKeyGetTestCases() []contextKeyGetTestCase {
 	var nilCtx context.Context
-	return S(
+	return core.S(
 		newContextKeyGetTestCase(context.Background(), "nil receiver", nil, 0, false),
-		newContextKeyGetTestCase(nilCtx, "nil context", NewContextKey[int]("test"), 0, false),
+		newContextKeyGetTestCase(nilCtx, "nil context", core.NewContextKey[int]("test"), 0, false),
 		newContextKeyGetTestCase(
-			context.WithValue(context.Background(), NewContextKey[int]("test"), "string_value"),
-			"wrong type", NewContextKey[int]("test"), 0, false),
+			context.WithValue(context.Background(), core.NewContextKey[int]("test"), "string_value"),
+			"wrong type", core.NewContextKey[int]("test"), 0, false),
 	)
 }
 
 func TestContextKeyGet(t *testing.T) {
-	RunTestCases(t, contextKeyGetTestCases())
+	core.RunTestCases(t, contextKeyGetTestCases())
 }
