@@ -1,21 +1,21 @@
-package core
+package core_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 var (
-	_ TestCase = asTestCase[string]{}
-	_ TestCase = asFnTestCase{}
-	_ TestCase = sliceAsTestCase{}
-	_ TestCase = sliceAsFnTestCase{}
-	_ TestCase = asErrorTestCase{}
-	_ TestCase = asErrorsTestCase{}
+	_ core.TestCase = asTestCase[string]{}
+	_ core.TestCase = asFnTestCase{}
+	_ core.TestCase = sliceAsTestCase{}
+	_ core.TestCase = sliceAsFnTestCase{}
+	_ core.TestCase = asErrorTestCase{}
+	_ core.TestCase = asErrorsTestCase{}
 )
-
-const testHello = "hello"
 
 // asTestCase states what As does for one target type V: ok says whether
 // the input already held a V, and the value returned is that V when it
@@ -59,20 +59,20 @@ func (tc asTestCase[V]) Name() string {
 func (tc asTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
-	got, ok := As[any, V](tc.input)
-	AssertEqual(t, tc.wantOK, ok, "ok")
-	AssertEqual(t, tc.want, got, "value")
+	got, ok := core.As[any, V](tc.input)
+	core.AssertEqual(t, tc.wantOK, ok, "ok")
+	core.AssertEqual(t, tc.want, got, "value")
 }
 
 // asTestCases compounds the rows of every target type into one table,
 // grouped by target: string, then int, then error. A zero value of the
 // target and a typed nil pointer come back with true, which is what
 // makes the ok column say something the value alone does not.
-func asTestCases() []TestCase {
+func asTestCases() []core.TestCase {
 	testErr := errors.New("test error")
 	var typedNil *typedNilError
 
-	return []TestCase{
+	return []core.TestCase{
 		newAsTestCase("string to string", testHello, testHello),
 		newAsTestCase("empty string to string", "", ""),
 		newAsTestCaseFails[string]("int to string fails", 42),
@@ -89,7 +89,7 @@ func asTestCases() []TestCase {
 }
 
 func TestAs(t *testing.T) {
-	RunTestCases(t, asTestCases())
+	core.RunTestCases(t, asTestCases())
 }
 
 // asFnTestCase tests AsFn: the function's answer comes back as given,
@@ -119,9 +119,9 @@ func (tc asFnTestCase) Name() string {
 func (tc asFnTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got, ok := AsFn(tc.fn, tc.input)
-	AssertEqual(t, tc.wantOK, ok, "ok")
-	AssertEqual(t, tc.want, got, "value")
+	got, ok := core.AsFn(tc.fn, tc.input)
+	core.AssertEqual(t, tc.wantOK, ok, "ok")
+	core.AssertEqual(t, tc.want, got, "value")
 }
 
 func TestAsFn(t *testing.T) {
@@ -133,14 +133,14 @@ func TestAsFn(t *testing.T) {
 	}
 	ignored := func(any) (string, bool) { return "ignored", false }
 
-	testCases := S(
+	testCases := core.S(
 		newAsFnTestCase("converted", intToString, 42, "42", true),
 		newAsFnTestCase("wrong type", intToString, "not an int", "", false),
 		newAsFnTestCase("function returning false", ignored, 42, "ignored", false),
 		newAsFnTestCase("nil function", nil, 42, "", false),
 	)
 
-	RunTestCases(t, testCases)
+	core.RunTestCases(t, testCases)
 }
 
 // sliceAsTestCase tests SliceAs: the elements of the target type, in
@@ -166,22 +166,22 @@ func (tc sliceAsTestCase) Name() string {
 func (tc sliceAsTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := SliceAs[any, string](tc.input)
-	AssertSliceEqual(t, tc.want, got, "slice")
+	got := core.SliceAs[any, string](tc.input)
+	core.AssertSliceEqual(t, tc.want, got, "slice")
 }
 
 func TestSliceAs(t *testing.T) {
-	testCases := S(
-		newSliceAsTestCase("all strings", S[any]("a", "b", "c"), S("a", "b", "c")),
-		newSliceAsTestCase("mixed types", S[any](testHello, 42, "world", 3.14, "!"),
-			S(testHello, "world", "!")),
-		newSliceAsTestCase("with nil values", S[any](testHello, nil, "world"), S(testHello, "world")),
-		newSliceAsTestCase("no strings", S[any](1, 2, 3, 4.5, true), nil),
-		newSliceAsTestCase("empty slice", S[any](), nil),
+	testCases := core.S(
+		newSliceAsTestCase("all strings", core.S[any]("a", "b", "c"), core.S("a", "b", "c")),
+		newSliceAsTestCase("mixed types", core.S[any](testHello, 42, "world", 3.14, "!"),
+			core.S(testHello, "world", "!")),
+		newSliceAsTestCase("with nil values", core.S[any](testHello, nil, "world"), core.S(testHello, "world")),
+		newSliceAsTestCase("no strings", core.S[any](1, 2, 3, 4.5, true), nil),
+		newSliceAsTestCase("empty slice", core.S[any](), nil),
 		newSliceAsTestCase("nil slice", nil, nil),
 	)
 
-	RunTestCases(t, testCases)
+	core.RunTestCases(t, testCases)
 }
 
 // sliceAsFnTestCase tests SliceAsFn: the elements the function accepts,
@@ -209,8 +209,8 @@ func (tc sliceAsFnTestCase) Name() string {
 func (tc sliceAsFnTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := SliceAsFn(tc.fn, tc.input)
-	AssertSliceEqual(t, tc.want, got, "slice")
+	got := core.SliceAsFn(tc.fn, tc.input)
+	core.AssertSliceEqual(t, tc.want, got, "slice")
 }
 
 func TestSliceAsFn(t *testing.T) {
@@ -221,16 +221,16 @@ func TestSliceAsFn(t *testing.T) {
 		return "", false
 	}
 
-	testCases := S(
-		newSliceAsFnTestCase("converted", prefixString, S[any]("a", 1, "b", 2, "c"),
-			S("prefix:a", "prefix:b", "prefix:c")),
-		newSliceAsFnTestCase("all filtered out", prefixString, S[any](1, 2, 3), nil),
-		newSliceAsFnTestCase("empty slice", prefixString, S[any](), nil),
+	testCases := core.S(
+		newSliceAsFnTestCase("converted", prefixString, core.S[any]("a", 1, "b", 2, "c"),
+			core.S("prefix:a", "prefix:b", "prefix:c")),
+		newSliceAsFnTestCase("all filtered out", prefixString, core.S[any](1, 2, 3), nil),
+		newSliceAsFnTestCase("empty slice", prefixString, core.S[any](), nil),
 		newSliceAsFnTestCase("nil slice", prefixString, nil, nil),
-		newSliceAsFnTestCase("nil function", nil, S[any]("a", "b", "c"), nil),
+		newSliceAsFnTestCase("nil function", nil, core.S[any]("a", "b", "c"), nil),
 	)
 
-	RunTestCases(t, testCases)
+	core.RunTestCases(t, testCases)
 }
 
 func TestSliceAsFnPanic(t *testing.T) {
@@ -238,8 +238,8 @@ func TestSliceAsFnPanic(t *testing.T) {
 		panic("test panic")
 	}
 
-	AssertPanic(t, func() {
-		_ = SliceAsFn(panicFn, S[any]("will panic"))
+	core.AssertPanic(t, func() {
+		_ = core.SliceAsFn(panicFn, core.S[any]("will panic"))
 	}, "test panic", "panic")
 }
 
@@ -290,8 +290,8 @@ func (tc asErrorTestCase) Name() string {
 func (tc asErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := AsError(tc.input)
-	AssertEqual(t, tc.want, got, "error")
+	got := core.AsError(tc.input)
+	core.AssertEqual(t, tc.want, got, "error")
 }
 
 func asErrorTestCases() []asErrorTestCase {
@@ -300,7 +300,7 @@ func asErrorTestCases() []asErrorTestCase {
 	notOK := errorWithOK{msg: "not ok error", ok: false}
 	var typedNil *typedNilError
 
-	return S(
+	return core.S(
 		newAsErrorTestCase("error", standard, standard),
 		newAsErrorTestCase("AsError returning error", errorWithAsError{err: custom}, custom),
 		newAsErrorTestCase("AsError returning nil", errorWithAsError{}, nil),
@@ -314,7 +314,7 @@ func asErrorTestCases() []asErrorTestCase {
 }
 
 func TestAsError(t *testing.T) {
-	RunTestCases(t, asErrorTestCases())
+	core.RunTestCases(t, asErrorTestCases())
 }
 
 // asErrorsTestCase tests AsErrors: the errors the elements stand for,
@@ -340,8 +340,8 @@ func (tc asErrorsTestCase) Name() string {
 func (tc asErrorsTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := AsErrors(tc.input)
-	AssertSliceEqual(t, tc.want, got, "errors")
+	got := core.AsErrors(tc.input)
+	core.AssertSliceEqual(t, tc.want, got, "errors")
 }
 
 func asErrorsTestCases() []asErrorsTestCase {
@@ -351,25 +351,25 @@ func asErrorsTestCases() []asErrorsTestCase {
 	fail2 := errorWithOK{msg: "fail2", ok: false}
 	pass := errorWithOK{msg: "pass", ok: true}
 
-	return S(
-		newAsErrorsTestCase("all errors", S[any](errA, errB, errC), S(errA, errB, errC)),
-		newAsErrorsTestCase("mixed values", S[any](
+	return core.S(
+		newAsErrorsTestCase("all errors", core.S[any](errA, errB, errC), core.S(errA, errB, errC)),
+		newAsErrorsTestCase("mixed values", core.S[any](
 			err1,
 			"not an error",
 			err2,
 			42,
 			errorWithAsError{err: err3},
 			nil,
-		), S(err1, err2, err3)),
-		newAsErrorsTestCase("OK interface", S[any](fail, pass, fail2), S[error](fail, fail2)),
-		newAsErrorsTestCase("no errors", S[any]("a", 1, true, nil), nil),
-		newAsErrorsTestCase("empty slice", S[any](), nil),
+		), core.S(err1, err2, err3)),
+		newAsErrorsTestCase("OK interface", core.S[any](fail, pass, fail2), core.S[error](fail, fail2)),
+		newAsErrorsTestCase("no errors", core.S[any]("a", 1, true, nil), nil),
+		newAsErrorsTestCase("empty slice", core.S[any](), nil),
 		newAsErrorsTestCase("nil slice", nil, nil),
 	)
 }
 
 func TestAsErrors(t *testing.T) {
-	RunTestCases(t, asErrorsTestCases())
+	core.RunTestCases(t, asErrorsTestCases())
 }
 
 // TestAsWithConcreteTypes states As over source types the typed tables,
@@ -378,21 +378,21 @@ func TestAsErrors(t *testing.T) {
 func TestAsWithConcreteTypes(t *testing.T) {
 	i := 42
 
-	v, ok := As[int, int64](i)
-	AssertFalse(t, ok, "int to int64 ok")
-	AssertEqual(t, 0, v, "int to int64 value")
+	v, ok := core.As[int, int64](i)
+	core.AssertFalse(t, ok, "int to int64 ok")
+	core.AssertEqual(t, 0, v, "int to int64 value")
 
 	pi := &i
-	p, ok := As[*int, *int](pi)
-	AssertTrue(t, ok, "*int to *int ok")
-	AssertSame(t, pi, p, "*int to *int value")
+	p, ok := core.As[*int, *int](pi)
+	core.AssertTrue(t, ok, "*int to *int ok")
+	core.AssertSame(t, pi, p, "*int to *int value")
 }
 
 // Benchmark tests
 func BenchmarkAs(b *testing.B) {
 	input := "test string"
 	for b.Loop() {
-		_, _ = As[any, string](input)
+		_, _ = core.As[any, string](input)
 	}
 }
 
@@ -404,15 +404,15 @@ func BenchmarkAsFn(b *testing.B) {
 	var input any = "test string"
 
 	for b.Loop() {
-		_, _ = AsFn(fn, input)
+		_, _ = core.AsFn(fn, input)
 	}
 }
 
 func BenchmarkSliceAs(b *testing.B) {
-	input := S[any]("a", 1, "b", 2, "c", 3, "d", 4, "e", 5)
+	input := core.S[any]("a", 1, "b", 2, "c", 3, "d", 4, "e", 5)
 
 	for b.Loop() {
-		_ = SliceAs[any, string](input)
+		_ = core.SliceAs[any, string](input)
 	}
 }
 
@@ -420,7 +420,7 @@ func BenchmarkAsError(b *testing.B) {
 	err := errors.New("test error")
 
 	for b.Loop() {
-		_ = AsError(err)
+		_ = core.AsError(err)
 	}
 }
 
