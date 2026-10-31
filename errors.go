@@ -442,8 +442,10 @@ func CheckIsTemporary(err error) (is, known bool) {
 //   - Detecting modern IsTemporary() bool implementations
 //   - Detecting timeout errors (which are also considered temporary)
 //
-// Returns true if any error in the chain indicates a temporary condition.
-// Returns false for nil errors or chains with no temporary indicators.
+// Returns the answer of the first error in the chain that gives one, so
+// an error that reports itself not temporary stops the walk before the
+// errors it wraps. Returns false for nil errors or chains with no
+// temporary indicators.
 //
 // Use this function when you need to determine if an operation should be
 // retried based on the error's temporary nature.
@@ -496,8 +498,10 @@ func CheckIsTimeout(err error) (is, known bool) {
 //   - Detecting legacy net.Error.Timeout() implementations
 //   - Detecting modern IsTimeout() bool implementations
 //
-// Returns true if any error in the chain indicates a timeout condition.
-// Returns false for nil errors or chains with no timeout indicators.
+// Returns the answer of the first error in the chain that gives one, so
+// an error that reports itself not a timeout stops the walk before the
+// errors it wraps. Returns false for nil errors or chains with no
+// timeout indicators.
 //
 // Use this function when you need to distinguish timeout errors from
 // other types of temporary errors for specialized retry logic or
