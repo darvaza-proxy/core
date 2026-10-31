@@ -3,6 +3,7 @@ package core_test
 // cspell:words Errno ENOENT
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -23,6 +24,8 @@ var (
 	_ core.TestCase = checkErrorIsInTestCase{}
 	_ core.TestCase = checkErrorIsIn2TestCase{}
 	_ core.TestCase = temporaryErrorTestCase{}
+	_ core.TestCase = permanentErrorTestCase{}
+	_ core.TestCase = permanentErrorNilCauseTestCase{}
 	_ core.TestCase = checkIsTemporaryTestCase{}
 	_ core.TestCase = isTemporaryTestCase{}
 	_ core.TestCase = checkIsTimeoutTestCase{}
@@ -552,6 +555,167 @@ func TestTemporaryErrorNilReceiver(t *testing.T) {
 	core.AssertEqual(t, "", tempErr.Error(), "nil TemporaryError should return empty string")
 	core.AssertFalse(t, tempErr.IsTimeout(), "nil TemporaryError IsTimeout")
 	core.AssertFalse(t, tempErr.Timeout(), "nil TemporaryError Timeout")
+}
+
+// permanentErrorTestCase wraps a cause with NewPermanentError, and checks
+// the wrapper answers neither temporary nor a timeout, alone and further
+// down a chain, while it still unwraps to the cause.
+type permanentErrorTestCase struct {
+	cause error
+	name  string
+}
+
+// newPermanentOverTemporaryCase wraps a cause that reports itself
+// temporary but not a timeout.
+func newPermanentOverTemporaryCase(name string, cause error) permanentErrorTestCase {
+	if !core.IsTemporary(cause) || core.IsTimeout(cause) {
+		panic("permanentErrorTestCase: every temporary row must wrap a temporary error that is not a timeout")
+	}
+
+	return permanentErrorTestCase{
+		cause: cause,
+		name:  name,
+	}
+}
+
+// newPermanentOverTimeoutCase wraps a cause that reports itself a
+// timeout.
+func newPermanentOverTimeoutCase(name string, cause error) permanentErrorTestCase {
+	if !core.IsTimeout(cause) {
+		panic("permanentErrorTestCase: every timeout row must wrap a timeout")
+	}
+
+	return permanentErrorTestCase{
+		cause: cause,
+		name:  name,
+	}
+}
+
+// newPermanentOverPlainCase wraps a cause that reports itself neither
+// temporary nor a timeout.
+func newPermanentOverPlainCase(name string, cause error) permanentErrorTestCase {
+	if cause == nil || core.IsTemporary(cause) || core.IsTimeout(cause) {
+		panic("permanentErrorTestCase: every plain row must wrap an error that is neither temporary nor a timeout")
+	}
+
+	return permanentErrorTestCase{
+		cause: cause,
+		name:  name,
+	}
+}
+
+func (tc permanentErrorTestCase) Name() string {
+	return tc.name
+}
+
+func (tc permanentErrorTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	err := core.NewPermanentError(tc.cause)
+	pe := core.AssertMustTypeIs[*core.PermanentError](t, err, "type")
+	core.AssertEqual(t, tc.cause.Error(), pe.Error(), "message")
+	core.AssertEqual(t, tc.cause, pe.Unwrap(), "Unwrap")
+	core.AssertErrorIs(t, err, tc.cause, "errors.Is")
+
+	// errors.As finds in the wrapper what it finds in the cause
+	var wantAs, gotAs *core.TemporaryError
+	wantOK := errors.As(tc.cause, &wantAs)
+	gotOK := errors.As(err, &gotAs)
+	core.AssertEqual(t, wantOK, gotOK, "errors.As found")
+	core.AssertSame(t, wantAs, gotAs, "errors.As target")
+
+	assertPermanentAnswers(t, pe)
+
+	// further down a chain, the walk still stops at the wrapper
+	chained := fmt.Errorf("chained: %w", err)
+	core.AssertFalse(t, core.IsTemporary(chained), "chained IsTemporary")
+	core.AssertFalse(t, core.IsTimeout(chained), "chained IsTimeout")
+}
+
+func permanentErrorTestCases() []permanentErrorTestCase {
+	timeoutErr := core.NewTimeoutError(errors.New("i/o timeout"))
+
+	return core.S(
+		newPermanentOverTemporaryCase("temporary error",
+			core.NewTemporaryError(errors.New("too many open files"))),
+		newPermanentOverTimeoutCase("timeout error", timeoutErr),
+		newPermanentOverTimeoutCase("wrapped timeout error",
+			fmt.Errorf("read: %w", timeoutErr)),
+		newPermanentOverTimeoutCase("context deadline", context.DeadlineExceeded),
+		newPermanentOverPlainCase("plain error", errors.New("closed")),
+		newPermanentOverPlainCase("typed nil error", (*typedNilError)(nil)),
+	)
+}
+
+func TestNewPermanentError(t *testing.T) {
+	core.RunTestCases(t, permanentErrorTestCases())
+}
+
+// TestNewPermanentErrorNil checks NewPermanentError returns a nil error,
+// not a typed nil, for a nil err.
+func TestNewPermanentErrorNil(t *testing.T) {
+	core.AssertNoError(t, core.NewPermanentError(nil), "NewPermanentError(nil)")
+}
+
+// permanentErrorNilCauseTestCase checks a PermanentError with no cause,
+// a nil receiver or the zero value: it has no text, unwraps to nil, and
+// answers as any PermanentError does.
+type permanentErrorNilCauseTestCase struct {
+	pe   *core.PermanentError
+	name string
+}
+
+// newPermanentNilCauseCase takes a PermanentError that has no cause.
+func newPermanentNilCauseCase(name string, pe *core.PermanentError) permanentErrorNilCauseTestCase {
+	if pe != nil && pe.Unwrap() != nil {
+		panic("permanentErrorNilCauseTestCase: every row must have no cause")
+	}
+
+	return permanentErrorNilCauseTestCase{
+		pe:   pe,
+		name: name,
+	}
+}
+
+func (tc permanentErrorNilCauseTestCase) Name() string {
+	return tc.name
+}
+
+func (tc permanentErrorNilCauseTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	core.AssertEqual(t, "", tc.pe.Error(), "message")
+	core.AssertNil(t, tc.pe.Unwrap(), "Unwrap")
+	assertPermanentAnswers(t, tc.pe)
+}
+
+func TestPermanentErrorNilCause(t *testing.T) {
+	core.RunTestCases(t, core.S(
+		newPermanentNilCauseCase("nil receiver", nil),
+		newPermanentNilCauseCase("zero value", &core.PermanentError{}),
+	))
+}
+
+// assertPermanentAnswers fails unless pe answers neither temporary nor a
+// timeout through any of its methods, and core's checks take that as a
+// known answer, alone and walking its chain.
+func assertPermanentAnswers(t *testing.T, pe *core.PermanentError) {
+	t.Helper()
+
+	core.AssertFalse(t, pe.Temporary(), "Temporary")
+	core.AssertFalse(t, pe.IsTemporary(), "IsTemporary method")
+	core.AssertFalse(t, pe.Timeout(), "Timeout")
+	core.AssertFalse(t, pe.IsTimeout(), "IsTimeout method")
+
+	is, known := core.CheckIsTemporary(pe)
+	core.AssertFalse(t, is, "CheckIsTemporary is")
+	core.AssertTrue(t, known, "CheckIsTemporary known")
+	is, known = core.CheckIsTimeout(pe)
+	core.AssertFalse(t, is, "CheckIsTimeout is")
+	core.AssertTrue(t, known, "CheckIsTimeout known")
+
+	core.AssertFalse(t, core.IsTemporary(pe), "IsTemporary")
+	core.AssertFalse(t, core.IsTimeout(pe), "IsTimeout")
 }
 
 // Test case for CheckIsTemporary function

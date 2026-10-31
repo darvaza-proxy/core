@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"slices"
 )
 
@@ -37,6 +38,8 @@ var (
 
 var (
 	_ Unwrappable = (*WrappedError)(nil)
+	_ Unwrappable = (*PermanentError)(nil)
+	_ net.Error   = (*PermanentError)(nil)
 )
 
 // Unwrappable represents an error that can be Unwrap() to get the cause
@@ -173,6 +176,53 @@ func NewTemporaryError(err error) error {
 	return &TemporaryError{
 		cause: err,
 	}
+}
+
+// PermanentError is an error wrapper that reports neither a temporary
+// error nor a timeout, whatever the error it wraps reports. Its
+// Temporary, IsTemporary, Timeout and IsTimeout methods answer false,
+// so [CheckIsTemporary] and [CheckIsTimeout] give a known false for it,
+// and [IsTemporary] and [IsTimeout] stop their walk there. errors.Is
+// and errors.As still reach the wrapped error through Unwrap.
+type PermanentError struct {
+	cause error
+}
+
+// Error returns the wrapped error's text.
+func (w *PermanentError) Error() string {
+	if w == nil || w.cause == nil {
+		return ""
+	}
+	return w.cause.Error()
+}
+
+// Unwrap returns the wrapped error.
+func (w *PermanentError) Unwrap() error {
+	if w == nil {
+		return nil
+	}
+	return w.cause
+}
+
+// IsTemporary reports false, whatever the wrapped error reports.
+func (*PermanentError) IsTemporary() bool { return false }
+
+// IsTimeout reports false, whatever the wrapped error reports.
+func (*PermanentError) IsTimeout() bool { return false }
+
+// Temporary reports false, whatever the wrapped error reports.
+func (*PermanentError) Temporary() bool { return false }
+
+// Timeout reports false, whatever the wrapped error reports.
+func (*PermanentError) Timeout() bool { return false }
+
+// NewPermanentError wraps err as a PermanentError, and returns nil for
+// a nil err.
+func NewPermanentError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &PermanentError{cause: err}
 }
 
 // CoalesceError returns the first non-nil error argument.

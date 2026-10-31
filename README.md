@@ -452,6 +452,13 @@ Special error types for network-style temporary and timeout conditions:
 * `NewTemporaryError(err)` - wrap error as temporary condition.
 * `NewTimeoutError(err)` - wrap error as timeout condition with both temporary
   and timeout properties.
+* `PermanentError` type - reports neither a temporary error nor a timeout,
+  whatever the error it wraps reports: its `Temporary()`, `IsTemporary()`,
+  `Timeout()` and `IsTimeout()` methods answer false, so `IsTemporary` and
+  `IsTimeout` stop at it, while `errors.Is` and `errors.As` reach the
+  wrapped error through `Unwrap()`.
+* `NewPermanentError(err)` - wrap error as neither temporary nor a timeout,
+  returning nil for a nil error.
 * `IsTemporary(err)` - walk the error chain for a temporary condition via
   `CheckIsTemporary`, stopping at the first error that gives an answer.
 * `CheckIsTemporary(err)` - test single error for temporary condition via
