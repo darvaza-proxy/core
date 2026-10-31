@@ -9,7 +9,8 @@ compliant test code that meets our strict linting requirements.
 
 ## Core Testing Principles
 
-1. **Consistency**: All projects follow the same testing patterns.
+1. **Consistency**: All projects are expected to follow the same testing
+   patterns.
 2. **Simplicity**: Tests should be easy to read and understand.
 3. **Compliance**: Tests must meet linting requirements (cognitive
    complexity ≤7, cyclomatic complexity ≤10).
@@ -284,24 +285,22 @@ When implementing custom assertions in your projects, follow this pattern:
 
 ```go
 // Base assertion - independent implementation
-func AssertCustomCondition(t core.T, value SomeType, name string,
-    args ...any) bool {
+func AssertCustomCondition(t core.T, value SomeType, name string, args ...any) bool {
     t.Helper()
+    prefix := fmt.Sprintf(name, args...)
     ok := customLogic(value)
     if !ok {
-        doError(t, name, args, "expected custom condition, got %v",
-            value)
+        t.Errorf("%s: expected custom condition, got %v", prefix, value)
     } else {
-        doLog(t, name, args, "custom: %v", value)
+        t.Logf("%s: custom: %v", prefix, value)
     }
     return ok
 }
 
 // Derived assertion - calls base function for consistency
-func AssertCustomTrue(t core.T, condition bool, name string,
-    args ...any) bool {
+func AssertCustomParsed(t core.T, s, name string, args ...any) bool {
     t.Helper()
-    return AssertCustomCondition(t, condition, name, args...)
+    return AssertCustomCondition(t, parseSomeType(s), name, args...)
 }
 ```
 
@@ -328,7 +327,7 @@ core.AssertEqual(t, "expected", actual, "value")
 // logs: "value: expected"
 core.AssertTrue(t, found, "key %q found", k)
 // logs: "key \"myKey\" found: true"
-core.AssertTrue(t, SliceContains(got, k), "key %q present", k)
+core.AssertTrue(t, core.SliceContains(got, k), "key %q present", k)
 // logs: "key \"myKey\" present: true"
 ```
 
@@ -413,7 +412,7 @@ naked struct literals:
 
 ```go
 func TestParseURL(t *testing.T) {
-    testCases := []parseURLTestCase{
+    testCases := []core.TestCase{
         newParseURLTestCase("valid URL", "https://example.com",
             &url.URL{Scheme: "https", Host: "example.com"}, false),
         newParseURLTestCase("invalid URL", "invalid-url", nil, true),
@@ -444,19 +443,18 @@ func TestParseURL(t *testing.T) {
 
 ### Step 6: Test Case List Factories (MANDATORY)
 
-**Use factory functions for complex TestCase generation:**
+**Use factory functions for complex TestCase generation**: computed values,
+conditional logic, parameterisation or reuse. A fixed list can be a
+factory, a variable or inline in the test, whichever reads more clearly:
 
 ```go
-// ✅ CORRECT - Use factory function for complex lists
-func httpClientTestCases() []httpClientTestCase {
-    return []httpClientTestCase{
+// ✅ CORRECT - A list factory
+func httpClientTestCases() []core.TestCase {
+    return []core.TestCase{
         newHTTPClientTestCase("GET request", "GET", "/api/users", 200, nil),
-        newHTTPClientTestCase("POST request", "POST", "/api/users", 201,
-            userPayload),
-        newHTTPClientTestCase("PUT request", "PUT", "/api/users/1", 200,
-            updatePayload),
-        newHTTPClientTestCase("DELETE request", "DELETE", "/api/users/1", 204,
-            nil),
+        newHTTPClientTestCase("POST request", "POST", "/api/users", 201, userPayload),
+        newHTTPClientTestCase("PUT request", "PUT", "/api/users/1", 200, updatePayload),
+        newHTTPClientTestCase("DELETE request", "DELETE", "/api/users/1", 204, nil),
         newHTTPClientTestCase("invalid endpoint", "GET", "/invalid", 404, nil),
         newHTTPClientTestCase("unauthorized", "GET", "/api/admin", 401, nil),
     }
@@ -465,13 +463,16 @@ func httpClientTestCases() []httpClientTestCase {
 func TestHTTPClient(t *testing.T) {
     core.RunTestCases(t, httpClientTestCases())
 }
+```
 
-// ❌ FORBIDDEN - Variable declaration for complex lists
-var httpClientTestCases = []httpClientTestCase{
+Or the same fixed list as a variable:
+
+```go
+// ✅ CORRECT - A fixed list as a variable
+var httpClientTestCases = []core.TestCase{
     newHTTPClientTestCase("GET request", "GET", "/api/users", 200, nil),
-    newHTTPClientTestCase("POST request", "POST", "/api/users", 201,
-        userPayload),
-    // ... many more cases (this becomes unwieldy)
+    newHTTPClientTestCase("POST request", "POST", "/api/users", 201, userPayload),
+    // ... more cases
 }
 ```
 
@@ -553,7 +554,7 @@ of length):
 
 ```go
 func TestParseURL(t *testing.T) {
-    testCases := []parseURLTestCase{
+    testCases := []core.TestCase{
         newParseURLTestCase("valid URL", "https://example.com", expectedURL,
             false),
         newParseURLTestCase("invalid URL", "invalid-url", nil, true),
@@ -573,8 +574,8 @@ func TestParseURL(t *testing.T) {
 logic, parameterisation, or reuse):**
 
 ```go
-func httpClientTestCases() []httpClientTestCase {
-    return []httpClientTestCase{
+func httpClientTestCases() []core.TestCase {
+    return []core.TestCase{
         newHTTPClientTestCase("GET request", "GET", "/api/users", 200, nil),
         newHTTPClientTestCase("POST request", "POST", "/api/users", 201,
             userPayload),
@@ -601,8 +602,8 @@ Use factory functions with parameters when you need variations of the same
 test suite:
 
 ```go
-func validationTestCases(fieldName string, required bool) []validationTestCase {
-    cases := []validationTestCase{
+func validationTestCases(fieldName string, required bool) []core.TestCase {
+    cases := []core.TestCase{
         newValidationTestCase("valid "+fieldName, "valid-value", false),
         newValidationTestCase("empty "+fieldName, "", required),
     }
@@ -637,12 +638,12 @@ func TestUserValidation(t *testing.T) {
 For TestCase requiring computation or setup:
 
 ```go
-func dateParsingTestCases() []dateParseTestCase {
+func dateParsingTestCases() []core.TestCase {
     now := time.Now()
     yesterday := now.AddDate(0, 0, -1)
     nextWeek := now.AddDate(0, 0, 7)
 
-    return []dateParseTestCase{
+    return []core.TestCase{
         newDateParseTestCase("ISO format", now.Format(time.RFC3339), now,
             false),
         newDateParseTestCase("yesterday", yesterday.Format("2006-01-02"),
@@ -708,7 +709,7 @@ func newParseAddrTestCaseStr(name, input, wantAddr string,
 }
 
 // Usage shows the benefits
-var parseAddrTestCases = []parseAddrTestCase{
+var parseAddrTestCases = []core.TestCase{
     // Simple string-based test cases
     newParseAddrTestCaseStr("IPv4 address", "192.168.1.1", "192.168.1.1",
         false),
@@ -770,10 +771,10 @@ func newErrGroupGoTestCaseCancel(name string,
 }
 
 // Usage - intent is crystal clear
-var errGroupGoTestCases = []errGroupGoTestCase{
+var errGroupGoTestCases = []core.TestCase{
     newErrGroupGoTestCaseSuccess("successful worker", successFunc, nil),
     newErrGroupGoTestCaseError("worker with error", errorFunc, nil),
-    newErrGroupGoTestCaseCancel("worker canceled", cancelFunc, nil),
+    newErrGroupGoTestCaseCancel("worker cancelled", cancelFunc, nil),
 }
 ```
 
@@ -843,20 +844,20 @@ func newWaitGroupGoTestCase(name string, fn func() error, expectError bool,
     }
 }
 
-// Without factory, callers would be forced to use memory order:
-// ❌ FORBIDDEN - Forces callers to know memory layout
-var badTestCases = []waitGroupGoTestCase{
-    {
-        fn:          func() error { return nil },  // Memory order required
-        errorMsg:    "",                           // Not logical order
-        name:        "test name",                  // Confusing for readers
-        expectError: false,                        // Hard to understand
+// Without factory, the rows spell out the struct's fields by name:
+// ❌ FORBIDDEN - Couples rows to field names, and an omitted field is silently zero
+var badTestCases = []core.TestCase{
+    waitGroupGoTestCase{
+        fn:          func() error { return nil },
+        errorMsg:    "",
+        name:        "test name",
+        expectError: false,
     },
 }
 
 // With factory, callers use logical order:
 // ✅ CORRECT - Logical, readable parameter order
-var goodTestCases = []waitGroupGoTestCase{
+var goodTestCases = []core.TestCase{
     newWaitGroupGoTestCase("test name", func() error { return nil }, false, ""),
 }
 ```
@@ -1066,7 +1067,6 @@ Use build tags for different test categories:
 
 ```go
 //go:build integration
-// +build integration
 
 func TestDatabaseIntegration(t *testing.T) {
     // Integration test code
@@ -1167,8 +1167,8 @@ tests := []struct {
 }{ /* ... */ }
 
 // DON'T: Naked struct literals (use factory functions)
-testCases := []myTestCase{
-    {name: "test", input: "value", expected: "result"},
+testCases := []core.TestCase{
+    myTestCase{name: "test", input: "value", expected: "result"},
 }
 
 // DON'T: Manual loops
@@ -1181,17 +1181,6 @@ for _, tc := range testCases {
 
 // DON'T: Missing factory functions for TestCase
 // (no newTestCaseTypeName() functions)
-
-// DON'T: Complex TestCase lists without factory functions
-var complexTestCases = []myTestCase{
-    newMyTestCase("test1", param1, param2, param3),
-    newMyTestCase("test2", param1, param2, param3),
-    newMyTestCase("test3", param1, param2, param3),
-    newMyTestCase("test4", param1, param2, param3),
-    newMyTestCase("test5", param1, param2, param3),
-    newMyTestCase("test6", param1, param2, param3),
-    // ... many more cases
-}
 ```
 
 ### ✅ Always Use These Patterns
@@ -1224,7 +1213,7 @@ func newMyTestCase(name string, expected result) myTestCase {
 }
 
 // DO: Use factory functions for TestCase creation
-testCases := []myTestCase{
+testCases := []core.TestCase{
     newMyTestCase("test", expectedResult),
 }
 
@@ -1242,25 +1231,9 @@ func (tc myTestCase) Test(t *testing.T) {
 // DO: Use core assertion functions
 core.AssertNoError(t, err, "operation")
 
-// DO: Use TestCase list factories for complex table-driven tests
-func myComplexTestCases() []myTestCase {
-    return []myTestCase{
-        newMyTestCase("test1", expectedResult1),
-        newMyTestCase("test2", expectedResult2),
-        newMyTestCase("test3", expectedResult3),
-        newMyTestCase("test4", expectedResult4),
-        newMyTestCase("test5", expectedResult5),
-        newMyTestCase("test6", expectedResult6),
-    }
-}
-
-func TestMyFunction(t *testing.T) {
-    core.RunTestCases(t, myComplexTestCases())
-}
-
 // DO: Use parameterised TestCase list factories when needed
-func validationTestCases(fieldName string) []validationTestCase {
-    return []validationTestCase{
+func validationTestCases(fieldName string) []core.TestCase {
+    return []core.TestCase{
         newValidationTestCase("valid "+fieldName, "valid-value", false),
         newValidationTestCase("empty "+fieldName, "", true),
     }
@@ -1287,8 +1260,7 @@ requirements:
 
 ## Summary
 
-By following these **MANDATORY** guidelines, all darvaza.org projects will
-have:
+By following these guidelines, all darvaza.org projects will have:
 
 - **Consistent testing patterns** across the entire ecosystem.
 - **Lint-compliant code** that meets complexity requirements.
@@ -1300,6 +1272,7 @@ The key is to treat test code with the same care as production code, using
 the excellent utilities provided by `darvaza.org/core` to maintain
 consistency and quality across all projects.
 
-**Remember**: These are not suggestions - they are **MANDATORY**
-requirements. Use TestCase **ONLY** for table-driven tests with multiple
-data cases. Use standard t.Run() patterns for different test scenarios.
+**Remember**: readability is the end every rule here serves, and where a
+rule and that end pull apart, the end wins. TestCase is for table-driven
+tests with multiple data cases; standard t.Run() patterns are for different
+test scenarios.

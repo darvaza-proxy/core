@@ -68,15 +68,26 @@ func TestAssertEqual(t *testing.T) {
     AssertTrue(t, result, "result")
 }
 
-// Where the subject is what the readers are built on, use plain checks
-func TestAssertTrue(t *testing.T) {
+// The same for a utility: AssertTrue and AssertFalse do not reach IsNil
+func TestIsNil(t *testing.T) {
+    var p *int
+    AssertTrue(t, IsNil(p), "typed nil")
+    AssertFalse(t, IsNil(42), "non-nil")
+}
+
+// Where the subject is the trusted ground, use plain checks
+func TestAssertComparable(t *testing.T) {
     mock := &MockT{}
-    result := AssertTrue(mock, true, "test")
+    result := assertComparable(mock, 42, 42, "test")
     if !result {
-        t.Error("AssertTrue should return true")
+        t.Error("assertComparable should return true")
     }
 }
 ```
+
+The tests of the trusted ground make their plain checks through `plainEqual`
+and `plainContains`, defined in `testing_test.go`: they compare and report
+without an assertion.
 
 **❌ Circular Testing Anti-Patterns:**
 
@@ -92,6 +103,12 @@ func TestAssertTrue(t *testing.T) {
     mock := &MockT{}
     result := AssertTrue(mock, true, "test")
     AssertTrue(t, result, "result") // CIRCULAR!
+}
+
+// DON'T: Test IsNil using AssertNil (AssertNil calls IsNil internally)
+func TestIsNil(t *testing.T) {
+    var p *int
+    AssertNil(t, p, "typed nil") // CIRCULAR!
 }
 ```
 
@@ -299,25 +316,25 @@ Core provides sophisticated error handling that needs thorough testing:
 
 ```go
 func TestPanicError(t *testing.T) {
- // Test panic recovery
- panicErr := NewPanicError(42, "test panic")
+ // Build a PanicError from a payload
+ panicErr := NewPanicError(0, 42)
 
  // Test interfaces
- AssertEqual(t, "test panic", panicErr.Error(), "error message")
+ AssertEqual(t, "panic: 42", panicErr.Error(), "error message")
  AssertEqual(t, 42, panicErr.Recovered(), "recovered value")
 
  // Test stack trace
- frames := panicErr.Frames()
- AssertTrue(t, len(frames) > 0, "frames")
+ stack := panicErr.CallStack()
+ AssertTrue(t, len(stack) > 0, "stack")
 
  // Test unwrapping
  cause := errors.New("root cause")
- wrappedErr := NewPanicError(cause, "wrapped panic")
+ wrappedErr := NewPanicError(0, cause)
  AssertErrorIs(t, wrappedErr, cause, "cause")
 }
 ```
 
-### Synchronization Primitive Testing
+### Synchronisation Primitive Testing
 
 Core provides advanced sync primitives:
 
@@ -409,7 +426,7 @@ func TestRunBenchmark(t *testing.T) {
 
 ## Testing Zero Dependencies
 
-Core has zero external dependencies, so all tests must use only:
+Core's tests bring in no testing or mocking frameworks. They use:
 
 - Go standard library
 - Core's own utilities (for self-testing)
@@ -424,79 +441,12 @@ import (
  "time"
 )
 
-// ❌ FORBIDDEN - no external dependencies
+// ❌ FORBIDDEN - testing and mocking frameworks
 import (
  "github.com/stretchr/testify/assert" // cspell:disable-line
  "github.com/golang/mock/gomock" // cspell:disable-line
 )
 ```
-
-### Exception: testing_test.go
-
-The `testing_test.go` file is a special case where we test the testing
-utilities themselves. In this file, we use the standard `testing` package
-directly rather than our own Assert functions to avoid circular dependencies:
-
-```go
-// testing_test.go - uses standard testing package
-func TestAssertEqual(t *testing.T) {
- mock := &MockT{}
-
- // Use standard testing methods to test our Assert functions
- result := AssertEqual(mock, 42, 42, "test")
- if !result {
-  t.Error("AssertEqual should return true for equal values")
- }
-
- if !mock.HasLogs() {
-  t.Error("AssertEqual should log success")
- }
-}
-```
-
-This is the **only** exception to using our Assert functions - when testing
-the Assert functions themselves.
-
-**Additional Exception**: Avoid using Assert helpers that internally use the
-functions being tested (circular dependencies):
-
-```go
-// ❌ DON'T: Test IsNil using AssertNil (AssertNil calls IsNil internally)
-func TestIsNil(t *testing.T) {
-    AssertNil(t, IsNil(nil), "IsNil with nil") // Circular dependency!
-}
-
-// ❌ DON'T: Test SliceContains using AssertTrue with SliceContains
-func TestSliceContains(t *testing.T) {
-    slice := S(1, 2, 3)
-    AssertTrue(t, SliceContains(slice, 2), "contains 2")
-    // Uses the function being tested!
-}
-
-// ✅ DO: Use standard testing methods when testing core utilities
-func TestIsNil(t *testing.T) {
-    if !IsNil(nil) {
-        t.Error("IsNil should return true for nil")
-    }
-    if IsNil(42) {
-        t.Error("IsNil should return false for non-nil")
-    }
-}
-
-func TestSliceContains(t *testing.T) {
-    slice := S(1, 2, 3)
-    if !SliceContains(slice, 2) {
-        t.Error("SliceContains should find existing element")
-    }
-    if SliceContains(slice, 4) {
-        t.Error("SliceContains should not find missing element")
-    }
-}
-```
-
-**Rule**: When testing a function, don't use Assert helpers that call that same
-function internally. This ensures the test is actually validating the function
-rather than creating circular logic.
 
 ## Performance Testing
 
@@ -596,19 +546,19 @@ func TestAssertEqualNilHandling(t *testing.T) {
  mock := &MockT{}
 
  // Test nil vs nil
- result := AssertEqual(mock, nil, nil, "both nil")
+ result := AssertEqual[any](mock, nil, nil, "both nil")
  AssertTrue(t, result, "result")
 
  // Test nil vs non-nil
  mock.Reset()
- result = AssertEqual(mock, nil, 42, "nil vs non-nil")
+ result = AssertEqual[any](mock, nil, 42, "nil vs non-nil")
  AssertFalse(t, result, "result")
 
  // Test different nil types
  mock.Reset()
  var nilSlice []int
  var nilMap map[string]int
- result = AssertEqual(mock, nilSlice, nilMap, "different nil types")
+ result = AssertEqual[any](mock, nilSlice, nilMap, "different nil types")
  AssertFalse(t, result, "result")
 }
 ```
@@ -619,7 +569,7 @@ Testing `darvaza.org/core` requires:
 
 1. **Self-testing** using MockT for assertion functions.
 2. **Generic testing** across multiple types.
-3. **Zero dependencies** - only standard library.
+3. **Zero dependencies** - no testing frameworks beyond core's own utilities.
 4. **Performance awareness** - benchmarks for utilities.
 5. **Edge case coverage** - nil handling, empty inputs.
 6. **Documentation** - examples for public APIs.
