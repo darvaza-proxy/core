@@ -8,34 +8,37 @@ import (
 
 var _ TestCase = errGroupSetDefaultsTestCase{}
 
+// errGroupTestKey is the key a custom parent carries its value under, read
+// back through the group's context.
+type errGroupTestKey struct{}
+
 type errGroupSetDefaultsTestCase struct {
+	parent         context.Context
 	expectedParent context.Context
-	setup          func() *ErrGroup
+	expectedValue  any
 	name           string
 }
 
-// newErrGroupSetDefaultsTestCase creates a new errGroupSetDefaultsTestCase
-func newErrGroupSetDefaultsTestCase(expectedParent context.Context, name string,
-	setup func() *ErrGroup) errGroupSetDefaultsTestCase {
+// newErrGroupSetDefaultsTestCase declares a row: the Parent the group
+// starts with, the Parent SetDefaults leaves it with, and the value the
+// group's context then holds under errGroupTestKey.
+func newErrGroupSetDefaultsTestCase(parent, expectedParent context.Context,
+	expectedValue any, name string) errGroupSetDefaultsTestCase {
 	return errGroupSetDefaultsTestCase{
 		name:           name,
-		setup:          setup,
+		parent:         parent,
 		expectedParent: expectedParent,
+		expectedValue:  expectedValue,
 	}
 }
 
 func errGroupSetDefaultsTestCases() []errGroupSetDefaultsTestCase {
 	var nilCtx context.Context
+	custom := context.WithValue(context.Background(), errGroupTestKey{}, "value")
 
 	return []errGroupSetDefaultsTestCase{
-		newErrGroupSetDefaultsTestCase(context.Background(), "nil parent context", func() *ErrGroup {
-			return &ErrGroup{}
-		}),
-		newErrGroupSetDefaultsTestCase(nilCtx, "custom parent context", func() *ErrGroup {
-			type testKey string
-			ctx := context.WithValue(context.Background(), testKey("test"), "value")
-			return &ErrGroup{Parent: ctx}
-		}), // Will be set by test
+		newErrGroupSetDefaultsTestCase(nilCtx, context.Background(), nil, "nil parent context"),
+		newErrGroupSetDefaultsTestCase(custom, custom, "value", "custom parent context"),
 	}
 }
 
@@ -46,24 +49,33 @@ func (tc errGroupSetDefaultsTestCase) Name() string {
 func (tc errGroupSetDefaultsTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	eg := tc.setup()
-	expectedParent := tc.expectedParent
-	if tc.name == "custom parent context" {
-		expectedParent = eg.Parent
-	}
-
+	eg := &ErrGroup{Parent: tc.parent}
 	eg.SetDefaults()
 
-	if eg.Parent != expectedParent {
-		t.Errorf("Expected Parent %v, got %v", expectedParent, eg.Parent)
-	}
+	AssertEqual(t, tc.expectedParent, eg.Parent, "parent")
+	AssertMustNotNil(t, eg.ctx, "ctx")
+	AssertMustNotNil(t, eg.cancel, "cancel")
+	AssertEqual(t, tc.expectedValue, eg.ctx.Value(errGroupTestKey{}), "value through ctx")
 
-	AssertNotNil(t, eg.ctx, "ctx")
-	AssertNotNil(t, eg.cancel, "cancel")
+	cause := errors.New("cause")
+	eg.cancel(cause)
+	AssertSame(t, cause, context.Cause(eg.ctx), "cause")
 }
 
 func TestErrGroupSetDefaults(t *testing.T) {
 	RunTestCases(t, errGroupSetDefaultsTestCases())
+}
+
+// TestErrGroupSetDefaultsTwice states that a second SetDefaults keeps the
+// context the first one built.
+func TestErrGroupSetDefaultsTwice(t *testing.T) {
+	var eg ErrGroup
+	eg.SetDefaults()
+	ctx := eg.ctx
+	AssertMustNotNil(t, ctx, "first ctx")
+
+	eg.SetDefaults()
+	AssertSame(t, ctx, eg.ctx, "ctx")
 }
 
 func testErrGroupCatcherErrorWhenNotCancelled(t *testing.T) {
