@@ -1085,6 +1085,36 @@ Run with: `go test -tags=integration`
   - `func (tc testCaseType) Name() string` - returns test case name.
   - `func (tc testCaseType) Test(t *testing.T)` - runs the test logic.
 
+### Test Files and Packages
+
+The tests of `bar.go`, in package `foo`, are black-box by default:
+`bar_test.go` declares `package foo_test` and uses `foo` through its
+exported names, as a caller would. A test that needs an unexported name
+is white-box, in `bar_internal_test.go`, under `package foo`.
+
+Test code follows the same modularity rules as the code it tests: a
+factory goes with the type it builds, and a helper with the area it is
+about. On either side, that usually means:
+
+- a file's own test code, such as its TestCase types and their
+  factories, in that file;
+- factories and helpers for one area's values in
+  `<area>_testutils_test.go`, whichever files use them;
+- general helpers, shared by several files, in `testutils_test.go`.
+
+White-box files take the same names with `_internal` added:
+`<area>_testutils_internal_test.go` and `testutils_internal_test.go`.
+
+Test code can export names as any other code would, a factory for
+instance. `_test.go` files build only into the tests, so an export
+joins no package's API, and one in `package foo` is reachable from the
+black-box tests, as `foo.NameForTest`.
+
+An exported name in test code includes the word `Test`, which sets it
+apart from the package's own names, as `NewTestClient` and
+`NameForTest` do. It does not start with `Test`, as `go test` runs a
+function named `TestXxx` as a test.
+
 ### Documentation
 
 ```go
