@@ -66,25 +66,27 @@ func (tc assertTopFrameTestCase) Test(t *testing.T) {
 }
 
 // assertTopFrameTestCases lists the values AssertTopFrame passes, then
-// the ones it fails. newPanicPayload builds a *PanicError whose stack
-// starts in newPanicPayload itself; a zero PanicError carries no stack.
+// the ones it fails. NewPanicPayloadForTest builds a *PanicError whose
+// stack starts in NewPanicPayloadForTest itself; a zero PanicError
+// carries no stack.
 func assertTopFrameTestCases() []assertTopFrameTestCase {
 	return S(
 		newAssertTopFrameTestCase("PanicError",
-			newPanicPayload(), "newPanicPayload"),
+			NewPanicPayloadForTest(), "NewPanicPayloadForTest"),
 		newAssertTopFrameTestCase("Catch of a plain panic",
-			Catch(panicPlain), "panicPlain"),
+			Catch(PanicPlainForTest), "PanicPlainForTest"),
 
 		newAssertTopFrameTestCaseFails("other top frame",
-			newPanicPayload(), "callPanic", `got "newPanicPayload"`),
+			NewPanicPayloadForTest(), "callPanic",
+			`got "NewPanicPayloadForTest"`),
 		newAssertTopFrameTestCaseFails("nil",
-			nil, "newPanicPayload", "got nil"),
+			nil, "NewPanicPayloadForTest", "got nil"),
 		newAssertTopFrameTestCaseFails("nil PanicError",
-			(*PanicError)(nil), "newPanicPayload", "got nil"),
+			(*PanicError)(nil), "NewPanicPayloadForTest", "got nil"),
 		newAssertTopFrameTestCaseFails("not a CallStacker",
-			errSentinel, "newPanicPayload", "expected a CallStacker"),
+			ErrSentinelForTest, "NewPanicPayloadForTest", "expected a CallStacker"),
 		newAssertTopFrameTestCaseFails("empty stack",
-			&PanicError{}, "newPanicPayload", "empty call stack"),
+			&PanicError{}, "NewPanicPayloadForTest", "empty call stack"),
 	)
 }
 

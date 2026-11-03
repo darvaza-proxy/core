@@ -1,24 +1,26 @@
-package core
+package core_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = asRecoveredTestCase{}
-	_ TestCase = catcherDoTestCase{}
-	_ TestCase = catcherTryTestCase{}
-	_ TestCase = catcherAbortTestCase{}
-	_ TestCase = catchTestCase{}
-	_ TestCase = mustTestCase[int]{}
-	_ TestCase = maybeTestCase[int]{}
-	_ TestCase = mustOKTestCase[int]{}
-	_ TestCase = maybeOKTestCase[int]{}
-	_ TestCase = mustTTestCase[int]{}
-	_ TestCase = maybeTTestCase[int]{}
+	_ core.TestCase = asRecoveredTestCase{}
+	_ core.TestCase = catcherDoTestCase{}
+	_ core.TestCase = catcherTryTestCase{}
+	_ core.TestCase = catcherAbortTestCase{}
+	_ core.TestCase = catchTestCase{}
+	_ core.TestCase = mustTestCase[int]{}
+	_ core.TestCase = maybeTestCase[int]{}
+	_ core.TestCase = mustOKTestCase[int]{}
+	_ core.TestCase = maybeOKTestCase[int]{}
+	_ core.TestCase = mustTTestCase[int]{}
+	_ core.TestCase = maybeTTestCase[int]{}
 )
 
 // asRecoveredTestCase states what AsRecovered wraps a payload in: a
@@ -65,31 +67,31 @@ func (tc asRecoveredTestCase) Name() string { return tc.name }
 
 func (tc asRecoveredTestCase) Test(t *testing.T) {
 	t.Helper()
-	rec := AssertMustTypeIs[Recovered](t, AsRecovered(tc.input), "result")
+	rec := core.AssertMustTypeIs[core.Recovered](t, core.AsRecovered(tc.input), "result")
 
 	got := rec.Recovered()
 	if tc.wantConverted {
-		err := AssertMustTypeIs[error](t, got, "payload is an error")
+		err := core.AssertMustTypeIs[error](t, got, "payload is an error")
 		got = err.Error()
 	}
 
-	AssertEqual(t, tc.input, got, "payload")
+	core.AssertEqual(t, tc.input, got, "payload")
 }
 
 func TestAsRecovered(t *testing.T) {
-	RunTestCases(t, asRecoveredTestCases())
+	core.RunTestCases(t, asRecoveredTestCases())
 }
 
 func TestAsRecoveredNil(t *testing.T) {
-	AssertNil(t, AsRecovered(nil), "result")
+	core.AssertNil(t, core.AsRecovered(nil), "result")
 }
 
 // AsRecovered hands back a value that is already Recovered rather than
 // wrapping it a second time.
 func TestAsRecoveredPassThrough(t *testing.T) {
-	var rec Recovered = NewPanicError(0, "wrapped error")
+	var rec core.Recovered = core.NewPanicError(0, "wrapped error")
 
-	AssertSame(t, rec, AsRecovered(rec), "result")
+	core.AssertSame(t, rec, core.AsRecovered(rec), "result")
 }
 
 // catcherDoTestCase states what Catcher.Do reports for a function that
@@ -147,12 +149,12 @@ func newCatcherDoTestCasePanicString(name, payload string) catcherDoTestCase {
 func catcherDoTestCases() []catcherDoTestCase {
 	return []catcherDoTestCase{
 		newCatcherDoTestCase("successful function", nil),
-		newCatcherDoTestCase("function returns error", errSentinel),
+		newCatcherDoTestCase("function returns error", core.ErrSentinelForTest),
 		newCatcherDoTestCasePanicString("function panics with string",
 			"test panic"),
 		newCatcherDoTestCasePanic("function panics with named string",
 			namedString("test panic")),
-		newCatcherDoTestCasePanic("function panics with error", errSentinel),
+		newCatcherDoTestCasePanic("function panics with error", core.ErrSentinelForTest),
 		newCatcherDoTestCasePanic("function panics with int", 42),
 		newCatcherDoTestCasePanic("function panics with float", 3.14),
 	}
@@ -173,45 +175,45 @@ func (tc catcherDoTestCase) fn() error {
 func (tc catcherDoTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var catcher Catcher
+	var catcher core.Catcher
 	err := catcher.Do(tc.fn)
 	if !tc.wantPanic {
-		AssertSame(t, tc.err, err, "error")
+		core.AssertSame(t, tc.err, err, "error")
 		return
 	}
 
-	rec := AssertMustTypeIs[Recovered](t, err, "result")
+	rec := core.AssertMustTypeIs[core.Recovered](t, err, "result")
 
 	got := rec.Recovered()
 	if tc.wantConverted {
-		payload := AssertMustTypeIs[error](t, got, "payload type")
+		payload := core.AssertMustTypeIs[error](t, got, "payload type")
 		got = payload.Error()
 	}
 
-	AssertEqual(t, tc.payload, got, "payload")
+	core.AssertEqual(t, tc.payload, got, "payload")
 }
 
 func TestCatcherDo(t *testing.T) {
-	RunTestCases(t, catcherDoTestCases())
+	core.RunTestCases(t, catcherDoTestCases())
 }
 
 func TestCatcherDoNil(t *testing.T) {
-	var catcher Catcher
+	var catcher core.Catcher
 
-	AssertNoError(t, catcher.Do(nil), "result")
+	core.AssertNoError(t, catcher.Do(nil), "result")
 }
 
 // Catcher.Do hands back a payload that is already Recovered rather than
 // wrapping it a second time.
 func TestCatcherDoPassThrough(t *testing.T) {
-	var catcher Catcher
-	var rec Recovered = NewPanicError(0, errSentinel)
+	var catcher core.Catcher
+	var rec core.Recovered = core.NewPanicError(0, core.ErrSentinelForTest)
 
 	err := catcher.Do(func() error {
 		panic(rec)
 	})
 
-	AssertSame(t, rec, err, "result")
+	core.AssertSame(t, rec, err, "result")
 }
 
 // catcherTryTestCase states what Catcher.Try does with a function that
@@ -270,12 +272,12 @@ func newCatcherTryTestCasePanicString(name, payload string) catcherTryTestCase {
 func catcherTryTestCases() []catcherTryTestCase {
 	return []catcherTryTestCase{
 		newCatcherTryTestCase("successful function", nil),
-		newCatcherTryTestCase("function returns error", errSentinel),
+		newCatcherTryTestCase("function returns error", core.ErrSentinelForTest),
 		newCatcherTryTestCasePanicString("function panics with string",
 			"test panic"),
 		newCatcherTryTestCasePanic("function panics with named string",
 			namedString("test panic")),
-		newCatcherTryTestCasePanic("function panics with error", errSentinel),
+		newCatcherTryTestCasePanic("function panics with error", core.ErrSentinelForTest),
 		newCatcherTryTestCasePanic("function panics with int", 42),
 		newCatcherTryTestCasePanic("function panics with float", 3.14),
 	}
@@ -296,75 +298,75 @@ func (tc catcherTryTestCase) fn() error {
 func (tc catcherTryTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var catcher Catcher
+	var catcher core.Catcher
 	err := catcher.Try(tc.fn)
 	rec := catcher.Recovered()
 	if !tc.wantPanic {
-		AssertSame(t, tc.err, err, "error")
-		AssertNil(t, rec, "recovered")
+		core.AssertSame(t, tc.err, err, "error")
+		core.AssertNil(t, rec, "recovered")
 		return
 	}
 
-	AssertNoError(t, err, "error")
-	AssertMustNotNil(t, rec, "recovered")
+	core.AssertNoError(t, err, "error")
+	core.AssertMustNotNil(t, rec, "recovered")
 
 	got := rec.Recovered()
 	if tc.wantConverted {
-		payload := AssertMustTypeIs[error](t, got, "payload type")
+		payload := core.AssertMustTypeIs[error](t, got, "payload type")
 		got = payload.Error()
 	}
 
-	AssertEqual(t, tc.payload, got, "payload")
+	core.AssertEqual(t, tc.payload, got, "payload")
 }
 
 func TestCatcherTry(t *testing.T) {
-	RunTestCases(t, catcherTryTestCases())
+	core.RunTestCases(t, catcherTryTestCases())
 }
 
 func TestCatcherTryNil(t *testing.T) {
-	var catcher Catcher
+	var catcher core.Catcher
 
-	AssertNoError(t, catcher.Try(nil), "result")
-	AssertNil(t, catcher.Recovered(), "recovered")
+	core.AssertNoError(t, catcher.Try(nil), "result")
+	core.AssertNil(t, catcher.Recovered(), "recovered")
 }
 
 // Catcher.Try stores a payload that is already Recovered rather than
 // wrapping it a second time.
 func TestCatcherTryPassThrough(t *testing.T) {
-	var catcher Catcher
-	var rec Recovered = NewPanicError(0, errSentinel)
+	var catcher core.Catcher
+	var rec core.Recovered = core.NewPanicError(0, core.ErrSentinelForTest)
 
 	err := catcher.Try(func() error {
 		panic(rec)
 	})
 
-	AssertNoError(t, err, "result")
-	AssertSame(t, rec, catcher.Recovered(), "recovered")
+	core.AssertNoError(t, err, "result")
+	core.AssertSame(t, rec, catcher.Recovered(), "recovered")
 }
 
 func TestCatcherRecovered(t *testing.T) {
-	var catcher Catcher
+	var catcher core.Catcher
 
 	// Initially no panic
 	recovered := catcher.Recovered()
-	AssertNil(t, recovered, "initially nil recovered")
+	core.AssertNil(t, recovered, "initially nil recovered")
 
 	// After panic
 	err := catcher.Try(func() error {
 		panic("test panic")
 	})
-	AssertNoError(t, err, "result")
+	core.AssertNoError(t, err, "result")
 
 	recovered = catcher.Recovered()
-	AssertMustNotNil(t, recovered, "recovered panic after Try")
+	core.AssertMustNotNil(t, recovered, "recovered panic after Try")
 
 	// A string payload comes back as an error carrying it
-	payload := AssertMustTypeIs[error](t, recovered.Recovered(), "payload type")
-	AssertEqual(t, "test panic", payload.Error(), "message")
+	payload := core.AssertMustTypeIs[error](t, recovered.Recovered(), "payload type")
+	core.AssertEqual(t, "test panic", payload.Error(), "message")
 }
 
 func TestCatcherConcurrent(t *testing.T) {
-	var catcher Catcher
+	var catcher core.Catcher
 
 	// Each goroutine hands back what Try returned
 	done := make(chan error, 2)
@@ -383,16 +385,16 @@ func TestCatcherConcurrent(t *testing.T) {
 	}()
 
 	// Wait for both goroutines to complete
-	AssertNoError(t, <-done, "result")
-	AssertNoError(t, <-done, "result")
+	core.AssertNoError(t, <-done, "result")
+	core.AssertNoError(t, <-done, "result")
 
 	recovered := catcher.Recovered()
-	AssertMustNotNil(t, recovered, "concurrent recovered panic")
+	core.AssertMustNotNil(t, recovered, "concurrent recovered panic")
 
 	// Whichever panic was stored, it was one of the two
-	payload := AssertMustTypeIs[error](t, recovered.Recovered(), "payload type")
+	payload := core.AssertMustTypeIs[error](t, recovered.Recovered(), "payload type")
 	msg := payload.Error()
-	AssertTrue(t, SliceContains(S("first panic", "second panic"), msg),
+	core.AssertTrue(t, core.SliceContains(core.S("first panic", "second panic"), msg),
 		"%q stored", msg)
 }
 
@@ -408,17 +410,17 @@ func (r callerRecovered) Recovered() any { return r.payload }
 // The first panic caught survives: a later one, whatever type of
 // Recovered it arrives as, does not replace it.
 func TestCatcherFirstPanicWins(t *testing.T) {
-	var catcher Catcher
+	var catcher core.Catcher
 
-	first := NewPanicError(0, "first")
+	first := core.NewPanicError(0, "first")
 	_ = catcher.Try(func() error { panic(first) })
-	AssertSame(t, first, catcher.Recovered(), "first panic")
+	core.AssertSame(t, first, catcher.Recovered(), "first panic")
 
 	later := callerRecovered{payload: "later"}
-	AssertNoPanic(t, func() {
+	core.AssertNoPanic(t, func() {
 		_ = catcher.Try(func() error { panic(later) })
 	}, "later panic")
-	AssertSame(t, first, catcher.Recovered(), "first panic kept")
+	core.AssertSame(t, first, catcher.Recovered(), "first panic kept")
 }
 
 // catcherAbortTestCase states what Catcher.Try does with what fn does
@@ -426,7 +428,7 @@ func TestCatcherFirstPanicWins(t *testing.T) {
 // through to MockT.Run and cuts the body short after Try, and the
 // Catcher records nothing either way.
 type catcherAbortTestCase struct {
-	fn         func(T)
+	fn         func(core.T)
 	name       string
 	wantErrors int
 	wantLogs   int
@@ -442,10 +444,10 @@ func (tc catcherAbortTestCase) Name() string {
 
 func (tc catcherAbortTestCase) Test(t *testing.T) {
 	t.Helper()
-	var catcher Catcher
+	var catcher core.Catcher
 	var continued bool
-	mock := &MockT{}
-	ok := mock.Run(tc.name, func(mt T) {
+	mock := &core.MockT{}
+	ok := mock.Run(tc.name, func(mt core.T) {
 		_ = catcher.Try(func() error {
 			tc.fn(mt)
 			return nil
@@ -453,18 +455,18 @@ func (tc catcherAbortTestCase) Test(t *testing.T) {
 		continued = true
 	})
 
-	AssertEqual(t, !tc.wantFailed, ok, "passed")
-	AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
-	AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
-	AssertEqual(t, !tc.wantAborted, continued, "continued")
-	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
-	AssertEqual(t, tc.wantLogs, mock.NumLogs(), "logs")
-	AssertNil(t, catcher.Recovered(), "recovered")
+	core.AssertEqual(t, !tc.wantFailed, ok, "passed")
+	core.AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
+	core.AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
+	core.AssertEqual(t, !tc.wantAborted, continued, "continued")
+	core.AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
+	core.AssertEqual(t, tc.wantLogs, mock.NumLogs(), "logs")
+	core.AssertNil(t, catcher.Recovered(), "recovered")
 }
 
 // newCatcherAbortTestCase is a row whose abort fails the test and cuts
 // it short, recording wantErrors on the way.
-func newCatcherAbortTestCase(name string, abort func(T),
+func newCatcherAbortTestCase(name string, abort func(core.T),
 	wantErrors int) catcherAbortTestCase {
 	return catcherAbortTestCase{
 		fn:          abort,
@@ -479,7 +481,7 @@ func newCatcherAbortTestCase(name string, abort func(T),
 
 // newCatcherAbortTestCaseContinues is a row whose function fails the
 // test without cutting it short, recording wantErrors on the way.
-func newCatcherAbortTestCaseContinues(name string, fn func(T),
+func newCatcherAbortTestCaseContinues(name string, fn func(core.T),
 	wantErrors int) catcherAbortTestCase {
 	return catcherAbortTestCase{
 		fn:          fn,
@@ -494,7 +496,7 @@ func newCatcherAbortTestCaseContinues(name string, fn func(T),
 
 // newCatcherAbortTestCaseSkips is a row whose abort skips the test,
 // recording wantLogs on the way.
-func newCatcherAbortTestCaseSkips(name string, abort func(T),
+func newCatcherAbortTestCaseSkips(name string, abort func(core.T),
 	wantLogs int) catcherAbortTestCase {
 	return catcherAbortTestCase{
 		fn:          abort,
@@ -509,7 +511,7 @@ func newCatcherAbortTestCaseSkips(name string, abort func(T),
 
 // newCatcherAbortTestCaseFailsSkips is a row whose abort fails the test
 // and then skips it, recording wantErrors and wantLogs on the way.
-func newCatcherAbortTestCaseFailsSkips(name string, abort func(T),
+func newCatcherAbortTestCaseFailsSkips(name string, abort func(core.T),
 	wantErrors, wantLogs int) catcherAbortTestCase {
 	return catcherAbortTestCase{
 		fn:          abort,
@@ -522,27 +524,27 @@ func newCatcherAbortTestCaseFailsSkips(name string, abort func(T),
 	}
 }
 
-var catcherAbortTestCases = S(
-	newCatcherAbortTestCaseContinues("Fail", func(mt T) { mt.Fail() }, 0),
-	newCatcherAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
-	newCatcherAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
-	newCatcherAbortTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow() }, 0),
-	newCatcherAbortTestCaseSkips("Skip", func(mt T) { mt.Skip("skip") }, 1),
+var catcherAbortTestCases = core.S(
+	newCatcherAbortTestCaseContinues("Fail", func(mt core.T) { mt.Fail() }, 0),
+	newCatcherAbortTestCase("FailNow", func(mt core.T) { mt.FailNow() }, 0),
+	newCatcherAbortTestCase("Fatal", func(mt core.T) { mt.Fatal("fatal") }, 1),
+	newCatcherAbortTestCaseSkips("SkipNow", func(mt core.T) { mt.SkipNow() }, 0),
+	newCatcherAbortTestCaseSkips("Skip", func(mt core.T) { mt.Skip("skip") }, 1),
 	newCatcherAbortTestCaseFailsSkips("Fail then SkipNow",
-		func(mt T) { mt.Fail(); mt.SkipNow() }, 0, 0),
+		func(mt core.T) { mt.Fail(); mt.SkipNow() }, 0, 0),
 )
 
 func TestCatcherAbort(t *testing.T) {
-	RunTestCases(t, catcherAbortTestCases)
+	core.RunTestCases(t, catcherAbortTestCases)
 }
 
 // Catcher.Do reaches fn through Try, so an abort inside it passes on to
 // MockT.Run as well, and the Catcher records nothing.
 func TestCatcherDoAbort(t *testing.T) {
-	var catcher Catcher
+	var catcher core.Catcher
 	var continued bool
-	mock := &MockT{}
-	ok := mock.Run("Do", func(mt T) {
+	mock := &core.MockT{}
+	ok := mock.Run("Do", func(mt core.T) {
 		_ = catcher.Do(func() error {
 			mt.FailNow()
 			return nil
@@ -550,32 +552,32 @@ func TestCatcherDoAbort(t *testing.T) {
 		continued = true
 	})
 
-	AssertFalse(t, ok, "passed")
-	AssertTrue(t, mock.Failed(), "failed")
-	AssertFalse(t, continued, "continued")
-	AssertEqual(t, 0, mock.NumErrors(), "errors")
-	AssertEqual(t, 0, mock.NumLogs(), "logs")
-	AssertNil(t, catcher.Recovered(), "recovered")
+	core.AssertFalse(t, ok, "passed")
+	core.AssertTrue(t, mock.Failed(), "failed")
+	core.AssertFalse(t, continued, "continued")
+	core.AssertEqual(t, 0, mock.NumErrors(), "errors")
+	core.AssertEqual(t, 0, mock.NumLogs(), "logs")
+	core.AssertNil(t, catcher.Recovered(), "recovered")
 }
 
 // Catch reaches fn through a Catcher, so an abort inside it passes on to
 // MockT.Run as well.
 func TestCatchAbort(t *testing.T) {
 	var continued bool
-	mock := &MockT{}
-	ok := mock.Run("Catch", func(mt T) {
-		_ = Catch(func() error {
+	mock := &core.MockT{}
+	ok := mock.Run("Catch", func(mt core.T) {
+		_ = core.Catch(func() error {
 			mt.FailNow()
 			return nil
 		})
 		continued = true
 	})
 
-	AssertFalse(t, ok, "passed")
-	AssertTrue(t, mock.Failed(), "failed")
-	AssertFalse(t, continued, "continued")
-	AssertEqual(t, 0, mock.NumErrors(), "errors")
-	AssertEqual(t, 0, mock.NumLogs(), "logs")
+	core.AssertFalse(t, ok, "passed")
+	core.AssertTrue(t, mock.Failed(), "failed")
+	core.AssertFalse(t, continued, "continued")
+	core.AssertEqual(t, 0, mock.NumErrors(), "errors")
+	core.AssertEqual(t, 0, mock.NumLogs(), "logs")
 }
 
 // catchTestCase states what Catch reports for a function that returns an
@@ -633,12 +635,12 @@ func newCatchTestCasePanicString(name, payload string) catchTestCase {
 func catchTestCases() []catchTestCase {
 	return []catchTestCase{
 		newCatchTestCase("successful function", nil),
-		newCatchTestCase("function returns error", errSentinel),
+		newCatchTestCase("function returns error", core.ErrSentinelForTest),
 		newCatchTestCasePanicString("function panics with string",
 			"test panic"),
 		newCatchTestCasePanic("function panics with named string",
 			namedString("test panic")),
-		newCatchTestCasePanic("function panics with error", errSentinel),
+		newCatchTestCasePanic("function panics with error", core.ErrSentinelForTest),
 		newCatchTestCasePanic("function panics with int", 42),
 		newCatchTestCasePanic("function panics with float", 3.14),
 	}
@@ -659,44 +661,44 @@ func (tc catchTestCase) fn() error {
 func (tc catchTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	err := Catch(tc.fn)
+	err := core.Catch(tc.fn)
 	if !tc.wantPanic {
-		AssertSame(t, tc.err, err, "error")
+		core.AssertSame(t, tc.err, err, "error")
 		return
 	}
 
-	rec := AssertMustTypeIs[Recovered](t, err, "result")
+	rec := core.AssertMustTypeIs[core.Recovered](t, err, "result")
 
 	got := rec.Recovered()
 	if tc.wantConverted {
-		payload := AssertMustTypeIs[error](t, got, "payload type")
+		payload := core.AssertMustTypeIs[error](t, got, "payload type")
 		got = payload.Error()
 	}
 
-	AssertEqual(t, tc.payload, got, "payload")
+	core.AssertEqual(t, tc.payload, got, "payload")
 }
 
 func TestCatch(t *testing.T) {
-	RunTestCases(t, catchTestCases())
+	core.RunTestCases(t, catchTestCases())
 }
 
 func TestCatchNil(t *testing.T) {
-	AssertNoError(t, Catch(nil), "result")
+	core.AssertNoError(t, core.Catch(nil), "result")
 }
 
 // Catch hands back a payload that is already Recovered rather than
 // wrapping it a second time.
 func TestCatchPassThrough(t *testing.T) {
-	var rec Recovered = NewPanicError(0, errSentinel)
+	var rec core.Recovered = core.NewPanicError(0, core.ErrSentinelForTest)
 
-	err := Catch(func() error {
+	err := core.Catch(func() error {
 		panic(rec)
 	})
 
-	AssertSame(t, rec, err, "result")
+	core.AssertSame(t, rec, err, "result")
 }
 
-var _ TestCase = catchStackTestCase{}
+var _ core.TestCase = catchStackTestCase{}
 
 // catchStackTestCase states where the stack of a panic Catch recovers
 // starts: at the function that panicked, past the runtime's frames.
@@ -721,12 +723,7 @@ func (tc catchStackTestCase) Name() string {
 
 func (tc catchStackTestCase) Test(t *testing.T) {
 	t.Helper()
-	_ = assertTopFrameIs(t, Catch(tc.fn), tc.wantFunc, 2)
-}
-
-// panicPlain panics with a plain value, not a PanicError.
-func panicPlain() error {
-	panic(errSentinel)
+	_ = assertTopFrameIs(t, core.Catch(tc.fn), tc.wantFunc, 2)
 }
 
 // panicMapAssign writes to m, which a nil m turns into a panic the
@@ -737,27 +734,27 @@ func panicMapAssign(m map[string]int) error {
 }
 
 func catchStackTestCases() []catchStackTestCase {
-	return S(
-		newCatchStackTestCase("plain panic", panicPlain, "panicPlain"),
+	return core.S(
+		newCatchStackTestCase("plain panic", core.PanicPlainForTest, "PanicPlainForTest"),
 		newCatchStackTestCase("runtime panic",
 			func() error { return panicMapAssign(nil) }, "panicMapAssign"),
 	)
 }
 
 func TestCatchStack(t *testing.T) {
-	RunTestCases(t, catchStackTestCases())
+	core.RunTestCases(t, catchStackTestCases())
 }
 
 // callMust calls Must and returns what came back: the value, or the
 // recovered panic as an error.
 func callMust[V any](value V, err error) (got V, recovered error) {
 	defer func() {
-		if e := AsRecovered(recover()); e != nil {
+		if e := core.AsRecovered(recover()); e != nil {
 			recovered = e
 		}
 	}()
 
-	got = Must(value, err)
+	got = core.Must(value, err)
 	return got, nil
 }
 
@@ -772,7 +769,7 @@ type mustTestCase[V any] struct {
 	wantPanic bool
 }
 
-func newMustTestCase[V any](name string, value V) TestCase {
+func newMustTestCase[V any](name string, value V) core.TestCase {
 	return mustTestCase[V]{
 		err:       nil,
 		value:     value,
@@ -783,7 +780,7 @@ func newMustTestCase[V any](name string, value V) TestCase {
 
 // newMustTestCasePanic declares a row whose error makes Must panic, with
 // that error in the chain of what it raises.
-func newMustTestCasePanic[V any](name string, value V, err error) TestCase {
+func newMustTestCasePanic[V any](name string, value V, err error) core.TestCase {
 	if err == nil {
 		panic("mustTestCase: a panic row states the error it panics with")
 	}
@@ -805,22 +802,22 @@ func (tc mustTestCase[V]) Test(t *testing.T) {
 
 	got, recovered := callMust(tc.value, tc.err)
 	if !tc.wantPanic {
-		AssertNoError(t, recovered, "no panic")
-		AssertEqual(t, tc.value, got, "value")
+		core.AssertNoError(t, recovered, "no panic")
+		core.AssertEqual(t, tc.value, got, "value")
 		return
 	}
 
-	panicErr := AssertMustTypeIs[*PanicError](t, recovered, "panic")
-	AssertErrorIs(t, panicErr, ErrUnreachable, "ErrUnreachable in chain")
-	AssertErrorIs(t, panicErr, tc.err, "error in chain")
-	AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
+	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
+	core.AssertErrorIs(t, panicErr, tc.err, "error in chain")
+	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
 }
 
-func mustTestCases() []TestCase {
+func mustTestCases() []core.TestCase {
 	var nilPtr *int
-	slice, named := S(1, 2, 3), newNameStruct()
+	slice, named := core.S(1, 2, 3), newNameStruct()
 
-	return []TestCase{
+	return []core.TestCase{
 		newMustTestCase("string", testHello),
 		newMustTestCase("int", 42),
 		newMustTestCase("bool", true),
@@ -828,17 +825,17 @@ func mustTestCases() []TestCase {
 		newMustTestCase("nil pointer", nilPtr),
 		newMustTestCase("struct", named),
 
-		newMustTestCasePanic("string with error", testHello, errSentinel),
-		newMustTestCasePanic("int with error", 42, errSentinel),
-		newMustTestCasePanic("bool with error", true, errSentinel),
-		newMustTestCasePanic("slice with error", slice, errSentinel),
-		newMustTestCasePanic("nil pointer with error", nilPtr, errSentinel),
-		newMustTestCasePanic("struct with error", named, errSentinel),
+		newMustTestCasePanic("string with error", testHello, core.ErrSentinelForTest),
+		newMustTestCasePanic("int with error", 42, core.ErrSentinelForTest),
+		newMustTestCasePanic("bool with error", true, core.ErrSentinelForTest),
+		newMustTestCasePanic("slice with error", slice, core.ErrSentinelForTest),
+		newMustTestCasePanic("nil pointer with error", nilPtr, core.ErrSentinelForTest),
+		newMustTestCasePanic("struct with error", named, core.ErrSentinelForTest),
 	}
 }
 
 func TestMust(t *testing.T) {
-	RunTestCases(t, mustTestCases())
+	core.RunTestCases(t, mustTestCases())
 }
 
 // maybeTestCase states that Maybe returns its value without panicking
@@ -850,7 +847,7 @@ type maybeTestCase[V any] struct {
 	name  string
 }
 
-func newMaybeTestCase[V any](name string, value V, err error) TestCase {
+func newMaybeTestCase[V any](name string, value V, err error) core.TestCase {
 	return maybeTestCase[V]{
 		err:   err,
 		value: value,
@@ -866,48 +863,48 @@ func (tc maybeTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
 	var got V
-	err := Catch(func() error {
-		got = Maybe(tc.value, tc.err)
+	err := core.Catch(func() error {
+		got = core.Maybe(tc.value, tc.err)
 		return nil
 	})
-	AssertNoError(t, err, "no panic")
-	AssertEqual(t, tc.value, got, "value")
+	core.AssertNoError(t, err, "no panic")
+	core.AssertEqual(t, tc.value, got, "value")
 }
 
-func maybeTestCases() []TestCase {
+func maybeTestCases() []core.TestCase {
 	var nilPtr *int
-	slice, named := S(1, 2, 3), newNameStruct()
+	slice, named := core.S(1, 2, 3), newNameStruct()
 
-	return []TestCase{
+	return []core.TestCase{
 		newMaybeTestCase("string with nil error", testHello, nil),
-		newMaybeTestCase("string with error", testHello, errSentinel),
+		newMaybeTestCase("string with error", testHello, core.ErrSentinelForTest),
 		newMaybeTestCase("int with nil error", 42, nil),
-		newMaybeTestCase("int with error", 42, errSentinel),
+		newMaybeTestCase("int with error", 42, core.ErrSentinelForTest),
 		newMaybeTestCase("bool with nil error", true, nil),
-		newMaybeTestCase("bool with error", true, errSentinel),
+		newMaybeTestCase("bool with error", true, core.ErrSentinelForTest),
 		newMaybeTestCase("slice with nil error", slice, nil),
-		newMaybeTestCase("slice with error", slice, errSentinel),
+		newMaybeTestCase("slice with error", slice, core.ErrSentinelForTest),
 		newMaybeTestCase("nil pointer with nil error", nilPtr, nil),
-		newMaybeTestCase("nil pointer with error", nilPtr, errSentinel),
+		newMaybeTestCase("nil pointer with error", nilPtr, core.ErrSentinelForTest),
 		newMaybeTestCase("struct with nil error", named, nil),
-		newMaybeTestCase("struct with error", named, errSentinel),
+		newMaybeTestCase("struct with error", named, core.ErrSentinelForTest),
 	}
 }
 
 func TestMaybe(t *testing.T) {
-	RunTestCases(t, maybeTestCases())
+	core.RunTestCases(t, maybeTestCases())
 }
 
 // callMustOK calls MustOK and returns what came back: the value, or the
 // recovered panic as an error.
 func callMustOK[V any](value V, ok bool) (got V, recovered error) {
 	defer func() {
-		if e := AsRecovered(recover()); e != nil {
+		if e := core.AsRecovered(recover()); e != nil {
 			recovered = e
 		}
 	}()
 
-	got = MustOK(value, ok)
+	got = core.MustOK(value, ok)
 	return got, nil
 }
 
@@ -922,7 +919,7 @@ type mustOKTestCase[V any] struct {
 	wantPanic bool
 }
 
-func newMustOKTestCase[V any](name string, value V) TestCase {
+func newMustOKTestCase[V any](name string, value V) core.TestCase {
 	return mustOKTestCase[V]{
 		value:     value,
 		name:      name,
@@ -932,7 +929,7 @@ func newMustOKTestCase[V any](name string, value V) TestCase {
 }
 
 // newMustOKTestCasePanic declares a row whose flag makes MustOK panic.
-func newMustOKTestCasePanic[V any](name string, value V) TestCase {
+func newMustOKTestCasePanic[V any](name string, value V) core.TestCase {
 	return mustOKTestCase[V]{
 		value:     value,
 		name:      name,
@@ -950,22 +947,22 @@ func (tc mustOKTestCase[V]) Test(t *testing.T) {
 
 	got, recovered := callMustOK(tc.value, tc.ok)
 	if !tc.wantPanic {
-		AssertNoError(t, recovered, "no panic")
-		AssertEqual(t, tc.value, got, "value")
+		core.AssertNoError(t, recovered, "no panic")
+		core.AssertEqual(t, tc.value, got, "value")
 		return
 	}
 
-	panicErr := AssertMustTypeIs[*PanicError](t, recovered, "panic")
-	AssertErrorIs(t, panicErr, ErrUnreachable, "ErrUnreachable in chain")
-	AssertContains(t, panicErr.Error(), "operation failed", "reason")
-	AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
+	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
+	core.AssertContains(t, panicErr.Error(), "operation failed", "reason")
+	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
 }
 
-func mustOKTestCases() []TestCase {
+func mustOKTestCases() []core.TestCase {
 	var nilPtr *int
-	slice, named := S(1, 2, 3), newNameStruct()
+	slice, named := core.S(1, 2, 3), newNameStruct()
 
-	return []TestCase{
+	return []core.TestCase{
 		newMustOKTestCase("string", testHello),
 		newMustOKTestCase("int", 42),
 		newMustOKTestCase("bool", true),
@@ -983,7 +980,7 @@ func mustOKTestCases() []TestCase {
 }
 
 func TestMustOK(t *testing.T) {
-	RunTestCases(t, mustOKTestCases())
+	core.RunTestCases(t, mustOKTestCases())
 }
 
 // maybeOKTestCase states that MaybeOK returns its value without panicking
@@ -995,7 +992,7 @@ type maybeOKTestCase[V any] struct {
 	ok    bool
 }
 
-func newMaybeOKTestCase[V any](name string, value V, ok bool) TestCase {
+func newMaybeOKTestCase[V any](name string, value V, ok bool) core.TestCase {
 	return maybeOKTestCase[V]{
 		value: value,
 		name:  name,
@@ -1011,19 +1008,19 @@ func (tc maybeOKTestCase[V]) Test(t *testing.T) {
 	t.Helper()
 
 	var got V
-	err := Catch(func() error {
-		got = MaybeOK(tc.value, tc.ok)
+	err := core.Catch(func() error {
+		got = core.MaybeOK(tc.value, tc.ok)
 		return nil
 	})
-	AssertNoError(t, err, "no panic")
-	AssertEqual(t, tc.value, got, "value")
+	core.AssertNoError(t, err, "no panic")
+	core.AssertEqual(t, tc.value, got, "value")
 }
 
-func maybeOKTestCases() []TestCase {
+func maybeOKTestCases() []core.TestCase {
 	var nilPtr *int
-	slice, named := S(1, 2, 3), newNameStruct()
+	slice, named := core.S(1, 2, 3), newNameStruct()
 
-	return []TestCase{
+	return []core.TestCase{
 		newMaybeOKTestCase("string with true", testHello, true),
 		newMaybeOKTestCase("string with false", testHello, false),
 		newMaybeOKTestCase("int with true", 42, true),
@@ -1040,19 +1037,19 @@ func maybeOKTestCases() []TestCase {
 }
 
 func TestMaybeOK(t *testing.T) {
-	RunTestCases(t, maybeOKTestCases())
+	core.RunTestCases(t, maybeOKTestCases())
 }
 
 // callMustT calls MustT and returns what came back: the value, or the
 // recovered panic as an error.
 func callMustT[T any](input any) (got T, recovered error) {
 	defer func() {
-		if e := AsRecovered(recover()); e != nil {
+		if e := core.AsRecovered(recover()); e != nil {
 			recovered = e
 		}
 	}()
 
-	got = MustT[T](input)
+	got = core.MustT[T](input)
 	return got, nil
 }
 
@@ -1071,7 +1068,7 @@ type mustTTestCase[T any] struct {
 	wantPanic bool
 }
 
-func newMustTTestCase[T any](name string, input any, want T) TestCase {
+func newMustTTestCase[T any](name string, input any, want T) core.TestCase {
 	return mustTTestCase[T]{
 		input:     input,
 		want:      want,
@@ -1083,7 +1080,7 @@ func newMustTTestCase[T any](name string, input any, want T) TestCase {
 
 // newMustTTestCasePanic declares a row whose input makes MustT panic,
 // and the reason the panic gives.
-func newMustTTestCasePanic[T any](name string, input any, reason string) TestCase {
+func newMustTTestCasePanic[T any](name string, input any, reason string) core.TestCase {
 	if reason == "" {
 		panic("mustTTestCase: a panic row states the reason it panics with")
 	}
@@ -1108,37 +1105,37 @@ func (tc mustTTestCase[T]) Test(t *testing.T) {
 
 	got, recovered := callMustT[T](tc.input)
 	if !tc.wantPanic {
-		AssertNoError(t, recovered, "no panic")
-		AssertEqual(t, tc.want, got, "value")
+		core.AssertNoError(t, recovered, "no panic")
+		core.AssertEqual(t, tc.want, got, "value")
 		return
 	}
 
-	panicErr := AssertMustTypeIs[*PanicError](t, recovered, "panic")
-	AssertErrorIs(t, panicErr, ErrUnreachable, "ErrUnreachable in chain")
-	AssertContains(t, panicErr.Error(), tc.reason, "reason")
-	AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
+	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
+	core.AssertContains(t, panicErr.Error(), tc.reason, "reason")
+	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
 }
 
 // mustTValueTestCases are the rows where the input holds the target
 // type. The zero value is a result there, not the mark of a failure.
-func mustTValueTestCases() []TestCase {
+func mustTValueTestCases() []core.TestCase {
 	stringer := newMockStringer("test")
 
-	return []TestCase{
+	return []core.TestCase{
 		newMustTTestCase[string]("string to string", testHello, testHello),
 		newMustTTestCase[string]("empty string to string", "", ""),
 		newMustTTestCase[int]("int to int", 42, 42),
 		newMustTTestCase[int]("zero to int", 0, 0),
 		newMustTTestCase[float64]("float64 to float64", 3.14, 3.14),
-		newMustTTestCase[error]("error to error", errSentinel, errSentinel),
+		newMustTTestCase[error]("error to error", core.ErrSentinelForTest, core.ErrSentinelForTest),
 		newMustTTestCase[fmt.Stringer]("stringer to fmt.Stringer",
 			stringer, stringer),
 	}
 }
 
 // mustTPanicTestCases are the rows where it does not.
-func mustTPanicTestCases() []TestCase {
-	return []TestCase{
+func mustTPanicTestCases() []core.TestCase {
+	return []core.TestCase{
 		newMustTTestCasePanic[string]("int to string", 42,
 			"failed to convert int to string"),
 		newMustTTestCasePanic[int]("string to int", testHello,
@@ -1159,8 +1156,8 @@ func mustTPanicTestCases() []TestCase {
 }
 
 func TestMustT(t *testing.T) {
-	RunTestCases(t, mustTValueTestCases())
-	RunTestCases(t, mustTPanicTestCases())
+	core.RunTestCases(t, mustTValueTestCases())
+	core.RunTestCases(t, mustTPanicTestCases())
 }
 
 // maybeTTestCase states what MaybeT returns for one target type: the
@@ -1172,7 +1169,7 @@ type maybeTTestCase[T any] struct {
 	name  string
 }
 
-func newMaybeTTestCase[T any](name string, input any, want T) TestCase {
+func newMaybeTTestCase[T any](name string, input any, want T) core.TestCase {
 	return maybeTTestCase[T]{
 		input: input,
 		want:  want,
@@ -1187,14 +1184,14 @@ func (tc maybeTTestCase[T]) Name() string {
 func (tc maybeTTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
-	AssertEqual(t, tc.want, MaybeT[T](tc.input), "value")
+	core.AssertEqual(t, tc.want, core.MaybeT[T](tc.input), "value")
 }
 
-func maybeTTestCases() []TestCase {
+func maybeTTestCases() []core.TestCase {
 	testErr := errors.New("test")
 	stringer := newMockStringer("test")
 
-	return []TestCase{
+	return []core.TestCase{
 		// the input already holds the target type
 		newMaybeTTestCase[string]("string to string", "hello", "hello"),
 		newMaybeTTestCase[string]("empty string to string", "", ""),
@@ -1217,20 +1214,7 @@ func maybeTTestCases() []TestCase {
 }
 
 func TestMaybeT(t *testing.T) {
-	RunTestCases(t, maybeTTestCases())
-}
-
-// Helper type for testing fmt.Stringer interface
-type mockStringer struct {
-	value string
-}
-
-func newMockStringer(value string) mockStringer {
-	return mockStringer{value: value}
-}
-
-func (ms mockStringer) String() string {
-	return ms.value
+	core.RunTestCases(t, maybeTTestCases())
 }
 
 // newNameStruct returns the anonymous struct the Must and Maybe tables
@@ -1256,31 +1240,31 @@ var (
 
 func BenchmarkMust(b *testing.B) {
 	for b.Loop() {
-		_ = Must(42, errBenchNil)
+		_ = core.Must(42, errBenchNil)
 	}
 }
 
 func BenchmarkCatch(b *testing.B) {
 	for b.Loop() {
-		_ = Catch(benchReturnNil)
+		_ = core.Catch(benchReturnNil)
 	}
 }
 
 func BenchmarkCatchPanic(b *testing.B) {
 	for b.Loop() {
-		_ = Catch(benchPanic)
+		_ = core.Catch(benchPanic)
 	}
 }
 
 func BenchmarkCatchPanicError(b *testing.B) {
 	for b.Loop() {
-		_ = Catch(benchPanicError)
+		_ = core.Catch(benchPanicError)
 	}
 }
 
 func BenchmarkCatchMust(b *testing.B) {
 	for b.Loop() {
-		_ = Catch(benchMustFail)
+		_ = core.Catch(benchMustFail)
 	}
 }
 
@@ -1289,11 +1273,11 @@ func benchReturnNil() error { return nil }
 func benchPanic() error { panic(errBenchPanic) }
 
 func benchPanicError() error {
-	Panic(errBenchPanic)
+	core.Panic(errBenchPanic)
 	return nil
 }
 
 func benchMustFail() error {
-	_ = Must(42, errBenchPanic)
+	_ = core.Must(42, errBenchPanic)
 	return nil
 }
