@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"testing"
@@ -16,6 +17,7 @@ var (
 	_ core.TestCase = sliceReversedTestCase{}
 	_ core.TestCase = sliceReversedFnTestCase[int]{}
 	_ core.TestCase = sliceSortFnTestCase[int]{}
+	_ core.TestCase = sliceSortTestCase{}
 	_ core.TestCase = sliceSortOrderedTestCase[int]{}
 	_ core.TestCase = sliceMinusTestCase{}
 	_ core.TestCase = sliceMinusFnTestCase{}
@@ -556,6 +558,47 @@ func testSliceSortFnNilFunction(t *testing.T) {
 	result := core.SliceCopy(original)
 	core.SliceSortFn(result, nil)
 	core.AssertSliceEqual(t, original, result, "nil function")
+}
+
+// sliceSortTestCase states what SliceSort leaves in a copy of input
+// after sorting it with compare.
+type sliceSortTestCase struct {
+	compare  func(a, b int) int
+	name     string
+	input    []int
+	expected []int
+}
+
+func (tc sliceSortTestCase) Name() string {
+	return tc.name
+}
+
+func (tc sliceSortTestCase) Test(t *testing.T) {
+	t.Helper()
+	result := core.SliceCopy(tc.input)
+	core.SliceSort(result, tc.compare)
+	core.AssertSliceEqual(t, tc.expected, result, "SliceSort")
+}
+
+func newSliceSortTestCase(name string, input []int,
+	compare func(a, b int) int, expected []int) sliceSortTestCase {
+	return sliceSortTestCase{
+		compare:  compare,
+		name:     name,
+		input:    input,
+		expected: expected,
+	}
+}
+
+func TestSliceSort(t *testing.T) {
+	unsorted := core.S(3, 1, 2)
+	ascending := cmp.Compare[int]
+
+	core.RunTestCases(t, core.S(
+		newSliceSortTestCase("ascending", unsorted, ascending, core.S(1, 2, 3)),
+		// a nil compare leaves the slice as it is
+		newSliceSortTestCase("nil compare", unsorted, nil, core.S(3, 1, 2)),
+	))
 }
 
 // Test cases for SliceSortOrdered function
