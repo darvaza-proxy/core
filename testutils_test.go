@@ -1,5 +1,7 @@
 package core_test
 
+import "time"
+
 // testHello is a string value the tests share as a payload and an
 // expected value.
 const testHello = "hello"
@@ -19,4 +21,8 @@ func newMockStringer(value string) mockStringer {
 
 func (ms mockStringer) String() string {
 	return ms.value
+}
+
+func ms(n int) time.Duration {
+	return time.Duration(n) * time.Millisecond
 }

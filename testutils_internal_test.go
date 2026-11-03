@@ -1,10 +1,10 @@
 package core
 
-import "errors"
-
-// testHello is a string value the tests share as a payload and an
-// expected value.
-const testHello = "hello"
+import (
+	"errors"
+	"strings"
+	"testing"
+)
 
 var (
 	// ErrSentinelForTest is the known error the tests pass in and
@@ -16,3 +16,21 @@ var (
 	// a chain that answered true to everything would fail.
 	ErrUnrelatedForTest = errors.New("unrelated error")
 )
+
+// plainEqual and plainContains check on the real t without any
+// assertion, for the tests of what the assertions are built on.
+//
+//revive:disable-next-line:flag-parameter
+func plainEqual(t *testing.T, expected, actual bool, desc string) {
+	t.Helper()
+	if expected != actual {
+		t.Errorf("%s: expected %v, got %v", desc, expected, actual)
+	}
+}
+
+func plainContains(t *testing.T, s, substr, desc string) {
+	t.Helper()
+	if substr == "" || !strings.Contains(s, substr) {
+		t.Errorf("%s: %q does not contain %q", desc, s, substr)
+	}
+}

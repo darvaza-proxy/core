@@ -1,8 +1,12 @@
-package core
+package core_test
 
-import "testing"
+import (
+	"testing"
 
-var _ TestCase = assertTopFrameTestCase{}
+	"darvaza.org/core"
+)
+
+var _ core.TestCase = assertTopFrameTestCase{}
 
 // assertTopFrameTestCase exercises AssertTopFrame and its Must form on
 // the same value. A row states whether the assertion passes, and the
@@ -46,23 +50,23 @@ func (tc assertTopFrameTestCase) Name() string {
 func (tc assertTopFrameTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	mock := &MockT{}
-	ok := AssertTopFrame(mock, tc.v, tc.want, "top frame")
+	mock := &core.MockT{}
+	ok := core.AssertTopFrame(mock, tc.v, tc.want, "top frame")
 
-	mustMock := &MockT{}
-	mustOK := mustMock.Run("must", func(mt T) {
-		AssertMustTopFrame(mt, tc.v, tc.want, "top frame")
-		mt.Log(mustContinuationLog)
+	mustMock := &core.MockT{}
+	mustOK := mustMock.Run("must", func(mt core.T) {
+		core.AssertMustTopFrame(mt, tc.v, tc.want, "top frame")
+		mt.Log(core.MustContinuationLogForTest)
 	})
 
 	if !tc.wantPass {
 		assertFailed(t, mock, ok, tc.failure, "AssertTopFrame")
-		assertMustAborted(t, mustMock, mustOK)
+		core.AssertMustAbortedForTest(t, mustMock, mustOK)
 		return
 	}
 
 	assertPassed(t, mock, ok, "AssertTopFrame")
-	assertMustContinued(t, mustMock, mustOK)
+	core.AssertMustContinuedForTest(t, mustMock, mustOK)
 }
 
 // assertTopFrameTestCases lists the values AssertTopFrame passes, then
@@ -70,26 +74,26 @@ func (tc assertTopFrameTestCase) Test(t *testing.T) {
 // stack starts in NewPanicPayloadForTest itself; a zero PanicError
 // carries no stack.
 func assertTopFrameTestCases() []assertTopFrameTestCase {
-	return S(
+	return core.S(
 		newAssertTopFrameTestCase("PanicError",
-			NewPanicPayloadForTest(), "NewPanicPayloadForTest"),
+			core.NewPanicPayloadForTest(), "NewPanicPayloadForTest"),
 		newAssertTopFrameTestCase("Catch of a plain panic",
-			Catch(PanicPlainForTest), "PanicPlainForTest"),
+			core.Catch(core.PanicPlainForTest), "PanicPlainForTest"),
 
 		newAssertTopFrameTestCaseFails("other top frame",
-			NewPanicPayloadForTest(), "callPanic",
+			core.NewPanicPayloadForTest(), "callPanic",
 			`got "NewPanicPayloadForTest"`),
 		newAssertTopFrameTestCaseFails("nil",
 			nil, "NewPanicPayloadForTest", "got nil"),
 		newAssertTopFrameTestCaseFails("nil PanicError",
-			(*PanicError)(nil), "NewPanicPayloadForTest", "got nil"),
+			(*core.PanicError)(nil), "NewPanicPayloadForTest", "got nil"),
 		newAssertTopFrameTestCaseFails("not a CallStacker",
-			ErrSentinelForTest, "NewPanicPayloadForTest", "expected a CallStacker"),
+			core.ErrSentinelForTest, "NewPanicPayloadForTest", "expected a CallStacker"),
 		newAssertTopFrameTestCaseFails("empty stack",
-			&PanicError{}, "NewPanicPayloadForTest", "empty call stack"),
+			&core.PanicError{}, "NewPanicPayloadForTest", "empty call stack"),
 	)
 }
 
 func TestAssertTopFrame(t *testing.T) {
-	RunTestCases(t, assertTopFrameTestCases())
+	core.RunTestCases(t, assertTopFrameTestCases())
 }

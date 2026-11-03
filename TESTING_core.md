@@ -86,8 +86,8 @@ func TestAssertComparable(t *testing.T) {
 ```
 
 The tests of the trusted ground make their plain checks through `plainEqual`
-and `plainContains`, defined in `testing_test.go`: they compare and report
-without an assertion.
+and `plainContains`, defined in `testutils_internal_test.go`: they compare
+and report without an assertion.
 
 **❌ Circular Testing Anti-Patterns:**
 
