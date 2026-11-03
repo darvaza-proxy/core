@@ -178,7 +178,7 @@ func TestAssertEqual(t *testing.T) {
 		"slice")
 
 	mock.Reset()
-	assertPassed(t, mock, AssertEqual(mock, eqSlice{1}, eqSlice{1},
+	assertPassed(t, mock, AssertEqual(mock, EqSliceForTest{1}, EqSliceForTest{1},
 		"Equal method test"), "Equal method")
 
 	mock.Reset()

@@ -1,30 +1,20 @@
-package core
+package core_test
 
 import (
-	"fmt"
-	"math"
 	"reflect"
-	"slices"
-	"sync/atomic"
 	"testing"
 	"time"
-	"unsafe"
+
+	"darvaza.org/core"
 )
 
 // TestCase validations
 var (
-	_ TestCase = zeroTestCase[int]{}
-	_ TestCase = zeroRefTestCase[int]{}
-	_ TestCase = isZeroTestCase{}
-	_ TestCase = isNilTestCase{}
-	_ TestCase = isNilVsIsZeroTestCase{}
-	_ TestCase = initializationSemanticsTestCase{}
-	_ TestCase = isSameTestCase{}
-	_ TestCase = isSameStackOverflowTestCase{}
-	_ TestCase = isZeroCustomInterfaceTestCase{}
-	_ TestCase = areComparableTestCase{}
-	_ TestCase = comparableEqualTestCase{}
-	_ TestCase = areEqualTestCase{}
+	_ core.TestCase = zeroTestCase[int]{}
+	_ core.TestCase = zeroRefTestCase[int]{}
+	_ core.TestCase = isZeroTestCase{}
+	_ core.TestCase = initializationSemanticsTestCase{}
+	_ core.TestCase = isZeroCustomInterfaceTestCase{}
 )
 
 type zeroTestCase[T comparable] struct {
@@ -39,8 +29,8 @@ func (tc zeroTestCase[T]) Name() string {
 
 func (tc zeroTestCase[T]) Test(t *testing.T) {
 	t.Helper()
-	result := Zero(tc.factory())
-	AssertEqual(t, tc.expected, result, "Zero[%T]", tc.expected)
+	result := core.Zero(tc.factory())
+	core.AssertEqual(t, tc.expected, result, "Zero[%T]", tc.expected)
 }
 
 // Generic test case for reference types that should return nil
@@ -55,8 +45,8 @@ func (tc zeroRefTestCase[T]) Name() string {
 
 func (tc zeroRefTestCase[T]) Test(t *testing.T) {
 	t.Helper()
-	result := Zero(tc.factory())
-	AssertNil(t, result, "Zero[%T]", *new(T))
+	result := core.Zero(tc.factory())
+	core.AssertNil(t, result, "Zero[%T]", *new(T))
 }
 
 func newZeroTestCase[T comparable](name string, expected T, factory func() *T) zeroTestCase[T] {
@@ -74,68 +64,68 @@ func newZeroRefTestCase[T any](name string, factory func() *T) zeroRefTestCase[T
 	}
 }
 
-var zeroIntTestCases = S(
+var zeroIntTestCases = core.S(
 	newZeroTestCase("nil pointer", 0, func() *int { return nil }),
 	newZeroTestCase("non-nil pointer", 0, func() *int { v := 42; return &v }),
 )
 
-var zeroStringTestCases = S(
+var zeroStringTestCases = core.S(
 	newZeroTestCase("nil pointer", "", func() *string { return nil }),
 	newZeroTestCase("non-nil pointer", "", func() *string { v := "hello"; return &v }),
 )
 
-var zeroBoolTestCases = S(
+var zeroBoolTestCases = core.S(
 	newZeroTestCase("nil pointer", false, func() *bool { return nil }),
 	newZeroTestCase("non-nil pointer", false, func() *bool { v := true; return &v }),
 )
 
-var zeroTimeTestCases = S(
+var zeroTimeTestCases = core.S(
 	newZeroTestCase("nil pointer", time.Time{}, func() *time.Time { return nil }),
 	newZeroTestCase("non-nil pointer", time.Time{}, func() *time.Time { v := time.Now(); return &v }),
 )
 
-var zeroSliceTestCases = S(
+var zeroSliceTestCases = core.S(
 	newZeroRefTestCase("nil slice pointer", func() *[]int { return nil }),
-	newZeroRefTestCase("non-nil slice pointer", func() *[]int { v := S(1, 2, 3); return &v }),
+	newZeroRefTestCase("non-nil slice pointer", func() *[]int { v := core.S(1, 2, 3); return &v }),
 )
 
-var zeroMapTestCases = S(
+var zeroMapTestCases = core.S(
 	newZeroRefTestCase("nil map pointer", func() *map[string]int { return nil }),
 	newZeroRefTestCase("non-nil map pointer", func() *map[string]int { v := map[string]int{"a": 1}; return &v }),
 )
 
-var zeroPointerTestCases = S(
+var zeroPointerTestCases = core.S(
 	newZeroRefTestCase("nil double pointer", func() **int { return nil }),
 	newZeroRefTestCase("non-nil double pointer", func() **int { v := 42; vp := &v; return &vp }),
 )
 
-var zeroInterfaceTestCases = S(
+var zeroInterfaceTestCases = core.S(
 	newZeroRefTestCase("nil interface pointer", func() *any { return nil }),
 	newZeroRefTestCase("non-nil interface pointer", func() *any { var v any = 42; return &v }),
 )
 
-var zeroChannelTestCases = S(
+var zeroChannelTestCases = core.S(
 	newZeroRefTestCase("nil channel pointer", func() *chan int { return nil }),
 	newZeroRefTestCase("non-nil channel pointer", func() *chan int { ch := make(chan int); return &ch }),
 )
 
-var zeroFuncTestCases = S(
+var zeroFuncTestCases = core.S(
 	newZeroRefTestCase("nil func pointer", func() *func() { return nil }),
 	newZeroRefTestCase("non-nil func pointer", func() *func() { fn := func() {}; return &fn }),
 )
 
 func TestZero(t *testing.T) {
-	t.Run("int", func(t *testing.T) { RunTestCases(t, zeroIntTestCases) })
-	t.Run("string", func(t *testing.T) { RunTestCases(t, zeroStringTestCases) })
-	t.Run("bool", func(t *testing.T) { RunTestCases(t, zeroBoolTestCases) })
-	t.Run("slice", func(t *testing.T) { RunTestCases(t, zeroSliceTestCases) })
-	t.Run("map", func(t *testing.T) { RunTestCases(t, zeroMapTestCases) })
-	t.Run("pointer", func(t *testing.T) { RunTestCases(t, zeroPointerTestCases) })
+	t.Run("int", func(t *testing.T) { core.RunTestCases(t, zeroIntTestCases) })
+	t.Run("string", func(t *testing.T) { core.RunTestCases(t, zeroStringTestCases) })
+	t.Run("bool", func(t *testing.T) { core.RunTestCases(t, zeroBoolTestCases) })
+	t.Run("slice", func(t *testing.T) { core.RunTestCases(t, zeroSliceTestCases) })
+	t.Run("map", func(t *testing.T) { core.RunTestCases(t, zeroMapTestCases) })
+	t.Run("pointer", func(t *testing.T) { core.RunTestCases(t, zeroPointerTestCases) })
 	t.Run("struct", testZeroStruct)
-	t.Run("interface", func(t *testing.T) { RunTestCases(t, zeroInterfaceTestCases) })
-	t.Run("channel", func(t *testing.T) { RunTestCases(t, zeroChannelTestCases) })
-	t.Run("func", func(t *testing.T) { RunTestCases(t, zeroFuncTestCases) })
-	t.Run("time", func(t *testing.T) { RunTestCases(t, zeroTimeTestCases) })
+	t.Run("interface", func(t *testing.T) { core.RunTestCases(t, zeroInterfaceTestCases) })
+	t.Run("channel", func(t *testing.T) { core.RunTestCases(t, zeroChannelTestCases) })
+	t.Run("func", func(t *testing.T) { core.RunTestCases(t, zeroFuncTestCases) })
+	t.Run("time", func(t *testing.T) { core.RunTestCases(t, zeroTimeTestCases) })
 }
 
 func testZeroStruct(t *testing.T) {
@@ -156,7 +146,7 @@ func testZeroStruct(t *testing.T) {
 		newZeroTestCase("non-nil pointer", testStruct{}, newTestStructPtr),
 	}
 
-	RunTestCases(t, structTests)
+	core.RunTestCases(t, structTests)
 }
 
 type isZeroTestCase struct {
@@ -172,8 +162,8 @@ func (tc isZeroTestCase) Name() string {
 func (tc isZeroTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	result := IsZero(tc.value)
-	AssertEqual(t, tc.expected, result, "IsZero result")
+	result := core.IsZero(tc.value)
+	core.AssertEqual(t, tc.expected, result, "IsZero result")
 }
 
 func newIsZeroTestCase(name string, value any, expected bool) isZeroTestCase {
@@ -228,7 +218,7 @@ func TestIsZero(t *testing.T) {
 		newIsZeroTestCase("non-zero uintptr", uintptr(0x12345678), false),
 	}
 
-	RunTestCases(t, zeroTests)
+	core.RunTestCases(t, zeroTests)
 }
 
 // Test IsZero with interfaces containing values
@@ -252,12 +242,13 @@ func TestIsZeroInterface(t *testing.T) {
 		// interface containing non-empty string
 		newIsZeroTestCase("interface containing non-empty string", any("hello"), false),
 		// interface containing empty slice
-		newIsZeroTestCase("interface containing empty slice", any(S[int]()), false), // empty slice is not a zero value
+		newIsZeroTestCase("interface containing empty slice", any(core.S[int]()),
+			false), // empty slice is not a zero value
 		// interface containing nil slice
 		newIsZeroTestCase("interface containing nil slice", any([]int(nil)), true),
 	}
 
-	RunTestCases(t, interfaceTests)
+	core.RunTestCases(t, interfaceTests)
 }
 
 // Test IsZero with edge cases
@@ -265,8 +256,8 @@ func TestIsZeroEdgeCases(t *testing.T) {
 	edgeTests := []isZeroTestCase{
 		// Slices
 		newIsZeroTestCase("nil slice", []int(nil), true),
-		newIsZeroTestCase("empty slice", S[int](), false),
-		newIsZeroTestCase("non-empty slice", S(1, 2, 3), false),
+		newIsZeroTestCase("empty slice", core.S[int](), false),
+		newIsZeroTestCase("non-empty slice", core.S(1, 2, 3), false),
 		// Maps
 		newIsZeroTestCase("nil map", map[string]int(nil), true),
 		newIsZeroTestCase("empty map", map[string]int{}, false),
@@ -283,7 +274,7 @@ func TestIsZeroEdgeCases(t *testing.T) {
 		newIsZeroTestCase("partially zero array", [3]int{0, 0, 1}, false),
 	}
 
-	RunTestCases(t, edgeTests)
+	core.RunTestCases(t, edgeTests)
 }
 
 func TestZeroEdgeCases(t *testing.T) {
@@ -300,7 +291,7 @@ func TestZeroEdgeCases(t *testing.T) {
 }
 
 func isZeroReflectValueTestCases() []isZeroTestCase {
-	return S(
+	return core.S(
 		// Invalid reflect.Value
 		newIsZeroTestCase("invalid reflect.Value", reflect.Value{}, true),
 
@@ -323,7 +314,7 @@ func isZeroReflectValueTestCases() []isZeroTestCase {
 }
 
 func TestIsZeroReflectValue(t *testing.T) {
-	RunTestCases(t, isZeroReflectValueTestCases())
+	core.RunTestCases(t, isZeroReflectValueTestCases())
 }
 
 type complexStruct struct {
@@ -349,7 +340,7 @@ func TestIsZeroComplexStruct(t *testing.T) {
 			SliceField: nil,
 		}, true),
 		newIsZeroTestCase("struct with empty slice", complexStruct{
-			SliceField: S[int](),
+			SliceField: core.S[int](),
 		}, false),
 		newIsZeroTestCase("struct with nil map", complexStruct{
 			MapField: nil,
@@ -359,7 +350,7 @@ func TestIsZeroComplexStruct(t *testing.T) {
 		}, false),
 	}
 
-	RunTestCases(t, complexTests)
+	core.RunTestCases(t, complexTests)
 }
 
 // Test IsZero with pointers
@@ -382,7 +373,7 @@ func TestIsZeroPointers(t *testing.T) {
 		newIsZeroTestCase("pointer to nil pointer", ptrToNilPtr, false),
 	}
 
-	RunTestCases(t, ptrTests)
+	core.RunTestCases(t, ptrTests)
 }
 
 type outerStruct struct {
@@ -409,291 +400,7 @@ func TestIsZeroNestedStructs(t *testing.T) {
 		newIsZeroTestCase("nil pointer to nested struct", nilOuterPtr, true),
 	}
 
-	RunTestCases(t, nestedTests)
-}
-
-// isNilTestCase tests IsNil function
-type isNilTestCase struct {
-	value    any
-	name     string
-	expected bool
-}
-
-func (tc isNilTestCase) Name() string {
-	return tc.name
-}
-
-func (tc isNilTestCase) Test(t *testing.T) {
-	t.Helper()
-
-	result := IsNil(tc.value)
-	assertComparable(t, tc.expected, result, "IsNil result")
-}
-
-func newIsNilTestCase(name string, value any, expected bool) isNilTestCase {
-	return isNilTestCase{
-		value:    value,
-		name:     name,
-		expected: expected,
-	}
-}
-
-func TestIsNil(t *testing.T) {
-	t.Run("basic", testIsNilBasic)
-	t.Run("pointers", testIsNilPointers)
-	t.Run("slices", testIsNilSlices)
-	t.Run("maps", testIsNilMaps)
-	t.Run("channels", testIsNilChannels)
-	t.Run("functions", testIsNilFunctions)
-	t.Run("interfaces", testIsNilInterfaces)
-}
-
-func testIsNilBasic(t *testing.T) {
-	t.Helper()
-
-	nilTests := []isNilTestCase{
-		newIsNilTestCase("nil", nil, true),
-		newIsNilTestCase("non-nil int", 42, false),
-		newIsNilTestCase("zero int", 0, false),
-		newIsNilTestCase("non-nil string", "hello", false),
-		newIsNilTestCase("empty string", "", false),
-		newIsNilTestCase("non-nil bool", true, false),
-		newIsNilTestCase("false bool", false, false),
-	}
-
-	RunTestCases(t, nilTests)
-}
-
-func testIsNilPointers(t *testing.T) {
-	t.Helper()
-
-	var nilPtr *int
-	nonNilPtr := new(int)
-
-	ptrTests := []isNilTestCase{
-		newIsNilTestCase("nil pointer", nilPtr, true),
-		newIsNilTestCase("non-nil pointer", nonNilPtr, false),
-	}
-
-	RunTestCases(t, ptrTests)
-}
-
-// isNilVsIsZeroTestCase tests both IsNil and IsZero behaviour on the same value
-type isNilVsIsZeroTestCase struct {
-	value        any
-	name         string
-	description  string
-	expectedNil  bool
-	expectedZero bool
-}
-
-func (tc isNilVsIsZeroTestCase) Name() string {
-	return tc.name
-}
-
-func (tc isNilVsIsZeroTestCase) Test(t *testing.T) {
-	t.Helper()
-
-	nilResult := IsNil(tc.value)
-	zeroResult := IsZero(tc.value)
-
-	assertComparable(t, tc.expectedNil, nilResult, "%s - IsNil result", tc.description)
-	assertComparable(t, tc.expectedZero, zeroResult, "%s - IsZero result", tc.description)
-}
-
-func newIsNilVsIsZeroTestCase(name string, value any, expectedNil, expectedZero bool,
-	description string) isNilVsIsZeroTestCase {
-	return isNilVsIsZeroTestCase{
-		name:         name,
-		value:        value,
-		expectedNil:  expectedNil,
-		expectedZero: expectedZero,
-		description:  description,
-	}
-}
-
-func isNilVsIsZeroTestCases() []isNilVsIsZeroTestCase {
-	return S(
-		// Basic types: not nil but can be zero
-		newIsNilVsIsZeroTestCase("zero int", 0, false, true, "zero int is not nil but is zero"),
-		newIsNilVsIsZeroTestCase("non-zero int", 42, false, false, "non-zero int is neither nil nor zero"),
-		newIsNilVsIsZeroTestCase("zero string", "", false, true, "zero string is not nil but is zero"),
-		newIsNilVsIsZeroTestCase("non-zero string", "hello", false, false, "non-zero string is neither nil nor zero"),
-
-		// Pointer types: can be both nil and zero
-		newIsNilVsIsZeroTestCase("nil pointer", (*int)(nil), true, true, "nil pointer is both nil and zero"),
-		newIsNilVsIsZeroTestCase("non-nil pointer", new(int), false, false, "non-nil pointer is neither nil nor zero"),
-
-		// Slice types: nil vs empty distinction
-		newIsNilVsIsZeroTestCase("nil slice", []int(nil), true, true, "nil slice is both nil and zero"),
-		newIsNilVsIsZeroTestCase("empty slice", []int{}, false, false,
-			"empty slice is neither nil nor zero"),
-		newIsNilVsIsZeroTestCase("non-empty slice", []int{1, 2}, false, false,
-			"non-empty slice is neither nil nor zero"),
-
-		// Map types: nil vs empty distinction
-		newIsNilVsIsZeroTestCase("nil map", map[string]int(nil), true, true, "nil map is both nil and zero"),
-		newIsNilVsIsZeroTestCase("empty map", map[string]int{}, false, false, "empty map is neither nil nor zero"),
-		newIsNilVsIsZeroTestCase("non-empty map", map[string]int{"a": 1}, false, false,
-			"non-empty map is neither nil nor zero"),
-
-		// Channel types
-		newIsNilVsIsZeroTestCase("nil channel", (chan int)(nil), true, true, "nil channel is both nil and zero"),
-		newIsNilVsIsZeroTestCase("non-nil channel", make(chan int), false, false,
-			"non-nil channel is neither nil nor zero"),
-
-		// Function types
-		newIsNilVsIsZeroTestCase("nil function", (func())(nil), true, true, "nil function is both nil and zero"),
-		newIsNilVsIsZeroTestCase("non-nil function", func() {}, false, false,
-			"non-nil function is neither nil nor zero"),
-
-		// Interface types
-		newIsNilVsIsZeroTestCase("nil interface", (any)(nil), true, true, "nil interface is both nil and zero"),
-		newIsNilVsIsZeroTestCase("non-nil interface", any(42), false, false,
-			"non-nil interface is neither nil nor zero"),
-
-		// Struct types: cannot be nil
-		newIsNilVsIsZeroTestCase("zero struct", struct{}{}, false, true, "zero struct is not nil but is zero"),
-		newIsNilVsIsZeroTestCase("non-zero struct", struct{ Name string }{Name: "test"}, false, false,
-			"non-zero struct is neither nil nor zero"),
-	)
-}
-
-func TestIsNilVsIsZero(t *testing.T) {
-	RunTestCases(t, isNilVsIsZeroTestCases())
-}
-
-func isNilReflectValueTestCases() []isNilTestCase {
-	return S(
-		// Invalid reflect.Value
-		newIsNilTestCase("invalid reflect.Value", reflect.Value{}, true),
-
-		// Valid reflect.Value containing nil
-		newIsNilTestCase("reflect.Value containing nil pointer", reflect.ValueOf((*int)(nil)), true),
-		newIsNilTestCase("reflect.Value containing nil slice", reflect.ValueOf([]int(nil)), true),
-		newIsNilTestCase("reflect.Value containing nil map", reflect.ValueOf(map[string]int(nil)), true),
-
-		// Valid reflect.Value containing non-nil
-		newIsNilTestCase("reflect.Value containing non-nil pointer", reflect.ValueOf(new(int)), false),
-		newIsNilTestCase("reflect.Value containing empty slice", reflect.ValueOf([]int{}), false),
-		newIsNilTestCase("reflect.Value containing empty map", reflect.ValueOf(map[string]int{}), false),
-
-		// reflect.Value containing basic types (cannot be nil)
-		newIsNilTestCase("reflect.Value containing int", reflect.ValueOf(42), false),
-		newIsNilTestCase("reflect.Value containing string", reflect.ValueOf("hello"), false),
-		newIsNilTestCase("reflect.Value containing bool", reflect.ValueOf(true), false),
-	)
-}
-
-func TestIsNilWithReflectValue(t *testing.T) {
-	RunTestCases(t, isNilReflectValueTestCases())
-}
-
-func testIsNilSlices(t *testing.T) {
-	t.Helper()
-
-	var nilSlice []int
-	emptySlice := S[int]()
-	nonEmptySlice := S(1, 2, 3)
-
-	sliceTests := []isNilTestCase{
-		newIsNilTestCase("nil slice", nilSlice, true),
-		newIsNilTestCase("empty slice", emptySlice, false),
-		newIsNilTestCase("non-empty slice", nonEmptySlice, false),
-	}
-
-	RunTestCases(t, sliceTests)
-}
-
-func testIsNilMaps(t *testing.T) {
-	t.Helper()
-
-	var nilMap map[string]int
-	emptyMap := map[string]int{}
-	nonEmptyMap := map[string]int{"a": 1}
-
-	mapTests := []isNilTestCase{
-		newIsNilTestCase("nil map", nilMap, true),
-		newIsNilTestCase("empty map", emptyMap, false),
-		newIsNilTestCase("non-empty map", nonEmptyMap, false),
-	}
-
-	RunTestCases(t, mapTests)
-}
-
-func testIsNilChannels(t *testing.T) {
-	t.Helper()
-
-	var nilChan chan int
-	nonNilChan := make(chan int)
-
-	chanTests := []isNilTestCase{
-		newIsNilTestCase("nil channel", nilChan, true),
-		newIsNilTestCase("non-nil channel", nonNilChan, false),
-	}
-
-	RunTestCases(t, chanTests)
-}
-
-func testIsNilFunctions(t *testing.T) {
-	t.Helper()
-
-	var nilFunc func()
-	nonNilFunc := func() {}
-
-	funcTests := []isNilTestCase{
-		newIsNilTestCase("nil function", nilFunc, true),
-		newIsNilTestCase("non-nil function", nonNilFunc, false),
-	}
-
-	RunTestCases(t, funcTests)
-}
-
-func testIsNilInterfaces(t *testing.T) {
-	t.Helper()
-
-	var nilInterface fmt.Stringer
-	var nonNilInterface fmt.Stringer = time.Second // time.Duration implements fmt.Stringer
-
-	interfaceTests := []isNilTestCase{
-		newIsNilTestCase("nil interface", nilInterface, true),
-		newIsNilTestCase("non-nil interface", nonNilInterface, false),
-	}
-
-	RunTestCases(t, interfaceTests)
-}
-
-func isNilTypedInterfaceTestCases() []isNilTestCase {
-	var nilPtr *int
-	var typedNilInterface any = nilPtr
-
-	ptrArray := []*int{nil, nil, nil}
-	nilValueMap := map[string]*int{"key": nil}
-	var nilChan chan int
-	closedChan := make(chan int)
-	close(closedChan)
-
-	return S(
-		// Typed nil in interface
-		newIsNilTestCase("interface containing typed nil pointer", typedNilInterface, true),
-
-		// Array/slice with nil elements
-		newIsNilTestCase("array with nil elements", ptrArray, false),
-		newIsNilTestCase("nil element in array", ptrArray[0], true),
-
-		// Map with nil values
-		newIsNilTestCase("map with nil values", nilValueMap, false),
-		newIsNilTestCase("nil value in map", nilValueMap["key"], true),
-
-		// Channel operations
-		newIsNilTestCase("nil channel", nilChan, true),
-		newIsNilTestCase("closed channel", closedChan, false),
-	)
-}
-
-// Test IsNil with typed nil in interface
-func TestIsNilTypedInterface(t *testing.T) {
-	RunTestCases(t, isNilTypedInterfaceTestCases())
+	core.RunTestCases(t, nestedTests)
 }
 
 // initializationSemanticsTestCase tests initialization semantics patterns
@@ -711,8 +418,8 @@ func (tc initializationSemanticsTestCase) Name() string {
 func (tc initializationSemanticsTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	result := IsZero(tc.value)
-	AssertEqual(t, tc.expected, result, tc.description)
+	result := core.IsZero(tc.value)
+	core.AssertEqual(t, tc.expected, result, tc.description)
 }
 
 func newInitializationSemanticsTestCase(
@@ -727,7 +434,7 @@ func newInitializationSemanticsTestCase(
 }
 
 func initializationSemanticsTestCases() []initializationSemanticsTestCase {
-	return S(
+	return core.S(
 		// Slices: nil vs initialized empty
 		newInitializationSemanticsTestCase("nil slice", []int(nil), true, "nil slice needs initialization"),
 		newInitializationSemanticsTestCase("empty slice", []int{}, false, "empty slice is already initialized"),
@@ -768,7 +475,7 @@ func initializationSemanticsTestCases() []initializationSemanticsTestCase {
 
 func TestIsZeroInitializationSemantics(t *testing.T) {
 	// Test the key insight: initialized vs uninitialized state
-	RunTestCases(t, initializationSemanticsTestCases())
+	core.RunTestCases(t, initializationSemanticsTestCases())
 }
 
 func TestIsZeroPracticalInitialization(t *testing.T) {
@@ -776,669 +483,102 @@ func TestIsZeroPracticalInitialization(t *testing.T) {
 
 	// Example 1: Lazy initialization of slice
 	var items []string
-	if IsZero(items) {
+	if core.IsZero(items) {
 		items = []string{"default", "values"}
 	}
-	AssertSliceEqual(t, []string{"default", "values"}, items, "slice should be initialized")
+	core.AssertSliceEqual(t, []string{"default", "values"}, items, "slice should be initialized")
 
 	// Items is now initialized, so IsZero returns false
-	AssertFalse(t, IsZero(items), "initialized slice zero")
+	core.AssertFalse(t, core.IsZero(items), "initialized slice zero")
 
 	// Example 2: Conditional map initialization
 	var cache map[string]int
-	if IsZero(cache) {
+	if core.IsZero(cache) {
 		cache = make(map[string]int)
 	}
 	cache["key"] = 42
-	AssertEqual(t, 42, cache["key"], "map should be usable after initialization")
+	core.AssertEqual(t, 42, cache["key"], "map should be usable after initialization")
 
 	// Example 3: Pointer initialization
 	var ptr *int
-	if IsZero(ptr) {
+	if core.IsZero(ptr) {
 		value := 100
 		ptr = &value
 	}
-	AssertEqual(t, 100, *ptr, "pointer should point to initialized value")
+	core.AssertEqual(t, 100, *ptr, "pointer should point to initialized value")
 
 	// Example 4: Channel initialization
 	var ch chan int
-	if IsZero(ch) {
+	if core.IsZero(ch) {
 		ch = make(chan int, 1)
 	}
 	ch <- 42
 	result := <-ch
-	AssertEqual(t, 42, result, "channel should be usable after initialization")
+	core.AssertEqual(t, 42, result, "channel should be usable after initialization")
 
 	// Example 5: Function initialization
 	var fn func() string
-	if IsZero(fn) {
+	if core.IsZero(fn) {
 		fn = func() string { return "initialized" }
 	}
-	AssertEqual(t, "initialized", fn(), "function should be callable after initialization")
+	core.AssertEqual(t, "initialized", fn(), "function should be callable after initialization")
 }
 
 func testZeroEdgeCasesNilSlicePointer(t *testing.T) {
 	t.Helper()
-	items := Zero[[]string](nil)
-	AssertNil(t, items, "Zero(nil)")
+	items := core.Zero[[]string](nil)
+	core.AssertNil(t, items, "Zero(nil)")
 
 	// Initialize the slice
-	items = S("default", "values")
-	AssertSliceEqual(t, S("default", "values"), items, "initialized slice")
+	items = core.S("default", "values")
+	core.AssertSliceEqual(t, core.S("default", "values"), items, "initialized slice")
 
 	// Check that it's not zero after initialization
-	AssertEqual(t, false, IsZero(items), "IsZero(initialized)")
+	core.AssertEqual(t, false, core.IsZero(items), "IsZero(initialized)")
 }
 
 func testZeroEdgeCasesNilMapPointer(t *testing.T) {
 	t.Helper()
-	cache := Zero[map[string]int](nil)
-	AssertNil(t, cache, "Zero(nil)")
+	cache := core.Zero[map[string]int](nil)
+	core.AssertNil(t, cache, "Zero(nil)")
 
 	// Initialize and use the map
 	cache = make(map[string]int)
 	cache["key"] = 42
-	AssertEqual(t, 42, cache["key"], "map value")
+	core.AssertEqual(t, 42, cache["key"], "map value")
 }
 
 func testZeroEdgeCasesNilPointerPointer(t *testing.T) {
 	t.Helper()
-	ptr := Zero[*int](nil)
-	AssertNil(t, ptr, "Zero(nil)")
+	ptr := core.Zero[*int](nil)
+	core.AssertNil(t, ptr, "Zero(nil)")
 
 	// Initialize the pointer
 	value := 100
 	ptr = &value
-	AssertEqual(t, 100, *ptr, "pointer value")
+	core.AssertEqual(t, 100, *ptr, "pointer value")
 }
 
 func testZeroEdgeCasesNilChannelPointer(t *testing.T) {
 	t.Helper()
-	ch := Zero[chan int](nil)
-	AssertNil(t, ch, "Zero(nil)")
+	ch := core.Zero[chan int](nil)
+	core.AssertNil(t, ch, "Zero(nil)")
 
 	// Initialize and use the channel
 	ch = make(chan int, 1)
 	ch <- 42
 	result := <-ch
-	AssertEqual(t, 42, result, "channel value")
+	core.AssertEqual(t, 42, result, "channel value")
 }
 
 func testZeroEdgeCasesNilFuncPointer(t *testing.T) {
 	t.Helper()
-	fn := Zero[func() string](nil)
-	AssertNil(t, fn, "Zero(nil)")
+	fn := core.Zero[func() string](nil)
+	core.AssertNil(t, fn, "Zero(nil)")
 
 	// Initialize the function
 	fn = func() string { return "initialized" }
-	AssertEqual(t, "initialized", fn(), "function result")
-}
-
-// isSameTestCase tests IsSame function
-type isSameTestCase struct {
-	// Large fields first (interfaces, strings) - 8+ bytes
-	a           any
-	b           any
-	description string
-	name        string
-
-	// Small fields last (booleans) - 1 byte
-	expected bool
-}
-
-func (tc isSameTestCase) Name() string {
-	return tc.name
-}
-
-func (tc isSameTestCase) Test(t *testing.T) {
-	t.Helper()
-
-	result := IsSame(tc.a, tc.b)
-	assertComparable(t, tc.expected, result, "%s", tc.description)
-}
-
-func newIsSameTestCase(name string, a, b any, expected bool,
-	description string) isSameTestCase {
-	return isSameTestCase{
-		name:        name,
-		a:           a,
-		b:           b,
-		expected:    expected,
-		description: description,
-	}
-}
-
-func isSameValueTypeTestCases() []isSameTestCase {
-	return S(
-		// Value types - compared by equality
-		newIsSameTestCase("same integers", 42, 42, true,
-			"same integers should be same"),
-		newIsSameTestCase("different integers", 42, 43, false,
-			"different integers should not be same"),
-		newIsSameTestCase("same strings", "hello", "hello", true,
-			"same strings should be same"),
-		newIsSameTestCase("different strings", "hello", "world", false,
-			"different strings should not be same"),
-		newIsSameTestCase("same booleans", true, true, true,
-			"same booleans should be same"),
-		newIsSameTestCase("different booleans", true, false, false,
-			"different booleans should not be same"),
-		newIsSameTestCase("same floats", 3.14, 3.14, true,
-			"same floats should be same"),
-		newIsSameTestCase("different floats", 3.14, 2.71, false,
-			"different floats should not be same"),
-		// Arrays and structs have no pointer-based sameness; both fall
-		// through to the empty default branch of isSamePointer.
-		newIsSameTestCase("same arrays", [2]int{1, 2}, [2]int{1, 2}, false,
-			"arrays fall through to the default branch"),
-		newIsSameTestCase("same structs",
-			struct{ X int }{X: 1}, struct{ X int }{X: 1}, false,
-			"structs fall through to the default branch"),
-	)
-}
-
-func isSameReferenceTypeTestCases() []isSameTestCase {
-	slice1 := S(1, 2, 3)
-	slice2 := slice1
-	slice3 := S(1, 2, 3)
-
-	map1 := map[string]int{"a": 1}
-	map2 := map1
-	map3 := map[string]int{"a": 1}
-
-	ch1 := make(chan int)
-	ch2 := ch1
-	ch3 := make(chan int)
-
-	fn1 := func() {}
-	fn2 := fn1
-	fn3 := func() {}
-
-	x := 42
-	ptr1 := &x
-	ptr2 := ptr1
-	ptr3 := &x
-
-	// Empty slices from separate make() calls
-	emptySlice1 := make([]int, 0)
-	emptySlice2 := make([]int, 0)
-
-	// Zero-length slices from same backing array
-	baseArray := []int{1, 2, 3, 4, 5}
-	zeroLen1 := baseArray[2:2] // zero-length slice at position 2
-	zeroLen2 := baseArray[2:2] // same zero-length slice
-	zeroLen3 := baseArray[3:3] // different zero-length slice from same array
-
-	return S(
-		// Slices - compared by backing array pointer
-		newIsSameTestCase("same slice reference", slice1, slice2, true,
-			"slices with same backing array should be same"),
-		newIsSameTestCase("different slice reference", slice1, slice3, false,
-			"slices with different backing arrays should not be same"),
-
-		// Empty slice tests
-		newIsSameTestCase("two empty slices from separate make()", emptySlice1, emptySlice2, false,
-			"empty slices from separate make() calls should not be same"),
-		newIsSameTestCase("zero-length slices from same position", zeroLen1, zeroLen2, true,
-			"zero-length slices from same array position should be same"),
-		newIsSameTestCase("zero-length slices from different positions", zeroLen1, zeroLen3, false,
-			"zero-length slices from different positions should not be same"),
-
-		// Maps - compared by map pointer
-		newIsSameTestCase("same map reference", map1, map2, true,
-			"maps with same reference should be same"),
-		newIsSameTestCase("different map reference", map1, map3, false,
-			"maps with different references should not be same"),
-
-		// Channels - compared by channel pointer
-		newIsSameTestCase("same channel reference", ch1, ch2, true,
-			"channels with same reference should be same"),
-		newIsSameTestCase("different channel reference", ch1, ch3, false,
-			"channels with different references should not be same"),
-
-		// Functions - compared by function pointer
-		newIsSameTestCase("same function reference", fn1, fn2, true,
-			"functions with same reference should be same"),
-		newIsSameTestCase("different function reference", fn1, fn3, false,
-			"functions with different references should not be same"),
-
-		// Pointers - compared by address
-		newIsSameTestCase("same pointer reference", ptr1, ptr2, true,
-			"pointers with same reference should be same"),
-		newIsSameTestCase("pointers to same address", ptr1, ptr3, true,
-			"pointers to same address should be same"),
-	)
-}
-
-func isSameNilTestCases() []isSameTestCase {
-	var nilSlice1, nilSlice2 []int
-	var nilMap1, nilMap2 map[string]int
-	var nilPtr1, nilPtr2 *int
-	var nilChan1, nilChan2 chan int
-	var nilFunc1, nilFunc2 func()
-
-	return S(
-		// Untyped nil
-		newIsSameTestCase("both untyped nil", nil, nil, true,
-			"both untyped nil should be same"),
-		newIsSameTestCase("untyped nil vs typed nil", nil, nilPtr1, false,
-			"untyped nil vs typed nil should not be same"),
-
-		// Typed nils of same type
-		newIsSameTestCase("same type nil slices", nilSlice1, nilSlice2, true,
-			"nil slices of same type should be same"),
-		newIsSameTestCase("same type nil maps", nilMap1, nilMap2, true,
-			"nil maps of same type should be same"),
-		newIsSameTestCase("same type nil pointers", nilPtr1, nilPtr2, true,
-			"nil pointers of same type should be same"),
-		newIsSameTestCase("same type nil channels", nilChan1, nilChan2, true,
-			"nil channels of same type should be same"),
-		newIsSameTestCase("same type nil functions", nilFunc1, nilFunc2, true,
-			"nil functions of same type should be same"),
-
-		// Nil vs non-nil
-		newIsSameTestCase("nil vs empty slice", nilSlice1, S[int](), false,
-			"nil slice vs empty slice should not be same"),
-		newIsSameTestCase("nil vs empty map", nilMap1, map[string]int{}, false,
-			"nil map vs empty map should not be same"),
-		newIsSameTestCase("nil vs non-nil pointer", nilPtr1, new(int), false,
-			"nil pointer vs non-nil pointer should not be same"),
-	)
-}
-
-func isSameDifferentTypeTestCases() []isSameTestCase {
-	return S(
-		// Different types should never be same
-		newIsSameTestCase("int vs string", 42, "42", false,
-			"different types should not be same"),
-		newIsSameTestCase("int vs float", 42, 42.0, false,
-			"different numeric types should not be same"),
-		newIsSameTestCase("slice vs array", S(1, 2, 3), [3]int{1, 2, 3}, false,
-			"slice vs array should not be same"),
-		newIsSameTestCase("int slice vs string slice", S(1, 2, 3), S("1", "2", "3"), false,
-			"slices of different types should not be same"),
-	)
-}
-
-func isSameInterfaceTestCases() []isSameTestCase {
-	x := 42
-	ptr1 := &x
-	ptr2 := ptr1
-
-	var interface1 any = ptr1
-	var interface2 any = ptr2
-	var interface3 any = &x
-
-	slice1 := S(1, 2, 3)
-	slice2 := slice1
-	var interface4 any = slice1
-	var interface5 any = slice2
-
-	// Critical nil interface cases for interface comparison coverage
-	var nilInterface1 any
-	var nilInterface2 any
-	var nonNilInterface any = 42
-
-	// Nested interface cases
-	var nestedInterface1 = interface1
-	var nestedInterface2 = interface2
-
-	return S(
-		// Both interfaces nil - handled by isSameTypedNil
-		newIsSameTestCase("both interfaces nil", nilInterface1, nilInterface2, true,
-			"both nil interfaces should be same"),
-
-		// One nil, one not nil - handled by isSameTypedNil
-		newIsSameTestCase("nil vs non-nil interface", nilInterface1, nonNilInterface, false,
-			"nil interface vs non-nil interface should not be same"),
-		newIsSameTestCase("non-nil vs nil interface", nonNilInterface, nilInterface1, false,
-			"non-nil interface vs nil interface should not be same"),
-
-		// Both non-nil interfaces - handled by interface case in isSamePointer
-		newIsSameTestCase("interfaces with same pointer", interface1, interface2, true,
-			"interfaces containing same pointer should be same"),
-		newIsSameTestCase("interfaces with pointers to same address", interface1, interface3, true,
-			"interfaces with pointers to same address should be same"),
-		newIsSameTestCase("interfaces with same slice", interface4, interface5, true,
-			"interfaces containing same slice should be same"),
-
-		// Interfaces with values
-		newIsSameTestCase("interfaces with same value", any(42), any(42), true,
-			"interfaces with same value should be same"),
-		newIsSameTestCase("interfaces with different values", any(42), any(43), false,
-			"interfaces with different values should not be same"),
-
-		// Nested interface comparisons - recursive interface handling
-		newIsSameTestCase("nested interfaces same", nestedInterface1, nestedInterface2, true,
-			"nested interfaces with same content should be same"),
-		newIsSameTestCase("interface vs nested interface", interface1, nestedInterface1, true,
-			"interface and nested interface with same content should be same"),
-
-		// Interface containing different reference types
-		newIsSameTestCase("interfaces with different slices", any(S(1, 2, 3)), any(S(1, 2, 3)), false,
-			"interfaces with different slice backing arrays should not be same"),
-		newIsSameTestCase("interfaces with different maps",
-			any(map[string]int{"a": 1}), any(map[string]int{"a": 1}), false,
-			"interfaces with different map references should not be same"),
-	)
-}
-
-// opaqueFields provides reflect.Values that cannot be unwrapped via
-// Interface(), as reached through unexported struct fields.
-type opaqueFields struct {
-	v any
-	n int
-}
-
-func isSameUnexportedFieldTestCases() []isSameTestCase {
-	a := reflect.ValueOf(opaqueFields{v: 42, n: 1})
-	b := reflect.ValueOf(opaqueFields{v: 42, n: 1})
-	plain := any(42)
-
-	return S(
-		newIsSameTestCase("unexported scalar fields",
-			a.Field(1), b.Field(1), false,
-			"fields that cannot be unwrapped are never same"),
-		newIsSameTestCase("unexported interface fields",
-			a.Field(0), b.Field(0), false,
-			"interface fields that cannot be unwrapped are never same"),
-		newIsSameTestCase("unexported vs plain value",
-			a.Field(1), reflect.ValueOf(1), false,
-			"one side that cannot be unwrapped is never same"),
-		newIsSameTestCase("plain vs unexported value",
-			reflect.ValueOf(1), a.Field(1), false,
-			"one side that cannot be unwrapped is never same"),
-		newIsSameTestCase("plain vs unexported interface",
-			reflect.ValueOf(&plain).Elem(), a.Field(0), false,
-			"one side that cannot be unwrapped is never same"),
-	)
-}
-
-func TestIsSame(t *testing.T) {
-	t.Run("value types", func(t *testing.T) {
-		RunTestCases(t, isSameValueTypeTestCases())
-	})
-	t.Run("unexported fields", func(t *testing.T) {
-		RunTestCases(t, isSameUnexportedFieldTestCases())
-	})
-	t.Run("reference types", func(t *testing.T) {
-		RunTestCases(t, isSameReferenceTypeTestCases())
-	})
-	t.Run("nil handling", func(t *testing.T) {
-		RunTestCases(t, isSameNilTestCases())
-	})
-	t.Run("different types", func(t *testing.T) {
-		RunTestCases(t, isSameDifferentTypeTestCases())
-	})
-	t.Run("interfaces", func(t *testing.T) {
-		RunTestCases(t, isSameInterfaceTestCases())
-	})
-	t.Run("unsafe pointers", func(t *testing.T) {
-		RunTestCases(t, isSameUnsafePointerTestCases())
-	})
-	t.Run("complex numbers", func(t *testing.T) {
-		RunTestCases(t, isSameComplexTestCases())
-	})
-}
-
-func isSameInterfaceReflectValueTestCases() []isSameTestCase {
-	// Create interface variables
-	var interface1 any = 42
-	var interface2 any = 42
-	var interface3 any = 43
-
-	// Create reflect.Values with Kind() == reflect.Interface
-	v1 := reflect.ValueOf(&interface1).Elem()
-	v2 := reflect.ValueOf(&interface2).Elem()
-	v3 := reflect.ValueOf(&interface3).Elem()
-
-	// Nil interface reflect.Values: Kind() == reflect.Interface and
-	// CanInterface() == true, but Elem() is the zero Value. These pin
-	// that isSameTypedNil decides them before isSameInterface calls
-	// Elem().Interface(), which would panic on a zero Value.
-	var nilInterface1, nilInterface2 any
-	nv1 := reflect.ValueOf(&nilInterface1).Elem()
-	nv2 := reflect.ValueOf(&nilInterface2).Elem()
-
-	return S(
-		// Same values in interface reflect.Values
-		newIsSameTestCase("interface reflect.Values with same value", v1, v2, true,
-			"interface reflect.Values containing same value should be same"),
-
-		// Different values in interface reflect.Values
-		newIsSameTestCase("interface reflect.Values with different values", v1, v3, false,
-			"interface reflect.Values containing different values should not be same"),
-
-		// Nil interface reflect.Values are both nil: decided as same
-		// without unwrapping, so no panic on the zero Elem().
-		newIsSameTestCase("nil interface reflect.Values", nv1, nv2, true,
-			"two nil interface reflect.Values should be same, not panic"),
-
-		// One nil, one non-nil: decided as not same, still no unwrap.
-		newIsSameTestCase("nil vs non-nil interface reflect.Value", nv1, v1, false,
-			"nil and non-nil interface reflect.Values should not be same"),
-	)
-}
-
-// Test reflect.Values with Kind() == reflect.Interface
-func TestIsSameInterfaceReflectValues(t *testing.T) {
-	RunTestCases(t, isSameInterfaceReflectValueTestCases())
-}
-
-func isSameInvalidReflectValueTestCases() []isSameTestCase {
-	invalid1 := reflect.Value{}
-	invalid2 := reflect.Value{}
-	valid := reflect.ValueOf(42)
-	var nilValue reflect.Value
-
-	return S(
-		// Two invalid reflect.Values - now returns false since we can't compare them
-		newIsSameTestCase("two invalid reflect.Values", invalid1, invalid2, false,
-			"two invalid reflect.Values cannot be compared"),
-
-		// Invalid vs valid
-		newIsSameTestCase("invalid vs valid reflect.Value", invalid1, valid, false,
-			"invalid and valid reflect.Value should not be same"),
-		newIsSameTestCase("valid vs invalid reflect.Value", valid, invalid1, false,
-			"valid and invalid reflect.Value should not be same"),
-
-		// Nil reflect.Value vs invalid
-		newIsSameTestCase("nil vs invalid reflect.Value", nilValue, invalid1, false,
-			"nil and invalid reflect.Values cannot be compared"),
-	)
-}
-
-func TestIsSameInvalidReflectValues(t *testing.T) {
-	RunTestCases(t, isSameInvalidReflectValueTestCases())
-}
-
-// isSameStackOverflowTestCase tests stack overflow scenarios for IsSame function
-type isSameStackOverflowTestCase struct {
-	// Large fields first - interfaces and strings (8+ bytes)
-	setupFunc   func() (any, any)
-	description string
-	name        string
-
-	// Small fields last - booleans (1 byte)
-	expected bool
-}
-
-func (tc isSameStackOverflowTestCase) Name() string {
-	return tc.name
-}
-
-func (tc isSameStackOverflowTestCase) Test(t *testing.T) {
-	t.Helper()
-
-	a, b := tc.setupFunc()
-	result := IsSame(a, b)
-	assertComparable(t, tc.expected, result, "%s", tc.description)
-}
-
-func newIsSameStackOverflowTestCase(name string,
-	setupFunc func() (any, any), expected bool,
-	description string) isSameStackOverflowTestCase {
-	return isSameStackOverflowTestCase{
-		name:        name,
-		setupFunc:   setupFunc,
-		expected:    expected,
-		description: description,
-	}
-}
-
-func isSameStackOverflowTestCases() []isSameStackOverflowTestCase {
-	return S(
-		// Circular interface references
-		newIsSameStackOverflowTestCase("circular interface references", func() (any, any) {
-			var a, b any
-			a = &b
-			b = &a
-			return a, b
-		}, false, "circular interface references should not be same"),
-
-		newIsSameStackOverflowTestCase("same circular reference", func() (any, any) {
-			var a any
-			a = &a
-			c := &a
-			d := &a
-			return c, d
-		}, true, "pointers to same circular reference should be same"),
-
-		// Deeply nested interfaces
-		newIsSameStackOverflowTestCase("different deep nested chains", func() (any, any) {
-			var current1 any = 42
-			for range 100 {
-				next := current1
-				current1 = &next
-			}
-
-			var current2 any = 42
-			for range 100 {
-				next := current2
-				current2 = &next
-			}
-
-			return current1, current2
-		}, false, "different deep nested chains should not be same"),
-
-		newIsSameStackOverflowTestCase("same deep nested chain", func() (any, any) {
-			var current any = 42
-			for range 100 {
-				next := current
-				current = &next
-			}
-
-			return current, current
-		}, true, "same deep nested chain should be same"),
-
-		// Self-referential structures
-		newIsSameStackOverflowTestCase("different self-referential nodes", func() (any, any) {
-			type Node struct {
-				Next  *Node
-				Value int
-			}
-
-			node1 := &Node{Value: 1}
-			node1.Next = node1
-
-			node2 := &Node{Value: 1}
-			node2.Next = node2
-
-			var interface1 any = node1
-			var interface2 any = node2
-
-			return interface1, interface2
-		}, false, "different self-referential nodes should not be same"),
-
-		newIsSameStackOverflowTestCase("same self-referential node", func() (any, any) {
-			type Node struct {
-				Next  *Node
-				Value int
-			}
-
-			node1 := &Node{Value: 1}
-			node1.Next = node1
-
-			var interface1 any = node1
-			var interface2 any = node1
-
-			return interface1, interface2
-		}, true, "same self-referential node should be same"),
-
-		newIsSameStackOverflowTestCase("nested interface with self-referential content", func() (any, any) {
-			type Node struct {
-				Next  *Node
-				Value int
-			}
-
-			node := &Node{Value: 1}
-			node.Next = node
-
-			var interface1 any = node
-			nested1 := interface1
-			nested2 := interface1
-
-			return nested1, nested2
-		}, true, "nested interfaces with same self-referential content should be same"),
-	)
-}
-
-func isSameUnsafePointerTestCases() []isSameTestCase {
-	x := 42
-	ptr := &x
-
-	// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
-	unsafePtr1 := unsafe.Pointer(ptr)
-	unsafePtr2 := unsafePtr1
-	// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
-	unsafePtr3 := unsafe.Pointer(&x) // Same address, different unsafe.Pointer
-
-	y := 42
-	// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
-	unsafePtr4 := unsafe.Pointer(&y) // Different address
-
-	return S(
-		newIsSameTestCase("same unsafe pointer", unsafePtr1, unsafePtr2, true,
-			"same unsafe pointer should be same"),
-		newIsSameTestCase("unsafe pointers to same address", unsafePtr1, unsafePtr3, true,
-			"unsafe pointers to same address should be same"),
-		newIsSameTestCase("unsafe pointers to different addresses", unsafePtr1, unsafePtr4, false,
-			"unsafe pointers to different addresses should not be same"),
-
-		// Nil unsafe pointers
-		newIsSameTestCase("nil unsafe pointers",
-			// skipcq: GSC-G103 - Testing IsSame's handling of unsafe.Pointer
-			unsafe.Pointer(nil), unsafe.Pointer(nil), true,
-			"nil unsafe pointers should be same"),
-	)
-}
-
-func isSameComplexTestCases() []isSameTestCase {
-	return S(
-		// Complex64
-		newIsSameTestCase("same complex64", complex64(1+2i), complex64(1+2i), true,
-			"same complex64 values should be same"),
-		newIsSameTestCase("different complex64", complex64(1+2i), complex64(1+3i), false,
-			"different complex64 values should not be same"),
-
-		// Complex128
-		newIsSameTestCase("same complex128", complex128(1+2i), complex128(1+2i), true,
-			"same complex128 values should be same"),
-		newIsSameTestCase("different complex128", complex128(1+2i), complex128(2+2i), false,
-			"different complex128 values should not be same"),
-
-		// Edge cases with NaN and Inf
-		newIsSameTestCase("complex with NaN",
-			complex(math.NaN(), 1), complex(math.NaN(), 1), false,
-			"complex with NaN should not be same (NaN != NaN)"),
-		newIsSameTestCase("complex with Inf",
-			complex(math.Inf(1), 1), complex(math.Inf(1), 1), true,
-			"complex with same Inf should be same"),
-	)
-}
-
-func TestIsSameStackOverflow(t *testing.T) {
-	RunTestCases(t, isSameStackOverflowTestCases())
+	core.AssertEqual(t, "initialized", fn(), "function result")
 }
 
 // Custom type that implements IsZero() bool for the interface branch.
@@ -1458,7 +598,7 @@ func (tc isZeroCustomInterfaceTestCase) Name() string { return tc.name }
 
 func (tc isZeroCustomInterfaceTestCase) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.want, IsZero(tc.in), tc.name)
+	core.AssertEqual(t, tc.want, core.IsZero(tc.in), tc.name)
 }
 
 func newIsZeroCustomInterfaceTestCase(name string, in hasIsZeroType,
@@ -1468,353 +608,12 @@ func newIsZeroCustomInterfaceTestCase(name string, in hasIsZeroType,
 
 // Cover the `interface{ IsZero() bool }` branch of IsZero.
 func TestIsZeroCustomInterface(t *testing.T) {
-	RunTestCases(t, []isZeroCustomInterfaceTestCase{
+	core.RunTestCases(t, []isZeroCustomInterfaceTestCase{
 		newIsZeroCustomInterfaceTestCase("custom IsZero returns true",
 			hasIsZeroType{zero: true}, true),
 		newIsZeroCustomInterfaceTestCase("custom IsZero returns false",
 			hasIsZeroType{zero: false}, false),
 	})
-}
-
-// eqSlice is non-comparable and follows the Equal(T) bool convention.
-type eqSlice []int
-
-func (s eqSlice) Equal(o eqSlice) bool { return slices.Equal(s, o) }
-
-// panicEqSlice is non-comparable with an Equal method that panics.
-type panicEqSlice []int
-
-func (panicEqSlice) Equal(panicEqSlice) bool { panic("Equal called") }
-
-// oddEqSlice is non-comparable with an Equal method that doesn't
-// follow the Equal(T) bool convention.
-type oddEqSlice []int
-
-func (oddEqSlice) Equal() bool { return true }
-
-// eqNeverSlice is non-comparable with an Equal method that never
-// matches, proving Equal wins over element-wise comparison.
-type eqNeverSlice []int
-
-func (eqNeverSlice) Equal(eqNeverSlice) bool { return false }
-
-// panicEqMap is non-comparable and not a slice; after its Equal
-// panics there is no further rung to consult.
-type panicEqMap map[string]int
-
-func (panicEqMap) Equal(panicEqMap) bool { panic("Equal called") }
-
-// eqAlways is comparable with an Equal method that always matches,
-// proving a false == defers to Equal for comparable types.
-type eqAlways int
-
-func (eqAlways) Equal(eqAlways) bool { return true }
-
-// eqNeverComparable is comparable with an Equal method that never
-// matches. The call counter lets a test prove a true == skips Equal
-// outright while a false == still invokes it.
-type eqNeverComparable int
-
-var eqNeverComparableCalls atomic.Int64
-
-func (eqNeverComparable) Equal(eqNeverComparable) bool {
-	eqNeverComparableCalls.Add(1)
-	return false
-}
-
-type areComparableTestCase struct {
-	name string
-	vvi  []any
-	want bool
-}
-
-func (tc areComparableTestCase) Name() string { return tc.name }
-
-func (tc areComparableTestCase) Test(t *testing.T) {
-	t.Helper()
-	assertComparable(t, tc.want, AreComparable(tc.vvi...), "comparable")
-}
-
-func newAreComparableTestCase(name string, vvi []any,
-	want bool) areComparableTestCase {
-	return areComparableTestCase{
-		name: name,
-		vvi:  vvi,
-		want: want,
-	}
-}
-
-func areComparableTestCases() []areComparableTestCase {
-	return []areComparableTestCase{
-		newAreComparableTestCase("no values", nil, false),
-		newAreComparableTestCase("untyped nil", S[any](nil), true),
-		newAreComparableTestCase("untyped nil and int", S[any](nil, 42), true),
-		newAreComparableTestCase("untyped nil and slice",
-			S[any](nil, S(1)), false),
-		newAreComparableTestCase("single int", S[any](42), true),
-		newAreComparableTestCase("ints", S[any](1, 2, 3), true),
-		newAreComparableTestCase("mixed comparable types",
-			S[any](1, "a", true), true),
-		newAreComparableTestCase("slice", S[any](S(1, 2)), false),
-		newAreComparableTestCase("map", S[any](map[string]int{}), false),
-		newAreComparableTestCase("comparable struct",
-			S[any](struct{ A int }{1}), true),
-		newAreComparableTestCase("comparable then slice",
-			S[any](1, S(2)), false),
-		newAreComparableTestCase("array holding slice",
-			S[any]([1]any{S(1)}), false),
-	}
-}
-
-func TestAreComparable(t *testing.T) {
-	RunTestCases(t, areComparableTestCases())
-}
-
-// heldValues is comparable as a type, while == on two of them panics
-// once it reaches a field holding values of a non-comparable type.
-// Fields compare in order, and the first difference ends the comparison.
-type heldValues struct {
-	first  any
-	second any
-}
-
-// comparableEqualTestCase reads its results with plain checks:
-// comparableEqual sits under the assertions that would otherwise read
-// them.
-type comparableEqualTestCase struct {
-	a, b      any
-	name      string
-	wantEqual bool
-	wantKnown bool
-}
-
-func (tc comparableEqualTestCase) Name() string { return tc.name }
-
-func (tc comparableEqualTestCase) Test(t *testing.T) {
-	t.Helper()
-	equal, known := comparableEqual(tc.a, tc.b)
-	plainEqual(t, tc.wantEqual, equal, "equal")
-	plainEqual(t, tc.wantKnown, known, "known")
-}
-
-func newComparableEqualTestCase(name string, a, b any,
-	wantEqual, wantKnown bool) comparableEqualTestCase {
-	return comparableEqualTestCase{
-		name:      name,
-		a:         a,
-		b:         b,
-		wantEqual: wantEqual,
-		wantKnown: wantKnown,
-	}
-}
-
-func comparableEqualTestCases() []comparableEqualTestCase {
-	p := new(int)
-
-	return []comparableEqualTestCase{
-		newComparableEqualTestCase("equal ints", 42, 42, true, true),
-		newComparableEqualTestCase("unequal ints", 42, 43, false, true),
-		newComparableEqualTestCase("different types", 42, "42", false, true),
-		newComparableEqualTestCase("both nil", nil, nil, true, true),
-		newComparableEqualTestCase("nil vs typed nil",
-			nil, (*int)(nil), false, true),
-		newComparableEqualTestCase("NaN never equals",
-			math.NaN(), math.NaN(), false, true),
-		newComparableEqualTestCase("same pointer", p, p, true, true),
-		newComparableEqualTestCase("distinct pointers",
-			p, new(int), false, true),
-		newComparableEqualTestCase("slice vs int", S(1), 1, false, true),
-		newComparableEqualTestCase("slices panic", S(1), S(1), false, false),
-		newComparableEqualTestCase("held slices reached",
-			heldValues{1, S(1)}, heldValues{1, S(1)}, false, false),
-		newComparableEqualTestCase("held slices behind a difference",
-			heldValues{1, S(1)}, heldValues{2, S(1)}, false, true),
-	}
-}
-
-func TestComparableEqual(t *testing.T) {
-	RunTestCases(t, comparableEqualTestCases())
-}
-
-// TestComparableEqualTyped instantiates comparableEqual with the concrete
-// types the assertions use, where == cannot panic.
-func TestComparableEqualTyped(t *testing.T) {
-	equal, known := comparableEqual(true, true)
-	plainEqual(t, true, equal, "true, true equal")
-	plainEqual(t, true, known, "true, true known")
-
-	equal, known = comparableEqual(true, false)
-	plainEqual(t, false, equal, "true, false equal")
-	plainEqual(t, true, known, "true, false known")
-
-	equal, known = comparableEqual("a", "b")
-	plainEqual(t, false, equal, "a, b equal")
-	plainEqual(t, true, known, "a, b known")
-}
-
-type areEqualTestCase struct {
-	name      string
-	vvi       []any
-	wantIs    bool
-	wantKnown bool
-}
-
-func (tc areEqualTestCase) Name() string { return tc.name }
-
-func (tc areEqualTestCase) Test(t *testing.T) {
-	t.Helper()
-	is, known := AreEqual(tc.vvi...)
-	assertComparable(t, tc.wantIs, is, "is")
-	assertComparable(t, tc.wantKnown, known, "known")
-}
-
-func newAreEqualTestCase(name string, vvi []any,
-	wantIs, wantKnown bool) areEqualTestCase {
-	return areEqualTestCase{
-		name:      name,
-		vvi:       vvi,
-		wantIs:    wantIs,
-		wantKnown: wantKnown,
-	}
-}
-
-func areEqualComparableTestCases() []areEqualTestCase {
-	return []areEqualTestCase{
-		newAreEqualTestCase("no values", nil, false, true),
-		newAreEqualTestCase("single value", S[any](42), true, true),
-		newAreEqualTestCase("equal ints", S[any](42, 42), true, true),
-		newAreEqualTestCase("unequal ints", S[any](42, 43), false, true),
-		newAreEqualTestCase("different types", S[any](42, "42"), false, true),
-		newAreEqualTestCase("int vs int64", S[any](42, int64(42)), false, true),
-		newAreEqualTestCase("equal chain", S[any]("a", "a", "a"), true, true),
-		newAreEqualTestCase("chain broken at the end",
-			S[any]("a", "a", "b"), false, true),
-		newAreEqualTestCase("NaN never equals",
-			S[any](math.NaN(), math.NaN()), false, true),
-		newAreEqualTestCase("Equal rescues a false ==",
-			S[any](eqAlways(1), eqAlways(2)), true, true),
-		newAreEqualTestCase("true == skips Equal",
-			S[any](eqNeverComparable(1), eqNeverComparable(1)), true, true),
-		newAreEqualTestCase("false == with false Equal stays unequal",
-			S[any](eqNeverComparable(1), eqNeverComparable(2)), false, true),
-		newAreEqualTestCase("held slices reached stay unknown",
-			S[any](heldValues{1, S(1)}, heldValues{1, S(1)}), false, false),
-		newAreEqualTestCase("held slices behind a difference",
-			S[any](heldValues{1, S(1)}, heldValues{2, S(1)}), false, true),
-	}
-}
-
-func areEqualNilTestCases() []areEqualTestCase {
-	return []areEqualTestCase{
-		newAreEqualTestCase("both untyped nil", S[any](nil, nil), true, true),
-		newAreEqualTestCase("untyped nil vs zero", S[any](nil, 0), false, true),
-		newAreEqualTestCase("untyped nil vs typed nil",
-			S[any](nil, (*int)(nil)), false, true),
-		newAreEqualTestCase("typed nil pointers",
-			S[any]((*int)(nil), (*int)(nil)), true, true),
-		newAreEqualTestCase("nil slices",
-			S[any]([]int(nil), []int(nil)), true, true),
-		newAreEqualTestCase("nil vs empty slice",
-			S[any]([]int(nil), S[int]()), false, true),
-		newAreEqualTestCase("nil maps",
-			S[any](map[string]int(nil), map[string]int(nil)), true, true),
-	}
-}
-
-func areEqualIdentityTestCases() []areEqualTestCase {
-	slice := S(1, 2, 3)
-	m := map[string]int{"a": 1}
-	o := reflect.ValueOf(opaqueFields{v: 42, n: 1})
-
-	return []areEqualTestCase{
-		newAreEqualTestCase("same slice", S[any](slice, slice), true, true),
-		newAreEqualTestCase("same map", S[any](m, m), true, true),
-		newAreEqualTestCase("unexported fields stay unknown",
-			S[any](o.Field(1), o.Field(1)), false, false),
-		newAreEqualTestCase("distinct maps",
-			S[any](map[string]int{}, map[string]int{}), false, false),
-		newAreEqualTestCase("undecided then settled",
-			S[any](map[string]int{"a": 1}, map[string]int{"a": 1}, "x"),
-			false, true),
-	}
-}
-
-func areEqualMethodTestCases() []areEqualTestCase {
-	return []areEqualTestCase{
-		newAreEqualTestCase("Equal method match",
-			S[any](eqSlice{1, 2}, eqSlice{1, 2}), true, true),
-		newAreEqualTestCase("Equal method mismatch",
-			S[any](eqSlice{1}, eqSlice{2}), false, true),
-		newAreEqualTestCase("Equal beats elements",
-			S[any](eqNeverSlice{1}, eqNeverSlice{1}), false, true),
-		newAreEqualTestCase("panicking Equal falls back to elements",
-			S[any](panicEqSlice{1}, panicEqSlice{1}), true, true),
-		newAreEqualTestCase("mismatched Equal signature falls back to elements",
-			S[any](oddEqSlice{1}, oddEqSlice{1}), true, true),
-		newAreEqualTestCase("panicking Equal without elements stays unknown",
-			S[any](panicEqMap{"a": 1}, panicEqMap{"a": 1}), false, false),
-	}
-}
-
-func areEqualSliceTestCases() []areEqualTestCase {
-	shared := S(1, 2, 3)
-
-	return []areEqualTestCase{
-		newAreEqualTestCase("distinct equal slices",
-			S[any](S(1, 2, 3), S(1, 2, 3)), true, true),
-		newAreEqualTestCase("unequal elements",
-			S[any](S(1, 2, 3), S(1, 2, 4)), false, true),
-		newAreEqualTestCase("different lengths",
-			S[any](S(1, 2), S(1, 2, 3)), false, true),
-		newAreEqualTestCase("empty slices",
-			S[any](S[int](), S[int]()), true, true),
-		newAreEqualTestCase("equal interface elements",
-			S[any](S[any](1, "a"), S[any](1, "a")), true, true),
-		newAreEqualTestCase("nil interface elements",
-			S[any](S[any](nil), S[any](nil)), true, true),
-		newAreEqualTestCase("interface elements of different types",
-			S[any](S[any](1), S[any]("a")), false, true),
-		newAreEqualTestCase("shared nested slice",
-			S[any](S[any](shared), S[any](shared)), true, true),
-		newAreEqualTestCase("distinct nested slices stay unknown",
-			S[any](S(S(1)), S(S(1))), false, false),
-		newAreEqualTestCase("unknown element then settled",
-			S[any](S[any](S(1), 1), S[any](S(2), 2)), false, true),
-	}
-}
-
-func TestAreEqual(t *testing.T) {
-	t.Run("comparable", func(t *testing.T) {
-		RunTestCases(t, areEqualComparableTestCases())
-	})
-	t.Run("nil", func(t *testing.T) {
-		RunTestCases(t, areEqualNilTestCases())
-	})
-	t.Run("identity", func(t *testing.T) {
-		RunTestCases(t, areEqualIdentityTestCases())
-	})
-	t.Run("Equal method", func(t *testing.T) {
-		RunTestCases(t, areEqualMethodTestCases())
-	})
-	t.Run("slices", func(t *testing.T) {
-		RunTestCases(t, areEqualSliceTestCases())
-	})
-}
-
-// TestAreEqualComparableEqualCalls pins that AreEqual consults a
-// comparable type's Equal method only when == is false: a true == skips
-// it outright, a false == invokes it. The table rows above cover the
-// returned verdict; this covers the call itself.
-func TestAreEqualComparableEqualCalls(t *testing.T) {
-	eqNeverComparableCalls.Store(0)
-	is, _ := AreEqual(eqNeverComparable(1), eqNeverComparable(1))
-	AssertTrue(t, is, "true == equal")
-	assertComparable(t, int64(0), eqNeverComparableCalls.Load(), "Equal skipped on true ==")
-
-	eqNeverComparableCalls.Store(0)
-	is, _ = AreEqual(eqNeverComparable(1), eqNeverComparable(2))
-	AssertFalse(t, is, "false == unequal")
-	assertComparable(t, int64(1), eqNeverComparableCalls.Load(), "Equal consulted on false ==")
 }
 
 // Benchmarks
@@ -1837,21 +636,21 @@ func BenchmarkEqualOperator(b *testing.B) {
 func BenchmarkAreEqualComparable(b *testing.B) {
 	x, y := 42, 42
 	for b.Loop() {
-		benchEqualSink, _ = AreEqual(x, y)
+		benchEqualSink, _ = core.AreEqual(x, y)
 	}
 }
 
 func BenchmarkAreEqualMethod(b *testing.B) {
-	x, y := eqSlice{1, 2, 3}, eqSlice{1, 2, 3}
+	x, y := core.EqSliceForTest{1, 2, 3}, core.EqSliceForTest{1, 2, 3}
 	for b.Loop() {
-		benchEqualSink, _ = AreEqual(x, y)
+		benchEqualSink, _ = core.AreEqual(x, y)
 	}
 }
 
 func BenchmarkAreEqualSlice(b *testing.B) {
-	x, y := S(1, 2, 3), S(1, 2, 3)
+	x, y := core.S(1, 2, 3), core.S(1, 2, 3)
 	for b.Loop() {
-		benchEqualSink, _ = AreEqual(x, y)
+		benchEqualSink, _ = core.AreEqual(x, y)
 	}
 }
 
@@ -1860,6 +659,6 @@ func BenchmarkAreEqualSlice(b *testing.B) {
 func BenchmarkAreEqualUndecided(b *testing.B) {
 	x, y := map[string]int{"a": 1}, map[string]int{"a": 1}
 	for b.Loop() {
-		benchEqualSink, _ = AreEqual(x, y)
+		benchEqualSink, _ = core.AreEqual(x, y)
 	}
 }
