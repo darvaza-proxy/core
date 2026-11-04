@@ -169,7 +169,16 @@ func PanicUnreachable(err error, note string) {
 // err and note, its stack starting skip frames above the caller: 0 is
 // PanicUnreachableFrom's own caller.
 func PanicUnreachableFrom(skip int, err error, note string) {
-	panic(NewUnreachableError(deeper(skip), err, note))
+	doPanicUnreachable(skip, err, note)
+}
+
+// doPanicUnreachable is [PanicUnreachableFrom] less its own frame: 0 is
+// the caller of the function calling it. It stays out of line so that
+// PanicUnreachableFrom is cheap enough to inline into its callers.
+//
+//go:noinline
+func doPanicUnreachable(skip int, err error, note string) {
+	panic(NewUnreachableError(deeper(deeper(skip)), err, note))
 }
 
 // PanicUnreachablef emits the PanicError [NewUnreachableErrorf] makes of

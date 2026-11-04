@@ -161,10 +161,13 @@ func Maybe[V any](value V, _ error) V {
 //revive:disable-next-line:flag-parameter
 func MustOK[V any](value V, ok bool) V {
 	if !ok {
-		PanicUnreachableFrom(1, errors.New("operation failed"), "")
+		PanicUnreachableFrom(1, errMustOK, "")
 	}
 	return value
 }
+
+// errMustOK is the reason [MustOK] panics with.
+var errMustOK = errors.New("operation failed")
 
 // MaybeOK returns the value, ignoring the ok flag.
 // This is useful when you want to proceed with a default or zero value
