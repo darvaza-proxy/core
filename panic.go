@@ -253,17 +253,25 @@ func MustNoError(err error) {
 // The panic value's top stack frame resolves to the caller, not to this
 // helper.
 func MustNoErrorExcept(err error, allowed ...error) {
+	if err != nil {
+		doMustNoErrorExcept(err, allowed)
+	}
+}
+
+// doMustNoErrorExcept is [MustNoErrorExcept] for a non-nil err. It stays
+// out of line so that MustNoErrorExcept is cheap enough to inline into
+// its callers, and its skip of 2 counts MustNoErrorExcept, which calls it
+// directly.
+//
+//go:noinline
+func doMustNoErrorExcept(err error, allowed []error) {
 	// IsError(err) with no filter returns true for any non-nil err. The
 	// len(allowed) > 0 guard below blocks that degenerate shape from
 	// silently swallowing the panic.
-	switch {
-	case err == nil:
+	if len(allowed) > 0 && IsError(err, allowed...) {
 		return
-	case len(allowed) > 0 && IsError(err, allowed...):
-		return
-	default:
-		PanicUnreachableFrom(1, err, "")
 	}
+	PanicUnreachableFrom(2, err, "")
 }
 
 // MustNoErrorExceptFn panics if err is non-nil and check accepts none of
@@ -275,15 +283,23 @@ func MustNoErrorExcept(err error, allowed ...error) {
 // then panics — the same degenerate shape as MustNoError. The panic
 // value's top stack frame resolves to the caller, not to this helper.
 func MustNoErrorExceptFn(err error, check func(error) bool) {
+	if err != nil {
+		doMustNoErrorExceptFn(err, check)
+	}
+}
+
+// doMustNoErrorExceptFn is [MustNoErrorExceptFn] for a non-nil err. It
+// stays out of line so that MustNoErrorExceptFn is cheap enough to inline
+// into its callers, and its skip of 2 counts MustNoErrorExceptFn, which
+// calls it directly.
+//
+//go:noinline
+func doMustNoErrorExceptFn(err error, check func(error) bool) {
 	// check != nil is a short-circuit, not load-bearing: IsErrorFn
 	// already returns false for a nil check, so a nil check still
 	// reaches the panic below.
-	switch {
-	case err == nil:
+	if check != nil && IsErrorFn(check, err) {
 		return
-	case check != nil && IsErrorFn(check, err):
-		return
-	default:
-		PanicUnreachableFrom(1, err, "")
 	}
+	PanicUnreachableFrom(2, err, "")
 }
