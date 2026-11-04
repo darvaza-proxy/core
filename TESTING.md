@@ -209,7 +209,8 @@ core.AssertTopFrame(t, recovered, "callPanic", "panic stack")
 the stack of a recovered `PanicError`. It compares the name
 `Frame.FuncName()` gives the top frame, which is the short name: a method
 is named without its type and a closure by its generated `funcN`, so a
-named wrapper gives a test a stable caller to name.
+named wrapper gives a test a stable caller to name. The `[...]`
+decoration of a generic function is left out.
 
 **Channel and Timing Assertions:**
 

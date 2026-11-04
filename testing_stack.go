@@ -1,13 +1,17 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // AssertTopFrame fails the test unless v carries a call stack whose top
-// frame is the function want, as [Frame.FuncName] names it. v is taken
-// as any so a recovered panic value, or the error [Catch] returns, can be
-// passed as it is; it fails when v is nil, is not a [CallStacker], or
-// carries an empty stack. The stack of a panic raised by [Panic], or of
-// the error [Catch] returns, starts at the function that panicked.
+// frame is the function want, as [Frame.FuncName] names it less the
+// "[...]" decoration of a generic function. v is taken as any so a
+// recovered panic value, or the error [Catch] returns, can be passed as
+// it is; it fails when v is nil, is not a [CallStacker], or carries an
+// empty stack. The stack of a panic raised by [Panic], or of the error
+// [Catch] returns, starts at the function that panicked.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 //
@@ -33,7 +37,7 @@ func AssertTopFrame(t T, v any, want, name string, args ...any) bool {
 }
 
 // topFrameName returns the [Frame.FuncName] of the top frame of the stack
-// v carries, or why there is none.
+// v carries, without a generic function's "[...]", or why there is none.
 func topFrameName(v any) (funcName, reason string) {
 	if IsNil(v) {
 		return "", "expected a call stack, got nil"
@@ -48,7 +52,7 @@ func topFrameName(v any) (funcName, reason string) {
 	if len(stack) == 0 {
 		return "", "empty call stack"
 	}
-	return stack[0].FuncName(), ""
+	return strings.TrimSuffix(stack[0].FuncName(), "[...]"), ""
 }
 
 // AssertMustTopFrame calls AssertTopFrame and t.FailNow() if the assertion
