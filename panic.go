@@ -202,10 +202,19 @@ func MaybeOK[V any](value V, _ bool) V {
 func MustT[T any](value any) T {
 	result, ok := value.(T)
 	if !ok {
-		err := fmt.Errorf("failed to convert %T to %s", value, TypeName[T]())
-		PanicUnreachableFrom(1, err, "")
+		doPanicMustT[T](value)
 	}
 	return result
+}
+
+// doPanicMustT is [MustT] for a value that is not a T. It stays out of
+// line to keep MustT's body to the type assertion and a call, and its
+// skip of 2 counts MustT, which calls it directly.
+//
+//go:noinline
+func doPanicMustT[T any](value any) {
+	err := fmt.Errorf("failed to convert %s to %s", TypeNameOf(value), TypeName[T]())
+	PanicUnreachableFrom(2, err, "")
 }
 
 // MaybeT returns the converted value if type conversion succeeds, otherwise

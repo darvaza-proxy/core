@@ -160,6 +160,8 @@ Key distinctions from `IsZero`:
 * `TypeName[T]()` names a type parameter itself, an interface type
   included, where `%T` on a value can only name the dynamic type it
   holds.
+* `TypeNameOf(v)` names the type of the value `v` holds, as `%T` does,
+  spelling the empty interface `any` as `TypeName` does.
 
 ### Type Conversion
 
