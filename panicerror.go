@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 var (
@@ -187,10 +188,15 @@ func PanicUnreachablefFrom(skip int, err error, format string, args ...any) {
 // deeper accounts for the frame of the function calling it, so a skip of
 // 0 attributes to that function's own caller. A negative skip clamps to
 // 1, that same caller, instead of reaching [StackTrace], which rejects it
-// and captures nothing.
+// and captures nothing. A skip of math.MaxInt stays as it is, past the
+// top of any stack, instead of wrapping negative.
 func deeper(skip int) int {
-	if skip < 0 {
+	switch {
+	case skip < 0:
 		return 1
+	case skip == math.MaxInt:
+		return skip
+	default:
+		return skip + 1
 	}
-	return skip + 1
 }

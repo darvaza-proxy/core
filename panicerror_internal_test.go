@@ -1,6 +1,9 @@
 package core
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 var _ TestCase = deeperTestCase{}
 
@@ -32,12 +35,14 @@ func (tc deeperTestCase) Test(t *testing.T) {
 
 // The clamped rows all state 1, the same answer the zero row states, so
 // a negative skip is indistinguishable from no skip at all. The far
-// positive row declares that only the negative side is clamped.
+// positive row declares that the positive side counts on, and the max
+// skip row that it stops at math.MaxInt instead of wrapping.
 func deeperTestCases() []deeperTestCase {
 	return []deeperTestCase{
 		newDeeperTestCase("no skip", 0, 1),
 		newDeeperTestCase("one frame", 1, 2),
 		newDeeperTestCase("far positive", 9999, 10000),
+		newDeeperTestCase("max skip", math.MaxInt, math.MaxInt),
 		newDeeperTestCase("minus one", -1, 1),
 		newDeeperTestCase("far negative", -9999, 1),
 	}
