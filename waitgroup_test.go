@@ -1,4 +1,4 @@
-package core
+package core_test
 
 import (
 	"context"
@@ -6,13 +6,15 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = waitGroupGoTestCase{}
-	_ TestCase = waitGroupGoCatchTestCase{}
-	_ TestCase = waitGroupOnErrorTestCase{}
+	_ core.TestCase = waitGroupGoTestCase{}
+	_ core.TestCase = waitGroupGoCatchTestCase{}
+	_ core.TestCase = waitGroupOnErrorTestCase{}
 )
 
 // waitGroupGoTestCase states what Wait reports once a worker is done:
@@ -37,7 +39,7 @@ func waitGroupGoTestCases() []waitGroupGoTestCase {
 	workerErr := errors.New("worker error")
 	panicErr := errors.New("worker panic")
 
-	return S(
+	return core.S(
 		newWaitGroupGoTestCase("successful worker", func() error {
 			return nil
 		}, nil),
@@ -58,20 +60,20 @@ func (tc waitGroupGoTestCase) Name() string {
 func (tc waitGroupGoTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var wg WaitGroup
+	var wg core.WaitGroup
 	wg.Go(tc.fn)
 
-	AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
+	core.AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
 }
 
 func TestWaitGroupGo(t *testing.T) {
-	RunTestCases(t, waitGroupGoTestCases())
+	core.RunTestCases(t, waitGroupGoTestCases())
 }
 
 // A worker that panics is reported as a *PanicError carrying what it
 // panicked with and the stack it was caught on.
 func TestWaitGroupGoPanic(t *testing.T) {
-	var wg WaitGroup
+	var wg core.WaitGroup
 	wg.Go(func() error {
 		// False positive: the rule guards sync.WaitGroup, and this
 		// WaitGroup recovering the panic is what is under test.
@@ -79,10 +81,10 @@ func TestWaitGroupGoPanic(t *testing.T) {
 		panic("worker panic")
 	})
 
-	pe := AssertMustErrorAs[*PanicError](t, wg.Wait(), "error")
-	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
-	AssertEqual(t, "worker panic", payload.Error(), "payload")
-	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+	pe := core.AssertMustErrorAs[*core.PanicError](t, wg.Wait(), "error")
+	payload := core.AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
+	core.AssertEqual(t, "worker panic", payload.Error(), "payload")
+	core.AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 }
 
 // waitGroupGoCatchTestCase states what the catch function leaves for
@@ -111,7 +113,7 @@ func waitGroupGoCatchTestCases() []waitGroupGoCatchTestCase {
 	transformedErr := errors.New("transformed error")
 	panicErr := errors.New("catch panic")
 
-	return S(
+	return core.S(
 		newWaitGroupGoCatchTestCase("successful worker with catch", func() error {
 			return nil
 		}, func(_ error) error {
@@ -148,14 +150,14 @@ func (tc waitGroupGoCatchTestCase) Name() string {
 func (tc waitGroupGoCatchTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var wg WaitGroup
+	var wg core.WaitGroup
 	wg.GoCatch(tc.fn, tc.catch)
 
-	AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
+	core.AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
 }
 
 func TestWaitGroupGoCatch(t *testing.T) {
-	RunTestCases(t, waitGroupGoCatchTestCases())
+	core.RunTestCases(t, waitGroupGoCatchTestCases())
 }
 
 // A catch function that panics is reported the same way as a worker
@@ -163,7 +165,7 @@ func TestWaitGroupGoCatch(t *testing.T) {
 func TestWaitGroupGoCatchPanic(t *testing.T) {
 	workerErr := errors.New("worker error")
 
-	var wg WaitGroup
+	var wg core.WaitGroup
 	wg.GoCatch(func() error {
 		return workerErr
 	}, func(_ error) error {
@@ -171,12 +173,12 @@ func TestWaitGroupGoCatchPanic(t *testing.T) {
 	})
 
 	err := wg.Wait()
-	AssertNotErrorIs(t, err, workerErr, "worker error")
+	core.AssertNotErrorIs(t, err, workerErr, "worker error")
 
-	pe := AssertMustErrorAs[*PanicError](t, err, "error")
-	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
-	AssertEqual(t, "catch panic", payload.Error(), "payload")
-	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+	pe := core.AssertMustErrorAs[*core.PanicError](t, err, "error")
+	payload := core.AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
+	core.AssertEqual(t, "catch panic", payload.Error(), "payload")
+	core.AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 }
 
 // waitGroupOnErrorTestCase states what the OnError filter leaves for
@@ -204,19 +206,19 @@ func waitGroupOnErrorTestCases() []waitGroupOnErrorTestCase {
 	workerErr := errors.New("worker error")
 	filteredErr := errors.New("filtered error")
 
-	return S(
-		newWaitGroupOnErrorTestCase("successful workers with onError", S(
+	return core.S(
+		newWaitGroupOnErrorTestCase("successful workers with onError", core.S(
 			func() error { return nil },
 			func() error { return nil },
 		), func(err error) error {
 			return err
 		}, nil),
-		newWaitGroupOnErrorTestCase("error dismissed by onError filter", S(
+		newWaitGroupOnErrorTestCase("error dismissed by onError filter", core.S(
 			func() error { return workerErr },
 		), func(_ error) error {
 			return nil // onError filter dismisses the error
 		}, nil),
-		newWaitGroupOnErrorTestCase("error transformed by onError filter", S(
+		newWaitGroupOnErrorTestCase("error transformed by onError filter", core.S(
 			func() error { return workerErr },
 		), func(_ error) error {
 			return filteredErr
@@ -231,22 +233,22 @@ func (tc waitGroupOnErrorTestCase) Name() string {
 func (tc waitGroupOnErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var wg WaitGroup
+	var wg core.WaitGroup
 	wg.OnError(tc.onErrorHandler)
 
 	for _, worker := range tc.workers {
 		wg.Go(worker)
 	}
 
-	AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
+	core.AssertErrorIs(t, wg.Wait(), tc.wantErr, "error")
 }
 
 func TestWaitGroupOnError(t *testing.T) {
-	RunTestCases(t, waitGroupOnErrorTestCases())
+	core.RunTestCases(t, waitGroupOnErrorTestCases())
 }
 
 func TestWaitGroupDone(t *testing.T) {
-	var wg WaitGroup
+	var wg core.WaitGroup
 
 	// Test with successful workers
 	wg.Go(func() error {
@@ -261,31 +263,31 @@ func TestWaitGroupDone(t *testing.T) {
 	done := wg.Done()
 
 	// Should not be closed yet
-	AssertOpen(t, done, 5*time.Millisecond, "done before the workers finish")
+	core.AssertOpen(t, done, 5*time.Millisecond, "done before the workers finish")
 
 	// Wait for completion
-	AssertClosed(t, done, 100*time.Millisecond, "done after the workers finish")
+	core.AssertClosed(t, done, 100*time.Millisecond, "done after the workers finish")
 
 	// Verify Wait() also works
-	AssertNoError(t, wg.Wait(), "wait")
+	core.AssertNoError(t, wg.Wait(), "wait")
 }
 
 func testWaitGroupErrNoError(t *testing.T) {
 	t.Helper()
-	var wg WaitGroup
+	var wg core.WaitGroup
 	wg.Go(func() error { return nil })
-	AssertNoError(t, wg.Wait(), "wait")
-	AssertNil(t, wg.Err(), "error")
+	core.AssertNoError(t, wg.Wait(), "wait")
+	core.AssertNil(t, wg.Err(), "error")
 }
 
 func testWaitGroupErrWithError(t *testing.T) {
 	t.Helper()
-	var wg WaitGroup
+	var wg core.WaitGroup
 	expectedErr := errors.New("test error")
 	wg.Go(func() error { return expectedErr })
-	AssertError(t, wg.Wait(), "wait error")
-	AssertError(t, wg.Err(), "error")
-	AssertEqual(t, expectedErr.Error(), wg.Err().Error(), "error message")
+	core.AssertError(t, wg.Wait(), "wait error")
+	core.AssertError(t, wg.Err(), "error")
+	core.AssertEqual(t, expectedErr.Error(), wg.Err().Error(), "error message")
 }
 
 func TestWaitGroupErr(t *testing.T) {
@@ -297,7 +299,7 @@ func TestWaitGroupConcurrency(t *testing.T) {
 	const numWorkers = 50
 	const numIterations = 100
 
-	var wg WaitGroup
+	var wg core.WaitGroup
 	var counter int64
 	var mu sync.Mutex
 
@@ -313,10 +315,10 @@ func TestWaitGroupConcurrency(t *testing.T) {
 	}
 
 	err := wg.Wait()
-	AssertNoError(t, err, "concurrent workers")
+	core.AssertNoError(t, err, "concurrent workers")
 
 	expected := int64(numWorkers * numIterations)
-	AssertEqual(t, expected, counter, "counter value")
+	core.AssertEqual(t, expected, counter, "counter value")
 }
 
 // The first error stored survives: the workers failing after it, however
@@ -327,28 +329,28 @@ func TestWaitGroupFirstErrorWins(t *testing.T) {
 	first := errors.New("first")
 	later := errors.New("later")
 
-	var wg WaitGroup
+	var wg core.WaitGroup
 	wg.Go(func() error { return first })
-	AssertErrorIs(t, wg.Wait(), first, "first error")
+	core.AssertErrorIs(t, wg.Wait(), first, "first error")
 
-	for _, err := range S[error](
+	for _, err := range core.S[error](
 		later,
-		StringError("later"),
-		Wrap(later, "wrapped"),
-		NewTimeoutError(later),
-		NewCompoundError(later),
-		NewPanicError(0, later),
+		core.StringError("later"),
+		core.Wrap(later, "wrapped"),
+		core.NewTimeoutError(later),
+		core.NewCompoundError(later),
+		core.NewPanicError(0, later),
 	) {
 		wg.Go(func() error { return err })
 	}
-	AssertErrorIs(t, wg.Wait(), first, "first error kept")
+	core.AssertErrorIs(t, wg.Wait(), first, "first error kept")
 }
 
 func TestWaitGroupWithContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	var wg WaitGroup
+	var wg core.WaitGroup
 
 	// Worker that takes longer than context timeout
 	wg.Go(func() error {
@@ -367,11 +369,11 @@ func TestWaitGroupWithContext(t *testing.T) {
 	})
 
 	err := wg.Wait()
-	AssertError(t, err, "context timeout")
+	core.AssertError(t, err, "context timeout")
 }
 
 func TestWaitGroupOnErrorCalledForAllErrors(t *testing.T) {
-	var wg WaitGroup
+	var wg core.WaitGroup
 	var callCount int
 	var mu sync.Mutex
 
@@ -396,18 +398,18 @@ func TestWaitGroupOnErrorCalledForAllErrors(t *testing.T) {
 
 	// Wait for all workers to complete
 	err := wg.Wait()
-	AssertError(t, err, "wait")
+	core.AssertError(t, err, "wait")
 
 	// Check how many times onError was called
 	mu.Lock()
 	count := callCount
 	mu.Unlock()
 
-	AssertEqual(t, 3, count, "onError calls")
+	core.AssertEqual(t, 3, count, "onError calls")
 }
 
 func TestWaitGroupOnErrorCalledForMixedResults(t *testing.T) {
-	var wg WaitGroup
+	var wg core.WaitGroup
 	var callCount int
 	var errorMessages []string
 	var mu sync.Mutex
@@ -437,12 +439,12 @@ func TestWaitGroupOnErrorCalledForMixedResults(t *testing.T) {
 
 	// Wait for all workers to complete
 	err := wg.Wait()
-	AssertError(t, err, "wait")
+	core.AssertError(t, err, "wait")
 
 	// Check how many times onError was called
 	mu.Lock()
 	count := callCount
 	mu.Unlock()
 
-	AssertEqual(t, 2, count, "onError calls")
+	core.AssertEqual(t, 2, count, "onError calls")
 }

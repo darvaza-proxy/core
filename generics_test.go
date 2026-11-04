@@ -1,19 +1,21 @@
-package core
+package core_test
 
 import (
 	"fmt"
 	"math"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 // TestCase interface validations
-var _ TestCase = typeNameTestCase[int]{}
-var _ TestCase = coalesceTestCase[int]{}
-var _ TestCase = coalescePointerTestCase[int]{}
-var _ TestCase = iifTestCase{}
-var _ TestCase = iifStringTestCase{}
-var _ TestCase = iifPointerTestCase{}
-var _ TestCase = iifStructTestCase{}
+var _ core.TestCase = typeNameTestCase[int]{}
+var _ core.TestCase = coalesceTestCase[int]{}
+var _ core.TestCase = coalescePointerTestCase[int]{}
+var _ core.TestCase = iifTestCase{}
+var _ core.TestCase = iifStringTestCase{}
+var _ core.TestCase = iifPointerTestCase{}
+var _ core.TestCase = iifStructTestCase{}
 
 // typeNameTestCase states what TypeName renders for one type.
 type typeNameTestCase[T any] struct {
@@ -21,7 +23,7 @@ type typeNameTestCase[T any] struct {
 	name string
 }
 
-func newTypeNameTestCase[T any](name, want string) TestCase {
+func newTypeNameTestCase[T any](name, want string) core.TestCase {
 	return typeNameTestCase[T]{
 		want: want,
 		name: name,
@@ -34,18 +36,18 @@ func (tc typeNameTestCase[T]) Name() string {
 
 func (tc typeNameTestCase[T]) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.want, TypeName[T](), "name")
+	core.AssertEqual(t, tc.want, core.TypeName[T](), "name")
 }
 
-func typeNameTestCases() []TestCase {
-	return S(
+func typeNameTestCases() []core.TestCase {
+	return core.S(
 		newTypeNameTestCase[int]("builtin", "int"),
-		newTypeNameTestCase[PanicError]("struct", "core.PanicError"),
-		newTypeNameTestCase[*PanicError]("pointer", "*core.PanicError"),
+		newTypeNameTestCase[core.PanicError]("struct", "core.PanicError"),
+		newTypeNameTestCase[*core.PanicError]("pointer", "*core.PanicError"),
 		newTypeNameTestCase[[]string]("slice", "[]string"),
 		newTypeNameTestCase[error]("builtin interface", "error"),
 		newTypeNameTestCase[fmt.Stringer]("interface", "fmt.Stringer"),
-		newTypeNameTestCase[Recovered]("package interface", "core.Recovered"),
+		newTypeNameTestCase[core.Recovered]("package interface", "core.Recovered"),
 		newTypeNameTestCase[interface{ Len() int }]("anonymous interface",
 			"interface { Len() int }"),
 		newTypeNameTestCase[any]("any", "any"),
@@ -54,7 +56,7 @@ func typeNameTestCases() []TestCase {
 }
 
 func TestTypeName(t *testing.T) {
-	RunTestCases(t, typeNameTestCases())
+	core.RunTestCases(t, typeNameTestCases())
 }
 
 // coalesceTestCase tests Coalesce function with generic type support
@@ -71,8 +73,8 @@ func (tc coalesceTestCase[T]) Name() string {
 func (tc coalesceTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
-	got := Coalesce(tc.inputs...)
-	AssertEqual(t, tc.expected, got, "Coalesce")
+	got := core.Coalesce(tc.inputs...)
+	core.AssertEqual(t, tc.expected, got, "Coalesce")
 }
 
 // Factory function for coalesceTestCase
@@ -85,40 +87,40 @@ func newCoalesceTestCase[T comparable](name string, inputs []T, expected T) coal
 }
 
 var coalesceIntTestCases = []coalesceTestCase[int]{
-	newCoalesceTestCase("all zeros", S(0, 0, 0), 0),
-	newCoalesceTestCase("first non-zero", S(0, 42, 0, 100), 42),
-	newCoalesceTestCase("last non-zero", S(0, 0, 0, 100), 100),
-	newCoalesceTestCase("single value", S(42), 42),
-	newCoalesceTestCase("single zero", S(0), 0),
-	newCoalesceTestCase("empty inputs", S[int](), 0),
-	newCoalesceTestCase("negative values", S(0, -42, 0, -100), -42),
-	newCoalesceTestCase("mixed positive and negative", S(0, -1, 0, 1), -1),
-	newCoalesceTestCase("large numbers", S(0, 0, 2147483647, 0), 2147483647),
-	newCoalesceTestCase("no zeros", S(1, 2, 3, 4), 1),
+	newCoalesceTestCase("all zeros", core.S(0, 0, 0), 0),
+	newCoalesceTestCase("first non-zero", core.S(0, 42, 0, 100), 42),
+	newCoalesceTestCase("last non-zero", core.S(0, 0, 0, 100), 100),
+	newCoalesceTestCase("single value", core.S(42), 42),
+	newCoalesceTestCase("single zero", core.S(0), 0),
+	newCoalesceTestCase("empty inputs", core.S[int](), 0),
+	newCoalesceTestCase("negative values", core.S(0, -42, 0, -100), -42),
+	newCoalesceTestCase("mixed positive and negative", core.S(0, -1, 0, 1), -1),
+	newCoalesceTestCase("large numbers", core.S(0, 0, 2147483647, 0), 2147483647),
+	newCoalesceTestCase("no zeros", core.S(1, 2, 3, 4), 1),
 }
 
 func TestCoalesceInt(t *testing.T) {
-	RunTestCases(t, coalesceIntTestCases)
+	core.RunTestCases(t, coalesceIntTestCases)
 }
 
 var coalesceStringTestCases = []coalesceTestCase[string]{
-	newCoalesceTestCase("all empty", S("", "", ""), ""),
-	newCoalesceTestCase("first non-empty", S("", "hello", "", "world"), "hello"),
-	newCoalesceTestCase("last non-empty", S("", "", "", "world"), "world"),
-	newCoalesceTestCase("single value", S("hello"), "hello"),
-	newCoalesceTestCase("single empty", S(""), ""),
-	newCoalesceTestCase("empty inputs", S[string](), ""),
-	newCoalesceTestCase("spaces are not empty", S("", " ", "", "world"), " "),
-	newCoalesceTestCase("unicode strings", S("", "🚀", "", "world"), "🚀"),
+	newCoalesceTestCase("all empty", core.S("", "", ""), ""),
+	newCoalesceTestCase("first non-empty", core.S("", "hello", "", "world"), "hello"),
+	newCoalesceTestCase("last non-empty", core.S("", "", "", "world"), "world"),
+	newCoalesceTestCase("single value", core.S("hello"), "hello"),
+	newCoalesceTestCase("single empty", core.S(""), ""),
+	newCoalesceTestCase("empty inputs", core.S[string](), ""),
+	newCoalesceTestCase("spaces are not empty", core.S("", " ", "", "world"), " "),
+	newCoalesceTestCase("unicode strings", core.S("", "🚀", "", "world"), "🚀"),
 	newCoalesceTestCase("long strings",
-		S("", "a very long string that should not be truncated", "", "short"),
+		core.S("", "a very long string that should not be truncated", "", "short"),
 		"a very long string that should not be truncated"),
-	newCoalesceTestCase("newlines and tabs", S("", "\n\t", "", "world"), "\n\t"),
-	newCoalesceTestCase("no empty strings", S("first", "second", "third"), "first"),
+	newCoalesceTestCase("newlines and tabs", core.S("", "\n\t", "", "world"), "\n\t"),
+	newCoalesceTestCase("no empty strings", core.S("first", "second", "third"), "first"),
 }
 
 func TestCoalesceString(t *testing.T) {
-	RunTestCases(t, coalesceStringTestCases)
+	core.RunTestCases(t, coalesceStringTestCases)
 }
 
 // coalescePointerTestCase tests Coalesce with pointers (requires special comparison logic)
@@ -135,8 +137,8 @@ func (tc coalescePointerTestCase[T]) Name() string {
 func (tc coalescePointerTestCase[T]) Test(t *testing.T) {
 	t.Helper()
 
-	got := Coalesce(tc.inputs...)
-	AssertSame(t, tc.expected, got, "Coalesce")
+	got := core.Coalesce(tc.inputs...)
+	core.AssertSame(t, tc.expected, got, "Coalesce")
 }
 
 // Factory function for coalescePointerTestCase
@@ -160,18 +162,18 @@ func coalescePointerTestCases() []coalescePointerTestCase[int] {
 	first, last, zero := intPtr(42), intPtr(100), intPtr(0)
 
 	return []coalescePointerTestCase[int]{
-		newCoalescePointerTestCase("all nil", S[*int](nil, nil, nil), nil),
-		newCoalescePointerTestCase("first non-nil", S(nil, first, nil, last), first),
-		newCoalescePointerTestCase("last non-nil", S(nil, nil, nil, last), last),
-		newCoalescePointerTestCase("single value", S(first), first),
-		newCoalescePointerTestCase("single nil", S[*int](nil), nil),
-		newCoalescePointerTestCase("empty inputs", S[*int](), nil),
-		newCoalescePointerTestCase("zero value pointer is not nil", S(nil, zero, nil, last), zero),
+		newCoalescePointerTestCase("all nil", core.S[*int](nil, nil, nil), nil),
+		newCoalescePointerTestCase("first non-nil", core.S(nil, first, nil, last), first),
+		newCoalescePointerTestCase("last non-nil", core.S(nil, nil, nil, last), last),
+		newCoalescePointerTestCase("single value", core.S(first), first),
+		newCoalescePointerTestCase("single nil", core.S[*int](nil), nil),
+		newCoalescePointerTestCase("empty inputs", core.S[*int](), nil),
+		newCoalescePointerTestCase("zero value pointer is not nil", core.S(nil, zero, nil, last), zero),
 	}
 }
 
 func TestCoalescePointer(t *testing.T) {
-	RunTestCases(t, coalescePointerTestCases())
+	core.RunTestCases(t, coalescePointerTestCases())
 }
 
 // testStruct for testing struct coalescing
@@ -193,42 +195,42 @@ func coalesceStructTestCases() []coalesceTestCase[testStruct] {
 	noCount, noValue := newTestStruct("hello", 0), newTestStruct("", 42)
 
 	return []coalesceTestCase[testStruct]{
-		newCoalesceTestCase("all zero", S(zero, zero, zero), zero),
-		newCoalesceTestCase("first non-zero", S(zero, first, zero, last), first),
-		newCoalesceTestCase("partial zero struct", S(zero, noCount, noValue, last), noCount),
-		newCoalesceTestCase("empty inputs", S[testStruct](), zero),
+		newCoalesceTestCase("all zero", core.S(zero, zero, zero), zero),
+		newCoalesceTestCase("first non-zero", core.S(zero, first, zero, last), first),
+		newCoalesceTestCase("partial zero struct", core.S(zero, noCount, noValue, last), noCount),
+		newCoalesceTestCase("empty inputs", core.S[testStruct](), zero),
 	}
 }
 
 func TestCoalesceStruct(t *testing.T) {
-	RunTestCases(t, coalesceStructTestCases())
+	core.RunTestCases(t, coalesceStructTestCases())
 }
 
 // Additional test cases for different numeric types
 var coalesceFloat64TestCases = []coalesceTestCase[float64]{
-	newCoalesceTestCase("all zeros", S(0.0, 0.0, 0.0), 0.0),
-	newCoalesceTestCase("first non-zero", S(0.0, 3.14, 0.0, 2.71), 3.14),
-	newCoalesceTestCase("negative float", S(0.0, -1.5, 0.0, 1.5), -1.5),
-	newCoalesceTestCase("very small numbers", S(0.0, 1e-10, 0.0, 1e-5), 1e-10),
-	newCoalesceTestCase("infinity", S(0.0, math.Inf(1), 2.0), math.Inf(1)),
-	newCoalesceTestCase("no zeros", S(1.1, 2.2, 3.3), 1.1),
+	newCoalesceTestCase("all zeros", core.S(0.0, 0.0, 0.0), 0.0),
+	newCoalesceTestCase("first non-zero", core.S(0.0, 3.14, 0.0, 2.71), 3.14),
+	newCoalesceTestCase("negative float", core.S(0.0, -1.5, 0.0, 1.5), -1.5),
+	newCoalesceTestCase("very small numbers", core.S(0.0, 1e-10, 0.0, 1e-5), 1e-10),
+	newCoalesceTestCase("infinity", core.S(0.0, math.Inf(1), 2.0), math.Inf(1)),
+	newCoalesceTestCase("no zeros", core.S(1.1, 2.2, 3.3), 1.1),
 }
 
 func TestCoalesceFloat64(t *testing.T) {
-	RunTestCases(t, coalesceFloat64TestCases)
+	core.RunTestCases(t, coalesceFloat64TestCases)
 }
 
 // Test cases for bool type
 var coalesceBoolTestCases = []coalesceTestCase[bool]{
-	newCoalesceTestCase("all false", S(false, false, false), false),
-	newCoalesceTestCase("first true", S(false, true, false), true),
-	newCoalesceTestCase("single true", S(true), true),
-	newCoalesceTestCase("empty inputs", S[bool](), false),
-	newCoalesceTestCase("no false values", S(true, true, true), true),
+	newCoalesceTestCase("all false", core.S(false, false, false), false),
+	newCoalesceTestCase("first true", core.S(false, true, false), true),
+	newCoalesceTestCase("single true", core.S(true), true),
+	newCoalesceTestCase("empty inputs", core.S[bool](), false),
+	newCoalesceTestCase("no false values", core.S(true, true, true), true),
 }
 
 func TestCoalesceBool(t *testing.T) {
-	RunTestCases(t, coalesceBoolTestCases)
+	core.RunTestCases(t, coalesceBoolTestCases)
 }
 
 // iifTestCase tests IIf function
@@ -247,8 +249,8 @@ func (tc iifTestCase) Name() string {
 func (tc iifTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := IIf(tc.cond, tc.yes, tc.no)
-	AssertEqual(t, tc.expected, got, "IIf")
+	got := core.IIf(tc.cond, tc.yes, tc.no)
+	core.AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifTestCase
@@ -273,7 +275,7 @@ var iifTestCases = []iifTestCase{
 }
 
 func TestIIfInt(t *testing.T) {
-	RunTestCases(t, iifTestCases)
+	core.RunTestCases(t, iifTestCases)
 }
 
 // iifStringTestCase tests IIf with strings
@@ -292,8 +294,8 @@ func (tc iifStringTestCase) Name() string {
 func (tc iifStringTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := IIf(tc.cond, tc.yes, tc.no)
-	AssertEqual(t, tc.expected, got, "IIf")
+	got := core.IIf(tc.cond, tc.yes, tc.no)
+	core.AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStringTestCase
@@ -316,7 +318,7 @@ var iifStringTestCases = []iifStringTestCase{
 }
 
 func TestIIfString(t *testing.T) {
-	RunTestCases(t, iifStringTestCases)
+	core.RunTestCases(t, iifStringTestCases)
 }
 
 // iifPointerTestCase tests IIf with pointers
@@ -335,8 +337,8 @@ func (tc iifPointerTestCase) Name() string {
 func (tc iifPointerTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := IIf(tc.cond, tc.yes, tc.no)
-	AssertSame(t, tc.expected, got, "IIf")
+	got := core.IIf(tc.cond, tc.yes, tc.no)
+	core.AssertSame(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifPointerTestCase
@@ -367,7 +369,7 @@ func iifPointerTestCases() []iifPointerTestCase {
 }
 
 func TestIIfPointer(t *testing.T) {
-	RunTestCases(t, iifPointerTestCases())
+	core.RunTestCases(t, iifPointerTestCases())
 }
 
 // iifStructTestCase tests IIf with structs
@@ -386,8 +388,8 @@ func (tc iifStructTestCase) Name() string {
 func (tc iifStructTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got := IIf(tc.cond, tc.yes, tc.no)
-	AssertEqual(t, tc.expected, got, "IIf")
+	got := core.IIf(tc.cond, tc.yes, tc.no)
+	core.AssertEqual(t, tc.expected, got, "IIf")
 }
 
 // Factory function for iifStructTestCase
@@ -414,7 +416,7 @@ func iifStructTestCases() []iifStructTestCase {
 }
 
 func TestIIfStruct(t *testing.T) {
-	RunTestCases(t, iifStructTestCases())
+	core.RunTestCases(t, iifStructTestCases())
 }
 
 // Test IIf with function evaluation (ensure both branches are evaluated before selection)
@@ -426,11 +428,11 @@ func TestIIfEvaluation(t *testing.T) {
 	no := evaluateNoFunction(&calledNo)
 
 	// Both should be evaluated before IIf is called
-	AssertTrue(t, calledYes, "yes evaluated")
-	AssertTrue(t, calledNo, "no evaluated")
+	core.AssertTrue(t, calledYes, "yes evaluated")
+	core.AssertTrue(t, calledNo, "no evaluated")
 
-	AssertEqual(t, 42, IIf(true, yes, no), "IIf true")
-	AssertEqual(t, 100, IIf(false, yes, no), "IIf false")
+	core.AssertEqual(t, 42, core.IIf(true, yes, no), "IIf true")
+	core.AssertEqual(t, 100, core.IIf(false, yes, no), "IIf false")
 }
 
 func evaluateYesFunction(called *bool) int {
@@ -445,23 +447,23 @@ func evaluateNoFunction(called *bool) int {
 
 // Benchmark tests
 func BenchmarkCoalesceInt(b *testing.B) {
-	inputs := S(0, 0, 0, 42, 0, 100)
+	inputs := core.S(0, 0, 0, 42, 0, 100)
 	for b.Loop() {
-		_ = Coalesce(inputs...)
+		_ = core.Coalesce(inputs...)
 	}
 }
 
 func BenchmarkCoalesceString(b *testing.B) {
-	inputs := S("", "", "", "hello", "", "world")
+	inputs := core.S("", "", "", "hello", "", "world")
 	for b.Loop() {
-		_ = Coalesce(inputs...)
+		_ = core.Coalesce(inputs...)
 	}
 }
 
 func BenchmarkIIfInt(b *testing.B) {
 	i := 0
 	for b.Loop() {
-		_ = IIf(i%2 == 0, 42, 100)
+		_ = core.IIf(i%2 == 0, 42, 100)
 		i++
 	}
 }
@@ -469,7 +471,7 @@ func BenchmarkIIfInt(b *testing.B) {
 func BenchmarkIIfString(b *testing.B) {
 	i := 0
 	for b.Loop() {
-		_ = IIf(i%2 == 0, "hello", "world")
+		_ = core.IIf(i%2 == 0, "hello", "world")
 		i++
 	}
 }

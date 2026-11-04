@@ -1,17 +1,19 @@
-package core
+package core_test
 
 import (
 	"container/list"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = listForEachTestCase{}
-	_ TestCase = listForEachElementTestCase{}
-	_ TestCase = listContainsTestCase{}
-	_ TestCase = listCopyTestCase{}
-	_ TestCase = listForEachTypeMismatchTestCase{}
+	_ core.TestCase = listForEachTestCase{}
+	_ core.TestCase = listForEachElementTestCase{}
+	_ core.TestCase = listContainsTestCase{}
+	_ core.TestCase = listCopyTestCase{}
+	_ core.TestCase = listForEachTypeMismatchTestCase{}
 )
 
 // listValues collects the values of a list of int, walking it through
@@ -57,7 +59,7 @@ func (tc listForEachTestCase) Test(t *testing.T) {
 		return false
 	})
 
-	AssertSliceEqual(t, tc.expected, result, "visited values")
+	core.AssertSliceEqual(t, tc.expected, result, "visited values")
 }
 
 func newListForEachTestCase(name string, iterFn func(*list.List, func(int) bool),
@@ -77,8 +79,8 @@ func listForEachTestCases(iterFn func(*list.List, func(int) bool),
 	wantMultiple []int) []listForEachTestCase {
 	return []listForEachTestCase{
 		newListForEachTestCase("empty list", iterFn, nil, nil),
-		newListForEachTestCase("single element", iterFn, S(1), S(1)),
-		newListForEachTestCase("multiple elements", iterFn, S(1, 2, 3), wantMultiple),
+		newListForEachTestCase("single element", iterFn, core.S(1), core.S(1)),
+		newListForEachTestCase("multiple elements", iterFn, core.S(1, 2, 3), wantMultiple),
 	}
 }
 
@@ -104,7 +106,7 @@ func (tc listForEachElementTestCase) Test(t *testing.T) {
 		return false
 	})
 
-	AssertSliceEqual(t, tc.expected, result, "visited values")
+	core.AssertSliceEqual(t, tc.expected, result, "visited values")
 }
 
 func newListForEachElementTestCase(name string, iterFn func(*list.List, func(*list.Element) bool),
@@ -121,43 +123,43 @@ func listForEachElementTestCases(iterFn func(*list.List, func(*list.Element) boo
 	wantMultiple []int) []listForEachElementTestCase {
 	return []listForEachElementTestCase{
 		newListForEachElementTestCase("empty list", iterFn, nil, nil),
-		newListForEachElementTestCase("single element", iterFn, S(1), S(1)),
-		newListForEachElementTestCase("multiple elements", iterFn, S(1, 2, 3), wantMultiple),
+		newListForEachElementTestCase("single element", iterFn, core.S(1), core.S(1)),
+		newListForEachElementTestCase("multiple elements", iterFn, core.S(1, 2, 3), wantMultiple),
 	}
 }
 
 func TestListForEach(t *testing.T) {
-	RunTestCases(t, listForEachTestCases(ListForEach[int], S(1, 2, 3)))
+	core.RunTestCases(t, listForEachTestCases(core.ListForEach[int], core.S(1, 2, 3)))
 
 	testListForEachNilAndEarlyReturn(t, "ListForEach", func(l *list.List, fn func(int) bool) {
-		ListForEach(l, fn)
-	}, S(1, 2))
+		core.ListForEach(l, fn)
+	}, core.S(1, 2))
 }
 
 func TestListForEachElement(t *testing.T) {
-	RunTestCases(t, listForEachElementTestCases(ListForEachElement, S(1, 2, 3)))
+	core.RunTestCases(t, listForEachElementTestCases(core.ListForEachElement, core.S(1, 2, 3)))
 
 	testListForEachElementNilAndEarlyReturn(t, "ListForEachElement",
 		func(l *list.List, fn func(*list.Element) bool) {
-			ListForEachElement(l, fn)
-		}, S(1, 2))
+			core.ListForEachElement(l, fn)
+		}, core.S(1, 2))
 }
 
 func TestListForEachBackward(t *testing.T) {
-	RunTestCases(t, listForEachTestCases(ListForEachBackward[int], S(3, 2, 1)))
+	core.RunTestCases(t, listForEachTestCases(core.ListForEachBackward[int], core.S(3, 2, 1)))
 
 	testListForEachNilAndEarlyReturn(t, "ListForEachBackward", func(l *list.List, fn func(int) bool) {
-		ListForEachBackward(l, fn)
-	}, S(3, 2))
+		core.ListForEachBackward(l, fn)
+	}, core.S(3, 2))
 }
 
 func TestListForEachBackwardElement(t *testing.T) {
-	RunTestCases(t, listForEachElementTestCases(ListForEachBackwardElement, S(3, 2, 1)))
+	core.RunTestCases(t, listForEachElementTestCases(core.ListForEachBackwardElement, core.S(3, 2, 1)))
 
 	testListForEachElementNilAndEarlyReturn(t, "ListForEachBackwardElement",
 		func(l *list.List, fn func(*list.Element) bool) {
-			ListForEachBackwardElement(l, fn)
-		}, S(3, 2))
+			core.ListForEachBackwardElement(l, fn)
+		}, core.S(3, 2))
 }
 
 // Test cases for ListContains function
@@ -190,29 +192,29 @@ func (tc listContainsTestCase) Test(t *testing.T) {
 		l.PushBack(v)
 	}
 
-	result := ListContains(l, tc.target)
-	AssertEqual(t, tc.expected, result, "ListContains result")
+	result := core.ListContains(l, tc.target)
+	core.AssertEqual(t, tc.expected, result, "ListContains result")
 }
 
 func TestListContains(t *testing.T) {
 	testCases := []listContainsTestCase{
-		newListContainsTestCase("empty list", S[int](), 42, false),
-		newListContainsTestCase("single element found", S(42), 42, true),
-		newListContainsTestCase("single element not found", S(42), 99, false),
-		newListContainsTestCase("multiple elements found", S(1, 2, 3, 42, 5), 42, true),
-		newListContainsTestCase("multiple elements not found", S(1, 2, 3, 4, 5), 42, false),
-		newListContainsTestCase("first element", S(42, 1, 2), 42, true),
-		newListContainsTestCase("last element", S(1, 2, 42), 42, true),
-		newListContainsTestCase("middle element", S(1, 42, 2), 42, true),
-		newListContainsTestCase("duplicate elements", S(1, 42, 2, 42, 3), 42, true),
+		newListContainsTestCase("empty list", core.S[int](), 42, false),
+		newListContainsTestCase("single element found", core.S(42), 42, true),
+		newListContainsTestCase("single element not found", core.S(42), 99, false),
+		newListContainsTestCase("multiple elements found", core.S(1, 2, 3, 42, 5), 42, true),
+		newListContainsTestCase("multiple elements not found", core.S(1, 2, 3, 4, 5), 42, false),
+		newListContainsTestCase("first element", core.S(42, 1, 2), 42, true),
+		newListContainsTestCase("last element", core.S(1, 2, 42), 42, true),
+		newListContainsTestCase("middle element", core.S(1, 42, 2), 42, true),
+		newListContainsTestCase("duplicate elements", core.S(1, 42, 2, 42, 3), 42, true),
 	}
 
-	RunTestCases(t, testCases)
+	core.RunTestCases(t, testCases)
 
 	// Test nil list
 	t.Run("nil list", func(t *testing.T) {
-		result := ListContains((*list.List)(nil), 42)
-		AssertFalse(t, result, "ListContains nil list")
+		result := core.ListContains((*list.List)(nil), 42)
+		core.AssertFalse(t, result, "ListContains nil list")
 	})
 }
 
@@ -244,35 +246,35 @@ func (tc listCopyTestCase) Test(t *testing.T) {
 	}
 
 	// Copy the list
-	copied := ListCopy[int](orig)
+	copied := core.ListCopy[int](orig)
 
 	// Everything below reads the copy, so a copy that is the original
 	// or holds the wrong values makes the rest meaningless.
-	AssertMustNotSame(t, orig, copied, "list instance")
-	AssertMustSliceEqual(t, tc.values, listValues(copied), "copied values")
+	core.AssertMustNotSame(t, orig, copied, "list instance")
+	core.AssertMustSliceEqual(t, tc.values, listValues(copied), "copied values")
 
 	// Appending to the original must not reach the copy.
 	orig.PushBack(999)
-	AssertSliceEqual(t, tc.values, listValues(copied), "copy after appending to the original")
+	core.AssertSliceEqual(t, tc.values, listValues(copied), "copy after appending to the original")
 }
 
 func TestListCopy(t *testing.T) {
 	testCases := []listCopyTestCase{
-		newListCopyTestCase("empty list", S[int]()),
-		newListCopyTestCase("single element", S(42)),
-		newListCopyTestCase("multiple elements", S(1, 2, 3, 4, 5)),
-		newListCopyTestCase("negative numbers", S(-1, 0, 1)),
-		newListCopyTestCase("duplicates", S(1, 1, 2, 2, 3)),
+		newListCopyTestCase("empty list", core.S[int]()),
+		newListCopyTestCase("single element", core.S(42)),
+		newListCopyTestCase("multiple elements", core.S(1, 2, 3, 4, 5)),
+		newListCopyTestCase("negative numbers", core.S(-1, 0, 1)),
+		newListCopyTestCase("duplicates", core.S(1, 1, 2, 2, 3)),
 	}
 
-	RunTestCases(t, testCases)
+	core.RunTestCases(t, testCases)
 }
 
 // Test ListCopy with nil input
 func TestListCopyNil(t *testing.T) {
-	result := ListCopy[int](nil)
-	AssertMustNotNil(t, result, "ListCopy(nil)")
-	AssertEqual(t, 0, result.Len(), "length")
+	result := core.ListCopy[int](nil)
+	core.AssertMustNotNil(t, result, "ListCopy(nil)")
+	core.AssertEqual(t, 0, result.Len(), "length")
 }
 
 // Test ListContainsFn function
@@ -290,18 +292,18 @@ func testListContainsFnCustomFunction(t *testing.T) {
 	l.PushBack(3)
 
 	// Find element greater than 2
-	result := ListContainsFn(l, 0, func(_, val int) bool {
+	result := core.ListContainsFn(l, 0, func(_, val int) bool {
 		return val > 2
 	})
-	AssertTrue(t, result, "ListContainsFn custom function")
+	core.AssertTrue(t, result, "ListContainsFn custom function")
 }
 
 func testListContainsFnNilList(t *testing.T) {
 	t.Helper()
-	result := ListContainsFn((*list.List)(nil), 42, func(a, b int) bool {
+	result := core.ListContainsFn((*list.List)(nil), 42, func(a, b int) bool {
 		return a == b
 	})
-	AssertFalse(t, result, "ListContainsFn nil list")
+	core.AssertFalse(t, result, "ListContainsFn nil list")
 }
 
 func testListContainsFnNilFunction(t *testing.T) {
@@ -309,8 +311,8 @@ func testListContainsFnNilFunction(t *testing.T) {
 	l := list.New()
 	l.PushBack(42)
 
-	result := ListContainsFn(l, 42, nil)
-	AssertFalse(t, result, "ListContainsFn nil function")
+	result := core.ListContainsFn(l, 42, nil)
+	core.AssertFalse(t, result, "ListContainsFn nil function")
 }
 
 // Test ListCopyFn function
@@ -329,12 +331,12 @@ func testListCopyFnTransformation(t *testing.T) {
 	l.PushBack(3)
 
 	// Double each value
-	result := ListCopyFn(l, func(v int) (int, bool) {
+	result := core.ListCopyFn(l, func(v int) (int, bool) {
 		return v * 2, true
 	})
 
-	AssertMustNotNil(t, result, "ListCopyFn(_, double)")
-	AssertSliceEqual(t, S(2, 4, 6), listValues(result), "doubled values")
+	core.AssertMustNotNil(t, result, "ListCopyFn(_, double)")
+	core.AssertSliceEqual(t, core.S(2, 4, 6), listValues(result), "doubled values")
 }
 
 func testListCopyFnFiltering(t *testing.T) {
@@ -346,21 +348,21 @@ func testListCopyFnFiltering(t *testing.T) {
 	l.PushBack(4)
 
 	// Only keep even numbers
-	result := ListCopyFn(l, func(v int) (int, bool) {
+	result := core.ListCopyFn(l, func(v int) (int, bool) {
 		return v, v%2 == 0
 	})
 
-	AssertMustNotNil(t, result, "ListCopyFn(_, keepEven)")
-	AssertSliceEqual(t, S(2, 4), listValues(result), "kept values")
+	core.AssertMustNotNil(t, result, "ListCopyFn(_, keepEven)")
+	core.AssertSliceEqual(t, core.S(2, 4), listValues(result), "kept values")
 }
 
 func testListCopyFnNilList(t *testing.T) {
 	t.Helper()
-	result := ListCopyFn((*list.List)(nil), func(v int) (int, bool) {
+	result := core.ListCopyFn((*list.List)(nil), func(v int) (int, bool) {
 		return v, true
 	})
-	AssertMustNotNil(t, result, "ListCopyFn(nil, _)")
-	AssertSliceEqual(t, S[int](), listValues(result), "nil list")
+	core.AssertMustNotNil(t, result, "ListCopyFn(nil, _)")
+	core.AssertSliceEqual(t, core.S[int](), listValues(result), "nil list")
 }
 
 func testListCopyFnNilFunction(t *testing.T) {
@@ -368,9 +370,9 @@ func testListCopyFnNilFunction(t *testing.T) {
 	l := list.New()
 	l.PushBack(42)
 
-	result := ListCopyFn[int](l, nil)
-	AssertMustNotNil(t, result, "ListCopyFn(_, nil)")
-	AssertSliceEqual(t, S(42), listValues(result), "copied values")
+	result := core.ListCopyFn[int](l, nil)
+	core.AssertMustNotNil(t, result, "ListCopyFn(_, nil)")
+	core.AssertSliceEqual(t, core.S(42), listValues(result), "copied values")
 }
 
 func testListForEachNilAndEarlyReturn(t *testing.T, name string,
@@ -394,7 +396,7 @@ func testListForEachNilFunction(t *testing.T, name string, iterFn func(*list.Lis
 	l.PushBack(1)
 	l.PushBack(2)
 
-	AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
+	core.AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
 }
 
 func testListForEachEarlyReturn(t *testing.T, name string,
@@ -410,19 +412,19 @@ func testListForEachEarlyReturn(t *testing.T, name string,
 		result = append(result, v)
 		return v == 2 // Stop when we hit 2
 	})
-	AssertSliceEqual(t, want, result, name+" early return")
+	core.AssertSliceEqual(t, want, result, name+" early return")
 }
 
 func testListForEachNilList(t *testing.T, name string, iterFn func(*list.List, func(int) bool)) {
 	t.Helper()
 	visits := 0
-	AssertNoPanic(t, func() {
+	core.AssertNoPanic(t, func() {
 		iterFn((*list.List)(nil), func(int) bool {
 			visits++
 			return false
 		})
 	}, name+" nil list")
-	AssertEqual(t, 0, visits, name+" nil list visits")
+	core.AssertEqual(t, 0, visits, name+" nil list visits")
 }
 
 func testListForEachElementNilAndEarlyReturn(t *testing.T, name string,
@@ -445,7 +447,7 @@ func testListForEachElementNilFunction(t *testing.T, name string, iterFn func(*l
 	l := list.New()
 	l.PushBack(1)
 
-	AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
+	core.AssertNoPanic(t, func() { iterFn(l, nil) }, name+" nil function")
 }
 
 func testListForEachElementEarlyReturn(t *testing.T, name string,
@@ -461,19 +463,19 @@ func testListForEachElementEarlyReturn(t *testing.T, name string,
 		result = append(result, e.Value.(int))
 		return e.Value.(int) == 2 // Stop when we hit 2
 	})
-	AssertSliceEqual(t, want, result, name+" early return")
+	core.AssertSliceEqual(t, want, result, name+" early return")
 }
 
 func testListForEachElementNilList(t *testing.T, name string, iterFn func(*list.List, func(*list.Element) bool)) {
 	t.Helper()
 	visits := 0
-	AssertNoPanic(t, func() {
+	core.AssertNoPanic(t, func() {
 		iterFn((*list.List)(nil), func(*list.Element) bool {
 			visits++
 			return false
 		})
 	}, name+" nil list")
-	AssertEqual(t, 0, visits, name+" nil list visits")
+	core.AssertEqual(t, 0, visits, name+" nil list visits")
 }
 
 type listForEachTypeMismatchTestCase struct {
@@ -492,7 +494,7 @@ func (tc listForEachTypeMismatchTestCase) Test(t *testing.T) {
 		collected = append(collected, v)
 		return false
 	})
-	AssertSliceEqual(t, tc.want, collected, "visited values")
+	core.AssertSliceEqual(t, tc.want, collected, "visited values")
 }
 
 func newListForEachTypeMismatchTestCase(name string, l *list.List,
@@ -514,9 +516,9 @@ func TestListForEachTypeMismatch(t *testing.T) {
 	l.PushBack("not-an-int")
 	l.PushBack(3)
 
-	RunTestCases(t, []listForEachTypeMismatchTestCase{
-		newListForEachTypeMismatchTestCase("forward", l, ListForEach[int], S(1, 3)),
-		newListForEachTypeMismatchTestCase("backward", l, ListForEachBackward[int], S(3, 1)),
+	core.RunTestCases(t, []listForEachTypeMismatchTestCase{
+		newListForEachTypeMismatchTestCase("forward", l, core.ListForEach[int], core.S(1, 3)),
+		newListForEachTypeMismatchTestCase("backward", l, core.ListForEachBackward[int], core.S(3, 1)),
 	})
 }
 
@@ -529,9 +531,9 @@ func TestListContainsTypeMismatch(t *testing.T) {
 	l.PushBack("not-an-int")
 	l.PushBack(3)
 
-	AssertTrue(t, ListContains(l, 3), "ListContains(_, 3)")
-	AssertFalse(t, ListContains(l, 2), "ListContains(_, 2)")
-	AssertTrue(t, ListContains(l, "not-an-int"), `ListContains(_, "not-an-int")`)
+	core.AssertTrue(t, core.ListContains(l, 3), "ListContains(_, 3)")
+	core.AssertFalse(t, core.ListContains(l, 2), "ListContains(_, 2)")
+	core.AssertTrue(t, core.ListContains(l, "not-an-int"), `ListContains(_, "not-an-int")`)
 }
 
 // ListCopy inherits the skip as well, which drops the elements of
@@ -542,10 +544,10 @@ func TestListCopyTypeMismatch(t *testing.T) {
 	l.PushBack("not-an-int")
 	l.PushBack(3)
 
-	copied := ListCopy[int](l)
-	AssertMustNotNil(t, copied, "ListCopy[int]")
-	AssertSliceEqual(t, S(1, 3), listValues(copied), "copied values")
-	AssertEqual(t, 3, l.Len(), "source length")
+	copied := core.ListCopy[int](l)
+	core.AssertMustNotNil(t, copied, "ListCopy[int]")
+	core.AssertSliceEqual(t, core.S(1, 3), listValues(copied), "copied values")
+	core.AssertEqual(t, 3, l.Len(), "source length")
 }
 
 // ListCopy is documented as shallow, so the copy holds the values the
@@ -555,10 +557,10 @@ func TestListCopyIsShallow(t *testing.T) {
 	orig := list.New()
 	orig.PushBack(&v)
 
-	copied := ListCopy[*int](orig)
-	AssertMustNotNil(t, copied, "ListCopy[*int]")
-	AssertMustEqual(t, 1, copied.Len(), "length")
+	copied := core.ListCopy[*int](orig)
+	core.AssertMustNotNil(t, copied, "ListCopy[*int]")
+	core.AssertMustEqual(t, 1, copied.Len(), "length")
 
-	got := AssertMustTypeIs[*int](t, copied.Front().Value, "copied element")
-	AssertSame(t, &v, got, "element pointer")
+	got := core.AssertMustTypeIs[*int](t, copied.Front().Value, "copied element")
+	core.AssertSame(t, &v, got, "element pointer")
 }

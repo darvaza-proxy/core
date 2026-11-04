@@ -1,24 +1,25 @@
-package core
+package core_test
 
 import (
 	"errors"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = assertComparableTestCase{}
-	_ TestCase = assertErrorAsTestCase[*WrappedError]{}
-	_ TestCase = assertTypeIsTestCase[string]{}
-	_ TestCase = assertPanicTestCase{}
-	_ TestCase = assertAbortTestCase{}
-	_ TestCase = isMockTAbortTestCase{}
-	_ TestCase = (*mockTestCase)(nil)
-	_ TestCase = mockTMessageAtTestCase{}
-	_ TestCase = mockTRunTestCase{}
-	_ TestCase = mockTRunCarryOverTestCase{}
+	_ core.TestCase = assertErrorAsTestCase[*core.WrappedError]{}
+	_ core.TestCase = assertTypeIsTestCase[string]{}
+	_ core.TestCase = assertPanicTestCase{}
+	_ core.TestCase = assertAbortTestCase{}
+	_ core.TestCase = isMockTAbortTestCase{}
+	_ core.TestCase = (*mockTestCase)(nil)
+	_ core.TestCase = mockTMessageAtTestCase{}
+	_ core.TestCase = mockTRunTestCase{}
+	_ core.TestCase = mockTRunCarryOverTestCase{}
 )
 
 // Test MockT implementation
@@ -40,114 +41,20 @@ func TestMockT(t *testing.T) {
 // Test S helper function
 func TestS(t *testing.T) {
 	// Test with integers
-	intSlice := S(1, 2, 3)
-	AssertSliceEqual(t, []int{1, 2, 3}, intSlice, "S with integers")
+	intSlice := core.S(1, 2, 3)
+	core.AssertSliceEqual(t, []int{1, 2, 3}, intSlice, "S with integers")
 
 	// Test with strings
-	strSlice := S("a", "b", "c")
-	AssertSliceEqual(t, []string{"a", "b", "c"}, strSlice, "S with strings")
+	strSlice := core.S("a", "b", "c")
+	core.AssertSliceEqual(t, []string{"a", "b", "c"}, strSlice, "S with strings")
 
 	// Test empty slice
-	emptySlice := S[string]()
-	AssertSliceEqual(t, []string{}, emptySlice, "S empty slice")
+	emptySlice := core.S[string]()
+	core.AssertSliceEqual(t, []string{}, emptySlice, "S empty slice")
 
 	// Test single element
-	singleSlice := S(42)
-	AssertSliceEqual(t, []int{42}, singleSlice, "S single element")
-}
-
-// plainEqual and plainContains check on the real t without any
-// assertion, for the tests of what the assertions are built on.
-//
-//revive:disable-next-line:flag-parameter
-func plainEqual(t *testing.T, expected, actual bool, desc string) {
-	t.Helper()
-	if expected != actual {
-		t.Errorf("%s: expected %v, got %v", desc, expected, actual)
-	}
-}
-
-func plainContains(t *testing.T, s, substr, desc string) {
-	t.Helper()
-	if substr == "" || !strings.Contains(s, substr) {
-		t.Errorf("%s: %q does not contain %q", desc, s, substr)
-	}
-}
-
-// assertComparableTestCase reads its results with plain checks:
-// assertComparable sits under AssertTrue and AssertFalse, which would
-// otherwise read them. A row states whether the assertion passes, and
-// the essence of what it logs or reports.
-type assertComparableTestCase struct {
-	expected any
-	actual   any
-	name     string
-	message  string
-	wantPass bool
-}
-
-// newAssertComparableTestCase declares a row the assertion passes, with
-// the essence of what it logs.
-func newAssertComparableTestCase(name string, expected, actual any,
-	message string) assertComparableTestCase {
-	return assertComparableTestCase{
-		name:     name,
-		expected: expected,
-		actual:   actual,
-		message:  message,
-		wantPass: true,
-	}
-}
-
-// newAssertComparableTestCaseFails declares a row the assertion fails,
-// with the essence of the failure it reports.
-func newAssertComparableTestCaseFails(name string, expected, actual any,
-	message string) assertComparableTestCase {
-	return assertComparableTestCase{
-		name:     name,
-		expected: expected,
-		actual:   actual,
-		message:  message,
-		wantPass: false,
-	}
-}
-
-func (tc assertComparableTestCase) Name() string { return tc.name }
-
-func (tc assertComparableTestCase) Test(t *testing.T) {
-	t.Helper()
-	mock := &MockT{}
-	ok := assertComparable(mock, tc.expected, tc.actual, "value %d", 1)
-
-	plainEqual(t, tc.wantPass, ok, "result")
-	plainEqual(t, !tc.wantPass, mock.HasErrors(), "errors")
-	plainEqual(t, tc.wantPass, mock.HasLogs(), "logs")
-
-	msg, _ := mock.LastLog()
-	if !tc.wantPass {
-		msg, _ = mock.LastError()
-	}
-	plainContains(t, msg, tc.message, "message")
-}
-
-func assertComparableTestCases() []assertComparableTestCase {
-	return S(
-		newAssertComparableTestCase("equal ints", 42, 42, "value 1: 42"),
-		newAssertComparableTestCase("equal bools", true, true, "value 1: true"),
-		newAssertComparableTestCase("both nil", nil, nil, "value 1: <nil>"),
-		newAssertComparableTestCaseFails("unequal ints", 42, 24,
-			"value 1: expected 42, got 24"),
-		newAssertComparableTestCaseFails("unequal bools", false, true,
-			"value 1: expected false, got true"),
-		newAssertComparableTestCaseFails("different types", 42, "42",
-			"value 1: expected 42, got 42"),
-		newAssertComparableTestCaseFails("slices undecided", S(1), S(1),
-			"value 1: undecided for []int"),
-	)
-}
-
-func TestAssertComparable(t *testing.T) {
-	RunTestCases(t, assertComparableTestCases())
+	singleSlice := core.S(42)
+	core.AssertSliceEqual(t, []int{42}, singleSlice, "S single element")
 }
 
 // undecidedPair returns two values AreEqual cannot settle: maps are
@@ -159,88 +66,85 @@ func undecidedPair() (a, b map[string]int) {
 
 // Test AssertEqual
 func TestAssertEqual(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	assertPassed(t, mock, AssertEqual(mock, 42, 42, "equal test"), "equal")
-
-	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	assertComparable(t, "equal test: 42", lastLog, "log message on success")
+	assertPassed(t, mock, core.AssertEqual(mock, 42, 42, "equal test"), "equal")
+	core.AssertLastLogForTest(t, mock, "equal test: 42", "equal")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertEqual(mock, 42, 24, "not equal test"),
+	assertFailed(t, mock, core.AssertEqual(mock, 42, 24, "not equal test"),
 		"expected 42, got 24", "not equal")
 
 	// The point of the widened constraint: values == cannot compare at
 	// all, decided by AreEqual instead of rejected by the compiler.
 	mock.Reset()
-	assertPassed(t, mock, AssertEqual(mock, S(1, 2), S(1, 2), "slice test"),
+	assertPassed(t, mock, core.AssertEqual(mock, core.S(1, 2), core.S(1, 2), "slice test"),
 		"slice")
 
 	mock.Reset()
-	assertPassed(t, mock, AssertEqual(mock, eqSlice{1}, eqSlice{1},
+	assertPassed(t, mock, core.AssertEqual(mock, core.EqSliceForTest{1}, core.EqSliceForTest{1},
 		"Equal method test"), "Equal method")
 
 	mock.Reset()
 	a, b := undecidedPair()
-	assertFailed(t, mock, AssertEqual(mock, a, b, "undecided test"),
+	assertFailed(t, mock, core.AssertEqual(mock, a, b, "undecided test"),
 		"undecided for map[string]int, needs a deep comparison", "undecided")
 }
 
 // Test AssertNotEqual
 func TestAssertNotEqual(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	assertPassed(t, mock, AssertNotEqual(mock, 42, 24, "not equal test"),
+	assertPassed(t, mock, core.AssertNotEqual(mock, 42, 24, "not equal test"),
 		"not equal")
 
 	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	AssertEqual(t, "not equal test: 24", lastLog, "log message on success")
+	core.AssertTrue(t, ok, "LastLog ok on success")
+	core.AssertEqual(t, "not equal test: 24", lastLog, "log message on success")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertNotEqual(mock, 42, 42, "equal test"),
+	assertFailed(t, mock, core.AssertNotEqual(mock, 42, 42, "equal test"),
 		"expected a different value, got 42", "equal")
 
 	// Undecided must fail rather than count as different: AreEqual
 	// reports (false, false) here, and reading only the first result
 	// would pass the assertion by accident.
 	mock.Reset()
-	assertPassed(t, mock, AssertNotEqual(mock, S(1, 2), S(1, 3), "slice test"),
+	assertPassed(t, mock, core.AssertNotEqual(mock, core.S(1, 2), core.S(1, 3), "slice test"),
 		"slice")
 
 	mock.Reset()
 	a, b := undecidedPair()
-	assertFailed(t, mock, AssertNotEqual(mock, a, b, "undecided test"),
+	assertFailed(t, mock, core.AssertNotEqual(mock, a, b, "undecided test"),
 		"undecided for map[string]int, needs a deep comparison", "undecided")
 }
 
 // Test AssertSliceEqual
 func TestAssertSliceEqual(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	assertPassed(t, mock, AssertSliceEqual(mock, S(1, 2, 3), S(1, 2, 3),
+	assertPassed(t, mock, core.AssertSliceEqual(mock, core.S(1, 2, 3), core.S(1, 2, 3),
 		"slice equal test"), "equal")
 
 	mock.Reset()
 	// The differing element is named, not left to be spotted.
-	assertFailed(t, mock, AssertSliceEqual(mock, S(1, 2, 3), S(1, 2, 4),
+	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S(1, 2, 3), core.S(1, 2, 4),
 		"slice not equal test"), "index 2: expected 3, got 4", "not equal")
 
 	// Length is settled before the elements, and reported as a count.
 	mock.Reset()
-	assertFailed(t, mock, AssertSliceEqual(mock, S(1, 2, 3), S(1, 2),
+	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S(1, 2, 3), core.S(1, 2),
 		"length test"), "expected 3 elements, got 2", "length")
 
 	// An empty glass and no glass are not the same: only nil equals nil.
 	// Both render as "[]", so the message names the nil-ness instead.
 	mock.Reset()
-	assertFailed(t, mock, AssertSliceEqual(mock, nil, S[int](),
+	assertFailed(t, mock, core.AssertSliceEqual(mock, nil, core.S[int](),
 		"nil against empty test"), "expected nil slice, got empty slice",
 		"nil against empty")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertSliceEqual(mock, S[int](), nil,
+	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S[int](), nil,
 		"empty against nil test"), "expected empty slice, got nil slice",
 		"empty against nil")
 
@@ -248,17 +152,17 @@ func TestAssertSliceEqual(t *testing.T) {
 	// empty slice having no elements to disagree over and nil being
 	// equal to the only thing it can be.
 	mock.Reset()
-	assertPassed(t, mock, AssertSliceEqual(mock, S[int](), S[int](),
+	assertPassed(t, mock, core.AssertSliceEqual(mock, core.S[int](), core.S[int](),
 		"both empty test"), "both empty")
 
 	mock.Reset()
-	assertPassed(t, mock, AssertSliceEqual[int](mock, nil, nil,
+	assertPassed(t, mock, core.AssertSliceEqual[int](mock, nil, nil,
 		"both nil test"), "both nil")
 
 	// AreEqual walks one level deep, so the inner slices are undecided.
 	// The message names the element type, the size being already settled.
 	mock.Reset()
-	assertFailed(t, mock, AssertSliceEqual(mock, S(S(1)), S(S(1)),
+	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S(core.S(1)), core.S(core.S(1)),
 		"undecided test"), "undecided for []int elements", "undecided")
 
 	// An undecided element ahead of the mismatch must not be mistaken
@@ -266,36 +170,20 @@ func TestAssertSliceEqual(t *testing.T) {
 	// is the index worth reporting.
 	mock.Reset()
 	a, b := undecidedPair()
-	assertFailed(t, mock, AssertSliceEqual(mock, S[any](a, 1), S[any](b, 2),
+	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S[any](a, 1), core.S[any](b, 2),
 		"mixed test"), "index 1: expected 1, got 2", "mixed")
-}
-
-// TestSliceDiffErrorWithoutKnownDifference exercises the arm
-// AssertSliceEqual cannot reach: a slice it settles as unequal always
-// leaves an element known to differ for the walk to find. Called
-// directly with a pair that has none, doSliceDiffError must still
-// report — the assertion has already failed by then, and failing
-// without a message would be worse than naming the whole slice.
-func TestSliceDiffErrorWithoutKnownDifference(t *testing.T) {
-	mock := &MockT{}
-
-	doSliceDiffError(mock, S(1, 2), S(1, 2), "no known difference", nil)
-
-	lastErr, ok := mock.LastError()
-	AssertMustTrue(t, ok, "error reported")
-	AssertContains(t, lastErr, "expected [1 2], got [1 2]", "whole-slice message")
 }
 
 // Test AssertDeepEqual
 func TestAssertDeepEqual(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Succeeds on a pair AssertEqual leaves undecided.
-	assertPassed(t, mock, AssertDeepEqual(mock, S(S(1)), S(S(1)),
+	assertPassed(t, mock, core.AssertDeepEqual(mock, core.S(core.S(1)), core.S(core.S(1)),
 		"deep equal test"), "equal")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertDeepEqual(mock, S(S(1)), S(S(2)),
+	assertFailed(t, mock, core.AssertDeepEqual(mock, core.S(core.S(1)), core.S(core.S(2)),
 		"deep not equal test"), "expected [[1]], got [[2]]", "not equal")
 }
 
@@ -314,263 +202,263 @@ func (v taggedValue) Equal(o taggedValue) bool { return v.tag == o.tag }
 // form is a fallback for what AreEqual cannot decide, not a stronger
 // version of it, and swapping one for the other can flip the verdict.
 func TestEqualMethodVersusDeepEqual(t *testing.T) {
-	mock := &MockT{}
-	a := taggedValue{payload: S(1), tag: "x"}
-	b := taggedValue{payload: S(2), tag: "x"}
+	mock := &core.MockT{}
+	a := taggedValue{payload: core.S(1), tag: "x"}
+	b := taggedValue{payload: core.S(2), tag: "x"}
 
-	assertPassed(t, mock, AssertEqual(mock, a, b, "Equal method test"),
+	assertPassed(t, mock, core.AssertEqual(mock, a, b, "Equal method test"),
 		"Equal method")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertDeepEqual(mock, a, b, "deep test"),
+	assertFailed(t, mock, core.AssertDeepEqual(mock, a, b, "deep test"),
 		"expected {x [1]}, got {x [2]}", "deep")
 }
 
 // Test AssertNotDeepEqual
 func TestAssertNotDeepEqual(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	assertPassed(t, mock, AssertNotDeepEqual(mock, S(S(1)), S(S(2)),
+	assertPassed(t, mock, core.AssertNotDeepEqual(mock, core.S(core.S(1)), core.S(core.S(2)),
 		"deep not equal test"), "not equal")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertNotDeepEqual(mock, S(S(1)), S(S(1)),
+	assertFailed(t, mock, core.AssertNotDeepEqual(mock, core.S(core.S(1)), core.S(core.S(1)),
 		"deep equal test"), "expected a different value, got [[1]]", "equal")
 }
 
 // Test AssertContains
 func TestAssertContains(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	assertPassed(t, mock, AssertContains(mock, "hello world", "world",
+	assertPassed(t, mock, core.AssertContains(mock, "hello world", "world",
 		"contains test"), "contains")
-	assertLastLog(t, mock, "contains test: contains \"world\"", "contains")
+	core.AssertLastLogForTest(t, mock, "contains test: contains \"world\"", "contains")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertContains(mock, "hello world", "xyz",
+	assertFailed(t, mock, core.AssertContains(mock, "hello world", "xyz",
 		"not contains test"), "expected \"hello world\" to contain \"xyz\"", "missing")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertContains(mock, "hello world", "",
+	assertFailed(t, mock, core.AssertContains(mock, "hello world", "",
 		"empty substring test"), "expected a non-empty substring", "empty")
 }
 
 // Test AssertNotContain
 func TestAssertNotContain(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	assertPassed(t, mock, AssertNotContain(mock, "hello world", "xyz",
+	assertPassed(t, mock, core.AssertNotContain(mock, "hello world", "xyz",
 		"not contains test"), "not contains")
-	assertLastLog(t, mock, "not contains test: does not contain \"xyz\"", "not contains")
+	core.AssertLastLogForTest(t, mock, "not contains test: does not contain \"xyz\"", "not contains")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertNotContain(mock, "hello world", "world",
+	assertFailed(t, mock, core.AssertNotContain(mock, "hello world", "world",
 		"contains test"), "expected \"hello world\" not to contain \"world\"", "present")
 
 	mock.Reset()
-	assertFailed(t, mock, AssertNotContain(mock, "hello world", "",
+	assertFailed(t, mock, core.AssertNotContain(mock, "hello world", "",
 		"empty substring test"), "expected a non-empty substring", "empty")
 }
 
 // Test AssertError and AssertNoError
 func TestAssertError(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 	testErr := errors.New("test error")
 
 	// Test AssertError with error (success)
-	result := AssertError(mock, testErr, "error test")
-	AssertTrue(t, result, "AssertError result with error")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertError(mock, testErr, "error test")
+	core.AssertTrue(t, result, "AssertError result with error")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	mock.Reset()
 
 	// Test AssertError with nil (failure)
-	result = AssertError(mock, nil, "nil error test")
-	AssertFalse(t, result, "AssertError result with nil")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertError(mock, nil, "nil error test")
+	core.AssertFalse(t, result, "AssertError result with nil")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 
 	mock.Reset()
 
 	// Test AssertNoError with nil (success)
-	result = AssertNoError(mock, nil, "no error test")
-	AssertTrue(t, result, "AssertNoError result with nil")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result = core.AssertNoError(mock, nil, "no error test")
+	core.AssertTrue(t, result, "AssertNoError result with nil")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	mock.Reset()
 
 	// Test AssertNoError with error (failure)
-	result = AssertNoError(mock, testErr, "unexpected error test")
-	AssertFalse(t, result, "AssertNoError result with error")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertNoError(mock, testErr, "unexpected error test")
+	core.AssertFalse(t, result, "AssertNoError result with error")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
 // Test AssertTrue and AssertFalse
 func TestAssertBool(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test AssertTrue with true (success)
-	result := AssertTrue(mock, true, "true test")
-	AssertEqual(t, true, result, "AssertTrue(%v)", true)
-	AssertEqual(t, false, mock.HasErrors(), "HasErrors")
-	AssertEqual(t, true, mock.HasLogs(), "HasLogs")
+	result := core.AssertTrue(mock, true, "true test")
+	core.AssertEqual(t, true, result, "AssertTrue(%v)", true)
+	core.AssertEqual(t, false, mock.HasErrors(), "HasErrors")
+	core.AssertEqual(t, true, mock.HasLogs(), "HasLogs")
 
 	mock.Reset()
 
 	// Test AssertTrue with false (failure)
-	result = AssertTrue(mock, false, "false test")
-	AssertEqual(t, false, result, "AssertTrue(%v)", false)
-	AssertEqual(t, true, mock.HasErrors(), "HasErrors")
+	result = core.AssertTrue(mock, false, "false test")
+	core.AssertEqual(t, false, result, "AssertTrue(%v)", false)
+	core.AssertEqual(t, true, mock.HasErrors(), "HasErrors")
 
 	mock.Reset()
 
 	// Test AssertFalse with false (success)
-	result = AssertFalse(mock, false, "false test")
-	AssertEqual(t, true, result, "AssertFalse(%v)", false)
-	AssertEqual(t, false, mock.HasErrors(), "HasErrors")
-	AssertEqual(t, true, mock.HasLogs(), "HasLogs")
+	result = core.AssertFalse(mock, false, "false test")
+	core.AssertEqual(t, true, result, "AssertFalse(%v)", false)
+	core.AssertEqual(t, false, mock.HasErrors(), "HasErrors")
+	core.AssertEqual(t, true, mock.HasLogs(), "HasLogs")
 
 	mock.Reset()
 
 	// Test AssertFalse with true (failure)
-	result = AssertFalse(mock, true, "true test")
-	AssertEqual(t, false, result, "AssertFalse(%v)", true)
-	AssertEqual(t, true, mock.HasErrors(), "HasErrors")
+	result = core.AssertFalse(mock, true, "true test")
+	core.AssertEqual(t, false, result, "AssertFalse(%v)", true)
+	core.AssertEqual(t, true, mock.HasErrors(), "HasErrors")
 }
 
 // Test AssertNil and AssertNotNil
 func TestAssertNil(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test AssertNil with nil (success)
-	result := AssertNil(mock, nil, "nil test")
-	AssertTrue(t, result, "AssertNil result with nil")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertNil(mock, nil, "nil test")
+	core.AssertTrue(t, result, "AssertNil result with nil")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	mock.Reset()
 
 	// Test AssertNil with non-nil (failure)
-	result = AssertNil(mock, "not nil", "not nil test")
-	AssertFalse(t, result, "AssertNil result with non-nil")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertNil(mock, "not nil", "not nil test")
+	core.AssertFalse(t, result, "AssertNil result with non-nil")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 
 	mock.Reset()
 
 	// Test AssertNotNil with non-nil (success)
-	result = AssertNotNil(mock, "not nil", "not nil test")
-	AssertTrue(t, result, "AssertNotNil result with non-nil")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result = core.AssertNotNil(mock, "not nil", "not nil test")
+	core.AssertTrue(t, result, "AssertNotNil result with non-nil")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	mock.Reset()
 
 	// Test AssertNotNil with a pointer (success): the log names the
 	// type, not the address, so it reads the same on every run.
-	result = AssertNotNil(mock, new(int), "pointer test")
-	AssertTrue(t, result, "AssertNotNil result with pointer")
-	assertLastLog(t, mock, "pointer test: *int", "pointer")
+	result = core.AssertNotNil(mock, new(int), "pointer test")
+	core.AssertTrue(t, result, "AssertNotNil result with pointer")
+	core.AssertLastLogForTest(t, mock, "pointer test: *int", "pointer")
 
 	mock.Reset()
 
 	// Test AssertNotNil with nil (failure)
-	result = AssertNotNil(mock, nil, "nil test")
-	AssertFalse(t, result, "AssertNotNil result with nil")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertNotNil(mock, nil, "nil test")
+	core.AssertFalse(t, result, "AssertNotNil result with nil")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
 // Test AssertErrorIs
 func TestAssertErrorIs(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 	baseErr := errors.New("base error")
 	wrappedErr := errors.Join(baseErr, errors.New("wrapped"))
 
 	// Test AssertErrorIs with matching error (success)
-	result := AssertErrorIs(mock, wrappedErr, baseErr, "error is test")
-	AssertTrue(t, result, "AssertErrorIs result with matching error")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertErrorIs(mock, wrappedErr, baseErr, "error is test")
+	core.AssertTrue(t, result, "AssertErrorIs result with matching error")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	mock.Reset()
 
 	// Test AssertErrorIs with non-matching error (failure)
 	otherErr := errors.New("other error")
-	result = AssertErrorIs(mock, wrappedErr, otherErr, "error is not test")
-	AssertFalse(t, result, "AssertErrorIs result with non-matching error")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertErrorIs(mock, wrappedErr, otherErr, "error is not test")
+	core.AssertFalse(t, result, "AssertErrorIs result with non-matching error")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
 // Test AssertNotErrorIs
 func TestAssertNotErrorIs(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 	baseErr := errors.New("base error")
 	wrappedErr := errors.Join(baseErr, errors.New("wrapped"))
 	otherErr := errors.New("other error")
 
 	// Test AssertNotErrorIs with non-matching error (success)
-	result := AssertNotErrorIs(mock, wrappedErr, otherErr, "no match test")
-	AssertTrue(t, result, "AssertNotErrorIs result with non-matching error")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertNotErrorIs(mock, wrappedErr, otherErr, "no match test")
+	core.AssertTrue(t, result, "AssertNotErrorIs result with non-matching error")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	mock.Reset()
 
 	// Test AssertNotErrorIs with matching error (failure)
-	result = AssertNotErrorIs(mock, wrappedErr, baseErr, "match test")
-	AssertFalse(t, result, "AssertNotErrorIs result with matching error")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertNotErrorIs(mock, wrappedErr, baseErr, "match test")
+	core.AssertFalse(t, result, "AssertNotErrorIs result with matching error")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 
 	mock.Reset()
 
 	// Test AssertNotErrorIs with nil error (success, nil matches no
 	// non-nil target)
-	result = AssertNotErrorIs(mock, nil, otherErr, "nil error test")
-	AssertTrue(t, result, "AssertNotErrorIs result with nil error")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
+	result = core.AssertNotErrorIs(mock, nil, otherErr, "nil error test")
+	core.AssertTrue(t, result, "AssertNotErrorIs result with nil error")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
 
 	mock.Reset()
 
 	// Test AssertNotErrorIs with nil error and nil target (failure,
 	// errors.Is(nil, nil) matches)
-	result = AssertNotErrorIs(mock, nil, nil, "nil both test")
-	AssertFalse(t, result, "AssertNotErrorIs result with nil error and target")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertNotErrorIs(mock, nil, nil, "nil both test")
+	core.AssertFalse(t, result, "AssertNotErrorIs result with nil error and target")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
 // Test AssertErrorIsFn
 func TestAssertErrorIsFn(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 	baseErr := errors.New("base error")
-	wrappedErr := Wrap(baseErr, "wrapped")
+	wrappedErr := core.Wrap(baseErr, "wrapped")
 	isBase := func(err error) bool { return err == baseErr }
 
 	// Test AssertErrorIsFn with matching function (success)
-	result := AssertErrorIsFn(mock, wrappedErr, isBase, "error fn test")
-	AssertTrue(t, result, "AssertErrorIsFn result with matching function")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertErrorIsFn(mock, wrappedErr, isBase, "error fn test")
+	core.AssertTrue(t, result, "AssertErrorIsFn result with matching function")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	mock.Reset()
 
 	// Test AssertErrorIsFn with non-matching error (failure)
-	result = AssertErrorIsFn(mock, errors.New("other error"), isBase, "error fn mismatch test")
-	AssertFalse(t, result, "AssertErrorIsFn result with non-matching error")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertErrorIsFn(mock, errors.New("other error"), isBase, "error fn mismatch test")
+	core.AssertFalse(t, result, "AssertErrorIsFn result with non-matching error")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 
 	mock.Reset()
 
 	// Test AssertErrorIsFn with nil function (failure)
-	result = AssertErrorIsFn(mock, wrappedErr, nil, "nil fn test")
-	AssertFalse(t, result, "AssertErrorIsFn result with nil function")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertErrorIsFn(mock, wrappedErr, nil, "nil fn test")
+	core.AssertFalse(t, result, "AssertErrorIsFn result with nil function")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 
 	mock.Reset()
 
 	// Test AssertErrorIsFn with nil error (failure)
-	result = AssertErrorIsFn(mock, nil, isBase, "nil error test")
-	AssertFalse(t, result, "AssertErrorIsFn result with nil error")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertErrorIsFn(mock, nil, isBase, "nil error test")
+	core.AssertFalse(t, result, "AssertErrorIsFn result with nil error")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 }
 
 // assertErrorAsTestCase states what AssertErrorAs answers for one
@@ -586,7 +474,7 @@ type assertErrorAsTestCase[V error] struct {
 	wantOK    bool
 }
 
-func newAssertErrorAsTestCase[V error](name string, err error, want V) TestCase {
+func newAssertErrorAsTestCase[V error](name string, err error, want V) core.TestCase {
 	return assertErrorAsTestCase[V]{
 		err:    err,
 		want:   want,
@@ -596,7 +484,7 @@ func newAssertErrorAsTestCase[V error](name string, err error, want V) TestCase 
 }
 
 func newAssertErrorAsTestCaseFail[V error](name string, err error,
-	wantError string) TestCase {
+	wantError string) core.TestCase {
 	return assertErrorAsTestCase[V]{
 		err:       err,
 		wantError: wantError,
@@ -610,41 +498,41 @@ func (tc assertErrorAsTestCase[V]) Name() string {
 
 func (tc assertErrorAsTestCase[V]) Test(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	out, ok := AssertErrorAs[V](mock, tc.err, "type")
+	out, ok := core.AssertErrorAs[V](mock, tc.err, "type")
 	if !tc.wantOK {
 		var zero V
-		AssertEqual(t, zero, out, "value")
+		core.AssertEqual(t, zero, out, "value")
 		assertFailed(t, mock, ok, tc.wantError, "type")
 		return
 	}
 
-	AssertSame(t, tc.want, out, "value")
+	core.AssertSame(t, tc.want, out, "value")
 	assertPassed(t, mock, ok, "type")
 }
 
-func assertErrorAsTestCases() []TestCase {
+func assertErrorAsTestCases() []core.TestCase {
 	baseErr := errors.New("base error")
-	wrapped := &WrappedError{cause: baseErr, note: "note"}
+	wrapped := core.MustT[*core.WrappedError](core.Wrap(baseErr, "note"))
 	joined := errors.Join(errors.New("other error"), wrapped)
 
-	return S(
+	return core.S(
 		newAssertErrorAsTestCase("direct match", wrapped, wrapped),
 		newAssertErrorAsTestCase("nested match", joined, wrapped),
-		newAssertErrorAsTestCase("value match", StringError("value"),
-			StringError("value")),
-		newAssertErrorAsTestCaseFail[*WrappedError]("no match", baseErr,
+		newAssertErrorAsTestCase("value match", core.StringError("value"),
+			core.StringError("value")),
+		newAssertErrorAsTestCaseFail[*core.WrappedError]("no match", baseErr,
 			"expected error of type *core.WrappedError"),
-		newAssertErrorAsTestCaseFail[Recovered]("interface target", baseErr,
+		newAssertErrorAsTestCaseFail[core.Recovered]("interface target", baseErr,
 			"expected error of type core.Recovered"),
-		newAssertErrorAsTestCaseFail[StringError]("value target", baseErr,
+		newAssertErrorAsTestCaseFail[core.StringError]("value target", baseErr,
 			"expected error of type core.StringError"),
 	)
 }
 
 func TestAssertErrorAs(t *testing.T) {
-	RunTestCases(t, assertErrorAsTestCases())
+	core.RunTestCases(t, assertErrorAsTestCases())
 }
 
 // assertTypeIsTestCase states what AssertTypeIs answers for one target
@@ -659,7 +547,7 @@ type assertTypeIsTestCase[V any] struct {
 	wantOK    bool
 }
 
-func newAssertTypeIsTestCase[V any](name string, input any, want V) TestCase {
+func newAssertTypeIsTestCase[V any](name string, input any, want V) core.TestCase {
 	return assertTypeIsTestCase[V]{
 		input:  input,
 		want:   want,
@@ -669,7 +557,7 @@ func newAssertTypeIsTestCase[V any](name string, input any, want V) TestCase {
 }
 
 func newAssertTypeIsTestCaseFail[V any](name string, input any,
-	wantError string) TestCase {
+	wantError string) core.TestCase {
 	return assertTypeIsTestCase[V]{
 		input:     input,
 		wantError: wantError,
@@ -683,10 +571,10 @@ func (tc assertTypeIsTestCase[V]) Name() string {
 
 func (tc assertTypeIsTestCase[V]) Test(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	got, ok := AssertTypeIs[V](mock, tc.input, "type")
-	AssertEqual(t, tc.want, got, "value")
+	got, ok := core.AssertTypeIs[V](mock, tc.input, "type")
+	core.AssertEqual(t, tc.want, got, "value")
 	if tc.wantOK {
 		assertPassed(t, mock, ok, "type")
 	} else {
@@ -694,10 +582,10 @@ func (tc assertTypeIsTestCase[V]) Test(t *testing.T) {
 	}
 }
 
-func assertTypeIsTestCases() []TestCase {
+func assertTypeIsTestCases() []core.TestCase {
 	err := errors.New("test error")
 
-	return S(
+	return core.S(
 		newAssertTypeIsTestCase("string", testHello, testHello),
 		newAssertTypeIsTestCase("error", err, err),
 		newAssertTypeIsTestCaseFail[string]("int to string", 42,
@@ -708,7 +596,7 @@ func assertTypeIsTestCases() []TestCase {
 }
 
 func TestAssertTypeIs(t *testing.T) {
-	RunTestCases(t, assertTypeIsTestCases())
+	core.RunTestCases(t, assertTypeIsTestCases())
 }
 
 // assertPanicTestCase for table-driven tests
@@ -729,10 +617,10 @@ func (tc assertPanicTestCase) Name() string {
 
 func (tc assertPanicTestCase) Test(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	result := AssertPanic(mock, tc.panicFn, tc.expected, tc.desc)
-	AssertEqual(t, !result, mock.HasErrors(), "errors follow result")
+	result := core.AssertPanic(mock, tc.panicFn, tc.expected, tc.desc)
+	core.AssertEqual(t, !result, mock.HasErrors(), "errors follow result")
 
 	if !tc.expectResult {
 		assertFailed(t, mock, result, tc.message, tc.desc)
@@ -742,8 +630,8 @@ func (tc assertPanicTestCase) Test(t *testing.T) {
 	assertPassed(t, mock, result, tc.desc)
 
 	lastLog, ok := mock.LastLog()
-	AssertMustTrue(t, ok, "logged")
-	AssertContains(t, lastLog, tc.message, "log content")
+	core.AssertMustTrue(t, ok, "logged")
+	core.AssertContains(t, lastLog, tc.message, "log content")
 }
 
 // newAssertPanicTestCase builds the part of a row that does not depend on the
@@ -785,8 +673,8 @@ func newAssertPanicTestCaseReject(name string, panicFn func(), expected any,
 func assertPanicTestCases() []assertPanicTestCase {
 	testErr := errors.New("test error")
 	otherErr := errors.New("other error")
-	panicErr := NewPanicError(0, "recovered panic")
-	wrappedPanic := NewPanicError(0, 99)
+	panicErr := core.NewPanicError(0, "recovered panic")
+	wrappedPanic := core.NewPanicError(0, 99)
 
 	return []assertPanicTestCase{
 		// Any panic tests
@@ -820,7 +708,7 @@ func assertPanicTestCases() []assertPanicTestCase {
 			"string prefix test",
 			`expected panic to contain "panic: boom"`),
 		newAssertPanicTestCaseAccept("StringError panic renders as an error",
-			func() { panic(StringError("boom")) }, "panic: boom",
+			func() { panic(core.StringError("boom")) }, "panic: boom",
 			"StringError test", "contains"),
 		newAssertPanicTestCaseAccept("PanicError panic keeps its own prefix",
 			func() { panic(panicErr) }, "panic:",
@@ -849,7 +737,7 @@ func assertPanicTestCases() []assertPanicTestCase {
 
 // Test AssertPanic
 func TestAssertPanic(t *testing.T) {
-	RunTestCases(t, assertPanicTestCases())
+	core.RunTestCases(t, assertPanicTestCases())
 }
 
 // assertAbortTestCase states what AssertPanic and AssertNoPanic do when
@@ -859,7 +747,7 @@ func TestAssertPanic(t *testing.T) {
 // an error of its own. expectPanic is what the assertion under test
 // expects of fn.
 type assertAbortTestCase struct {
-	abort      func(T)
+	abort      func(core.T)
 	name       string
 	wantErrors int
 	wantLogs   int
@@ -875,26 +763,26 @@ func (tc assertAbortTestCase) Name() string {
 
 func (tc assertAbortTestCase) Test(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
-	ok := mock.Run(tc.name, func(mt T) {
+	mock := &core.MockT{}
+	ok := mock.Run(tc.name, func(mt core.T) {
 		fn := func() { tc.abort(mt) }
 		if tc.expectPanic {
-			AssertPanic(mt, fn, nil, "aborted")
+			core.AssertPanic(mt, fn, nil, "aborted")
 		} else {
-			AssertNoPanic(mt, fn, "aborted")
+			core.AssertNoPanic(mt, fn, "aborted")
 		}
 	})
 
-	AssertEqual(t, !tc.wantFailed, ok, "passed")
-	AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
-	AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
-	AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
-	AssertEqual(t, tc.wantLogs, mock.NumLogs(), "logs")
+	core.AssertEqual(t, !tc.wantFailed, ok, "passed")
+	core.AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
+	core.AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
+	core.AssertEqual(t, tc.wantErrors, mock.NumErrors(), "errors")
+	core.AssertEqual(t, tc.wantLogs, mock.NumLogs(), "logs")
 }
 
 // newAssertPanicAbortTestCase is an AssertPanic row whose abort fails
 // the test, recording wantErrors on the way.
-func newAssertPanicAbortTestCase(name string, abort func(T),
+func newAssertPanicAbortTestCase(name string, abort func(core.T),
 	wantErrors int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
@@ -909,7 +797,7 @@ func newAssertPanicAbortTestCase(name string, abort func(T),
 
 // newAssertPanicAbortTestCaseSkips is an AssertPanic row whose abort
 // skips the test, recording wantLogs on the way.
-func newAssertPanicAbortTestCaseSkips(name string, abort func(T),
+func newAssertPanicAbortTestCaseSkips(name string, abort func(core.T),
 	wantLogs int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
@@ -925,7 +813,7 @@ func newAssertPanicAbortTestCaseSkips(name string, abort func(T),
 // newAssertPanicAbortTestCaseFailsSkips is an AssertPanic row whose
 // abort fails the test and then skips it, recording wantErrors and
 // wantLogs on the way.
-func newAssertPanicAbortTestCaseFailsSkips(name string, abort func(T),
+func newAssertPanicAbortTestCaseFailsSkips(name string, abort func(core.T),
 	wantErrors, wantLogs int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
@@ -938,25 +826,25 @@ func newAssertPanicAbortTestCaseFailsSkips(name string, abort func(T),
 	}
 }
 
-var assertPanicAbortTestCases = S(
-	newAssertPanicAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
-	newAssertPanicAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
-	newAssertPanicAbortTestCase("AssertMust", func(mt T) {
-		AssertMustTrue(mt, false, "must")
+var assertPanicAbortTestCases = core.S(
+	newAssertPanicAbortTestCase("FailNow", func(mt core.T) { mt.FailNow() }, 0),
+	newAssertPanicAbortTestCase("Fatal", func(mt core.T) { mt.Fatal("fatal") }, 1),
+	newAssertPanicAbortTestCase("AssertMust", func(mt core.T) {
+		core.AssertMustTrue(mt, false, "must")
 	}, 1),
-	newAssertPanicAbortTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow() }, 0),
-	newAssertPanicAbortTestCaseSkips("Skip", func(mt T) { mt.Skip("skip") }, 1),
+	newAssertPanicAbortTestCaseSkips("SkipNow", func(mt core.T) { mt.SkipNow() }, 0),
+	newAssertPanicAbortTestCaseSkips("Skip", func(mt core.T) { mt.Skip("skip") }, 1),
 	newAssertPanicAbortTestCaseFailsSkips("Fail then SkipNow",
-		func(mt T) { mt.Fail(); mt.SkipNow() }, 0, 0),
+		func(mt core.T) { mt.Fail(); mt.SkipNow() }, 0, 0),
 )
 
 func TestAssertPanicAbort(t *testing.T) {
-	RunTestCases(t, assertPanicAbortTestCases)
+	core.RunTestCases(t, assertPanicAbortTestCases)
 }
 
 // newAssertNoPanicAbortTestCase is an AssertNoPanic row whose abort
 // fails the test, recording wantErrors on the way.
-func newAssertNoPanicAbortTestCase(name string, abort func(T),
+func newAssertNoPanicAbortTestCase(name string, abort func(core.T),
 	wantErrors int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
@@ -971,7 +859,7 @@ func newAssertNoPanicAbortTestCase(name string, abort func(T),
 
 // newAssertNoPanicAbortTestCaseSkips is an AssertNoPanic row whose abort
 // skips the test, recording wantLogs on the way.
-func newAssertNoPanicAbortTestCaseSkips(name string, abort func(T),
+func newAssertNoPanicAbortTestCaseSkips(name string, abort func(core.T),
 	wantLogs int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
@@ -987,7 +875,7 @@ func newAssertNoPanicAbortTestCaseSkips(name string, abort func(T),
 // newAssertNoPanicAbortTestCaseFailsSkips is an AssertNoPanic row whose
 // abort fails the test and then skips it, recording wantErrors and
 // wantLogs on the way.
-func newAssertNoPanicAbortTestCaseFailsSkips(name string, abort func(T),
+func newAssertNoPanicAbortTestCaseFailsSkips(name string, abort func(core.T),
 	wantErrors, wantLogs int) assertAbortTestCase {
 	return assertAbortTestCase{
 		abort:       abort,
@@ -1000,73 +888,73 @@ func newAssertNoPanicAbortTestCaseFailsSkips(name string, abort func(T),
 	}
 }
 
-var assertNoPanicAbortTestCases = S(
-	newAssertNoPanicAbortTestCase("FailNow", func(mt T) { mt.FailNow() }, 0),
-	newAssertNoPanicAbortTestCase("Fatal", func(mt T) { mt.Fatal("fatal") }, 1),
-	newAssertNoPanicAbortTestCase("AssertMust", func(mt T) {
-		AssertMustTrue(mt, false, "must")
+var assertNoPanicAbortTestCases = core.S(
+	newAssertNoPanicAbortTestCase("FailNow", func(mt core.T) { mt.FailNow() }, 0),
+	newAssertNoPanicAbortTestCase("Fatal", func(mt core.T) { mt.Fatal("fatal") }, 1),
+	newAssertNoPanicAbortTestCase("AssertMust", func(mt core.T) {
+		core.AssertMustTrue(mt, false, "must")
 	}, 1),
-	newAssertNoPanicAbortTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow() }, 0),
-	newAssertNoPanicAbortTestCaseSkips("Skip", func(mt T) { mt.Skip("skip") }, 1),
+	newAssertNoPanicAbortTestCaseSkips("SkipNow", func(mt core.T) { mt.SkipNow() }, 0),
+	newAssertNoPanicAbortTestCaseSkips("Skip", func(mt core.T) { mt.Skip("skip") }, 1),
 	newAssertNoPanicAbortTestCaseFailsSkips("Fail then SkipNow",
-		func(mt T) { mt.Fail(); mt.SkipNow() }, 0, 0),
+		func(mt core.T) { mt.Fail(); mt.SkipNow() }, 0, 0),
 )
 
 func TestAssertNoPanicAbort(t *testing.T) {
-	RunTestCases(t, assertNoPanicAbortTestCases)
+	core.RunTestCases(t, assertNoPanicAbortTestCases)
 }
 
 // Test AssertNoPanic
 func TestAssertNoPanic(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test AssertNoPanic without panic (success)
-	result := AssertNoPanic(mock, func() {}, "no panic test")
-	AssertTrue(t, result, "AssertNoPanic result without panic")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertNoPanic(mock, func() {}, "no panic test")
+	core.AssertTrue(t, result, "AssertNoPanic result without panic")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	AssertTrue(t, strings.Contains(lastLog, "no panic"), "log contains no panic message")
+	core.AssertTrue(t, ok, "LastLog ok on success")
+	core.AssertTrue(t, strings.Contains(lastLog, "no panic"), "log contains no panic message")
 
 	mock.Reset()
 
 	// Test AssertNoPanic with panic (failure)
-	result = AssertNoPanic(mock, func() { panic("unexpected") }, "panic test")
-	AssertFalse(t, result, "AssertNoPanic result with panic")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	result = core.AssertNoPanic(mock, func() { panic("unexpected") }, "panic test")
+	core.AssertFalse(t, result, "AssertNoPanic result with panic")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
 
 	mock.Reset()
 
 	// Test AssertNoPanic with a nil function (failure): the call-site
 	// mistake is reported as such, not as a panic.
-	result = AssertNoPanic(mock, nil, "nil function test")
+	result = core.AssertNoPanic(mock, nil, "nil function test")
 	assertFailed(t, mock, result, "expected a function", "nil function")
 }
 
 // Test RunConcurrentTest
 func TestRunConcurrentTest(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 	var counter atomic.Int64
 
 	// Test successful concurrent execution
-	err := RunConcurrentTest(mock, 5, func(_ int) error {
+	err := core.RunConcurrentTest(mock, 5, func(_ int) error {
 		counter.Add(1)
 		return nil
 	})
-	AssertNoError(t, err, "RunConcurrentTest successful")
-	AssertEqual(t, int64(5), counter.Load(), "all workers executed")
+	core.AssertNoError(t, err, "RunConcurrentTest successful")
+	core.AssertEqual(t, int64(5), counter.Load(), "all workers executed")
 
 	// Test concurrent execution with error
-	err = RunConcurrentTest(mock, 3, func(id int) error {
+	err = core.RunConcurrentTest(mock, 3, func(id int) error {
 		if id == 1 {
 			return errors.New("worker error")
 		}
 		return nil
 	})
-	AssertError(t, err, "RunConcurrentTest with error")
-	AssertTrue(t, strings.Contains(err.Error(), "worker error"), "error message")
+	core.AssertError(t, err, "RunConcurrentTest with error")
+	core.AssertTrue(t, strings.Contains(err.Error(), "worker error"), "error message")
 }
 
 // Test TestCase interface and RunTestCases
@@ -1095,13 +983,13 @@ func TestRunTestCases(t *testing.T) {
 	tc2 := newMockTestCase("test2")
 	tc3 := newMockTestCase("test3")
 
-	cases := []TestCase{tc1, tc2, tc3}
-	RunTestCases(t, cases)
+	cases := []core.TestCase{tc1, tc2, tc3}
+	core.RunTestCases(t, cases)
 
 	// Verify all test cases were called
-	AssertTrue(t, tc1.called, "test case 1 called")
-	AssertTrue(t, tc2.called, "test case 2 called")
-	AssertTrue(t, tc3.called, "test case 3 called")
+	core.AssertTrue(t, tc1.called, "test case 1 called")
+	core.AssertTrue(t, tc2.called, "test case 2 called")
+	core.AssertTrue(t, tc3.called, "test case 3 called")
 }
 
 // Test RunBenchmark
@@ -1113,200 +1001,200 @@ func TestRunBenchmark(t *testing.T) {
 	b := &testing.B{N: 10}
 	b.ResetTimer() // Simulate benchmark setup
 
-	RunBenchmark(b, func() any {
+	core.RunBenchmark(b, func() any {
 		setupCalled = true
 		return "test data"
 	}, func(data any) {
-		AssertEqual(t, "test data", data, "benchmark data")
+		core.AssertEqual(t, "test data", data, "benchmark data")
 		execCount++
 	})
 
-	AssertTrue(t, setupCalled, "setup function called")
-	AssertEqual(t, 10, execCount, "execution function called N times")
+	core.AssertTrue(t, setupCalled, "setup function called")
+	core.AssertEqual(t, 10, execCount, "execution function called N times")
 }
 
 func testMockTInitialState(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	AssertFalse(t, mock.HasErrors(), "initial HasErrors")
-	AssertFalse(t, mock.HasLogs(), "initial HasLogs")
-	AssertEqual(t, 0, mock.NumHelperCalls(), "initial NumHelperCalls")
-	AssertFalse(t, mock.Failed(), "initial Failed")
-	AssertFalse(t, mock.Skipped(), "initial Skipped")
+	core.AssertFalse(t, mock.HasErrors(), "initial HasErrors")
+	core.AssertFalse(t, mock.HasLogs(), "initial HasLogs")
+	core.AssertEqual(t, 0, mock.NumHelperCalls(), "initial NumHelperCalls")
+	core.AssertFalse(t, mock.Failed(), "initial Failed")
+	core.AssertFalse(t, mock.Skipped(), "initial Skipped")
 }
 
 func testMockTHelper(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	mock.Helper()
-	AssertEqual(t, 1, mock.NumHelperCalls(), "NumHelperCalls after Helper()")
+	core.AssertEqual(t, 1, mock.NumHelperCalls(), "NumHelperCalls after Helper()")
 
 	// Test multiple calls increment the counter
 	mock.Helper()
 	mock.Helper()
-	AssertEqual(t, 3, mock.NumHelperCalls(), "NumHelperCalls after multiple calls")
+	core.AssertEqual(t, 3, mock.NumHelperCalls(), "NumHelperCalls after multiple calls")
 }
 
 func testMockTErrors(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	mock.Error("test error")
-	AssertTrue(t, mock.HasErrors(), "HasErrors after Error")
-	AssertTrue(t, mock.Failed(), "Failed after Error")
-	AssertEqual(t, 1, mock.NumErrors(), "NumErrors")
+	core.AssertTrue(t, mock.HasErrors(), "HasErrors after Error")
+	core.AssertTrue(t, mock.Failed(), "Failed after Error")
+	core.AssertEqual(t, 1, mock.NumErrors(), "NumErrors")
 
 	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok")
-	AssertEqual(t, "test error", lastErr, "LastError value")
+	core.AssertTrue(t, ok, "LastError ok")
+	core.AssertEqual(t, "test error", lastErr, "LastError value")
 }
 
 func testMockTLogs(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	mock.Log("test log")
-	AssertTrue(t, mock.HasLogs(), "HasLogs after Log")
-	AssertFalse(t, mock.Failed(), "Failed after Log should be false")
-	AssertEqual(t, 1, mock.NumLogs(), "NumLogs")
+	core.AssertTrue(t, mock.HasLogs(), "HasLogs after Log")
+	core.AssertFalse(t, mock.Failed(), "Failed after Log should be false")
+	core.AssertEqual(t, 1, mock.NumLogs(), "NumLogs")
 
 	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok")
-	AssertEqual(t, "test log", lastLog, "LastLog value")
+	core.AssertTrue(t, ok, "LastLog ok")
+	core.AssertEqual(t, "test log", lastLog, "LastLog value")
 }
 
 func testMockTFail(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test Fail() marks test as failed
-	AssertFalse(t, mock.Failed(), "initial Failed state")
+	core.AssertFalse(t, mock.Failed(), "initial Failed state")
 	mock.Fail()
-	AssertTrue(t, mock.Failed(), "Failed after Fail()")
+	core.AssertTrue(t, mock.Failed(), "Failed after Fail()")
 
 	// Test that Error() also marks as failed
 	mock.Reset()
-	AssertFalse(t, mock.Failed(), "Failed after Reset")
+	core.AssertFalse(t, mock.Failed(), "Failed after Reset")
 	mock.Error("test error")
-	AssertTrue(t, mock.Failed(), "Failed after Error")
+	core.AssertTrue(t, mock.Failed(), "Failed after Error")
 
 	// Test that Errorf() also marks as failed
 	mock.Reset()
-	AssertFalse(t, mock.Failed(), "Failed after Reset")
+	core.AssertFalse(t, mock.Failed(), "Failed after Reset")
 	mock.Errorf("formatted error: %s", "test")
-	AssertTrue(t, mock.Failed(), "Failed after Errorf")
+	core.AssertTrue(t, mock.Failed(), "Failed after Errorf")
 
 	// Test that Log() does not mark as failed
 	mock.Reset()
 	mock.Log("test log")
-	AssertFalse(t, mock.Failed(), "Failed after Log should be false")
+	core.AssertFalse(t, mock.Failed(), "Failed after Log should be false")
 
 	// Test that Logf() does not mark as failed
 	mock.Reset()
 	mock.Logf("formatted log: %s", "test")
-	AssertFalse(t, mock.Failed(), "Failed after Logf should be false")
+	core.AssertFalse(t, mock.Failed(), "Failed after Logf should be false")
 }
 
 func testMockTFormatted(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test Errorf
 	mock.Errorf("error %d: %s", 42, "test message")
-	AssertTrue(t, mock.HasErrors(), "HasErrors after Errorf")
-	AssertTrue(t, mock.Failed(), "Failed after Errorf")
-	AssertEqual(t, 1, mock.NumErrors(), "NumErrors after Errorf")
+	core.AssertTrue(t, mock.HasErrors(), "HasErrors after Errorf")
+	core.AssertTrue(t, mock.Failed(), "Failed after Errorf")
+	core.AssertEqual(t, 1, mock.NumErrors(), "NumErrors after Errorf")
 
 	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok after Errorf")
-	AssertEqual(t, "error 42: test message", lastErr, "LastError value after Errorf")
+	core.AssertTrue(t, ok, "LastError ok after Errorf")
+	core.AssertEqual(t, "error 42: test message", lastErr, "LastError value after Errorf")
 
 	mock.Reset()
 
 	// Test Logf
 	mock.Logf("log %d: %s", 24, "test message")
-	AssertTrue(t, mock.HasLogs(), "HasLogs after Logf")
-	AssertFalse(t, mock.Failed(), "Failed after Logf should be false")
-	AssertEqual(t, 1, mock.NumLogs(), "NumLogs after Logf")
+	core.AssertTrue(t, mock.HasLogs(), "HasLogs after Logf")
+	core.AssertFalse(t, mock.Failed(), "Failed after Logf should be false")
+	core.AssertEqual(t, 1, mock.NumLogs(), "NumLogs after Logf")
 
 	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok after Logf")
-	AssertEqual(t, "log 24: test message", lastLog, "LastLog value after Logf")
+	core.AssertTrue(t, ok, "LastLog ok after Logf")
+	core.AssertEqual(t, "log 24: test message", lastLog, "LastLog value after Logf")
 }
 
 func testMockTMultiple(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	mock.Error("first error")
 	mock.Log("first log")
 	mock.Error("second error")
 	mock.Log("second log")
 
-	AssertEqual(t, 2, mock.NumErrors(), "multiple errors length")
-	AssertEqual(t, 2, mock.NumLogs(), "multiple logs length")
+	core.AssertEqual(t, 2, mock.NumErrors(), "multiple errors length")
+	core.AssertEqual(t, 2, mock.NumLogs(), "multiple logs length")
 
 	lastErr, ok := mock.LastError()
-	AssertTrue(t, ok, "LastError ok after multiple")
-	AssertEqual(t, "second error", lastErr, "LastError after multiple")
+	core.AssertTrue(t, ok, "LastError ok after multiple")
+	core.AssertEqual(t, "second error", lastErr, "LastError after multiple")
 
 	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok after multiple")
-	AssertEqual(t, "second log", lastLog, "LastLog after multiple")
+	core.AssertTrue(t, ok, "LastLog ok after multiple")
+	core.AssertEqual(t, "second log", lastLog, "LastLog after multiple")
 }
 
 func testMockTReset(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	mock.Error("test error")
 	mock.Log("test log")
 	mock.Helper()
 	mock.Helper()
 	mock.Fail()
-	mock.Run("skip", func(mt T) { mt.SkipNow() })
-	AssertMustTrue(t, mock.Skipped(), "Skipped before Reset")
+	mock.Run("skip", func(mt core.T) { mt.SkipNow() })
+	core.AssertMustTrue(t, mock.Skipped(), "Skipped before Reset")
 
 	mock.Reset()
-	AssertFalse(t, mock.HasErrors(), "HasErrors after Reset")
-	AssertFalse(t, mock.HasLogs(), "HasLogs after Reset")
-	AssertEqual(t, 0, mock.NumErrors(), "NumErrors after Reset")
-	AssertEqual(t, 0, mock.NumLogs(), "NumLogs after Reset")
-	AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls after Reset")
-	AssertFalse(t, mock.Failed(), "Failed after Reset")
-	AssertFalse(t, mock.Skipped(), "Skipped after Reset")
+	core.AssertFalse(t, mock.HasErrors(), "HasErrors after Reset")
+	core.AssertFalse(t, mock.HasLogs(), "HasLogs after Reset")
+	core.AssertEqual(t, 0, mock.NumErrors(), "NumErrors after Reset")
+	core.AssertEqual(t, 0, mock.NumLogs(), "NumLogs after Reset")
+	core.AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls after Reset")
+	core.AssertFalse(t, mock.Failed(), "Failed after Reset")
+	core.AssertFalse(t, mock.Skipped(), "Skipped after Reset")
 }
 
 func testMockTEmptyQueries(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	lastErr, ok := mock.LastError()
-	AssertFalse(t, ok, "LastError ok when empty")
-	AssertEqual(t, "", lastErr, "LastError value when empty")
+	core.AssertFalse(t, ok, "LastError ok when empty")
+	core.AssertEqual(t, "", lastErr, "LastError value when empty")
 
 	lastLog, ok := mock.LastLog()
-	AssertFalse(t, ok, "LastLog ok when empty")
-	AssertEqual(t, "", lastLog, "LastLog value when empty")
+	core.AssertFalse(t, ok, "LastLog ok when empty")
+	core.AssertEqual(t, "", lastLog, "LastLog value when empty")
 
-	AssertEqual(t, 0, mock.NumErrors(), "NumErrors when empty")
-	AssertEqual(t, 0, mock.NumLogs(), "NumLogs when empty")
-	AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls when empty")
+	core.AssertEqual(t, 0, mock.NumErrors(), "NumErrors when empty")
+	core.AssertEqual(t, 0, mock.NumLogs(), "NumLogs when empty")
+	core.AssertEqual(t, 0, mock.NumHelperCalls(), "NumHelperCalls when empty")
 
 	msg, ok := mock.ErrorAt(0)
-	AssertFalse(t, ok, "ErrorAt(0) ok when empty")
-	AssertEqual(t, "", msg, "ErrorAt(0) value when empty")
+	core.AssertFalse(t, ok, "ErrorAt(0) ok when empty")
+	core.AssertEqual(t, "", msg, "ErrorAt(0) value when empty")
 
 	msg, ok = mock.LogAt(-1)
-	AssertFalse(t, ok, "LogAt(-1) ok when empty")
-	AssertEqual(t, "", msg, "LogAt(-1) value when empty")
+	core.AssertFalse(t, ok, "LogAt(-1) ok when empty")
+	core.AssertEqual(t, "", msg, "LogAt(-1) value when empty")
 }
 
 func testMockTCounts(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	mock.Error("first error")
 	mock.Errorf("second %s", "error")
@@ -1318,9 +1206,9 @@ func testMockTCounts(t *testing.T) {
 	mock.Helper()
 	mock.Helper()
 
-	AssertEqual(t, 2, mock.NumErrors(), "NumErrors")
-	AssertEqual(t, 3, mock.NumLogs(), "NumLogs")
-	AssertEqual(t, 4, mock.NumHelperCalls(), "NumHelperCalls")
+	core.AssertEqual(t, 2, mock.NumErrors(), "NumErrors")
+	core.AssertEqual(t, 3, mock.NumLogs(), "NumLogs")
+	core.AssertEqual(t, 4, mock.NumHelperCalls(), "NumHelperCalls")
 }
 
 // mockTMessageAtTestCase exercises the index rule shared by ErrorAt and
@@ -1350,24 +1238,24 @@ func (tc mockTMessageAtTestCase) Name() string {
 
 func (tc mockTMessageAtTestCase) Test(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
-	for _, msg := range S("first", "", "third") {
+	mock := &core.MockT{}
+	for _, msg := range core.S("first", "", "third") {
 		mock.Error(msg)
 		mock.Log(msg)
 	}
 
 	msg, ok := mock.ErrorAt(tc.index)
-	AssertEqual(t, tc.wantOK, ok, "ErrorAt ok")
-	AssertEqual(t, tc.want, msg, "ErrorAt value")
+	core.AssertEqual(t, tc.wantOK, ok, "ErrorAt ok")
+	core.AssertEqual(t, tc.want, msg, "ErrorAt value")
 
 	msg, ok = mock.LogAt(tc.index)
-	AssertEqual(t, tc.wantOK, ok, "LogAt ok")
-	AssertEqual(t, tc.want, msg, "LogAt value")
+	core.AssertEqual(t, tc.wantOK, ok, "LogAt ok")
+	core.AssertEqual(t, tc.want, msg, "LogAt value")
 }
 
 func testMockTMessageAt(t *testing.T) {
 	t.Helper()
-	RunTestCases(t, S(
+	core.RunTestCases(t, core.S(
 		newMockTMessageAtTestCase("first", 0, "first", true),
 		newMockTMessageAtTestCase("empty message", 1, "", true),
 		newMockTMessageAtTestCase("last", 2, "third", true),
@@ -1380,10 +1268,10 @@ func testMockTMessageAt(t *testing.T) {
 
 func testMockTConcurrent(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test concurrent access to MockT methods
-	err := RunConcurrentTest(t, 10, func(id int) error {
+	err := core.RunConcurrentTest(t, 10, func(id int) error {
 		switch id % 5 {
 		case 0:
 			mock.Helper()
@@ -1406,12 +1294,12 @@ func testMockTConcurrent(t *testing.T) {
 		mock.NumHelperCalls()
 		return nil
 	})
-	AssertNoError(t, err, "concurrent MockT operations")
+	core.AssertNoError(t, err, "concurrent MockT operations")
 
 	// Verify that all operations completed without race conditions
-	AssertTrue(t, mock.HasErrors(), "has errors after concurrent operations")
-	AssertTrue(t, mock.HasLogs(), "has logs after concurrent operations")
-	AssertTrue(t, mock.Failed(), "failed after concurrent operations")
+	core.AssertTrue(t, mock.HasErrors(), "has errors after concurrent operations")
+	core.AssertTrue(t, mock.HasLogs(), "has logs after concurrent operations")
+	core.AssertTrue(t, mock.Failed(), "failed after concurrent operations")
 
 	// Check that we have the expected number of operations
 	// We should have 2 errors per 5 operations (case 1 and 3)
@@ -1421,86 +1309,86 @@ func testMockTConcurrent(t *testing.T) {
 	expectedLogs := 4    // 10 workers, 2 out of every 5 operations
 	expectedHelpers := 2 // 10 workers, 1 out of every 5 operations
 
-	AssertEqual(t, expectedErrors, mock.NumErrors(), "concurrent error count")
-	AssertEqual(t, expectedLogs, mock.NumLogs(), "concurrent log count")
-	AssertEqual(t, expectedHelpers, mock.NumHelperCalls(), "concurrent helper count")
+	core.AssertEqual(t, expectedErrors, mock.NumErrors(), "concurrent error count")
+	core.AssertEqual(t, expectedLogs, mock.NumLogs(), "concurrent log count")
+	core.AssertEqual(t, expectedHelpers, mock.NumHelperCalls(), "concurrent helper count")
 }
 
 // Test AssertSame
 func TestAssertSame(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test successful assertion with value types
-	result := AssertSame(mock, 42, 42, "same value test")
-	AssertTrue(t, result, "AssertSame result when same values")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertSame(mock, 42, 42, "same value test")
+	core.AssertTrue(t, result, "AssertSame result when same values")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	AssertEqual(t, "same value test: same value or reference", lastLog, "log message on success")
+	core.AssertTrue(t, ok, "LastLog ok on success")
+	core.AssertEqual(t, "same value test: same value or reference", lastLog, "log message on success")
 
 	mock.Reset()
 
 	// Test successful assertion with reference types
-	slice1 := S(1, 2, 3)
+	slice1 := core.S(1, 2, 3)
 	slice2 := slice1
-	result = AssertSame(mock, slice1, slice2, "same slice test")
-	AssertTrue(t, result, "AssertSame result when same slices")
-	AssertFalse(t, mock.HasErrors(), "no errors on slice success")
-	AssertTrue(t, mock.HasLogs(), "has logs on slice success")
+	result = core.AssertSame(mock, slice1, slice2, "same slice test")
+	core.AssertTrue(t, result, "AssertSame result when same slices")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on slice success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on slice success")
 
 	mock.Reset()
 
 	// Test failed assertion with value types
-	result = AssertSame(mock, 42, 43, "different value test")
-	AssertFalse(t, result, "AssertSame result when different values")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
-	AssertFalse(t, mock.HasLogs(), "no logs on failure")
+	result = core.AssertSame(mock, 42, 43, "different value test")
+	core.AssertFalse(t, result, "AssertSame result when different values")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	core.AssertFalse(t, mock.HasLogs(), "no logs on failure")
 
 	assertErrorContains(t, mock, "expected same value or reference, got different", "error message on failure")
 
 	mock.Reset()
 
 	// Test failed assertion with reference types
-	slice3 := S(1, 2, 3)
-	result = AssertSame(mock, slice1, slice3, "different slice test")
-	AssertFalse(t, result, "AssertSame result when different slices")
-	AssertTrue(t, mock.HasErrors(), "has errors on slice failure")
-	AssertFalse(t, mock.HasLogs(), "no logs on slice failure")
+	slice3 := core.S(1, 2, 3)
+	result = core.AssertSame(mock, slice1, slice3, "different slice test")
+	core.AssertFalse(t, result, "AssertSame result when different slices")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on slice failure")
+	core.AssertFalse(t, mock.HasLogs(), "no logs on slice failure")
 }
 
 // Test AssertNotSame
 func TestAssertNotSame(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test successful assertion with value types
-	result := AssertNotSame(mock, 42, 43, "different value test")
-	AssertTrue(t, result, "AssertNotSame result when different values")
-	AssertFalse(t, mock.HasErrors(), "no errors on success")
-	AssertTrue(t, mock.HasLogs(), "has logs on success")
+	result := core.AssertNotSame(mock, 42, 43, "different value test")
+	core.AssertTrue(t, result, "AssertNotSame result when different values")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on success")
 
 	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "LastLog ok on success")
-	AssertEqual(t, "different value test: different values or references", lastLog, "log message on success")
+	core.AssertTrue(t, ok, "LastLog ok on success")
+	core.AssertEqual(t, "different value test: different values or references", lastLog, "log message on success")
 
 	mock.Reset()
 
 	// Test successful assertion with reference types
-	slice1 := S(1, 2, 3)
-	slice2 := S(1, 2, 3) // same contents, different backing arrays
-	result = AssertNotSame(mock, slice1, slice2, "different slice test")
-	AssertTrue(t, result, "AssertNotSame result when different slices")
-	AssertFalse(t, mock.HasErrors(), "no errors on slice success")
-	AssertTrue(t, mock.HasLogs(), "has logs on slice success")
+	slice1 := core.S(1, 2, 3)
+	slice2 := core.S(1, 2, 3) // same contents, different backing arrays
+	result = core.AssertNotSame(mock, slice1, slice2, "different slice test")
+	core.AssertTrue(t, result, "AssertNotSame result when different slices")
+	core.AssertFalse(t, mock.HasErrors(), "no errors on slice success")
+	core.AssertTrue(t, mock.HasLogs(), "has logs on slice success")
 
 	mock.Reset()
 
 	// Test failed assertion with value types
-	result = AssertNotSame(mock, 42, 42, "same value test")
-	AssertFalse(t, result, "AssertNotSame result when same values")
-	AssertTrue(t, mock.HasErrors(), "has errors on failure")
-	AssertFalse(t, mock.HasLogs(), "no logs on failure")
+	result = core.AssertNotSame(mock, 42, 42, "same value test")
+	core.AssertFalse(t, result, "AssertNotSame result when same values")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on failure")
+	core.AssertFalse(t, mock.HasLogs(), "no logs on failure")
 
 	assertErrorContains(t, mock, "expected different values or references, got same", "error message on failure")
 
@@ -1508,16 +1396,16 @@ func TestAssertNotSame(t *testing.T) {
 
 	// Test failed assertion with reference types
 	slice3 := slice1 // same reference
-	result = AssertNotSame(mock, slice1, slice3, "same slice test")
-	AssertFalse(t, result, "AssertNotSame result when same slices")
-	AssertTrue(t, mock.HasErrors(), "has errors on slice failure")
-	AssertFalse(t, mock.HasLogs(), "no logs on slice failure")
+	result = core.AssertNotSame(mock, slice1, slice3, "same slice test")
+	core.AssertFalse(t, result, "AssertNotSame result when same slices")
+	core.AssertTrue(t, mock.HasErrors(), "has errors on slice failure")
+	core.AssertFalse(t, mock.HasLogs(), "no logs on slice failure")
 }
 
 // mockTRunTestCase tests the result MockT.Run reports for a test body,
 // and what the body's calls left recorded in the MockT.
 type mockTRunTestCase struct {
-	fn            func(T)
+	fn            func(core.T)
 	name          string
 	expectErrors  []string
 	expectLogs    []string
@@ -1527,7 +1415,7 @@ type mockTRunTestCase struct {
 
 // newMockTRunTestCase declares a body under which Run passes without
 // skipping, with the logs it leaves.
-func newMockTRunTestCase(name string, fn func(T),
+func newMockTRunTestCase(name string, fn func(core.T),
 	expectLogs []string) mockTRunTestCase {
 	return mockTRunTestCase{
 		fn:            fn,
@@ -1541,7 +1429,7 @@ func newMockTRunTestCase(name string, fn func(T),
 
 // newMockTRunTestCaseFails declares a body under which Run fails without
 // skipping, with the errors and logs it leaves.
-func newMockTRunTestCaseFails(name string, fn func(T),
+func newMockTRunTestCaseFails(name string, fn func(core.T),
 	expectErrors, expectLogs []string) mockTRunTestCase {
 	return mockTRunTestCase{
 		fn:            fn,
@@ -1555,7 +1443,7 @@ func newMockTRunTestCaseFails(name string, fn func(T),
 
 // newMockTRunTestCaseSkips declares a body that skips, under which Run
 // passes, with the logs it leaves.
-func newMockTRunTestCaseSkips(name string, fn func(T),
+func newMockTRunTestCaseSkips(name string, fn func(core.T),
 	expectLogs []string) mockTRunTestCase {
 	return mockTRunTestCase{
 		fn:            fn,
@@ -1569,7 +1457,7 @@ func newMockTRunTestCaseSkips(name string, fn func(T),
 
 // newMockTRunTestCaseFailsSkips declares a body that fails and then
 // skips, under which Run fails, with the errors and logs it leaves.
-func newMockTRunTestCaseFailsSkips(name string, fn func(T),
+func newMockTRunTestCaseFailsSkips(name string, fn func(core.T),
 	expectErrors, expectLogs []string) mockTRunTestCase {
 	return mockTRunTestCase{
 		fn:            fn,
@@ -1587,42 +1475,42 @@ func (tc mockTRunTestCase) Name() string {
 
 func (tc mockTRunTestCase) Test(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 	ok := mock.Run(tc.name, tc.fn)
 
-	AssertEqual(t, !tc.expectFailed, ok, "result")
-	AssertEqual(t, tc.expectFailed, mock.Failed(), "Failed()")
-	AssertEqual(t, tc.expectSkipped, mock.Skipped(), "Skipped()")
-	AssertSliceEqual(t, tc.expectErrors, mock.Errors, "errors")
-	AssertSliceEqual(t, tc.expectLogs, mock.Logs, "logs")
+	core.AssertEqual(t, !tc.expectFailed, ok, "result")
+	core.AssertEqual(t, tc.expectFailed, mock.Failed(), "Failed()")
+	core.AssertEqual(t, tc.expectSkipped, mock.Skipped(), "Skipped()")
+	core.AssertSliceEqual(t, tc.expectErrors, mock.Errors, "errors")
+	core.AssertSliceEqual(t, tc.expectLogs, mock.Logs, "logs")
 }
 
 func TestMockTRun(t *testing.T) {
-	RunTestCases(t, []mockTRunTestCase{
-		newMockTRunTestCase("Log", func(mt T) { mt.Log("logged") },
-			S("logged")),
-		newMockTRunTestCase("Logf", func(mt T) { mt.Logf("logged %d", 42) },
-			S("logged 42")),
-		newMockTRunTestCaseFails("Fail", func(mt T) { mt.Fail(); mt.Log("continued") },
-			nil, S("continued")),
-		newMockTRunTestCaseFails("FailNow", func(mt T) { mt.FailNow(); mt.Log("continued") },
+	core.RunTestCases(t, []mockTRunTestCase{
+		newMockTRunTestCase("Log", func(mt core.T) { mt.Log("logged") },
+			core.S("logged")),
+		newMockTRunTestCase("Logf", func(mt core.T) { mt.Logf("logged %d", 42) },
+			core.S("logged 42")),
+		newMockTRunTestCaseFails("Fail", func(mt core.T) { mt.Fail(); mt.Log("continued") },
+			nil, core.S("continued")),
+		newMockTRunTestCaseFails("FailNow", func(mt core.T) { mt.FailNow(); mt.Log("continued") },
 			nil, nil),
-		newMockTRunTestCaseFails("Error", func(mt T) { mt.Error("error"); mt.Log("continued") },
-			S("error"), S("continued")),
-		newMockTRunTestCaseFails("Errorf", func(mt T) { mt.Errorf("error %d", 42); mt.Log("continued") },
-			S("error 42"), S("continued")),
-		newMockTRunTestCaseFails("Fatal", func(mt T) { mt.Fatal("fatal"); mt.Log("continued") },
-			S("fatal"), nil),
-		newMockTRunTestCaseFails("Fatalf", func(mt T) { mt.Fatalf("fatal %d", 42); mt.Log("continued") },
-			S("fatal 42"), nil),
-		newMockTRunTestCaseSkips("SkipNow", func(mt T) { mt.SkipNow(); mt.Log("continued") },
+		newMockTRunTestCaseFails("Error", func(mt core.T) { mt.Error("error"); mt.Log("continued") },
+			core.S("error"), core.S("continued")),
+		newMockTRunTestCaseFails("Errorf", func(mt core.T) { mt.Errorf("error %d", 42); mt.Log("continued") },
+			core.S("error 42"), core.S("continued")),
+		newMockTRunTestCaseFails("Fatal", func(mt core.T) { mt.Fatal("fatal"); mt.Log("continued") },
+			core.S("fatal"), nil),
+		newMockTRunTestCaseFails("Fatalf", func(mt core.T) { mt.Fatalf("fatal %d", 42); mt.Log("continued") },
+			core.S("fatal 42"), nil),
+		newMockTRunTestCaseSkips("SkipNow", func(mt core.T) { mt.SkipNow(); mt.Log("continued") },
 			nil),
-		newMockTRunTestCaseSkips("Skip", func(mt T) { mt.Skip("skip"); mt.Log("continued") },
-			S("skip")),
-		newMockTRunTestCaseSkips("Skipf", func(mt T) { mt.Skipf("skip %d", 42); mt.Log("continued") },
-			S("skip 42")),
+		newMockTRunTestCaseSkips("Skip", func(mt core.T) { mt.Skip("skip"); mt.Log("continued") },
+			core.S("skip")),
+		newMockTRunTestCaseSkips("Skipf", func(mt core.T) { mt.Skipf("skip %d", 42); mt.Log("continued") },
+			core.S("skip 42")),
 		newMockTRunTestCaseFailsSkips("Fail then SkipNow",
-			func(mt T) { mt.Fail(); mt.SkipNow(); mt.Log("continued") },
+			func(mt core.T) { mt.Fail(); mt.SkipNow(); mt.Log("continued") },
 			nil, nil),
 	})
 }
@@ -1632,7 +1520,7 @@ func TestMockTRun(t *testing.T) {
 // passing body leaves them as they were, and Run reports the result
 // they give.
 type mockTRunCarryOverTestCase struct {
-	first       func(T)
+	first       func(core.T)
 	name        string
 	wantFailed  bool
 	wantSkipped bool
@@ -1641,7 +1529,7 @@ type mockTRunCarryOverTestCase struct {
 // newMockTRunCarryOverTestCaseFails declares a first body that fails
 // the test without skipping it.
 func newMockTRunCarryOverTestCaseFails(name string,
-	first func(T)) mockTRunCarryOverTestCase {
+	first func(core.T)) mockTRunCarryOverTestCase {
 	return mockTRunCarryOverTestCase{
 		first:       first,
 		name:        name,
@@ -1653,7 +1541,7 @@ func newMockTRunCarryOverTestCaseFails(name string,
 // newMockTRunCarryOverTestCaseSkips declares a first body that skips
 // the test without failing it.
 func newMockTRunCarryOverTestCaseSkips(name string,
-	first func(T)) mockTRunCarryOverTestCase {
+	first func(core.T)) mockTRunCarryOverTestCase {
 	return mockTRunCarryOverTestCase{
 		first:       first,
 		name:        name,
@@ -1668,46 +1556,46 @@ func (tc mockTRunCarryOverTestCase) Name() string {
 
 func (tc mockTRunCarryOverTestCase) Test(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 	mock.Run("first", tc.first)
-	AssertMustEqual(t, tc.wantFailed, mock.Failed(), "failed before")
-	AssertMustEqual(t, tc.wantSkipped, mock.Skipped(), "skipped before")
+	core.AssertMustEqual(t, tc.wantFailed, mock.Failed(), "failed before")
+	core.AssertMustEqual(t, tc.wantSkipped, mock.Skipped(), "skipped before")
 
-	ok := mock.Run("passes", func(mt T) { mt.Log("passed") })
-	AssertEqual(t, !tc.wantFailed, ok, "passed")
-	AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
-	AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
+	ok := mock.Run("passes", func(mt core.T) { mt.Log("passed") })
+	core.AssertEqual(t, !tc.wantFailed, ok, "passed")
+	core.AssertEqual(t, tc.wantFailed, mock.Failed(), "failed")
+	core.AssertEqual(t, tc.wantSkipped, mock.Skipped(), "skipped")
 }
 
 func TestMockTRunCarriesOver(t *testing.T) {
-	RunTestCases(t, []mockTRunCarryOverTestCase{
+	core.RunTestCases(t, []mockTRunCarryOverTestCase{
 		newMockTRunCarryOverTestCaseFails("after FailNow",
-			func(mt T) { mt.FailNow() }),
+			func(mt core.T) { mt.FailNow() }),
 		newMockTRunCarryOverTestCaseSkips("after SkipNow",
-			func(mt T) { mt.SkipNow() }),
+			func(mt core.T) { mt.SkipNow() }),
 	})
 }
 
 func TestMockTRunNilChecks(t *testing.T) {
 	// Test nil MockT
-	var mock *MockT
-	ok := mock.Run("nil test", func(mt T) {
+	var mock *core.MockT
+	ok := mock.Run("nil test", func(mt core.T) {
 		mt.Log("should not run")
 	})
-	AssertFalse(t, ok, "nil MockT should return false")
+	core.AssertFalse(t, ok, "nil MockT should return false")
 
 	// Test nil function
-	mock = &MockT{}
+	mock = &core.MockT{}
 	ok = mock.Run("nil func test", nil)
-	AssertFalse(t, ok, "nil function should return false")
+	core.AssertFalse(t, ok, "nil function should return false")
 }
 
 func TestMockTRunPanicPropagation(t *testing.T) {
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test that panics other than MockT's own sentinels are propagated
-	AssertPanic(t, func() {
-		mock.Run("panic test", func(_ T) {
+	core.AssertPanic(t, func() {
+		mock.Run("panic test", func(_ core.T) {
 			panic("custom panic")
 		})
 	}, "custom panic", "propagated")
@@ -1749,7 +1637,7 @@ func (tc isMockTAbortTestCase) Name() string {
 
 func (tc isMockTAbortTestCase) Test(t *testing.T) {
 	t.Helper()
-	AssertEqual(t, tc.want, IsMockTAbort(tc.recovered), "aborted")
+	core.AssertEqual(t, tc.want, core.IsMockTAbort(tc.recovered), "aborted")
 }
 
 // recoverFrom calls fn and returns what it panicked with, nil if it
@@ -1761,17 +1649,17 @@ func recoverFrom(fn func()) (recovered any) {
 }
 
 func isMockTAbortTestCases() []isMockTAbortTestCase {
-	failNow := recoverFrom(func() { (&MockT{}).FailNow() })
-	skipNow := recoverFrom(func() { (&MockT{}).SkipNow() })
+	failNow := recoverFrom(func() { (&core.MockT{}).FailNow() })
+	skipNow := recoverFrom(func() { (&core.MockT{}).SkipNow() })
 
 	return []isMockTAbortTestCase{
 		newIsMockTAbortTestCase("FailNow", failNow),
 		newIsMockTAbortTestCase("SkipNow", skipNow),
 		newIsMockTAbortTestCase("wrapped",
-			Wrap(MustT[error](failNow), "wrapped")),
-		newIsMockTAbortTestCase("recovered", AsRecovered(failNow)),
+			core.Wrap(core.MustT[error](failNow), "wrapped")),
+		newIsMockTAbortTestCase("recovered", core.AsRecovered(failNow)),
 		newIsMockTAbortTestCase("joined",
-			errors.Join(errors.New("another"), MustT[error](failNow))),
+			errors.Join(errors.New("another"), core.MustT[error](failNow))),
 		newIsMockTAbortTestCaseOther("nil", nil),
 		newIsMockTAbortTestCaseOther("another error", errors.New("another")),
 		newIsMockTAbortTestCaseOther("same text", errors.New("MockT.FailNow")),
@@ -1779,7 +1667,7 @@ func isMockTAbortTestCases() []isMockTAbortTestCase {
 }
 
 func TestIsMockTAbort(t *testing.T) {
-	RunTestCases(t, isMockTAbortTestCases())
+	core.RunTestCases(t, isMockTAbortTestCases())
 }
 
 // Test early abort pattern: if !Assert() { FailNow() }
@@ -1792,84 +1680,84 @@ func TestEarlyAbortPattern(t *testing.T) {
 
 func testEarlyAbortSuccess(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test successful assertion that continues execution
-	ok := mock.Run("early abort success", func(mt T) {
-		if !AssertEqual(mt, 42, 42, "equal values") {
+	ok := mock.Run("early abort success", func(mt core.T) {
+		if !core.AssertEqual(mt, 42, 42, "equal values") {
 			mt.FailNow()
 		}
 		// This should execute
 		mt.Log("execution continues after successful assertion")
 	})
 
-	AssertTrue(t, ok, "Test should pass when assertion succeeds")
-	AssertFalse(t, mock.Failed(), "Should not be marked as failed")
-	AssertEqual(t, 2, mock.NumLogs(), "Should have 2 log messages")
+	core.AssertTrue(t, ok, "Test should pass when assertion succeeds")
+	core.AssertFalse(t, mock.Failed(), "Should not be marked as failed")
+	core.AssertEqual(t, 2, mock.NumLogs(), "Should have 2 log messages")
 	// First log from AssertEqual success, second from explicit Log
-	AssertContains(t, mustMessageAt(t, mock.LogAt, 0, "first log"), "equal values: 42",
+	core.AssertContains(t, mustMessageAt(t, mock.LogAt, 0, "first log"), "equal values: 42",
 		"First log from assertion")
 }
 
 func testEarlyAbortFailure(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test failed assertion that aborts execution
-	ok := mock.Run("early abort failure", func(mt T) {
-		if !AssertEqual(mt, 42, 24, "different values") {
+	ok := mock.Run("early abort failure", func(mt core.T) {
+		if !core.AssertEqual(mt, 42, 24, "different values") {
 			mt.FailNow()
 		}
 		// This should NOT execute
 		mt.Log("this should not be reached")
 	})
 
-	AssertFalse(t, ok, "Test should fail when assertion fails and FailNow is called")
-	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 1, mock.NumErrors(), "Should have error from failed assertion")
-	AssertEqual(t, 0, mock.NumLogs(), "Should have no logs after early abort")
-	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "error"), "expected 42, got 24",
+	core.AssertFalse(t, ok, "Test should fail when assertion fails and FailNow is called")
+	core.AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	core.AssertEqual(t, 1, mock.NumErrors(), "Should have error from failed assertion")
+	core.AssertEqual(t, 0, mock.NumLogs(), "Should have no logs after early abort")
+	core.AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "error"), "expected 42, got 24",
 		"Error from failed assertion")
 }
 
 func testEarlyAbortMultiple(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test multiple assertions with early abort pattern
-	ok := mock.Run("multiple early abort", func(mt T) {
-		if !AssertEqual(mt, "hello", "hello", "first check") {
+	ok := mock.Run("multiple early abort", func(mt core.T) {
+		if !core.AssertEqual(mt, "hello", "hello", "first check") {
 			mt.FailNow()
 		}
-		if !AssertTrue(mt, true, "second check") {
+		if !core.AssertTrue(mt, true, "second check") {
 			mt.FailNow()
 		}
-		if !AssertEqual(mt, 1, 2, "third check") {
+		if !core.AssertEqual(mt, 1, 2, "third check") {
 			mt.FailNow() // This should abort
 		}
 		// This should NOT execute
 		mt.Log("unreachable code")
 	})
 
-	AssertFalse(t, ok, "Test should fail on third assertion")
-	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 1, mock.NumErrors(), "Should have one error from failed assertion")
-	AssertEqual(t, 2, mock.NumLogs(), "Should have logs from first two successful assertions")
-	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "error"), "expected 1, got 2",
+	core.AssertFalse(t, ok, "Test should fail on third assertion")
+	core.AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	core.AssertEqual(t, 1, mock.NumErrors(), "Should have one error from failed assertion")
+	core.AssertEqual(t, 2, mock.NumLogs(), "Should have logs from first two successful assertions")
+	core.AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "error"), "expected 1, got 2",
 		"Error from third assertion")
 }
 
 func testEarlyAbortMixed(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	// Test mixing early abort pattern with regular assertions
-	ok := mock.Run("mixed patterns", func(mt T) {
+	ok := mock.Run("mixed patterns", func(mt core.T) {
 		// Regular assertion (doesn't abort on failure)
-		AssertEqual(mt, 1, 2, "regular assertion")
+		core.AssertEqual(mt, 1, 2, "regular assertion")
 
 		// Early abort pattern (aborts on failure)
-		if !AssertEqual(mt, "test", "test", "critical assertion") {
+		if !core.AssertEqual(mt, "test", "test", "critical assertion") {
 			mt.FailNow()
 		}
 
@@ -1877,7 +1765,7 @@ func testEarlyAbortMixed(t *testing.T) {
 		mt.Log("continuing after critical assertion")
 
 		// Another early abort that fails
-		if !AssertFalse(mt, true, "should be false") {
+		if !core.AssertFalse(mt, true, "should be false") {
 			mt.FailNow() // This should abort
 		}
 
@@ -1885,21 +1773,21 @@ func testEarlyAbortMixed(t *testing.T) {
 		mt.Log("unreachable after failed critical assertion")
 	})
 
-	AssertFalse(t, ok, "Test should fail due to early abort")
-	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	AssertEqual(t, 2, mock.NumErrors(), "Should have two errors")
-	AssertEqual(t, 2, mock.NumLogs(), "Should have two logs before abort")
+	core.AssertFalse(t, ok, "Test should fail due to early abort")
+	core.AssertTrue(t, mock.Failed(), "Should be marked as failed")
+	core.AssertEqual(t, 2, mock.NumErrors(), "Should have two errors")
+	core.AssertEqual(t, 2, mock.NumLogs(), "Should have two logs before abort")
 
 	// Check the error messages
-	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "first error"), "expected 1, got 2",
+	core.AssertContains(t, mustMessageAt(t, mock.ErrorAt, 0, "first error"), "expected 1, got 2",
 		"First error from regular assertion")
-	AssertContains(t, mustMessageAt(t, mock.ErrorAt, 1, "second error"), "expected false, got true",
+	core.AssertContains(t, mustMessageAt(t, mock.ErrorAt, 1, "second error"), "expected false, got true",
 		"Second error from early abort assertion")
 
 	// Check log messages
-	AssertContains(t, mustMessageAt(t, mock.LogAt, 0, "first log"), "critical assertion: test",
+	core.AssertContains(t, mustMessageAt(t, mock.LogAt, 0, "first log"), "critical assertion: test",
 		"Log from successful critical assertion")
-	AssertContains(t, mustMessageAt(t, mock.LogAt, 1, "second log"), "continuing after critical assertion",
+	core.AssertContains(t, mustMessageAt(t, mock.LogAt, 1, "second log"), "continuing after critical assertion",
 		"Log showing execution continued")
 }
 
@@ -1931,520 +1819,440 @@ func TestAssertMustFunctions(t *testing.T) {
 
 func testAssertMustEqual(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustEqual(mt, 42, 42, "equal values")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustEqual(mt, 42, 42, "equal values")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustEqual(mt, 42, 24, "different values")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustEqual(mt, 42, 24, "different values")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNotEqual(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNotEqual(mt, 42, 24, "different values")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNotEqual(mt, 42, 24, "different values")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNotEqual(mt, 42, 42, "equal values")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNotEqual(mt, 42, 42, "equal values")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustSliceEqual(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustSliceEqual(mt, S(1, 2, 3), S(1, 2, 3), "equal slices")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustSliceEqual(mt, core.S(1, 2, 3), core.S(1, 2, 3), "equal slices")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustSliceEqual(mt, S(1, 2, 3), S(1, 2, 4), "different slices")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustSliceEqual(mt, core.S(1, 2, 3), core.S(1, 2, 4), "different slices")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustDeepEqual(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustDeepEqual(mt, S(S(1)), S(S(1)), "equal values")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustDeepEqual(mt, core.S(core.S(1)), core.S(core.S(1)), "equal values")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustDeepEqual(mt, S(S(1)), S(S(2)), "different values")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustDeepEqual(mt, core.S(core.S(1)), core.S(core.S(2)), "different values")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNotDeepEqual(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNotDeepEqual(mt, S(S(1)), S(S(2)), "different values")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNotDeepEqual(mt, core.S(core.S(1)), core.S(core.S(2)), "different values")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNotDeepEqual(mt, S(S(1)), S(S(1)), "equal values")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNotDeepEqual(mt, core.S(core.S(1)), core.S(core.S(1)), "equal values")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustContains(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustContains(mt, "hello world", "world", "contains substring")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustContains(mt, "hello world", "world", "contains substring")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustContains(mt, "hello world", "xyz", "missing substring")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustContains(mt, "hello world", "xyz", "missing substring")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNotContain(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNotContain(mt, "hello world", "xyz", "no substring")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNotContain(mt, "hello world", "xyz", "no substring")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNotContain(mt, "hello world", "world", "has substring")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNotContain(mt, "hello world", "world", "has substring")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustError(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustError(mt, errors.New("test error"), "expects error")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustError(mt, errors.New("test error"), "expects error")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustError(mt, nil, "expects error but got nil")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustError(mt, nil, "expects error but got nil")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNoError(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNoError(mt, nil, "expects no error")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNoError(mt, nil, "expects no error")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNoError(mt, errors.New("unexpected error"), "expects no error")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNoError(mt, errors.New("unexpected error"), "expects no error")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustPanic(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustPanic(mt, func() { panic("test panic") }, nil, "expects panic")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustPanic(mt, func() { panic("test panic") }, nil, "expects panic")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustPanic(mt, func() {}, nil, "expects panic but got none")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustPanic(mt, func() {}, nil, "expects panic but got none")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNoPanic(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNoPanic(mt, func() {}, "expects no panic")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNoPanic(mt, func() {}, "expects no panic")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNoPanic(mt, func() { panic("unexpected") }, "expects no panic")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNoPanic(mt, func() { panic("unexpected") }, "expects no panic")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustTrue(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustTrue(mt, true, "expects true")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustTrue(mt, true, "expects true")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustTrue(mt, false, "expects true but got false")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustTrue(mt, false, "expects true but got false")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustFalse(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustFalse(mt, false, "expects false")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustFalse(mt, false, "expects false")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustFalse(mt, true, "expects false but got true")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustFalse(mt, true, "expects false but got true")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustErrorIs(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 	baseErr := errors.New("base error")
 	wrappedErr := errors.Join(baseErr, errors.New("wrapped"))
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustErrorIs(mt, wrappedErr, baseErr, "error should match")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustErrorIs(mt, wrappedErr, baseErr, "error should match")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
 	otherErr := errors.New("other error")
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustErrorIs(mt, wrappedErr, otherErr, "error should not match")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustErrorIs(mt, wrappedErr, otherErr, "error should not match")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNotErrorIs(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 	baseErr := errors.New("base error")
 	wrappedErr := errors.Join(baseErr, errors.New("wrapped"))
 
 	otherErr := errors.New("other error")
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNotErrorIs(mt, wrappedErr, otherErr, "error should not match")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNotErrorIs(mt, wrappedErr, otherErr, "error should not match")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNotErrorIs(mt, wrappedErr, baseErr, "error should match")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNotErrorIs(mt, wrappedErr, baseErr, "error should match")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustErrorIsFn(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 	baseErr := errors.New("base error")
-	wrappedErr := Wrap(baseErr, "wrapped")
+	wrappedErr := core.Wrap(baseErr, "wrapped")
 	isBase := func(err error) bool { return err == baseErr }
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustErrorIsFn(mt, wrappedErr, isBase, "error should match")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustErrorIsFn(mt, wrappedErr, isBase, "error should match")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustErrorIsFn(mt, errors.New("other error"), isBase, "error should not match")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustErrorIsFn(mt, errors.New("other error"), isBase, "error should not match")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustErrorAs(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
-	wrapped := Wrap(errors.New("base error"), "note")
+	mock := &core.MockT{}
+	wrapped := core.Wrap(errors.New("base error"), "note")
 
-	ok := mock.Run("success", func(mt T) {
-		out := AssertMustErrorAs[*WrappedError](mt, wrapped, "type should match")
-		AssertSame(mt, wrapped, out, "matched value")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		out := core.AssertMustErrorAs[*core.WrappedError](mt, wrapped, "type should match")
+		core.AssertSame(mt, wrapped, out, "matched value")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		_ = AssertMustErrorAs[*WrappedError](mt, errors.New("plain"), "type should not match")
+	ok = mock.Run("failure", func(mt core.T) {
+		_ = core.AssertMustErrorAs[*core.WrappedError](mt, errors.New("plain"), "type should not match")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustTypeIs(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
+	ok := mock.Run("success", func(mt core.T) {
 		var val any = "hello"
-		result := AssertMustTypeIs[string](mt, val, "type should match")
-		AssertEqual(mt, "hello", result, "should return cast value")
-		mt.Log(mustContinuationLog)
+		result := core.AssertMustTypeIs[string](mt, val, "type should match")
+		core.AssertEqual(mt, "hello", result, "should return cast value")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
+	ok = mock.Run("failure", func(mt core.T) {
 		var val any = 42
-		AssertMustTypeIs[string](mt, val, "type should not match")
+		core.AssertMustTypeIs[string](mt, val, "type should not match")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNil(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNil(mt, nil, "expects nil")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNil(mt, nil, "expects nil")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNil(mt, "not nil", "expects nil but got value")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNil(mt, "not nil", "expects nil but got value")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNotNil(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNotNil(mt, "not nil", "expects not nil")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNotNil(mt, "not nil", "expects not nil")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNotNil(mt, nil, "expects not nil but got nil")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNotNil(mt, nil, "expects not nil but got nil")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustSame(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	slice1 := []int{1, 2, 3}
 	slice2 := slice1 // Same reference
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustSame(mt, slice1, slice2, "same slice reference")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustSame(mt, slice1, slice2, "same slice reference")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
 	slice3 := []int{1, 2, 3} // Different reference
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustSame(mt, slice1, slice3, "different slice references")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustSame(mt, slice1, slice3, "different slice references")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
+	core.AssertMustAbortedForTest(t, mock, ok)
 }
 
 func testAssertMustNotSame(t *testing.T) {
 	t.Helper()
-	mock := &MockT{}
+	mock := &core.MockT{}
 
 	slice1 := []int{1, 2, 3}
 	slice3 := []int{1, 2, 3} // Different reference
 
-	ok := mock.Run("success", func(mt T) {
-		AssertMustNotSame(mt, slice1, slice3, "different slice references")
-		mt.Log(mustContinuationLog)
+	ok := mock.Run("success", func(mt core.T) {
+		core.AssertMustNotSame(mt, slice1, slice3, "different slice references")
+		mt.Log(core.MustContinuationLogForTest)
 	})
-	assertMustContinued(t, mock, ok)
+	core.AssertMustContinuedForTest(t, mock, ok)
 
 	mock.Reset()
 
 	slice2 := slice1 // Same reference
-	ok = mock.Run("failure", func(mt T) {
-		AssertMustNotSame(mt, slice1, slice2, "same slice reference")
+	ok = mock.Run("failure", func(mt core.T) {
+		core.AssertMustNotSame(mt, slice1, slice2, "same slice reference")
 		mt.Log("should not reach here")
 	})
-	assertMustAborted(t, mock, ok)
-}
-
-// assertErrorContains checks that the last error from MockT contains the expected substring.
-// An empty expected substring matches any error, so it is a mistake at the call site.
-// The precondition is reported directly: this helper backs the tests for the assertions
-// it would otherwise route through.
-func assertErrorContains(t *testing.T, mock *MockT, expected, desc string) {
-	t.Helper()
-	if expected == "" {
-		t.Fatalf("%s: expected a non-empty substring", desc)
-	}
-
-	lastErr, ok := mock.LastError()
-	AssertMustTrue(t, ok, "%s recorded", desc)
-	AssertTrue(t, strings.Contains(lastErr, expected),
-		"%s: %q contains %q", desc, lastErr, expected)
-}
-
-// mustMessageAt returns the message at position i from one of MockT's At
-// accessors, aborting the test when there is none.
-func mustMessageAt(t *testing.T, at func(int) (string, bool), i int, desc string) string {
-	t.Helper()
-	msg, ok := at(i)
-	AssertMustTrue(t, ok, "%s recorded", desc)
-	return msg
-}
-
-// assertLastLog checks the message an assertion logged on success.
-func assertLastLog(t *testing.T, mock *MockT, expected, desc string) {
-	t.Helper()
-	lastLog, ok := mock.LastLog()
-	AssertTrue(t, ok, "%s last log", desc)
-	assertComparable(t, expected, lastLog, "%s log message", desc)
-}
-
-// assertMustContinued checks that a Must assertion passed and let the
-// caller carry on. The continuation log is matched rather than counted,
-// so a case that asserts on a returned value in between still fits.
-func assertMustContinued(t *testing.T, mock *MockT, ok bool) {
-	t.Helper()
-	AssertTrue(t, ok, "Success case should not abort")
-	AssertFalse(t, mock.Failed(), "Should not be marked as failed")
-	AssertFalse(t, mock.HasErrors(), "Should have no errors")
-
-	lastLog, hasLog := mock.LastLog()
-	AssertTrue(t, hasLog, "Should have logged the assertion")
-	assertComparable(t, mustContinuationLog, lastLog, "Should reach continuation log")
-}
-
-// mustContinuationLog is what every Must success case logs after the
-// assertion, marking that execution was not cut short.
-const mustContinuationLog = "execution continues"
-
-// assertMustAborted checks that a Must assertion failed and cut the
-// caller short before its continuation ran.
-func assertMustAborted(t *testing.T, mock *MockT, ok bool) {
-	t.Helper()
-	AssertFalse(t, ok, "Failure case should abort")
-	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	assertComparable(t, 1, mock.NumErrors(), "Should have error from failed assertion")
-	assertComparable(t, 0, mock.NumLogs(), "Should not reach continuation log")
-}
-
-// assertPassed checks that an assertion reported success: it returned
-// true, logged the value, and recorded no error.
-func assertPassed(t *testing.T, mock *MockT, result bool, desc string) {
-	t.Helper()
-	AssertTrue(t, result, "%s result", desc)
-	AssertFalse(t, mock.HasErrors(), "%s errors", desc)
-	AssertTrue(t, mock.HasLogs(), "%s logs", desc)
-}
-
-// assertFailed checks that an assertion reported failure: it returned
-// false, recorded an error containing expected, and logged nothing.
-func assertFailed(t *testing.T, mock *MockT, result bool, expected, desc string) {
-	t.Helper()
-	AssertFalse(t, result, "%s result", desc)
-	AssertTrue(t, mock.HasErrors(), "%s errors", desc)
-	AssertFalse(t, mock.HasLogs(), "%s logs", desc)
-	assertErrorContains(t, mock, expected, desc+" message")
+	core.AssertMustAbortedForTest(t, mock, ok)
 }

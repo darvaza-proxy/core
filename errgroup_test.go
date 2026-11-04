@@ -1,77 +1,20 @@
-package core
+package core_test
 
 import (
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = errGroupSetDefaultsTestCase{}
-	_ TestCase = errGroupGoTestCase{}
-	_ TestCase = errGroupGoCatchTestCase{}
-	_ TestCase = errGroupErrTestCase{}
+	_ core.TestCase = errGroupGoTestCase{}
+	_ core.TestCase = errGroupGoCatchTestCase{}
+	_ core.TestCase = errGroupErrTestCase{}
 )
-
-type errGroupSetDefaultsTestCase struct {
-	expectedParent context.Context
-	setup          func() *ErrGroup
-	name           string
-}
-
-// newErrGroupSetDefaultsTestCase creates a new errGroupSetDefaultsTestCase
-func newErrGroupSetDefaultsTestCase(expectedParent context.Context, name string,
-	setup func() *ErrGroup) errGroupSetDefaultsTestCase {
-	return errGroupSetDefaultsTestCase{
-		name:           name,
-		setup:          setup,
-		expectedParent: expectedParent,
-	}
-}
-
-func errGroupSetDefaultsTestCases() []errGroupSetDefaultsTestCase {
-	var nilCtx context.Context
-
-	return []errGroupSetDefaultsTestCase{
-		newErrGroupSetDefaultsTestCase(context.Background(), "nil parent context", func() *ErrGroup {
-			return &ErrGroup{}
-		}),
-		newErrGroupSetDefaultsTestCase(nilCtx, "custom parent context", func() *ErrGroup {
-			type testKey string
-			ctx := context.WithValue(context.Background(), testKey("test"), "value")
-			return &ErrGroup{Parent: ctx}
-		}), // Will be set by test
-	}
-}
-
-func (tc errGroupSetDefaultsTestCase) Name() string {
-	return tc.name
-}
-
-func (tc errGroupSetDefaultsTestCase) Test(t *testing.T) {
-	t.Helper()
-
-	eg := tc.setup()
-	expectedParent := tc.expectedParent
-	if tc.name == "custom parent context" {
-		expectedParent = eg.Parent
-	}
-
-	eg.SetDefaults()
-
-	if eg.Parent != expectedParent {
-		t.Errorf("Expected Parent %v, got %v", expectedParent, eg.Parent)
-	}
-
-	AssertNotNil(t, eg.ctx, "ctx")
-	AssertNotNil(t, eg.cancel, "cancel")
-}
-
-func TestErrGroupSetDefaults(t *testing.T) {
-	RunTestCases(t, errGroupSetDefaultsTestCases())
-}
 
 // errGroupGoTestCase states what a worker's outcome does to the group:
 // whether Wait reports an error, and whether the group ends cancelled.
@@ -164,7 +107,7 @@ func (tc errGroupGoTestCase) Name() string {
 func (tc errGroupGoTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var eg ErrGroup
+	var eg core.ErrGroup
 	eg.Go(tc.runFunc, tc.shutdownFunc)
 
 	if tc.cancelManually {
@@ -176,16 +119,16 @@ func (tc errGroupGoTestCase) Test(t *testing.T) {
 
 	err := eg.Wait()
 	if tc.expectError {
-		AssertError(t, err, "error")
+		core.AssertError(t, err, "error")
 	} else {
-		AssertNoError(t, err, "no error")
+		core.AssertNoError(t, err, "no error")
 	}
 
-	AssertEqual(t, tc.expectCancel, eg.IsCancelled(), "cancelled")
+	core.AssertEqual(t, tc.expectCancel, eg.IsCancelled(), "cancelled")
 }
 
 func TestErrGroupGo(t *testing.T) {
-	RunTestCases(t, errGroupGoTestCases)
+	core.RunTestCases(t, errGroupGoTestCases)
 }
 
 type errGroupGoCatchTestCase struct {
@@ -244,46 +187,46 @@ func (tc errGroupGoCatchTestCase) Name() string {
 func (tc errGroupGoCatchTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	var eg ErrGroup
+	var eg core.ErrGroup
 	eg.GoCatch(tc.runFunc, tc.catchFunc)
 
 	err := eg.Wait()
 	if tc.expectError {
-		AssertError(t, err, "error")
+		core.AssertError(t, err, "error")
 		return
 	}
-	AssertNoError(t, err, "error")
+	core.AssertNoError(t, err, "error")
 }
 
 func TestErrGroupGoCatch(t *testing.T) {
-	RunTestCases(t, errGroupGoCatchTestCases)
+	core.RunTestCases(t, errGroupGoCatchTestCases)
 }
 
 // GoCatch refuses a nil run function outright rather than spawning a
 // worker that cannot run.
 func TestErrGroupGoCatchNilFunction(t *testing.T) {
-	var eg ErrGroup
+	var eg core.ErrGroup
 
-	AssertPanic(t, func() {
+	core.AssertPanic(t, func() {
 		eg.GoCatch(nil, func(_ context.Context, err error) error { return err })
-	}, ErrInvalid, "panic")
+	}, core.ErrInvalid, "panic")
 }
 
 func testErrGroupFirstCancellation(t *testing.T) {
 	t.Helper()
-	var eg ErrGroup
+	var eg core.ErrGroup
 
 	cause := errors.New("test error")
 	isFirst := eg.Cancel(cause)
 
-	AssertTrue(t, isFirst, "first cancellation")
-	AssertTrue(t, eg.IsCancelled(), "cancelled")
-	AssertEqual(t, cause, eg.Err(), "error")
+	core.AssertTrue(t, isFirst, "first cancellation")
+	core.AssertTrue(t, eg.IsCancelled(), "cancelled")
+	core.AssertEqual(t, cause, eg.Err(), "error")
 }
 
 func testErrGroupSubsequentCancellation(t *testing.T) {
 	t.Helper()
-	var eg ErrGroup
+	var eg core.ErrGroup
 
 	// First cancellation
 	cause1 := errors.New("first error")
@@ -292,19 +235,19 @@ func testErrGroupSubsequentCancellation(t *testing.T) {
 	// Second cancellation
 	cause2 := errors.New("second error")
 	isFirst := eg.Cancel(cause2)
-	AssertFalse(t, isFirst, "subsequent cancellation")
+	core.AssertFalse(t, isFirst, "subsequent cancellation")
 
 	// Should keep the first error
-	AssertSame(t, cause1, eg.Err(), "error instance")
+	core.AssertSame(t, cause1, eg.Err(), "error instance")
 }
 
 func testErrGroupNilCause(t *testing.T) {
 	t.Helper()
-	var eg ErrGroup
+	var eg core.ErrGroup
 
 	isFirst := eg.Cancel(nil)
-	AssertTrue(t, isFirst, "first cancellation")
-	AssertSame(t, context.Canceled, eg.Err(), "error instance")
+	core.AssertTrue(t, isFirst, "first cancellation")
+	core.AssertSame(t, context.Canceled, eg.Err(), "error instance")
 }
 
 func TestErrGroupCancel(t *testing.T) {
@@ -314,7 +257,7 @@ func TestErrGroupCancel(t *testing.T) {
 }
 
 func TestErrGroupOnError(t *testing.T) {
-	var eg ErrGroup
+	var eg core.ErrGroup
 	var errorReceived error
 
 	eg.OnError(func(err error) {
@@ -327,33 +270,33 @@ func TestErrGroupOnError(t *testing.T) {
 	// Give time for onError to be called
 	time.Sleep(1 * time.Millisecond)
 
-	AssertSame(t, testErr, errorReceived, "error instance")
+	core.AssertSame(t, testErr, errorReceived, "error instance")
 }
 
 func TestErrGroupContext(t *testing.T) {
-	var eg ErrGroup
+	var eg core.ErrGroup
 
 	ctx := eg.Context()
-	AssertMustNotNil(t, ctx, "context")
+	core.AssertMustNotNil(t, ctx, "context")
 
-	AssertOpen(t, ctx.Done(), 0, "done before cancel")
+	core.AssertOpen(t, ctx.Done(), 0, "done before cancel")
 	eg.Cancel(errors.New("test"))
-	AssertClosed(t, ctx.Done(), time.Millisecond, "done after cancel")
+	core.AssertClosed(t, ctx.Done(), time.Millisecond, "done after cancel")
 }
 
 func TestErrGroupCancelled(t *testing.T) {
-	var eg ErrGroup
+	var eg core.ErrGroup
 
 	cancelled := eg.Cancelled()
-	AssertMustNotNil(t, cancelled, "cancelled channel")
+	core.AssertMustNotNil(t, cancelled, "cancelled channel")
 
-	AssertOpen(t, cancelled, 0, "cancelled before Cancel")
+	core.AssertOpen(t, cancelled, 0, "cancelled before Cancel")
 	eg.Cancel(errors.New("test"))
-	AssertClosed(t, cancelled, time.Millisecond, "cancelled after Cancel")
+	core.AssertClosed(t, cancelled, time.Millisecond, "cancelled after Cancel")
 }
 
 func TestErrGroupDone(t *testing.T) {
-	var eg ErrGroup
+	var eg core.ErrGroup
 
 	eg.Go(func(_ context.Context) error {
 		time.Sleep(10 * time.Millisecond)
@@ -361,21 +304,21 @@ func TestErrGroupDone(t *testing.T) {
 	}, nil)
 
 	done := eg.Done()
-	AssertOpen(t, done, 5*time.Millisecond, "done while the worker runs")
-	AssertClosed(t, done, 50*time.Millisecond, "done")
+	core.AssertOpen(t, done, 5*time.Millisecond, "done while the worker runs")
+	core.AssertClosed(t, done, 50*time.Millisecond, "done")
 }
 
 func TestErrGroupConcurrency(t *testing.T) {
 	const numWorkers = 10
 
-	var eg ErrGroup
+	var eg core.ErrGroup
 	startConcurrentWorkers(t, &eg, numWorkers)
 
 	err := eg.Wait()
 	validateConcurrencyResult(t, &eg, err)
 }
 
-func startConcurrentWorkers(t *testing.T, eg *ErrGroup, numWorkers int) {
+func startConcurrentWorkers(t *testing.T, eg *core.ErrGroup, numWorkers int) {
 	t.Helper()
 	for worker := range numWorkers {
 		eg.Go(createConcurrentWorker(worker), nil)
@@ -400,51 +343,17 @@ func createConcurrentWorker(worker int) func(context.Context) error {
 	}
 }
 
-func validateConcurrencyResult(t *testing.T, eg *ErrGroup, err error) {
+func validateConcurrencyResult(t *testing.T, eg *core.ErrGroup, err error) {
 	t.Helper()
-	AssertError(t, err, "worker 5 error")
-	AssertTrue(t, eg.IsCancelled(), "group cancelled")
-}
-
-func testErrGroupCatcherErrorWhenNotCancelled(t *testing.T) {
-	t.Helper()
-	var eg ErrGroup
-
-	testErr := errors.New("test error")
-	result := eg.defaultErrGroupCatcher(testErr)
-
-	AssertSame(t, testErr, result, "error instance")
-}
-
-func testErrGroupCatcherErrorWhenCancelled(t *testing.T) {
-	t.Helper()
-	var eg ErrGroup
-	eg.Cancel(errors.New("cancellation error"))
-
-	testErr := errors.New("test error")
-	result := eg.defaultErrGroupCatcher(testErr)
-	AssertSame(t, context.Canceled, result, "error instance")
-}
-
-func testErrGroupCatcherNilError(t *testing.T) {
-	t.Helper()
-	var eg ErrGroup
-
-	result := eg.defaultErrGroupCatcher(nil)
-	AssertNil(t, result, "result")
-}
-
-func TestErrGroupDefaultErrGroupCatcher(t *testing.T) {
-	t.Run("error when not cancelled", testErrGroupCatcherErrorWhenNotCancelled)
-	t.Run("error when cancelled", testErrGroupCatcherErrorWhenCancelled)
-	t.Run("nil error", testErrGroupCatcherNilError)
+	core.AssertError(t, err, "worker 5 error")
+	core.AssertTrue(t, eg.IsCancelled(), "group cancelled")
 }
 
 func TestErrGroupWithCustomParent(t *testing.T) {
 	parentCtx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 
-	eg := ErrGroup{Parent: parentCtx}
+	eg := core.ErrGroup{Parent: parentCtx}
 
 	eg.Go(func(ctx context.Context) error {
 		// Worker should be cancelled by parent timeout
@@ -457,7 +366,7 @@ func TestErrGroupWithCustomParent(t *testing.T) {
 	}, nil)
 
 	err := eg.Wait()
-	AssertError(t, err, "parent timeout")
+	core.AssertError(t, err, "parent timeout")
 }
 
 // errGroupErrTestCase covers ErrGroup.Err() across the pristine and
@@ -477,16 +386,16 @@ func (tc errGroupErrTestCase) Name() string { return tc.name }
 
 func (tc errGroupErrTestCase) Test(t *testing.T) {
 	t.Helper()
-	var eg ErrGroup
+	var eg core.ErrGroup
 	if tc.workerErr != nil {
 		eg.Go(func(_ context.Context) error { return tc.workerErr }, nil)
 		_ = eg.Wait()
 	}
 	if tc.workerErr == nil {
-		AssertNil(t, eg.Err(), tc.name)
+		core.AssertNil(t, eg.Err(), tc.name)
 		return
 	}
-	AssertSame(t, tc.workerErr, eg.Err(), tc.name)
+	core.AssertSame(t, tc.workerErr, eg.Err(), tc.name)
 }
 
 func errGroupErrTestCases() []errGroupErrTestCase {
@@ -497,5 +406,5 @@ func errGroupErrTestCases() []errGroupErrTestCase {
 }
 
 func TestErrGroupErr(t *testing.T) {
-	RunTestCases(t, errGroupErrTestCases())
+	core.RunTestCases(t, errGroupErrTestCases())
 }

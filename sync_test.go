@@ -1,51 +1,18 @@
-package core
+package core_test
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase interface
 var (
-	_ TestCase = waitForCondTestCase{}
-	_ TestCase = waitForCondContextTestCase{}
+	_ core.TestCase = waitForCondTestCase{}
+	_ core.TestCase = waitForCondContextTestCase{}
 )
-
-const (
-	// shortBudgetMS caps a path that should succeed well inside it.
-	shortBudgetMS = 50
-	// tinyBudgetMS caps a path that should time out, keeping the run short.
-	tinyBudgetMS = 10
-)
-
-func ms(n int) time.Duration {
-	return time.Duration(n) * time.Millisecond
-}
-
-// alwaysTrue returns a predicate that is true from the first call.
-func alwaysTrue() func() bool {
-	return func() bool { return true }
-}
-
-// alwaysFalse returns a predicate that never becomes true.
-func alwaysFalse() func() bool {
-	return func() bool { return false }
-}
-
-// noPredicate returns no predicate at all.
-func noPredicate() func() bool {
-	return nil
-}
-
-// flagFlip returns a predicate that becomes true two milliseconds after it
-// was made. Time-based, so it needs no goroutine and no shared state.
-func flagFlip() func() bool {
-	target := time.Now().Add(ms(2))
-	return func() bool {
-		return !time.Now().Before(target)
-	}
-}
 
 // trueOnSecondCall returns a predicate that is false once and true from
 // then on. Call-counted rather than time-based, so a row built on it does
@@ -93,8 +60,8 @@ func (tc waitForCondTestCase) Name() string {
 
 func (tc waitForCondTestCase) Test(t *testing.T) {
 	t.Helper()
-	got := WaitForCond(tc.cond(), ms(tc.budgetMS), tc.step)
-	AssertEqual(t, tc.want, got, "result")
+	got := core.WaitForCond(tc.cond(), ms(tc.budgetMS), tc.step)
+	core.AssertEqual(t, tc.want, got, "result")
 }
 
 func TestWaitForCond(t *testing.T) {
@@ -105,7 +72,7 @@ func TestWaitForCond(t *testing.T) {
 	// about timing decides whether that second call happens. The two
 	// guard rows carry a predicate that is already true, so a false result
 	// can only come from the argument guard.
-	RunTestCases(t, S(
+	core.RunTestCases(t, core.S(
 		newWaitForCondTestCase("true immediately", alwaysTrue, shortBudgetMS, true),
 		newWaitForCondTestCase("becomes true within budget", flagFlip, shortBudgetMS, true),
 		newWaitForCondTestCase("never true within budget", alwaysFalse, tinyBudgetMS, false),
@@ -116,30 +83,6 @@ func TestWaitForCond(t *testing.T) {
 		newWaitForCondTestCaseStep("zero step", alwaysTrue, shortBudgetMS, 0, false),
 		newWaitForCondTestCase("nil predicate", noPredicate, tinyBudgetMS, false),
 	))
-}
-
-// ctxWithBudget returns a context setup whose context ends budgetMS after
-// it runs.
-func ctxWithBudget(budgetMS int) func(*testing.T) context.Context {
-	return func(t *testing.T) context.Context {
-		t.Helper()
-		ctx, cancel := context.WithTimeout(t.Context(), ms(budgetMS))
-		t.Cleanup(cancel)
-		return ctx
-	}
-}
-
-// ctxCancelled returns a context that has already ended.
-func ctxCancelled(t *testing.T) context.Context {
-	t.Helper()
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	return ctx
-}
-
-// ctxNil returns no context at all.
-func ctxNil(*testing.T) context.Context {
-	return nil
 }
 
 // waitForCondContextTestCase exercises WaitForCondContext, polling every
@@ -178,8 +121,8 @@ func (tc waitForCondContextTestCase) Name() string {
 
 func (tc waitForCondContextTestCase) Test(t *testing.T) {
 	t.Helper()
-	got := WaitForCondContext(tc.ctx(t), tc.cond(), tc.step)
-	AssertEqual(t, tc.want, got, "result")
+	got := core.WaitForCondContext(tc.ctx(t), tc.cond(), tc.step)
+	core.AssertEqual(t, tc.want, got, "result")
 }
 
 func TestWaitForCondContext(t *testing.T) {
@@ -188,7 +131,7 @@ func TestWaitForCondContext(t *testing.T) {
 	// pins the final evaluation once the context has ended. The nil-context
 	// row carries a predicate that becomes true, since nothing else ends
 	// that wait, and the guard rows one that is already true.
-	RunTestCases(t, S(
+	core.RunTestCases(t, core.S(
 		newWaitForCondContextTestCase("true immediately", ctxWithBudget(shortBudgetMS),
 			alwaysTrue, true),
 		newWaitForCondContextTestCase("becomes true before the deadline",

@@ -1,14 +1,15 @@
-package core
+package core_test
 
 import (
 	"net"
 	"net/netip"
 	"testing"
+
+	"darvaza.org/core"
 )
 
-// Compile-time verification that test case types implement TestCase interface
-var _ TestCase = addrPortTestCase{}
-var _ TestCase = typeSpecificAddrPortTestCase{}
+// Compile-time verification that addrPortTestCase implements TestCase
+var _ core.TestCase = addrPortTestCase{}
 
 // Test cases for AddrPort
 type addrPortTestCase struct {
@@ -22,7 +23,7 @@ var addrPortTestCases = []addrPortTestCase{
 	// Direct netip.AddrPort types
 	newAddrPortTestCase("direct AddrPort", netip.MustParseAddrPort("192.168.1.1:8080"),
 		netip.MustParseAddrPort("192.168.1.1:8080"), true),
-	newAddrPortTestCase("pointer to AddrPort", addrPortPtr(netip.MustParseAddrPort("10.0.0.1:443")),
+	newAddrPortTestCase("pointer to AddrPort", core.NewAddrPortPtrForTest(netip.MustParseAddrPort("10.0.0.1:443")),
 		netip.MustParseAddrPort("10.0.0.1:443"), true),
 	newAddrPortTestCase("zero AddrPort", netip.AddrPort{}, netip.AddrPort{}, false),
 	newAddrPortTestCase("nil pointer to AddrPort", (*netip.AddrPort)(nil), netip.AddrPort{}, false),
@@ -67,11 +68,6 @@ var addrPortTestCases = []addrPortTestCase{
 	newAddrPortTestCase("empty struct", struct{}{}, netip.AddrPort{}, false),
 }
 
-// Helper to create pointer to AddrPort
-func addrPortPtr(ap netip.AddrPort) *netip.AddrPort {
-	return &ap
-}
-
 // Types implementing various interfaces
 type addrPortProvider struct {
 	ap netip.AddrPort
@@ -113,91 +109,13 @@ func (tc addrPortTestCase) Name() string {
 func (tc addrPortTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	got, ok := AddrPort(tc.input)
-	AssertEqual(t, tc.wantOK, ok, "ok")
-	AssertEqual(t, tc.want, got, "address")
+	got, ok := core.AddrPort(tc.input)
+	core.AssertEqual(t, tc.wantOK, ok, "ok")
+	core.AssertEqual(t, tc.want, got, "address")
 }
 
 func TestAddrPort(t *testing.T) {
-	RunTestCases(t, addrPortTestCases)
-}
-
-// Test typeSpecificAddrPort directly
-type typeSpecificAddrPortTestCase struct {
-	name      string
-	input     any
-	want      netip.AddrPort
-	wantOK    bool
-	wantKnown bool
-}
-
-var typeSpecificAddrPortTestCases = []typeSpecificAddrPortTestCase{
-	newTypeSpecificAddrPortTestCase("AddrPort value", netip.MustParseAddrPort("192.168.1.1:8080"),
-		netip.MustParseAddrPort("192.168.1.1:8080"), true),
-	newTypeSpecificAddrPortTestCase("AddrPort pointer", addrPortPtr(netip.MustParseAddrPort("10.0.0.1:443")),
-		netip.MustParseAddrPort("10.0.0.1:443"), true),
-	newTypeSpecificAddrPortTestCase("TCPAddr", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9000},
-		netip.MustParseAddrPort("127.0.0.1:9000"), true),
-	newTypeSpecificAddrPortTestCase("UDPAddr", &net.UDPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 53},
-		netip.MustParseAddrPort("10.0.0.1:53"), true),
-	newTypeSpecificAddrPortTestCase("zero AddrPort", netip.AddrPort{}, netip.AddrPort{}, false),
-	newTypeSpecificAddrPortTestCase("pointer to zero AddrPort", addrPortPtr(netip.AddrPort{}),
-		netip.AddrPort{}, false),
-	newTypeSpecificAddrPortTestCase("TCPAddr with invalid IP", &net.TCPAddr{IP: S[byte](1, 2, 3), Port: 80},
-		netip.AddrPort{}, false), // Invalid IP length
-	newTypeSpecificAddrPortTestCase("UDPAddr with invalid IP", &net.UDPAddr{IP: S[byte](), Port: 80},
-		netip.AddrPort{}, false), // Empty IP
-	newTypeSpecificAddrPortTestCase("TCPAddr with negative port",
-		&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: -1}, netip.AddrPort{}, false),
-	newTypeSpecificAddrPortTestCase("UDPAddr with port above the 16-bit range",
-		&net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 65536}, netip.AddrPort{}, false),
-	// A typed nil pointer is a recognised type carrying no address.
-	newTypeSpecificAddrPortTestCase("nil AddrPort pointer", (*netip.AddrPort)(nil), netip.AddrPort{}, false),
-	newTypeSpecificAddrPortTestCase("nil TCPAddr", (*net.TCPAddr)(nil), netip.AddrPort{}, false),
-	newTypeSpecificAddrPortTestCase("nil UDPAddr", (*net.UDPAddr)(nil), netip.AddrPort{}, false),
-	newTypeSpecificAddrPortTestCaseUnknown("unsupported type", "not an address"),
-}
-
-// newTypeSpecificAddrPortTestCase declares a row for a type the switch
-// recognises, whether or not it yields an address.
-func newTypeSpecificAddrPortTestCase(name string, input any, want netip.AddrPort,
-	wantOK bool) typeSpecificAddrPortTestCase {
-	return typeSpecificAddrPortTestCase{
-		name:      name,
-		input:     input,
-		want:      want,
-		wantOK:    wantOK,
-		wantKnown: true,
-	}
-}
-
-// newTypeSpecificAddrPortTestCaseUnknown declares a row for a type the switch
-// does not recognise, which never yields an address.
-func newTypeSpecificAddrPortTestCaseUnknown(name string, input any) typeSpecificAddrPortTestCase {
-	return typeSpecificAddrPortTestCase{
-		name:      name,
-		input:     input,
-		want:      netip.AddrPort{},
-		wantOK:    false,
-		wantKnown: false,
-	}
-}
-
-func (tc typeSpecificAddrPortTestCase) Name() string {
-	return tc.name
-}
-
-func (tc typeSpecificAddrPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
-	got, ok, known := typeSpecificAddrPort(tc.input)
-	AssertEqual(t, tc.wantKnown, known, "known")
-	AssertEqual(t, tc.wantOK, ok, "ok")
-	AssertEqual(t, tc.want, got, "address")
-}
-
-func TestTypeSpecificAddrPort(t *testing.T) {
-	RunTestCases(t, typeSpecificAddrPortTestCases)
+	core.RunTestCases(t, addrPortTestCases)
 }
 
 // Test edge cases and interface interactions
@@ -213,25 +131,25 @@ func testRecursiveInterfaceResolution(t *testing.T) {
 	tcpAddr := &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080}
 	provider := addrProvider{tcpAddr}
 
-	got, ok := AddrPort(provider)
-	AssertTrue(t, ok, "ok")
+	got, ok := core.AddrPort(provider)
+	core.AssertTrue(t, ok, "ok")
 
 	want := netip.MustParseAddrPort("192.168.1.1:8080")
-	AssertEqual(t, want, got, "address")
+	core.AssertEqual(t, want, got, "address")
 }
 
 func testNilFromInterfaceMethods(t *testing.T) {
 	t.Helper()
 
 	nilProvider := addrProvider{nil}
-	got, ok := AddrPort(nilProvider)
-	AssertFalse(t, ok, "nil Addr() ok")
-	AssertEqual(t, netip.AddrPort{}, got, "nil Addr() address")
+	got, ok := core.AddrPort(nilProvider)
+	core.AssertFalse(t, ok, "nil Addr() ok")
+	core.AssertEqual(t, netip.AddrPort{}, got, "nil Addr() address")
 
 	nilRemoteProvider := remoteAddrProvider{nil}
-	got, ok = AddrPort(nilRemoteProvider)
-	AssertFalse(t, ok, "nil RemoteAddr() ok")
-	AssertEqual(t, netip.AddrPort{}, got, "nil RemoteAddr() address")
+	got, ok = core.AddrPort(nilRemoteProvider)
+	core.AssertFalse(t, ok, "nil RemoteAddr() ok")
+	core.AssertEqual(t, netip.AddrPort{}, got, "nil RemoteAddr() address")
 }
 
 // Test with real network connection types (mock)
@@ -248,11 +166,11 @@ func TestAddrPortWithMockConnection(t *testing.T) {
 		remote: &net.TCPAddr{IP: net.ParseIP("192.168.1.100"), Port: 12345},
 	}
 
-	got, ok := AddrPort(conn)
-	AssertTrue(t, ok, "ok")
+	got, ok := core.AddrPort(conn)
+	core.AssertTrue(t, ok, "ok")
 
 	want := netip.MustParseAddrPort("192.168.1.100:12345")
-	AssertEqual(t, want, got, "address")
+	core.AssertEqual(t, want, got, "address")
 }
 
 // Test with IPv4 addresses using To4()
@@ -261,39 +179,39 @@ func TestAddrPortIPv4Handling(t *testing.T) {
 	ipv4 := net.ParseIP("192.168.1.1").To4()
 	tcpAddr := &net.TCPAddr{IP: ipv4, Port: 8080}
 
-	got, ok := AddrPort(tcpAddr)
-	AssertTrue(t, ok, "ok")
+	got, ok := core.AddrPort(tcpAddr)
+	core.AssertTrue(t, ok, "ok")
 
 	// Should get the IPv4 address directly
 	want := netip.MustParseAddrPort("192.168.1.1:8080")
-	AssertEqual(t, want, got, "address")
+	core.AssertEqual(t, want, got, "address")
 }
 
 // Benchmarks
 func BenchmarkAddrPortDirect(b *testing.B) {
 	ap := netip.MustParseAddrPort("192.168.1.1:8080")
 	for b.Loop() {
-		_, _ = AddrPort(ap)
+		_, _ = core.AddrPort(ap)
 	}
 }
 
 func BenchmarkAddrPortPointer(b *testing.B) {
-	ap := addrPortPtr(netip.MustParseAddrPort("192.168.1.1:8080"))
+	ap := core.NewAddrPortPtrForTest(netip.MustParseAddrPort("192.168.1.1:8080"))
 	for b.Loop() {
-		_, _ = AddrPort(ap)
+		_, _ = core.AddrPort(ap)
 	}
 }
 
 func BenchmarkAddrPortTCPAddr(b *testing.B) {
 	addr := &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080}
 	for b.Loop() {
-		_, _ = AddrPort(addr)
+		_, _ = core.AddrPort(addr)
 	}
 }
 
 func BenchmarkAddrPortInterface(b *testing.B) {
 	provider := addrPortProvider{netip.MustParseAddrPort("192.168.1.1:8080")}
 	for b.Loop() {
-		_, _ = AddrPort(provider)
+		_, _ = core.AddrPort(provider)
 	}
 }

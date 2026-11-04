@@ -1,30 +1,32 @@
-package core
+package core_test
 
 import (
 	"errors"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 // Compile-time verification that test case types implement TestCase.
 var (
-	_ TestCase = stringErrorTestCase{}
-	_ TestCase = stringErrorIsTestCase{}
-	_ TestCase = stringErrorCtorTestCase{}
+	_ core.TestCase = stringErrorTestCase{}
+	_ core.TestCase = stringErrorIsTestCase{}
+	_ core.TestCase = stringErrorCtorTestCase{}
 )
 
 // errStringSentinel exercises the constant-sentinel pattern StringError
 // exists for.
-const errStringSentinel StringError = "sentinel"
+const errStringSentinel core.StringError = "sentinel"
 
 // stringErrorTestCase checks Error() and AsError() for a StringError.
 type stringErrorTestCase struct {
 	name    string
-	input   StringError
+	input   core.StringError
 	wantMsg string
 	wantNil bool
 }
 
-func newStringErrorTestCase(name string, input StringError, wantMsg string,
+func newStringErrorTestCase(name string, input core.StringError, wantMsg string,
 	wantNil bool) stringErrorTestCase {
 	return stringErrorTestCase{
 		name:    name,
@@ -41,19 +43,19 @@ func (tc stringErrorTestCase) Name() string {
 func (tc stringErrorTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	AssertEqual(t, tc.wantMsg, tc.input.Error(), "Error")
+	core.AssertEqual(t, tc.wantMsg, tc.input.Error(), "Error")
 	// OK(), IsZero() and a nil AsError() all track emptiness together.
-	AssertEqual(t, tc.wantNil, tc.input.OK(), "OK")
-	AssertEqual(t, tc.wantNil, tc.input.IsZero(), "IsZero")
+	core.AssertEqual(t, tc.wantNil, tc.input.OK(), "OK")
+	core.AssertEqual(t, tc.wantNil, tc.input.IsZero(), "IsZero")
 
 	err := tc.input.AsError()
 	if tc.wantNil {
-		AssertNil(t, err, "AsError")
+		core.AssertNil(t, err, "AsError")
 		return
 	}
 
-	AssertNotNil(t, err, "AsError")
-	AssertEqual(t, tc.wantMsg, err.Error(), "AsError message")
+	core.AssertNotNil(t, err, "AsError")
+	core.AssertEqual(t, tc.wantMsg, err.Error(), "AsError message")
 }
 
 func stringErrorTestCases() []stringErrorTestCase {
@@ -67,7 +69,7 @@ func stringErrorTestCases() []stringErrorTestCase {
 }
 
 func TestStringError(t *testing.T) {
-	RunTestCases(t, stringErrorTestCases())
+	core.RunTestCases(t, stringErrorTestCases())
 }
 
 // stringErrorIsTestCase checks StringError identity matching through
@@ -96,25 +98,25 @@ func (tc stringErrorIsTestCase) Name() string {
 func (tc stringErrorIsTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	AssertEqual(t, tc.want, errors.Is(tc.err, tc.target), "errors.Is")
-	AssertEqual(t, tc.want, IsError(tc.err, tc.target), "IsError")
+	core.AssertEqual(t, tc.want, errors.Is(tc.err, tc.target), "errors.Is")
+	core.AssertEqual(t, tc.want, core.IsError(tc.err, tc.target), "IsError")
 }
 
 func stringErrorIsTestCases() []stringErrorIsTestCase {
 	return []stringErrorIsTestCase{
 		newStringErrorIsTestCase("same value",
-			StringError("boom"), StringError("boom"), true),
+			core.StringError("boom"), core.StringError("boom"), true),
 		newStringErrorIsTestCase("sentinel constant",
-			errStringSentinel, StringError("sentinel"), true),
+			errStringSentinel, core.StringError("sentinel"), true),
 		newStringErrorIsTestCase("different value",
-			StringError("boom"), StringError("bang"), false),
+			core.StringError("boom"), core.StringError("bang"), false),
 		newStringErrorIsTestCase("wrapped sentinel",
-			Wrap(errStringSentinel, "context"), errStringSentinel, true),
+			core.Wrap(errStringSentinel, "context"), errStringSentinel, true),
 	}
 }
 
 func TestStringErrorIs(t *testing.T) {
-	RunTestCases(t, stringErrorIsTestCases())
+	core.RunTestCases(t, stringErrorIsTestCases())
 }
 
 // stringErrorCtorTestCase checks NewStringError formatting and its
@@ -145,15 +147,15 @@ func (tc stringErrorCtorTestCase) Name() string {
 func (tc stringErrorCtorTestCase) Test(t *testing.T) {
 	t.Helper()
 
-	err := NewStringError(tc.format, tc.args...)
+	err := core.NewStringError(tc.format, tc.args...)
 	if tc.wantNil {
-		AssertNil(t, err, "NewStringError")
+		core.AssertNil(t, err, "NewStringError")
 		return
 	}
 
-	AssertNotNil(t, err, "NewStringError")
-	AssertEqual(t, tc.wantMsg, err.Error(), "message")
-	AssertErrorIs(t, err, StringError(tc.wantMsg), "matches sentinel")
+	core.AssertNotNil(t, err, "NewStringError")
+	core.AssertEqual(t, tc.wantMsg, err.Error(), "message")
+	core.AssertErrorIs(t, err, core.StringError(tc.wantMsg), "matches sentinel")
 }
 
 func stringErrorCtorTestCases() []stringErrorCtorTestCase {
@@ -161,21 +163,21 @@ func stringErrorCtorTestCases() []stringErrorCtorTestCase {
 		newStringErrorCtorTestCase("plain", "boom", nil, "boom", false),
 		newStringErrorCtorTestCase("empty", "", nil, "", true),
 		newStringErrorCtorTestCase("formatted", "%s: %d",
-			S[any]("code", 42), "code: 42", false),
+			core.S[any]("code", 42), "code: 42", false),
 		newStringErrorCtorTestCase("literal percent", "50% off", nil,
 			"50% off", false),
 	}
 }
 
 func TestNewStringError(t *testing.T) {
-	RunTestCases(t, stringErrorCtorTestCases())
+	core.RunTestCases(t, stringErrorCtorTestCases())
 }
 
 // TestStringErrorGenericHelpers confirms StringError's methods are picked
 // up by the generic AsError and IsZero helpers.
 func TestStringErrorGenericHelpers(t *testing.T) {
-	AssertNil(t, AsError(StringError("")), "empty via AsError")
-	AssertError(t, AsError(StringError("boom")), "non-empty via AsError")
-	AssertTrue(t, IsZero(StringError("")), "empty via IsZero")
-	AssertFalse(t, IsZero(StringError("boom")), "non-empty via IsZero")
+	core.AssertNil(t, core.AsError(core.StringError("")), "empty via AsError")
+	core.AssertError(t, core.AsError(core.StringError("boom")), "non-empty via AsError")
+	core.AssertTrue(t, core.IsZero(core.StringError("")), "empty via IsZero")
+	core.AssertFalse(t, core.IsZero(core.StringError("boom")), "non-empty via IsZero")
 }

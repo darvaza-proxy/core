@@ -1,28 +1,29 @@
-package core
+package core_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 // TestCase interface validations
 var (
-	_ TestCase = panicErrorMethodsTestCase{}
-	_ TestCase = panicErrorUnwrapErrorTestCase{}
-	_ TestCase = panicErrorUnwrapTestCase{}
-	_ TestCase = newPanicErrorfTestCase{}
-	_ TestCase = panicTestCase{}
-	_ TestCase = panicStackTestCase{}
-	_ TestCase = panicFromTestCase{}
-	_ TestCase = panicfTestCase{}
-	_ TestCase = panicfFromTestCase{}
-	_ TestCase = newUnreachableErrorTestCase{}
-	_ TestCase = newUnreachableErrorfTestCase{}
-	_ TestCase = panicUnreachableFromTestCase{}
-	_ TestCase = panicUnreachablefFromTestCase{}
-	_ TestCase = deeperTestCase{}
-	_ TestCase = negativeSkipTestCase{}
+	_ core.TestCase = panicErrorMethodsTestCase{}
+	_ core.TestCase = panicErrorUnwrapErrorTestCase{}
+	_ core.TestCase = panicErrorUnwrapTestCase{}
+	_ core.TestCase = newPanicErrorfTestCase{}
+	_ core.TestCase = panicTestCase{}
+	_ core.TestCase = panicStackTestCase{}
+	_ core.TestCase = panicFromTestCase{}
+	_ core.TestCase = panicfTestCase{}
+	_ core.TestCase = panicfFromTestCase{}
+	_ core.TestCase = newUnreachableErrorTestCase{}
+	_ core.TestCase = newUnreachableErrorfTestCase{}
+	_ core.TestCase = panicUnreachableFromTestCase{}
+	_ core.TestCase = panicUnreachablefFromTestCase{}
+	_ core.TestCase = negativeSkipTestCase{}
 )
 
 // panicErrorMethodsTestCase states what NewPanicError keeps and what it
@@ -81,24 +82,20 @@ func (tc panicErrorMethodsTestCase) Name() string {
 
 func (tc panicErrorMethodsTestCase) Test(t *testing.T) {
 	t.Helper()
-	pe := NewPanicError(0, tc.payload)
+	pe := core.NewPanicError(0, tc.payload)
 
-	AssertEqual(t, "panic: "+tc.wantMsg, pe.Error(), "message")
-	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+	core.AssertEqual(t, "panic: "+tc.wantMsg, pe.Error(), "message")
+	core.AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 
 	got := pe.Recovered()
 	if tc.wantConverted {
-		err := AssertMustTypeIs[error](t, got, "payload is an error")
-		AssertSame(t, err, pe.Unwrap(), "Unwrap")
+		err := core.AssertMustTypeIs[error](t, got, "payload is an error")
+		core.AssertSame(t, err, pe.Unwrap(), "Unwrap")
 		got = err.Error()
 	}
 
-	AssertEqual(t, tc.payload, got, "payload")
+	core.AssertEqual(t, tc.payload, got, "payload")
 }
-
-// namedString is a string by kind only, which NewPanicError does not
-// convert to an error.
-type namedString string
 
 // panicErrorUnwrapErrorTestCase tests Unwrap on a payload that is an
 // error, which Unwrap returns as it is.
@@ -113,9 +110,9 @@ func (tc panicErrorUnwrapErrorTestCase) Name() string {
 
 func (tc panicErrorUnwrapErrorTestCase) Test(t *testing.T) {
 	t.Helper()
-	unwrapped := NewPanicError(0, tc.err).Unwrap()
+	unwrapped := core.NewPanicError(0, tc.err).Unwrap()
 
-	AssertEqual(t, tc.err, unwrapped, "Unwrap")
+	core.AssertEqual(t, tc.err, unwrapped, "Unwrap")
 }
 
 func newPanicErrorUnwrapErrorTestCase(name string, err error) panicErrorUnwrapErrorTestCase {
@@ -145,15 +142,15 @@ func (tc panicErrorUnwrapTestCase) Name() string {
 
 func (tc panicErrorUnwrapTestCase) Test(t *testing.T) {
 	t.Helper()
-	unwrapped := NewPanicError(0, tc.payload).Unwrap()
+	unwrapped := core.NewPanicError(0, tc.payload).Unwrap()
 
 	if !tc.unwraps {
-		AssertNil(t, unwrapped, "Unwrap")
+		core.AssertNil(t, unwrapped, "Unwrap")
 		return
 	}
 
-	AssertMustError(t, unwrapped, "Unwrap")
-	AssertEqual(t, tc.message, unwrapped.Error(), "message")
+	core.AssertMustError(t, unwrapped, "Unwrap")
+	core.AssertEqual(t, tc.message, unwrapped.Error(), "message")
 }
 
 func newPanicErrorUnwrapTestCase(name, payload, message string) panicErrorUnwrapTestCase {
@@ -174,12 +171,12 @@ func newPanicErrorUnwrapTestCaseOpaque(name string, payload any) panicErrorUnwra
 	}
 }
 
-func panicErrorUnwrapTestCases() []TestCase {
+func panicErrorUnwrapTestCases() []core.TestCase {
 	err := errors.New("test error")
 	// skipcq: GO-W1024 - Testing an error with an empty message
 	empty := errors.New("")
 
-	return S[TestCase](
+	return core.S[core.TestCase](
 		newPanicErrorUnwrapErrorTestCase("error payload", err),
 		newPanicErrorUnwrapErrorTestCase("empty error payload", empty),
 		newPanicErrorUnwrapTestCase("string payload converts to error", "string error", "string error"),
@@ -200,8 +197,9 @@ type newPanicErrorfTestCase struct {
 
 var newPanicErrorfTestCases = []newPanicErrorfTestCase{
 	newNewPanicErrorfTestCase("no args", "simple error", nil, "simple error"),
-	newNewPanicErrorfTestCase("with args", "error %d: %s", S[any](42, "test"), "error 42: test"),
-	newNewPanicErrorfTestCase("with wrapped error", "wrapped: %w", S[any](errors.New("original")), "wrapped: original"),
+	newNewPanicErrorfTestCase("with args", "error %d: %s", core.S[any](42, "test"), "error 42: test"),
+	newNewPanicErrorfTestCase("with wrapped error", "wrapped: %w", core.S[any](errors.New("original")),
+		"wrapped: original"),
 }
 
 func (tc newPanicErrorfTestCase) Name() string {
@@ -210,15 +208,15 @@ func (tc newPanicErrorfTestCase) Name() string {
 
 func (tc newPanicErrorfTestCase) Test(t *testing.T) {
 	t.Helper()
-	pe := NewPanicErrorf(0, tc.format, tc.args...)
+	pe := core.NewPanicErrorf(0, tc.format, tc.args...)
 
 	// Test Error method
 	expectedError := fmt.Sprintf("panic: %s", tc.expected)
-	AssertEqual(t, expectedError, pe.Error(), "Error")
+	core.AssertEqual(t, expectedError, pe.Error(), "Error")
 
 	// Test that the payload is an error carrying the formatted message
-	payload := AssertMustTypeIs[error](t, pe.Recovered(), "payload")
-	AssertEqual(t, tc.expected, payload.Error(), "payload message")
+	payload := core.AssertMustTypeIs[error](t, pe.Recovered(), "payload")
+	core.AssertEqual(t, tc.expected, payload.Error(), "payload message")
 }
 
 // Factory function for newPanicErrorfTestCase
@@ -236,32 +234,32 @@ func runNewPanicWrapTest(t *testing.T) {
 	originalErr := errors.New("original error")
 	note := "wrapped note"
 
-	pe := NewPanicWrap(0, originalErr, note)
+	pe := core.NewPanicWrap(0, originalErr, note)
 
 	// Test that it wraps the error
-	AssertError(t, pe.Unwrap(), "Unwrap")
+	core.AssertError(t, pe.Unwrap(), "Unwrap")
 
 	// Test error message contains both note and original
 	errorStr := pe.Error()
-	AssertContains(t, errorStr, note, "note")
-	AssertContains(t, errorStr, originalErr.Error(), "original error")
+	core.AssertContains(t, errorStr, note, "note")
+	core.AssertContains(t, errorStr, originalErr.Error(), "original error")
 }
 
 func runNewPanicWrapfTest(t *testing.T) {
 	t.Helper()
 	originalErr := errors.New("original error")
 	format := "wrapped %s: %d"
-	args := S[any]("note", 42)
+	args := core.S[any]("note", 42)
 
-	pe := NewPanicWrapf(0, originalErr, format, args...)
+	pe := core.NewPanicWrapf(0, originalErr, format, args...)
 
 	// Test that it wraps the error
-	AssertError(t, pe.Unwrap(), "Unwrap")
+	core.AssertError(t, pe.Unwrap(), "Unwrap")
 
 	// Test error message contains formatted note and original
 	errorStr := pe.Error()
-	AssertContains(t, errorStr, "wrapped note: 42", "formatted note")
-	AssertContains(t, errorStr, originalErr.Error(), "original error")
+	core.AssertContains(t, errorStr, "wrapped note: 42", "formatted note")
+	core.AssertContains(t, errorStr, originalErr.Error(), "original error")
 }
 
 // panicTestCase states what Panic raises: a *PanicError over a captured
@@ -306,31 +304,25 @@ func (tc panicTestCase) Name() string {
 func (tc panicTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
-		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
-		AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+		pe := core.AssertMustTypeIs[*core.PanicError](t, recover(), "recovered")
+		core.AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 
 		got := pe.Recovered()
 		if tc.wantConverted {
-			err := AssertMustTypeIs[error](t, got, "payload is an error")
+			err := core.AssertMustTypeIs[error](t, got, "payload is an error")
 			got = err.Error()
 		}
 
-		AssertEqual(t, tc.payload, got, "payload")
+		core.AssertEqual(t, tc.payload, got, "payload")
 	}()
 
-	Panic(tc.payload)
+	core.Panic(tc.payload)
 }
 
 // callPanic gives Panic a stable, named caller, so a stack Panic
 // captures itself starts here.
 func callPanic(payload any) {
-	Panic(payload)
-}
-
-// newPanicPayload builds a *PanicError whose stack starts here, apart
-// from any stack Panic would capture.
-func newPanicPayload() *PanicError {
-	return NewPanicError(0, errSentinel)
+	core.Panic(payload)
 }
 
 // panicStackTestCase states where the stack of the value Panic raises
@@ -362,7 +354,7 @@ func (tc panicStackTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
 		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
-		AssertEqual(t, tc.wantPayload, pe.Recovered(), "payload")
+		core.AssertEqual(t, tc.wantPayload, pe.Recovered(), "payload")
 	}()
 
 	callPanic(tc.payload)
@@ -371,11 +363,11 @@ func (tc panicStackTestCase) Test(t *testing.T) {
 func panicStackTestCases() []panicStackTestCase {
 	return []panicStackTestCase{
 		newPanicStackTestCase("error payload",
-			errSentinel, errSentinel, "callPanic"),
+			core.ErrSentinelForTest, core.ErrSentinelForTest, "callPanic"),
 		newPanicStackTestCase("PanicError payload",
-			newPanicPayload(), errSentinel, "newPanicPayload"),
+			core.NewPanicPayloadForTest(), core.ErrSentinelForTest, "NewPanicPayloadForTest"),
 		newPanicStackTestCase("nil PanicError payload",
-			(*PanicError)(nil), nil, "callPanic"),
+			(*core.PanicError)(nil), nil, "callPanic"),
 	}
 }
 
@@ -386,7 +378,7 @@ func callPanicFromOuter(skip int, payload any) {
 }
 
 func callPanicFrom(skip int, payload any) {
-	PanicFrom(skip, payload)
+	core.PanicFrom(skip, payload)
 }
 
 // panicFromTestCase states where the stack of the value PanicFrom raises
@@ -418,7 +410,7 @@ func (tc panicFromTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
 		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
-		AssertEqual(t, tc.wantPayload, pe.Recovered(), "payload")
+		core.AssertEqual(t, tc.wantPayload, pe.Recovered(), "payload")
 	}()
 
 	callPanicFromOuter(tc.skip, tc.payload)
@@ -427,15 +419,15 @@ func (tc panicFromTestCase) Test(t *testing.T) {
 func panicFromTestCases() []panicFromTestCase {
 	return []panicFromTestCase{
 		newPanicFromTestCase("no skip", 0,
-			errSentinel, errSentinel, "callPanicFrom"),
+			core.ErrSentinelForTest, core.ErrSentinelForTest, "callPanicFrom"),
 		newPanicFromTestCase("one frame", 1,
-			errSentinel, errSentinel, "callPanicFromOuter"),
+			core.ErrSentinelForTest, core.ErrSentinelForTest, "callPanicFromOuter"),
 		newPanicFromTestCase("negative skip", -1,
-			errSentinel, errSentinel, "callPanicFrom"),
+			core.ErrSentinelForTest, core.ErrSentinelForTest, "callPanicFrom"),
 		newPanicFromTestCase("PanicError payload", 1,
-			newPanicPayload(), errSentinel, "newPanicPayload"),
+			core.NewPanicPayloadForTest(), core.ErrSentinelForTest, "NewPanicPayloadForTest"),
 		newPanicFromTestCase("nil PanicError payload", 1,
-			(*PanicError)(nil), nil, "callPanicFromOuter"),
+			(*core.PanicError)(nil), nil, "callPanicFromOuter"),
 	}
 }
 
@@ -450,7 +442,7 @@ type panicfTestCase struct {
 
 var panicfTestCases = []panicfTestCase{
 	newPanicfTestCase("no args", "simple panic", nil, "simple panic"),
-	newPanicfTestCase("with args", "panic %d: %s", S[any](42, "test"),
+	newPanicfTestCase("with args", "panic %d: %s", core.S[any](42, "test"),
 		"panic 42: test"),
 }
 
@@ -471,19 +463,19 @@ func (tc panicfTestCase) Name() string {
 func (tc panicfTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
-		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
-		err := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
-		AssertEqual(t, tc.wantMsg, err.Error(), "payload message")
-		AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+		pe := core.AssertMustTypeIs[*core.PanicError](t, recover(), "recovered")
+		err := core.AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
+		core.AssertEqual(t, tc.wantMsg, err.Error(), "payload message")
+		core.AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 	}()
 
-	Panicf(tc.format, tc.args...)
+	core.Panicf(tc.format, tc.args...)
 }
 
 // callPanicf gives Panicf a stable, named caller, so the stack Panicf
 // captures starts here.
 func callPanicf(format string, args ...any) {
-	Panicf(format, args...)
+	core.Panicf(format, args...)
 }
 
 // callPanicfFromOuter and callPanicfFrom give PanicfFrom two stable,
@@ -494,7 +486,7 @@ func callPanicfFromOuter(skip int, format string, args ...any) {
 }
 
 func callPanicfFrom(skip int, format string, args ...any) {
-	PanicfFrom(skip, format, args...)
+	core.PanicfFrom(skip, format, args...)
 }
 
 // panicfFromTestCase states where the stack of the value PanicfFrom
@@ -522,8 +514,8 @@ func (tc panicfFromTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
 		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
-		err := AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
-		AssertEqual(t, "panic 42", err.Error(), "payload message")
+		err := core.AssertMustTypeIs[error](t, pe.Recovered(), "payload is an error")
+		core.AssertEqual(t, "panic 42", err.Error(), "payload message")
 	}()
 
 	callPanicfFromOuter(tc.skip, "panic %d", 42)
@@ -538,23 +530,23 @@ var panicfFromTestCases = []panicfFromTestCase{
 func runPanicWrapTest(t *testing.T) {
 	t.Helper()
 	defer func() {
-		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
-		AssertErrorIs(t, pe, errSentinel, "original error in chain")
-		AssertContains(t, pe.Error(), "wrap note", "message")
+		pe := core.AssertMustTypeIs[*core.PanicError](t, recover(), "recovered")
+		core.AssertErrorIs(t, pe, core.ErrSentinelForTest, "original error in chain")
+		core.AssertContains(t, pe.Error(), "wrap note", "message")
 	}()
 
-	PanicWrap(errSentinel, "wrap note")
+	core.PanicWrap(core.ErrSentinelForTest, "wrap note")
 }
 
 func runPanicWrapfTest(t *testing.T) {
 	t.Helper()
 	defer func() {
-		pe := AssertMustTypeIs[*PanicError](t, recover(), "recovered")
-		AssertErrorIs(t, pe, errSentinel, "original error in chain")
-		AssertContains(t, pe.Error(), "wrap note: 42", "message")
+		pe := core.AssertMustTypeIs[*core.PanicError](t, recover(), "recovered")
+		core.AssertErrorIs(t, pe, core.ErrSentinelForTest, "original error in chain")
+		core.AssertContains(t, pe.Error(), "wrap note: 42", "message")
 	}()
 
-	PanicWrapf(errSentinel, "wrap %s: %d", "note", 42)
+	core.PanicWrapf(core.ErrSentinelForTest, "wrap %s: %d", "note", 42)
 }
 
 // newUnreachableErrorTestCase states NewUnreachableError's contract in
@@ -585,13 +577,13 @@ var newUnreachableErrorTestCases = []newUnreachableErrorTestCase{
 	newNewUnreachableErrorTestCase("nil error, with note",
 		nil, "test note", nil, "test note"),
 	newNewUnreachableErrorTestCase("ErrUnreachable, empty note",
-		ErrUnreachable, "", nil, "unreachable"),
+		core.ErrUnreachable, "", nil, "unreachable"),
 	newNewUnreachableErrorTestCase("ErrUnreachable, with note",
-		ErrUnreachable, "test note", nil, "test note"),
+		core.ErrUnreachable, "test note", nil, "test note"),
 	newNewUnreachableErrorTestCase("other error, no note",
-		errSentinel, "", errSentinel, "sentinel error"),
+		core.ErrSentinelForTest, "", core.ErrSentinelForTest, "sentinel error"),
 	newNewUnreachableErrorTestCase("other error, with note",
-		errSentinel, "test note", errSentinel, "test note"),
+		core.ErrSentinelForTest, "test note", core.ErrSentinelForTest, "test note"),
 }
 
 func (tc newUnreachableErrorTestCase) Name() string {
@@ -600,33 +592,33 @@ func (tc newUnreachableErrorTestCase) Name() string {
 
 func (tc newUnreachableErrorTestCase) Test(t *testing.T) {
 	t.Helper()
-	result := NewUnreachableError(0, tc.err, tc.note)
+	result := core.NewUnreachableError(0, tc.err, tc.note)
 
-	AssertMustNotNil(t, result, "result")
-	pe := AssertMustTypeIs[*PanicError](t, result, "result is *PanicError")
-	AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
+	core.AssertMustNotNil(t, result, "result")
+	pe := core.AssertMustTypeIs[*core.PanicError](t, result, "result is *PanicError")
+	core.AssertTrue(t, len(pe.CallStack()) > 0, "stack captured")
 
-	AssertErrorIs(t, result, ErrUnreachable, "ErrUnreachable in chain")
-	AssertNotErrorIs(t, result, errUnrelated, "unrelated error absent")
-	AssertContains(t, result.Error(), tc.wantMsg, "message")
-	AssertSliceEqual(t, tc.wantLeaves(), errorLeaves(result), "chain leaves")
+	core.AssertErrorIs(t, result, core.ErrUnreachable, "ErrUnreachable in chain")
+	core.AssertNotErrorIs(t, result, core.ErrUnrelatedForTest, "unrelated error absent")
+	core.AssertContains(t, result.Error(), tc.wantMsg, "message")
+	core.AssertSliceEqual(t, tc.wantLeaves(), errorLeaves(result), "chain leaves")
 }
 
 // wantLeaves is the exact list of errors the chain bottoms out in: the
 // sentinel alone, or the sentinel followed by the declared cause.
 func (tc newUnreachableErrorTestCase) wantLeaves() []error {
 	if tc.wantCause == nil {
-		return S(ErrUnreachable)
+		return core.S(core.ErrUnreachable)
 	}
-	return S(ErrUnreachable, tc.wantCause)
+	return core.S(core.ErrUnreachable, tc.wantCause)
 }
 
 // errorLeaves follows Unwrap through every layer of err and returns the
 // errors that unwrap no further, in order.
 func errorLeaves(err error) []error {
-	errs := Unwrap(err)
+	errs := core.Unwrap(err)
 	if len(errs) == 0 {
-		return S(err)
+		return core.S(err)
 	}
 
 	var leaves []error
@@ -662,7 +654,7 @@ var newUnreachableErrorfTestCases = []newUnreachableErrorfTestCase{
 	newNewUnreachableErrorfTestCase("no args", "100% sure", nil,
 		"100% sure"),
 	newNewUnreachableErrorfTestCase("with args", "formatted %s: %d",
-		S[any]("note", 42), "formatted note: 42"),
+		core.S[any]("note", 42), "formatted note: 42"),
 }
 
 func newNewUnreachableErrorfTestCase(name, format string, args []any,
@@ -681,20 +673,20 @@ func (tc newUnreachableErrorfTestCase) Name() string {
 
 func (tc newUnreachableErrorfTestCase) Test(t *testing.T) {
 	t.Helper()
-	result := NewUnreachableErrorf(0, errSentinel, tc.format, tc.args...)
+	result := core.NewUnreachableErrorf(0, core.ErrSentinelForTest, tc.format, tc.args...)
 
-	assertUnreachablePanicShape(t, result, errSentinel)
-	AssertContains(t, result.Error(), tc.wantMsg, "message")
+	assertUnreachablePanicShape(t, result, core.ErrSentinelForTest)
+	core.AssertContains(t, result.Error(), tc.wantMsg, "message")
 }
 
 // callPanicUnreachable and callPanicUnreachablef give the two functions
 // stable, named callers, so the stacks they capture start there.
 func callPanicUnreachable(err error, note string) {
-	PanicUnreachable(err, note)
+	core.PanicUnreachable(err, note)
 }
 
 func callPanicUnreachablef(err error, format string, args ...any) {
-	PanicUnreachablef(err, format, args...)
+	core.PanicUnreachablef(err, format, args...)
 }
 
 // callPanicUnreachableFromOuter and callPanicUnreachableFrom give
@@ -705,7 +697,7 @@ func callPanicUnreachableFromOuter(skip int, err error, note string) {
 }
 
 func callPanicUnreachableFrom(skip int, err error, note string) {
-	PanicUnreachableFrom(skip, err, note)
+	core.PanicUnreachableFrom(skip, err, note)
 }
 
 // panicUnreachableFromTestCase states where the stack of the value
@@ -734,11 +726,11 @@ func (tc panicUnreachableFromTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
 		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
-		assertUnreachableChain(t, pe, errSentinel)
-		AssertContains(t, pe.Error(), "test note", "message")
+		assertUnreachableChain(t, pe, core.ErrSentinelForTest)
+		core.AssertContains(t, pe.Error(), "test note", "message")
 	}()
 
-	callPanicUnreachableFromOuter(tc.skip, errSentinel, "test note")
+	callPanicUnreachableFromOuter(tc.skip, core.ErrSentinelForTest, "test note")
 }
 
 var panicUnreachableFromTestCases = []panicUnreachableFromTestCase{
@@ -760,7 +752,7 @@ func callPanicUnreachablefFromOuter(skip int, err error, format string,
 
 func callPanicUnreachablefFrom(skip int, err error, format string,
 	args ...any) {
-	PanicUnreachablefFrom(skip, err, format, args...)
+	core.PanicUnreachablefFrom(skip, err, format, args...)
 }
 
 // panicUnreachablefFromTestCase states the same for
@@ -789,11 +781,11 @@ func (tc panicUnreachablefFromTestCase) Test(t *testing.T) {
 	t.Helper()
 	defer func() {
 		pe := assertTopFrameIs(t, recover(), tc.wantFunc, 2)
-		assertUnreachableChain(t, pe, errSentinel)
-		AssertContains(t, pe.Error(), "test note 42", "message")
+		assertUnreachableChain(t, pe, core.ErrSentinelForTest)
+		core.AssertContains(t, pe.Error(), "test note 42", "message")
 	}()
 
-	callPanicUnreachablefFromOuter(tc.skip, errSentinel, "test note %d", 42)
+	callPanicUnreachablefFromOuter(tc.skip, core.ErrSentinelForTest, "test note %d", 42)
 }
 
 var panicUnreachablefFromTestCases = []panicUnreachablefFromTestCase{
@@ -807,15 +799,15 @@ var panicUnreachablefFromTestCases = []panicUnreachablefFromTestCase{
 
 // Main test functions that call the helpers
 func TestPanicErrorMethods(t *testing.T) {
-	RunTestCases(t, panicErrorMethodsTestCases)
+	core.RunTestCases(t, panicErrorMethodsTestCases)
 }
 
 func TestPanicErrorUnwrap(t *testing.T) {
-	RunTestCases(t, panicErrorUnwrapTestCases())
+	core.RunTestCases(t, panicErrorUnwrapTestCases())
 }
 
 func TestNewPanicErrorf(t *testing.T) {
-	RunTestCases(t, newPanicErrorfTestCases)
+	core.RunTestCases(t, newPanicErrorfTestCases)
 }
 
 func TestNewPanicWrap(t *testing.T) {
@@ -827,19 +819,19 @@ func TestNewPanicWrapf(t *testing.T) {
 }
 
 func TestPanic(t *testing.T) {
-	RunTestCases(t, panicTestCases)
+	core.RunTestCases(t, panicTestCases)
 }
 
 func TestPanicStack(t *testing.T) {
-	RunTestCases(t, panicStackTestCases())
+	core.RunTestCases(t, panicStackTestCases())
 }
 
 func TestPanicFrom(t *testing.T) {
-	RunTestCases(t, panicFromTestCases())
+	core.RunTestCases(t, panicFromTestCases())
 }
 
 func TestPanicf(t *testing.T) {
-	RunTestCases(t, panicfTestCases)
+	core.RunTestCases(t, panicfTestCases)
 }
 
 // TestPanicfStack states that the stack Panicf captures starts at its
@@ -852,7 +844,7 @@ func TestPanicfStack(t *testing.T) {
 }
 
 func TestPanicfFrom(t *testing.T) {
-	RunTestCases(t, panicfFromTestCases)
+	core.RunTestCases(t, panicfFromTestCases)
 }
 
 func TestPanicWrap(t *testing.T) {
@@ -864,11 +856,11 @@ func TestPanicWrapf(t *testing.T) {
 }
 
 func TestNewUnreachableError(t *testing.T) {
-	RunTestCases(t, newUnreachableErrorTestCases)
+	core.RunTestCases(t, newUnreachableErrorTestCases)
 }
 
 func TestNewUnreachableErrorf(t *testing.T) {
-	RunTestCases(t, newUnreachableErrorfTestCases)
+	core.RunTestCases(t, newUnreachableErrorfTestCases)
 }
 
 // TestPanicUnreachable states that PanicUnreachable raises the
@@ -876,10 +868,10 @@ func TestNewUnreachableErrorf(t *testing.T) {
 func TestPanicUnreachable(t *testing.T) {
 	defer func() {
 		pe := assertTopFrameIs(t, recover(), "callPanicUnreachable", 2)
-		assertUnreachableChain(t, pe, errSentinel)
-		AssertContains(t, pe.Error(), "test note", "message")
+		assertUnreachableChain(t, pe, core.ErrSentinelForTest)
+		core.AssertContains(t, pe.Error(), "test note", "message")
 	}()
-	callPanicUnreachable(errSentinel, "test note")
+	callPanicUnreachable(core.ErrSentinelForTest, "test note")
 }
 
 // TestPanicUnreachablef states the same for PanicUnreachablef, with the
@@ -887,61 +879,18 @@ func TestPanicUnreachable(t *testing.T) {
 func TestPanicUnreachablef(t *testing.T) {
 	defer func() {
 		pe := assertTopFrameIs(t, recover(), "callPanicUnreachablef", 2)
-		assertUnreachableChain(t, pe, errSentinel)
-		AssertContains(t, pe.Error(), "test note 42", "message")
+		assertUnreachableChain(t, pe, core.ErrSentinelForTest)
+		core.AssertContains(t, pe.Error(), "test note 42", "message")
 	}()
-	callPanicUnreachablef(errSentinel, "test note %d", 42)
+	callPanicUnreachablef(core.ErrSentinelForTest, "test note %d", 42)
 }
 
 func TestPanicUnreachableFrom(t *testing.T) {
-	RunTestCases(t, panicUnreachableFromTestCases)
+	core.RunTestCases(t, panicUnreachableFromTestCases)
 }
 
 func TestPanicUnreachablefFrom(t *testing.T) {
-	RunTestCases(t, panicUnreachablefFromTestCases)
-}
-
-// deeperTestCase pins the skip normalisation every panic constructor
-// applies. A negative skip is clamped to 1 rather than passed down to
-// getCallers, which rejects it and yields an empty stack.
-type deeperTestCase struct {
-	name string
-	skip int
-	want int
-}
-
-func newDeeperTestCase(name string, skip, want int) deeperTestCase {
-	return deeperTestCase{
-		name: name,
-		skip: skip,
-		want: want,
-	}
-}
-
-func (tc deeperTestCase) Name() string {
-	return tc.name
-}
-
-func (tc deeperTestCase) Test(t *testing.T) {
-	t.Helper()
-	AssertEqual(t, tc.want, deeper(tc.skip), "deeper(%d)", tc.skip)
-}
-
-// The clamped rows all state 1, the same answer the zero row states, so
-// a negative skip is indistinguishable from no skip at all. The far
-// positive row declares that only the negative side is clamped.
-func deeperTestCases() []deeperTestCase {
-	return []deeperTestCase{
-		newDeeperTestCase("no skip", 0, 1),
-		newDeeperTestCase("one frame", 1, 2),
-		newDeeperTestCase("far positive", 9999, 10000),
-		newDeeperTestCase("minus one", -1, 1),
-		newDeeperTestCase("far negative", -9999, 1),
-	}
-}
-
-func TestDeeper(t *testing.T) {
-	RunTestCases(t, deeperTestCases())
+	core.RunTestCases(t, panicUnreachablefFromTestCases)
 }
 
 // The seven wrappers below give each constructor a stable, named caller
@@ -949,34 +898,34 @@ func TestDeeper(t *testing.T) {
 // callMustNoError in the MustNoError tests. Each passes a negative
 // skip, so the captured top frame should resolve to the wrapper itself.
 
-func negativeSkipPanicError() *PanicError {
-	return NewPanicError(-1, "boom")
+func negativeSkipPanicError() *core.PanicError {
+	return core.NewPanicError(-1, "boom")
 }
 
-func negativeSkipPanicErrorf() *PanicError {
-	return NewPanicErrorf(-1, "boom %d", 42)
+func negativeSkipPanicErrorf() *core.PanicError {
+	return core.NewPanicErrorf(-1, "boom %d", 42)
 }
 
-func negativeSkipPanicWrap() *PanicError {
-	return NewPanicWrap(-1, errSentinel, "note")
+func negativeSkipPanicWrap() *core.PanicError {
+	return core.NewPanicWrap(-1, core.ErrSentinelForTest, "note")
 }
 
-func negativeSkipPanicWrapf() *PanicError {
-	return NewPanicWrapf(-1, errSentinel, "note %d", 42)
+func negativeSkipPanicWrapf() *core.PanicError {
+	return core.NewPanicWrapf(-1, core.ErrSentinelForTest, "note %d", 42)
 }
 
 func negativeSkipUnreachableError() error {
-	return NewUnreachableError(-1, errSentinel, "note")
+	return core.NewUnreachableError(-1, core.ErrSentinelForTest, "note")
 }
 
 // NewUnreachableError calls deeper once per arm, so the note-less arm
 // needs a caller of its own; without it a revert there goes unnoticed.
 func negativeSkipUnreachableErrorNoNote() error {
-	return NewUnreachableError(-1, errSentinel, "")
+	return core.NewUnreachableError(-1, core.ErrSentinelForTest, "")
 }
 
 func negativeSkipUnreachableErrorf() error {
-	return NewUnreachableErrorf(-1, errSentinel, "note %d", 42)
+	return core.NewUnreachableErrorf(-1, core.ErrSentinelForTest, "note %d", 42)
 }
 
 // negativeSkipTestCase states what the clamp is worth: 1 means the
@@ -1032,5 +981,5 @@ func negativeSkipTestCases() []negativeSkipTestCase {
 }
 
 func TestPanicConstructorsNegativeSkip(t *testing.T) {
-	RunTestCases(t, negativeSkipTestCases())
+	core.RunTestCases(t, negativeSkipTestCases())
 }

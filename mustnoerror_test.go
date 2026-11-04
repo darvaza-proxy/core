@@ -1,20 +1,16 @@
-package core
+package core_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"darvaza.org/core"
 )
 
 var (
-	errSentinel = errors.New("sentinel error")
-	errOther    = errors.New("other error")
-	errExtra    = errors.New("extra error")
-
-	// errUnrelated is never put into any chain under test. The
-	// errors.Is assertions pair a match against it as a non-match,
-	// so a chain that answered true to everything would fail.
-	errUnrelated = errors.New("unrelated error")
+	errOther = errors.New("other error")
+	errExtra = errors.New("extra error")
 
 	// errNilPointer is a non-nil error interface holding a nil
 	// pointer — the typed-nil shape MustNoError* treats as a real
@@ -33,7 +29,7 @@ func (*nilPointerError) Error() string { return "nil pointer error" }
 // predicates for the MustNoErrorExceptFn tests, both the data-table
 // rows and the standalone no-match tests; named (not inline
 // closures) so the call sites stay easy to scan.
-func matchesSentinel(err error) bool   { return err == errSentinel }
+func matchesSentinel(err error) bool   { return err == core.ErrSentinelForTest }
 func matchesOther(err error) bool      { return err == errOther }
 func matchesNilPointer(err error) bool { return err == errNilPointer }
 
@@ -57,23 +53,23 @@ func (tc mustNoErrorTestCase) Name() string { return tc.name }
 
 func (tc mustNoErrorTestCase) Test(t *testing.T) {
 	t.Helper()
-	fn := func() { MustNoError(tc.err) }
+	fn := func() { core.MustNoError(tc.err) }
 	if !tc.wantPanic {
-		AssertNoPanic(t, fn, "MustNoError nil")
+		core.AssertNoPanic(t, fn, "MustNoError nil")
 		return
 	}
-	AssertPanic(t, fn, ErrUnreachable,
+	core.AssertPanic(t, fn, core.ErrUnreachable,
 		"panic chains to ErrUnreachable")
 }
 
-var _ TestCase = mustNoErrorTestCase{}
+var _ core.TestCase = mustNoErrorTestCase{}
 
 func mustNoErrorTestCases() []mustNoErrorTestCase {
 	return []mustNoErrorTestCase{
 		newMustNoErrorTestCase("nil err returns",
 			nil, false),
 		newMustNoErrorTestCase("non-nil err panics",
-			errSentinel, true),
+			core.ErrSentinelForTest, true),
 		newMustNoErrorTestCase("nil pointer err panics",
 			errNilPointer, true),
 	}
@@ -82,7 +78,7 @@ func mustNoErrorTestCases() []mustNoErrorTestCase {
 // TestMustNoError exercises MustNoError across its panic and
 // no-panic paths.
 func TestMustNoError(t *testing.T) {
-	RunTestCases(t, mustNoErrorTestCases())
+	core.RunTestCases(t, mustNoErrorTestCases())
 }
 
 // TestMustNoErrorPreservesOriginal verifies the panic value chains
@@ -91,40 +87,12 @@ func TestMustNoError(t *testing.T) {
 // underlying error on its way to the panic. The typed-nil assertion
 // pins that a typed nil survives into the chain unchanged too.
 func TestMustNoErrorPreservesOriginal(t *testing.T) {
-	fn := func() { MustNoError(errSentinel) }
-	AssertPanic(t, fn, ErrUnreachable, "ErrUnreachable in chain")
-	AssertPanic(t, fn, errSentinel, "original err in chain")
+	fn := func() { core.MustNoError(core.ErrSentinelForTest) }
+	core.AssertPanic(t, fn, core.ErrUnreachable, "ErrUnreachable in chain")
+	core.AssertPanic(t, fn, core.ErrSentinelForTest, "original err in chain")
 
-	fnNil := func() { MustNoError(errNilPointer) }
-	AssertPanic(t, fnNil, errNilPointer, "typed-nil err in chain")
-}
-
-// assertUnreachablePanicShape pins that r is a *PanicError whose chain
-// assertUnreachableChain accepts. The PanicShape tests for the
-// MustNoError family share it, as their separate PanicUnreachableFrom
-// calls take identical arguments, so a regression in one would hit the
-// others identically. r is the raw recovered value, as assertTopFrameIs
-// takes it: AsRecovered would wrap a non-Recovered panic in a
-// *PanicError, leaving the type assertion to state what the line above
-// it had just built.
-func assertUnreachablePanicShape(t T, r any, want error) {
-	t.Helper()
-	AssertMustNotNil(t, r, "recovered value")
-	pe := AssertMustTypeIs[*PanicError](t, r,
-		"recovered value is *PanicError")
-	assertUnreachableChain(t, pe, want)
-}
-
-// assertUnreachableChain pins that pe chains to both ErrUnreachable and
-// want. What the payload is assembled from is NewUnreachableError's
-// business; what callers depend on is that [errors.Is] finds each of the
-// two, so that is what this asserts. errUnrelated pins the chain as
-// discriminating rather than matching anything put to it.
-func assertUnreachableChain(t T, pe *PanicError, want error) {
-	t.Helper()
-	AssertErrorIs(t, pe, ErrUnreachable, "ErrUnreachable in chain")
-	AssertErrorIs(t, pe, want, "original error in chain")
-	AssertNotErrorIs(t, pe, errUnrelated, "unrelated error absent")
+	fnNil := func() { core.MustNoError(errNilPointer) }
+	core.AssertPanic(t, fnNil, errNilPointer, "typed-nil err in chain")
 }
 
 // TestMustNoErrorPanicShape pins what MustNoError panics with on its
@@ -132,28 +100,9 @@ func assertUnreachableChain(t T, pe *PanicError, want error) {
 // original error, asserted by assertUnreachablePanicShape.
 func TestMustNoErrorPanicShape(t *testing.T) {
 	defer func() {
-		assertUnreachablePanicShape(t, recover(), errSentinel)
+		assertUnreachablePanicShape(t, recover(), core.ErrSentinelForTest)
 	}()
-	MustNoError(errSentinel)
-}
-
-// assertPlainUnreachableShape pins the no-cause panic shape:
-// NewUnreachableError treats ErrUnreachable as "no distinct cause", so
-// the *PanicError payload is the bare sentinel rather than a pairing of
-// the sentinel with a cause. Identity is the assertion here, not
-// [errors.Is]: matching the sentinel would pass for either shape, and
-// the distinction between them is the whole point. Shared by the
-// UnreachablePanicShape tests for MustNoError, MustNoErrorExcept and
-// MustNoErrorExceptFn so their structural pins stay symmetric. r is
-// the raw recovered value, for the reason assertUnreachablePanicShape
-// gives.
-func assertPlainUnreachableShape(t T, r any) {
-	t.Helper()
-	AssertMustNotNil(t, r, "recovered value")
-	pe := AssertMustTypeIs[*PanicError](t, r,
-		"recovered value is *PanicError")
-	AssertMustSame(t, ErrUnreachable, pe.Unwrap(),
-		"payload is ErrUnreachable")
+	core.MustNoError(core.ErrSentinelForTest)
 }
 
 // TestMustNoErrorUnreachablePanicShape pins
@@ -164,7 +113,7 @@ func TestMustNoErrorUnreachablePanicShape(t *testing.T) {
 	defer func() {
 		assertPlainUnreachableShape(t, recover())
 	}()
-	MustNoError(ErrUnreachable)
+	core.MustNoError(core.ErrUnreachable)
 }
 
 // TestMustNoErrorExceptPreservesOriginal mirrors
@@ -173,19 +122,19 @@ func TestMustNoErrorUnreachablePanicShape(t *testing.T) {
 // helper must still surface the original err in the panic chain.
 func TestMustNoErrorExceptPreservesOriginal(t *testing.T) {
 	fn := func() {
-		MustNoErrorExcept(errSentinel, errOther, errExtra)
+		core.MustNoErrorExcept(core.ErrSentinelForTest, errOther, errExtra)
 	}
-	AssertPanic(t, fn, ErrUnreachable, "ErrUnreachable in chain")
-	AssertPanic(t, fn, errSentinel, "original err in chain")
+	core.AssertPanic(t, fn, core.ErrUnreachable, "ErrUnreachable in chain")
+	core.AssertPanic(t, fn, core.ErrSentinelForTest, "original err in chain")
 }
 
 // TestMustNoErrorExceptPanicShape mirrors TestMustNoErrorPanicShape
 // for the no-match path of MustNoErrorExcept.
 func TestMustNoErrorExceptPanicShape(t *testing.T) {
 	defer func() {
-		assertUnreachablePanicShape(t, recover(), errSentinel)
+		assertUnreachablePanicShape(t, recover(), core.ErrSentinelForTest)
 	}()
-	MustNoErrorExcept(errSentinel, errOther)
+	core.MustNoErrorExcept(core.ErrSentinelForTest, errOther)
 }
 
 // TestMustNoErrorExceptUnreachablePanicShape mirrors
@@ -196,7 +145,7 @@ func TestMustNoErrorExceptUnreachablePanicShape(t *testing.T) {
 	defer func() {
 		assertPlainUnreachableShape(t, recover())
 	}()
-	MustNoErrorExcept(ErrUnreachable, errOther)
+	core.MustNoErrorExcept(core.ErrUnreachable, errOther)
 }
 
 // mustNoErrorExceptTestCase exercises MustNoErrorExcept across the
@@ -226,52 +175,52 @@ func (tc mustNoErrorExceptTestCase) Name() string { return tc.name }
 
 func (tc mustNoErrorExceptTestCase) Test(t *testing.T) {
 	t.Helper()
-	fn := func() { MustNoErrorExcept(tc.err, tc.allowed...) }
+	fn := func() { core.MustNoErrorExcept(tc.err, tc.allowed...) }
 	if !tc.wantPanic {
-		AssertNoPanic(t, fn, "MustNoErrorExcept allowed")
+		core.AssertNoPanic(t, fn, "MustNoErrorExcept allowed")
 		return
 	}
-	AssertPanic(t, fn, ErrUnreachable,
+	core.AssertPanic(t, fn, core.ErrUnreachable,
 		"panic chains to ErrUnreachable")
 }
 
-var _ TestCase = mustNoErrorExceptTestCase{}
+var _ core.TestCase = mustNoErrorExceptTestCase{}
 
 func mustNoErrorExceptTestCases() []mustNoErrorExceptTestCase {
 	return []mustNoErrorExceptTestCase{
 		newMustNoErrorExceptTestCase("nil err no allowed",
 			nil, nil, false),
 		newMustNoErrorExceptTestCase("nil err with allowed",
-			nil, []error{errSentinel}, false),
+			nil, []error{core.ErrSentinelForTest}, false),
 		newMustNoErrorExceptTestCase("non-nil empty allowed panics",
-			errSentinel, nil, true),
+			core.ErrSentinelForTest, nil, true),
 		newMustNoErrorExceptTestCase("non-nil direct match",
-			errSentinel, []error{errSentinel}, false),
+			core.ErrSentinelForTest, []error{core.ErrSentinelForTest}, false),
 		newMustNoErrorExceptTestCase("non-nil match second allowed",
-			errSentinel, []error{errOther, errSentinel}, false),
+			core.ErrSentinelForTest, []error{errOther, core.ErrSentinelForTest}, false),
 		newMustNoErrorExceptTestCase("non-nil no match panics",
-			errSentinel, []error{errOther, errExtra}, true),
+			core.ErrSentinelForTest, []error{errOther, errExtra}, true),
 		newMustNoErrorExceptTestCase("non-nil compound match",
-			&CompoundError{Errs: []error{errOther, errSentinel}},
-			[]error{errSentinel}, false),
+			&core.CompoundError{Errs: []error{errOther, core.ErrSentinelForTest}},
+			[]error{core.ErrSentinelForTest}, false),
 		newMustNoErrorExceptTestCase("non-nil wrapped match",
-			fmt.Errorf("context: %w", errSentinel),
-			[]error{errSentinel}, false),
+			fmt.Errorf("context: %w", core.ErrSentinelForTest),
+			[]error{core.ErrSentinelForTest}, false),
 		newMustNoErrorExceptTestCase("nil pointer no match panics",
 			errNilPointer, []error{errOther}, true),
 		newMustNoErrorExceptTestCase("nil pointer identity match",
 			errNilPointer, []error{errNilPointer}, false),
 		newMustNoErrorExceptTestCase("nil-only allowed panics",
-			errSentinel, []error{nil}, true),
+			core.ErrSentinelForTest, []error{nil}, true),
 		newMustNoErrorExceptTestCase("nil entry beside match",
-			errSentinel, []error{nil, errSentinel}, false),
+			core.ErrSentinelForTest, []error{nil, core.ErrSentinelForTest}, false),
 	}
 }
 
 // TestMustNoErrorExcept exercises MustNoErrorExcept across the
 // nil/non-nil and allowed-list match outcomes.
 func TestMustNoErrorExcept(t *testing.T) {
-	RunTestCases(t, mustNoErrorExceptTestCases())
+	core.RunTestCases(t, mustNoErrorExceptTestCases())
 }
 
 // mustNoErrorExceptFnTestCase exercises MustNoErrorExceptFn across the
@@ -300,16 +249,16 @@ func (tc mustNoErrorExceptFnTestCase) Name() string { return tc.name }
 
 func (tc mustNoErrorExceptFnTestCase) Test(t *testing.T) {
 	t.Helper()
-	fn := func() { MustNoErrorExceptFn(tc.err, tc.check) }
+	fn := func() { core.MustNoErrorExceptFn(tc.err, tc.check) }
 	if !tc.wantPanic {
-		AssertNoPanic(t, fn, "MustNoErrorExceptFn allowed")
+		core.AssertNoPanic(t, fn, "MustNoErrorExceptFn allowed")
 		return
 	}
-	AssertPanic(t, fn, ErrUnreachable,
+	core.AssertPanic(t, fn, core.ErrUnreachable,
 		"panic chains to ErrUnreachable")
 }
 
-var _ TestCase = mustNoErrorExceptFnTestCase{}
+var _ core.TestCase = mustNoErrorExceptFnTestCase{}
 
 func mustNoErrorExceptFnTestCases() []mustNoErrorExceptFnTestCase {
 	return []mustNoErrorExceptFnTestCase{
@@ -318,16 +267,16 @@ func mustNoErrorExceptFnTestCases() []mustNoErrorExceptFnTestCase {
 		newMustNoErrorExceptFnTestCase("nil err with check",
 			nil, matchesSentinel, false),
 		newMustNoErrorExceptFnTestCase("non-nil nil check panics",
-			errSentinel, nil, true),
+			core.ErrSentinelForTest, nil, true),
 		newMustNoErrorExceptFnTestCase("non-nil direct match",
-			errSentinel, matchesSentinel, false),
+			core.ErrSentinelForTest, matchesSentinel, false),
 		newMustNoErrorExceptFnTestCase("non-nil no match panics",
-			errSentinel, matchesOther, true),
+			core.ErrSentinelForTest, matchesOther, true),
 		newMustNoErrorExceptFnTestCase("non-nil compound match",
-			&CompoundError{Errs: []error{errOther, errSentinel}},
+			&core.CompoundError{Errs: []error{errOther, core.ErrSentinelForTest}},
 			matchesSentinel, false),
 		newMustNoErrorExceptFnTestCase("non-nil wrapped match",
-			fmt.Errorf("context: %w", errSentinel),
+			fmt.Errorf("context: %w", core.ErrSentinelForTest),
 			matchesSentinel, false),
 		newMustNoErrorExceptFnTestCase("nil pointer no match panics",
 			errNilPointer, matchesOther, true),
@@ -339,7 +288,7 @@ func mustNoErrorExceptFnTestCases() []mustNoErrorExceptFnTestCase {
 // TestMustNoErrorExceptFn exercises MustNoErrorExceptFn across the
 // nil/non-nil and predicate match outcomes.
 func TestMustNoErrorExceptFn(t *testing.T) {
-	RunTestCases(t, mustNoErrorExceptFnTestCases())
+	core.RunTestCases(t, mustNoErrorExceptFnTestCases())
 }
 
 // TestMustNoErrorExceptFnPreservesOriginal mirrors
@@ -348,19 +297,19 @@ func TestMustNoErrorExceptFn(t *testing.T) {
 // helper must still surface the original err in the panic chain.
 func TestMustNoErrorExceptFnPreservesOriginal(t *testing.T) {
 	fn := func() {
-		MustNoErrorExceptFn(errSentinel, matchesOther)
+		core.MustNoErrorExceptFn(core.ErrSentinelForTest, matchesOther)
 	}
-	AssertPanic(t, fn, ErrUnreachable, "ErrUnreachable in chain")
-	AssertPanic(t, fn, errSentinel, "original err in chain")
+	core.AssertPanic(t, fn, core.ErrUnreachable, "ErrUnreachable in chain")
+	core.AssertPanic(t, fn, core.ErrSentinelForTest, "original err in chain")
 }
 
 // TestMustNoErrorExceptFnPanicShape mirrors TestMustNoErrorPanicShape
 // for the no-match path of MustNoErrorExceptFn.
 func TestMustNoErrorExceptFnPanicShape(t *testing.T) {
 	defer func() {
-		assertUnreachablePanicShape(t, recover(), errSentinel)
+		assertUnreachablePanicShape(t, recover(), core.ErrSentinelForTest)
 	}()
-	MustNoErrorExceptFn(errSentinel, matchesOther)
+	core.MustNoErrorExceptFn(core.ErrSentinelForTest, matchesOther)
 }
 
 // TestMustNoErrorExceptFnUnreachablePanicShape mirrors
@@ -371,7 +320,7 @@ func TestMustNoErrorExceptFnUnreachablePanicShape(t *testing.T) {
 	defer func() {
 		assertPlainUnreachableShape(t, recover())
 	}()
-	MustNoErrorExceptFn(ErrUnreachable, matchesOther)
+	core.MustNoErrorExceptFn(core.ErrUnreachable, matchesOther)
 }
 
 // callMustNoError is a thin wrapper around MustNoError used as a
@@ -379,45 +328,19 @@ func TestMustNoErrorExceptFnUnreachablePanicShape(t *testing.T) {
 // captured top frame of the panic value should resolve to this
 // function, not to MustNoError or PanicUnreachableFrom.
 func callMustNoError(err error) {
-	MustNoError(err)
+	core.MustNoError(err)
 }
 
 // callMustNoErrorExcept is the MustNoErrorExcept counterpart of
 // callMustNoError.
 func callMustNoErrorExcept(err error, allowed ...error) {
-	MustNoErrorExcept(err, allowed...)
+	core.MustNoErrorExcept(err, allowed...)
 }
 
 // callMustNoErrorExceptFn is the MustNoErrorExceptFn counterpart of
 // callMustNoError.
 func callMustNoErrorExceptFn(err error, check func(error) bool) {
-	MustNoErrorExceptFn(err, check)
-}
-
-// assertTopFrameIs takes a recovered panic value, asserts it is a
-// *PanicError, returned for further checks, and pins:
-//
-//   - the top frame is wantFunc, through AssertMustTopFrame — catches
-//     a stack that lands inside the helper itself (skip too small) or
-//     skips past the wrapper (skip too large);
-//   - the captured stack has at least minDepth frames — guards
-//     against a future change that truncates the stack and makes
-//     the top-frame assertion vacuous.
-//
-// Both assertions are Must-* so a violation halts the test via
-// Fatal rather than logging silently. The t parameter is T (not
-// *testing.T) so a MockT can drive the negative meta-test rows in
-// TestAssertTopFrameIs.
-func assertTopFrameIs(t T, r any, wantFunc string, minDepth int) *PanicError {
-	t.Helper()
-	AssertMustNotNil(t, r, "recovered value")
-	pe := AssertMustTypeIs[*PanicError](t, r,
-		"recovered value is *PanicError")
-	stack := pe.CallStack()
-	AssertMustTrue(t, len(stack) >= minDepth,
-		"stack depth >= %d (got %d)", minDepth, len(stack))
-	AssertMustTopFrame(t, pe, wantFunc, "top frame")
-	return pe
+	core.MustNoErrorExceptFn(err, check)
 }
 
 // TestMustNoErrorStack verifies the captured call stack of the panic
@@ -430,7 +353,7 @@ func TestMustNoErrorStack(t *testing.T) {
 	defer func() {
 		_ = assertTopFrameIs(t, recover(), "callMustNoError", 2)
 	}()
-	callMustNoError(errSentinel)
+	callMustNoError(core.ErrSentinelForTest)
 }
 
 // TestMustNoErrorExceptStack verifies MustNoErrorExcept's panic
@@ -439,7 +362,7 @@ func TestMustNoErrorExceptStack(t *testing.T) {
 	defer func() {
 		_ = assertTopFrameIs(t, recover(), "callMustNoErrorExcept", 2)
 	}()
-	callMustNoErrorExcept(errSentinel, errOther)
+	callMustNoErrorExcept(core.ErrSentinelForTest, errOther)
 }
 
 // TestMustNoErrorExceptFnStack verifies MustNoErrorExceptFn's panic
@@ -448,7 +371,7 @@ func TestMustNoErrorExceptFnStack(t *testing.T) {
 	defer func() {
 		_ = assertTopFrameIs(t, recover(), "callMustNoErrorExceptFn", 2)
 	}()
-	callMustNoErrorExceptFn(errSentinel, matchesOther)
+	callMustNoErrorExceptFn(core.ErrSentinelForTest, matchesOther)
 }
 
 // recoverValidPanic invokes callMustNoError and returns the
@@ -459,7 +382,7 @@ func TestMustNoErrorExceptFnStack(t *testing.T) {
 // required by Go's flow analysis and the project's bare-return lint.
 func recoverValidPanic() (r any) {
 	defer func() { r = recover() }()
-	callMustNoError(errSentinel)
+	callMustNoError(core.ErrSentinelForTest)
 	return nil
 }
 
@@ -470,8 +393,8 @@ func recoverValidPanic() (r any) {
 // recovered panic in the deferred handler — without them the function
 // would return a nil *MockT after the recover.
 func runAssertTopFrameIs(r any, wantFunc string,
-	minDepth int) (pe *PanicError, mock *MockT) {
-	mock = &MockT{}
+	minDepth int) (pe *core.PanicError, mock *core.MockT) {
+	mock = &core.MockT{}
 	defer func() { _ = recover() }()
 	pe = assertTopFrameIs(mock, r, wantFunc, minDepth)
 	return pe, mock
@@ -512,16 +435,16 @@ func (tc assertTopFrameIsTestCase) Name() string { return tc.name }
 func (tc assertTopFrameIsTestCase) Test(t *testing.T) {
 	t.Helper()
 	pe, mock := runAssertTopFrameIs(tc.r, tc.wantFunc, tc.minDepth)
-	AssertMustEqual(t, tc.wantFailed, mock.Failed(),
+	core.AssertMustEqual(t, tc.wantFailed, mock.Failed(),
 		"MockT.Failed()")
 	if tc.wantFailed {
-		AssertNil(t, pe, "returned")
+		core.AssertNil(t, pe, "returned")
 	} else {
-		AssertSame(t, tc.r, pe, "returned")
+		core.AssertSame(t, tc.r, pe, "returned")
 	}
 }
 
-var _ TestCase = assertTopFrameIsTestCase{}
+var _ core.TestCase = assertTopFrameIsTestCase{}
 
 func assertTopFrameIsTestCases(validPanic any) []assertTopFrameIsTestCase {
 	return []assertTopFrameIsTestCase{
@@ -546,6 +469,6 @@ func assertTopFrameIsTestCases(validPanic any) []assertTopFrameIsTestCase {
 // drops a check would pass the positive row.
 func TestAssertTopFrameIs(t *testing.T) {
 	validPanic := recoverValidPanic()
-	AssertMustNotNil(t, validPanic, "captured valid panic")
-	RunTestCases(t, assertTopFrameIsTestCases(validPanic))
+	core.AssertMustNotNil(t, validPanic, "captured valid panic")
+	core.RunTestCases(t, assertTopFrameIsTestCases(validPanic))
 }

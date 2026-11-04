@@ -62,36 +62,56 @@ a plain check. `assertComparable` is private: it serves `AssertTrue`,
 ```go
 // Read a subject's results through something it does not use
 func TestAssertEqual(t *testing.T) {
-    mock := &MockT{}
-    result := AssertEqual(mock, 42, 42, "test")
+    mock := &core.MockT{}
+    result := core.AssertEqual(mock, 42, 42, "test")
     // AssertTrue does not reach AssertEqual or AreEqual
-    AssertTrue(t, result, "result")
+    core.AssertTrue(t, result, "result")
 }
 
-// Where the subject is what the readers are built on, use plain checks
-func TestAssertTrue(t *testing.T) {
+// The same for a utility: AssertTrue and AssertFalse do not reach IsNil
+func TestIsNil(t *testing.T) {
+    var p *int
+    core.AssertTrue(t, core.IsNil(p), "typed nil")
+    core.AssertFalse(t, core.IsNil(42), "non-nil")
+}
+```
+
+```go
+// Where the subject is the trusted ground, use plain checks; in package
+// core, as assertComparable is unexported
+func TestAssertComparable(t *testing.T) {
     mock := &MockT{}
-    result := AssertTrue(mock, true, "test")
+    result := assertComparable(mock, 42, 42, "test")
     if !result {
-        t.Error("AssertTrue should return true")
+        t.Error("assertComparable should return true")
     }
 }
 ```
+
+The tests of the trusted ground make their plain checks through `plainEqual`
+and `plainContains`, defined in `testutils_internal_test.go`: they compare
+and report without an assertion.
 
 **❌ Circular Testing Anti-Patterns:**
 
 ```go
 // DON'T: Test AreEqual using AssertEqual (AssertEqual calls AreEqual)
 func TestAreEqual(t *testing.T) {
-    is, _ := AreEqual(42, 42)
-    AssertEqual(t, true, is, "is") // CIRCULAR!
+    is, _ := core.AreEqual(42, 42)
+    core.AssertEqual(t, true, is, "is") // CIRCULAR!
 }
 
 // DON'T: Test AssertTrue using AssertTrue
 func TestAssertTrue(t *testing.T) {
-    mock := &MockT{}
-    result := AssertTrue(mock, true, "test")
-    AssertTrue(t, result, "result") // CIRCULAR!
+    mock := &core.MockT{}
+    result := core.AssertTrue(mock, true, "test")
+    core.AssertTrue(t, result, "result") // CIRCULAR!
+}
+
+// DON'T: Test IsNil using AssertNil (AssertNil calls IsNil internally)
+func TestIsNil(t *testing.T) {
+    var p *int
+    core.AssertNil(t, p, "typed nil") // CIRCULAR!
 }
 ```
 
@@ -164,22 +184,22 @@ enhanced capabilities:
 
 ```go
 func TestAssertContains(t *testing.T) {
- mock := &MockT{}
+ mock := &core.MockT{}
 
  // Test successful assertion
- result := AssertContains(mock, "hello world", "world", "text")
- AssertTrue(t, result, "returns true")
- AssertTrue(t, mock.HasLogs(), "has logs")
+ result := core.AssertContains(mock, "hello world", "world", "text")
+ core.AssertTrue(t, result, "returns true")
+ core.AssertTrue(t, mock.HasLogs(), "has logs")
 
  lastLog, ok := mock.LastLog()
- AssertTrue(t, ok, "has log")
- AssertEqual(t, `text: contains "world"`, lastLog, "log content")
+ core.AssertTrue(t, ok, "has log")
+ core.AssertEqual(t, `text: contains "world"`, lastLog, "log content")
 
  // Test failed assertion
  mock.Reset()
- result = AssertContains(mock, "hello world", "moon", "text")
- AssertFalse(t, result, "returns false")
- AssertTrue(t, mock.HasErrors(), "has errors")
+ result = core.AssertContains(mock, "hello world", "moon", "text")
+ core.AssertFalse(t, result, "returns false")
+ core.AssertTrue(t, mock.HasErrors(), "has errors")
 }
 ```
 
@@ -191,27 +211,27 @@ including the `AssertMust*` family of functions which automatically call
 
 ```go
 func TestFatalAssertion(t *testing.T) {
-    mock := &MockT{}
+    mock := &core.MockT{}
 
     // AssertMustEqual reports, then calls FailNow; Run returns there
-    ok := mock.Run("fatal assertion test", func(mt T) {
-        AssertMustEqual(mt, 1, 2, "value")
+    ok := mock.Run("fatal assertion test", func(mt core.T) {
+        core.AssertMustEqual(mt, 1, 2, "value")
         mt.Log("continued") // not reached
     })
 
-    AssertFalse(t, ok, "passed")
-    AssertTrue(t, mock.Failed(), "failed")
-    AssertEqual(t, 1, mock.NumErrors(), "errors")
-    AssertEqual(t, 0, mock.NumLogs(), "logs")
+    core.AssertFalse(t, ok, "passed")
+    core.AssertTrue(t, mock.Failed(), "failed")
+    core.AssertEqual(t, 1, mock.NumErrors(), "errors")
+    core.AssertEqual(t, 0, mock.NumLogs(), "logs")
 
     // The same through AssertEqual and an explicit FailNow
     mock.Reset()
-    ok = mock.Run("manual fatal test", func(mt T) {
-        if !AssertEqual(mt, 1, 2, "value") {
+    ok = mock.Run("manual fatal test", func(mt core.T) {
+        if !core.AssertEqual(mt, 1, 2, "value") {
             mt.FailNow() // Run returns here
         }
     })
-    AssertFalse(t, ok, "passed")
+    core.AssertFalse(t, ok, "passed")
 }
 ```
 
@@ -220,22 +240,22 @@ func TestFatalAssertion(t *testing.T) {
 ```go
 // Example MockT usage for testing assertion functions
 func TestMyAssertion(t *testing.T) {
-    mock := &MockT{}
+    mock := &core.MockT{}
 
     // Test successful assertion
     MyAssert(mock, true, "pass")
-    AssertFalse(t, mock.HasErrors(), "errors")
-    AssertTrue(t, mock.HasLogs(), "logs")
+    core.AssertFalse(t, mock.HasErrors(), "errors")
+    core.AssertTrue(t, mock.HasLogs(), "logs")
 
     // Test failed assertion
     mock.Reset()
     MyAssert(mock, false, "fail")
-    AssertTrue(t, mock.HasErrors(), "errors")
-    AssertTrue(t, mock.Failed(), "failed")
+    core.AssertTrue(t, mock.HasErrors(), "errors")
+    core.AssertTrue(t, mock.Failed(), "failed")
 
     lastErr, ok := mock.LastError()
-    AssertTrue(t, ok, "error recorded")
-    AssertContains(t, lastErr, "fail", "error message content")
+    core.AssertTrue(t, ok, "error recorded")
+    core.AssertContains(t, lastErr, "fail", "error message content")
 }
 ```
 
@@ -247,22 +267,22 @@ Core provides many generic functions that need comprehensive type testing:
 func TestSliceContainsGeneric(t *testing.T) {
  // Test with different types
  t.Run("int", func(t *testing.T) {
-  slice := S(1, 2, 3, 4, 5)
-  AssertTrue(t, SliceContains(slice, 3), "slice has int")
-  AssertFalse(t, SliceContains(slice, 6), "slice missing int")
+  slice := core.S(1, 2, 3, 4, 5)
+  core.AssertTrue(t, core.SliceContains(slice, 3), "slice has int")
+  core.AssertFalse(t, core.SliceContains(slice, 6), "slice missing int")
  })
 
  t.Run("string", func(t *testing.T) {
-  slice := S("a", "b", "c")
-  AssertTrue(t, SliceContains(slice, "b"), "slice has string")
-  AssertFalse(t, SliceContains(slice, "d"), "slice missing string")
+  slice := core.S("a", "b", "c")
+  core.AssertTrue(t, core.SliceContains(slice, "b"), "slice has string")
+  core.AssertFalse(t, core.SliceContains(slice, "d"), "slice missing string")
  })
 
  t.Run("custom type", func(t *testing.T) {
   type Custom struct{ ID int }
-  slice := S(Custom{1}, Custom{2})
-  AssertTrue(t, SliceContains(slice, Custom{1}), "slice has custom")
-  AssertFalse(t, SliceContains(slice, Custom{3}),
+  slice := core.S(Custom{1}, Custom{2})
+  core.AssertTrue(t, core.SliceContains(slice, Custom{1}), "slice has custom")
+  core.AssertFalse(t, core.SliceContains(slice, Custom{3}),
     "should not find missing custom")
  })
 }
@@ -274,22 +294,22 @@ Core provides type-safe context keys that require special testing:
 
 ```go
 func TestContextKey(t *testing.T) {
- key := NewContextKey[string]("test-key")
+ key := core.NewContextKey[string]("test-key")
 
  // Test string representation
- AssertEqual(t, "test-key", key.String(), "key name")
- AssertContains(t, key.GoString(), "core.NewContextKey[string]",
+ core.AssertEqual(t, "test-key", key.String(), "key name")
+ core.AssertContains(t, key.GoString(), "core.NewContextKey[string]",
    "GoString format")
 
  // Test context operations
  ctx := key.WithValue(context.Background(), "test-value")
  value, ok := key.Get(ctx)
- AssertTrue(t, ok, "found")
- AssertEqual(t, "test-value", value, "retrieved value")
+ core.AssertTrue(t, ok, "found")
+ core.AssertEqual(t, "test-value", value, "retrieved value")
 
  // Test wrong context
  _, ok = key.Get(context.Background())
- AssertFalse(t, ok, "found in empty context")
+ core.AssertFalse(t, ok, "found in empty context")
 }
 ```
 
@@ -299,34 +319,34 @@ Core provides sophisticated error handling that needs thorough testing:
 
 ```go
 func TestPanicError(t *testing.T) {
- // Test panic recovery
- panicErr := NewPanicError(42, "test panic")
+ // Build a PanicError from a payload
+ panicErr := core.NewPanicError(0, 42)
 
  // Test interfaces
- AssertEqual(t, "test panic", panicErr.Error(), "error message")
- AssertEqual(t, 42, panicErr.Recovered(), "recovered value")
+ core.AssertEqual(t, "panic: 42", panicErr.Error(), "error message")
+ core.AssertEqual(t, 42, panicErr.Recovered(), "recovered value")
 
  // Test stack trace
- frames := panicErr.Frames()
- AssertTrue(t, len(frames) > 0, "frames")
+ stack := panicErr.CallStack()
+ core.AssertTrue(t, len(stack) > 0, "stack")
 
  // Test unwrapping
  cause := errors.New("root cause")
- wrappedErr := NewPanicError(cause, "wrapped panic")
- AssertErrorIs(t, wrappedErr, cause, "cause")
+ wrappedErr := core.NewPanicError(0, cause)
+ core.AssertErrorIs(t, wrappedErr, cause, "cause")
 }
 ```
 
-### Synchronization Primitive Testing
+### Synchronisation Primitive Testing
 
 Core provides advanced sync primitives:
 
 ```go
 func TestSpinLock(t *testing.T) {
- var lock SpinLock
+ var lock core.SpinLock
  var counter int
 
- err := RunConcurrentTest(t, 10, func(workerID int) error {
+ err := core.RunConcurrentTest(t, 10, func(workerID int) error {
   for i := 0; i < 100; i++ {
    lock.Lock()
    counter++
@@ -335,8 +355,8 @@ func TestSpinLock(t *testing.T) {
   return nil
  })
 
- AssertNoError(t, err, "concurrent test")
- AssertEqual(t, 1000, counter, "counter")
+ core.AssertNoError(t, err, "concurrent test")
+ core.AssertEqual(t, 1000, counter, "counter")
 }
 ```
 
@@ -347,7 +367,7 @@ Core provides network utilities that need system-dependent testing:
 ```go
 func TestGetIPAddresses(t *testing.T) {
  // Test with system interfaces (may vary by system)
- addrs, err := GetIPAddresses()
+ addrs, err := core.GetIPAddresses()
  if err != nil {
   // Some CI systems may not have network interfaces
   t.Logf("No interfaces available: %v", err)
@@ -356,7 +376,7 @@ func TestGetIPAddresses(t *testing.T) {
 
  // Validate all addresses
  for i, addr := range addrs {
-  AssertTrue(t, addr.IsValid(), "address[%d] valid", i)
+  core.AssertTrue(t, addr.IsValid(), "address[%d] valid", i)
  }
 }
 ```
@@ -369,21 +389,21 @@ Test custom assertions with MockT:
 
 ```go
 func TestAssertSliceEqual(t *testing.T) {
- mock := &MockT{}
+ mock := &core.MockT{}
 
  // Test equal slices
- a := S(1, 2, 3)
- b := S(1, 2, 3)
- result := AssertSliceEqual(mock, a, b, "equal slices")
- AssertTrue(t, result, "result")
- AssertTrue(t, mock.HasLogs(), "logs")
+ a := core.S(1, 2, 3)
+ b := core.S(1, 2, 3)
+ result := core.AssertSliceEqual(mock, a, b, "equal slices")
+ core.AssertTrue(t, result, "result")
+ core.AssertTrue(t, mock.HasLogs(), "logs")
 
  // Test different slices
  mock.Reset()
- c := S(1, 2, 4)
- result = AssertSliceEqual(mock, a, c, "different slices")
- AssertFalse(t, result, "result")
- AssertTrue(t, mock.HasErrors(), "errors")
+ c := core.S(1, 2, 4)
+ result = core.AssertSliceEqual(mock, a, c, "different slices")
+ core.AssertFalse(t, result, "result")
+ core.AssertTrue(t, mock.HasErrors(), "errors")
 }
 ```
 
@@ -393,23 +413,23 @@ func TestAssertSliceEqual(t *testing.T) {
 func TestRunBenchmark(t *testing.T) {
  execCount := 0
 
- RunBenchmark(&testing.B{N: 10},
+ core.RunBenchmark(&testing.B{N: 10},
   func() any {
    return "test data"
   },
   func(data any) {
-   AssertEqual(t, "test data", data, "benchmark data")
+   core.AssertEqual(t, "test data", data, "benchmark data")
    execCount++
   },
  )
 
- AssertEqual(t, 10, execCount, "execution count")
+ core.AssertEqual(t, 10, execCount, "execution count")
 }
 ```
 
 ## Testing Zero Dependencies
 
-Core has zero external dependencies, so all tests must use only:
+Core's tests bring in no testing or mocking frameworks. They use:
 
 - Go standard library
 - Core's own utilities (for self-testing)
@@ -424,79 +444,12 @@ import (
  "time"
 )
 
-// ❌ FORBIDDEN - no external dependencies
+// ❌ FORBIDDEN - testing and mocking frameworks
 import (
  "github.com/stretchr/testify/assert" // cspell:disable-line
  "github.com/golang/mock/gomock" // cspell:disable-line
 )
 ```
-
-### Exception: testing_test.go
-
-The `testing_test.go` file is a special case where we test the testing
-utilities themselves. In this file, we use the standard `testing` package
-directly rather than our own Assert functions to avoid circular dependencies:
-
-```go
-// testing_test.go - uses standard testing package
-func TestAssertEqual(t *testing.T) {
- mock := &MockT{}
-
- // Use standard testing methods to test our Assert functions
- result := AssertEqual(mock, 42, 42, "test")
- if !result {
-  t.Error("AssertEqual should return true for equal values")
- }
-
- if !mock.HasLogs() {
-  t.Error("AssertEqual should log success")
- }
-}
-```
-
-This is the **only** exception to using our Assert functions - when testing
-the Assert functions themselves.
-
-**Additional Exception**: Avoid using Assert helpers that internally use the
-functions being tested (circular dependencies):
-
-```go
-// ❌ DON'T: Test IsNil using AssertNil (AssertNil calls IsNil internally)
-func TestIsNil(t *testing.T) {
-    AssertNil(t, IsNil(nil), "IsNil with nil") // Circular dependency!
-}
-
-// ❌ DON'T: Test SliceContains using AssertTrue with SliceContains
-func TestSliceContains(t *testing.T) {
-    slice := S(1, 2, 3)
-    AssertTrue(t, SliceContains(slice, 2), "contains 2")
-    // Uses the function being tested!
-}
-
-// ✅ DO: Use standard testing methods when testing core utilities
-func TestIsNil(t *testing.T) {
-    if !IsNil(nil) {
-        t.Error("IsNil should return true for nil")
-    }
-    if IsNil(42) {
-        t.Error("IsNil should return false for non-nil")
-    }
-}
-
-func TestSliceContains(t *testing.T) {
-    slice := S(1, 2, 3)
-    if !SliceContains(slice, 2) {
-        t.Error("SliceContains should find existing element")
-    }
-    if SliceContains(slice, 4) {
-        t.Error("SliceContains should not find missing element")
-    }
-}
-```
-
-**Rule**: When testing a function, don't use Assert helpers that call that same
-function internally. This ensures the test is actually validating the function
-rather than creating circular logic.
 
 ## Performance Testing
 
@@ -511,16 +464,16 @@ func BenchmarkSliceContains(b *testing.B) {
 
  b.ResetTimer()
  for i := 0; i < b.N; i++ {
-  _ = SliceContains(slice, 500)
+  _ = core.SliceContains(slice, 500)
  }
 }
 
 func BenchmarkAssertEqual(b *testing.B) {
- mock := &MockT{}
+ mock := &core.MockT{}
 
  b.ResetTimer()
  for i := 0; i < b.N; i++ {
-  AssertEqual(mock, 42, 42, "benchmark test")
+  core.AssertEqual(mock, 42, 42, "benchmark test")
   mock.Reset()
  }
 }
@@ -542,7 +495,7 @@ func TestTestCaseCompliance(t *testing.T) {
  }
 
  // Test case should have test method
- AssertTrue(t, hasTestMethod(tc), "test method")
+ core.AssertTrue(t, hasTestMethod(tc), "test method")
 }
 
 func hasTestMethod(tc any) bool {
@@ -558,10 +511,10 @@ Core's testing utilities should be well-documented:
 
 ```go
 func ExampleAssertEqual() {
- mock := &MockT{}
+ mock := &core.MockT{}
 
  // Test equality
- result := AssertEqual(mock, 42, 42, "numbers match")
+ result := core.AssertEqual(mock, 42, 42, "numbers match")
  fmt.Printf("Equal values: %t\n", result)
  fmt.Printf("Has logs: %t\n", mock.HasLogs())
 
@@ -572,9 +525,9 @@ func ExampleAssertEqual() {
 
 func ExampleS() {
  // Create test slices concisely
- numbers := S(1, 2, 3)
- strings := S("a", "b", "c")
- empty := S[int]()
+ numbers := core.S(1, 2, 3)
+ strings := core.S("a", "b", "c")
+ empty := core.S[int]()
 
  fmt.Printf("Numbers: %v\n", numbers)
  fmt.Printf("Strings: %v\n", strings)
@@ -593,23 +546,23 @@ Core utilities must handle edge cases gracefully:
 
 ```go
 func TestAssertEqualNilHandling(t *testing.T) {
- mock := &MockT{}
+ mock := &core.MockT{}
 
  // Test nil vs nil
- result := AssertEqual(mock, nil, nil, "both nil")
- AssertTrue(t, result, "result")
+ result := core.AssertEqual[any](mock, nil, nil, "both nil")
+ core.AssertTrue(t, result, "result")
 
  // Test nil vs non-nil
  mock.Reset()
- result = AssertEqual(mock, nil, 42, "nil vs non-nil")
- AssertFalse(t, result, "result")
+ result = core.AssertEqual[any](mock, nil, 42, "nil vs non-nil")
+ core.AssertFalse(t, result, "result")
 
  // Test different nil types
  mock.Reset()
  var nilSlice []int
  var nilMap map[string]int
- result = AssertEqual(mock, nilSlice, nilMap, "different nil types")
- AssertFalse(t, result, "result")
+ result = core.AssertEqual[any](mock, nilSlice, nilMap, "different nil types")
+ core.AssertFalse(t, result, "result")
 }
 ```
 
@@ -619,7 +572,7 @@ Testing `darvaza.org/core` requires:
 
 1. **Self-testing** using MockT for assertion functions.
 2. **Generic testing** across multiple types.
-3. **Zero dependencies** - only standard library.
+3. **Zero dependencies** - no testing frameworks beyond core's own utilities.
 4. **Performance awareness** - benchmarks for utilities.
 5. **Edge case coverage** - nil handling, empty inputs.
 6. **Documentation** - examples for public APIs.

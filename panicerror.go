@@ -23,7 +23,7 @@ func (p *PanicError) Error() string {
 	return fmt.Sprintf("panic: %v", p.payload)
 }
 
-// Unwrap returns the payload if it's and error
+// Unwrap returns the payload if it's an error
 func (p *PanicError) Unwrap() error {
 	if err, ok := p.payload.(error); ok {
 		return err
