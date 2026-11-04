@@ -5,3 +5,9 @@ package core
 func NewFrameForTest(name, file string, line int) *Frame {
 	return &Frame{name: name, file: file, line: line}
 }
+
+// FrameEntryForTest returns the entry point of the function f runs in,
+// which a frame inlined into its caller shares with that caller's frame.
+func FrameEntryForTest(f Frame) uintptr {
+	return f.entry
+}

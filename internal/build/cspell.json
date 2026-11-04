@@ -53,6 +53,7 @@
     "MDSPELL",
     "MORFOLOGIK",
     "netip",
+    "noinline",
     "panicerror",
     "Panicf",
     "Parameterisation",
