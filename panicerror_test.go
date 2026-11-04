@@ -3,6 +3,7 @@ package core_test
 import (
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 
 	"darvaza.org/core"
@@ -887,6 +888,18 @@ func TestPanicUnreachablef(t *testing.T) {
 
 func TestPanicUnreachableFrom(t *testing.T) {
 	core.RunTestCases(t, panicUnreachableFromTestCases)
+}
+
+// Test that a skip of math.MaxInt raises the error with an empty stack,
+// the skip past the top of any stack.
+func TestPanicUnreachableFromMaxSkip(t *testing.T) {
+	defer func() {
+		pe := core.AssertMustTypeIs[*core.PanicError](t, recover(), "panic")
+		assertUnreachableChain(t, pe, core.ErrSentinelForTest)
+		core.AssertEqual(t, 0, len(pe.CallStack()), "stack length")
+	}()
+
+	callPanicUnreachableFrom(math.MaxInt, core.ErrSentinelForTest, "test note")
 }
 
 func TestPanicUnreachablefFrom(t *testing.T) {

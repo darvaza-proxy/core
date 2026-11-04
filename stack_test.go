@@ -19,6 +19,7 @@ var (
 	_ core.TestCase = frameFileLineTestCase{}
 	_ core.TestCase = frameFormatTestCase{}
 	_ core.TestCase = capturedFrameFormatTestCase{}
+	_ core.TestCase = capturedLineTestCase{}
 	_ core.TestCase = stackStringTestCase{}
 	_ core.TestCase = stackFormatTestCase{}
 	_ core.TestCase = formatLineTestCase{}
@@ -36,6 +37,13 @@ func TestHere(t *testing.T) {
 		f := deepHere(i)
 		core.AssertMustEqual(t, "hereHere", fmt.Sprintf("%n", f), "depth %v", i)
 	}
+}
+
+// Test that Here allocates no more than the frame it returns, and
+// resolves its one program counter without allocating anything else.
+func TestHereAllocs(t *testing.T) {
+	allocs := testing.AllocsPerRun(100, func() { core.Here() })
+	core.AssertTrue(t, allocs <= 1, "at most one allocation, got %v", allocs)
 }
 
 func hereHere() *core.Frame {
@@ -590,9 +598,7 @@ func capturedFrameFormatTestCases(frame *core.Frame, file string,
 
 // Test Frame.Format against a captured frame. The expectations are built
 // from what runtime.Caller reports for the same call site, so the
-// preconditions state that frameForPC agrees with it on file and line —
-// the line being resolved there from the raw pc, where the name comes
-// from pc - 1.
+// preconditions state that StackFrame agrees with it on file and line.
 func TestCapturedFrameFormat(t *testing.T) {
 	frame, file, line := capturedFrame(t)
 
@@ -601,6 +607,112 @@ func TestCapturedFrameFormat(t *testing.T) {
 	core.AssertMustEqual(t, line, frame.Line(), "captured line")
 
 	core.RunTestCases(t, capturedFrameFormatTestCases(frame, file, line))
+}
+
+// capturedLineTestCase states the function and line that one frame of a
+// captured stack resolves to. Where callerOfInlined is set, the row
+// states the frame of a caller whose callee, the frame below it, was
+// inlined into it, and it skips in a build where that did not happen.
+type capturedLineTestCase struct {
+	name            string
+	wantFunc        string
+	stack           core.Stack
+	index           int
+	wantLine        int
+	callerOfInlined bool
+}
+
+func newCapturedLineTestCase(name string, stack core.Stack, index int,
+	wantFunc string, wantLine int) capturedLineTestCase {
+	return capturedLineTestCase{
+		stack:    stack,
+		name:     name,
+		wantFunc: wantFunc,
+		index:    index,
+		wantLine: wantLine,
+	}
+}
+
+func newCapturedLineInlinedTestCase(name string, stack core.Stack, index int,
+	wantFunc string, wantLine int) capturedLineTestCase {
+	tc := newCapturedLineTestCase(name, stack, index, wantFunc, wantLine)
+	tc.callerOfInlined = true
+	return tc
+}
+
+func (tc capturedLineTestCase) Name() string {
+	return tc.name
+}
+
+func (tc capturedLineTestCase) Test(t *testing.T) {
+	t.Helper()
+
+	core.AssertMustTrue(t, tc.index < len(tc.stack), "frame %v captured", tc.index)
+	if tc.callerOfInlined {
+		core.AssertMustTrue(t, tc.index > 0, "callee frame captured")
+		callee := core.FrameEntryForTest(tc.stack[tc.index-1])
+		if callee != core.FrameEntryForTest(tc.stack[tc.index]) {
+			t.Skip("the callee is not inlined in this build")
+		}
+	}
+
+	frame := tc.stack[tc.index]
+	core.AssertEqual(t, tc.wantFunc, frame.FuncName(), "function")
+	core.AssertEqual(t, tc.wantLine, frame.Line(), "line")
+}
+
+// stackFromLastCall captures its stack through a call that ends the
+// function, so the address the call returns to falls past the line of
+// the call. It reports, through above, the line just above the call.
+//
+//go:noinline
+func stackFromLastCall(st *core.Stack, above *int) {
+	_, _, *above, _ = runtime.Caller(0)
+	captureStack(st)
+}
+
+// captureStack stores the stack above it in st.
+//
+//go:noinline
+func captureStack(st *core.Stack) {
+	*st = core.StackTrace(1)
+}
+
+// stackThroughInlined captures its stack through stackInlined, which is
+// small enough to inline into it, and reports the line just above that
+// call.
+//
+//go:noinline
+func stackThroughInlined() (st core.Stack, above int) {
+	_, _, above, _ = runtime.Caller(0)
+	st = stackInlined()
+	return st, above
+}
+
+func stackInlined() core.Stack {
+	return core.StackTrace(0)
+}
+
+func capturedLineTestCases() []capturedLineTestCase {
+	var lastCall core.Stack
+	var lastCallAbove int
+	stackFromLastCall(&lastCall, &lastCallAbove)
+
+	inlined, inlinedAbove := stackThroughInlined()
+
+	return core.S(
+		newCapturedLineTestCase("call ending its function", lastCall, 0,
+			"stackFromLastCall", lastCallAbove+1),
+		newCapturedLineInlinedTestCase("caller of an inlined function", inlined, 1,
+			"stackThroughInlined", inlinedAbove+1),
+	)
+}
+
+// Test that a captured frame reports the line of its call, where the
+// address the call returns to sits on a later line, and where the
+// function it calls is inlined into it.
+func TestCapturedLine(t *testing.T) {
+	core.RunTestCases(t, capturedLineTestCases())
 }
 
 // stackFormatTestCase tests Stack.Format by the substrings its output

@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 var (
@@ -168,7 +169,16 @@ func PanicUnreachable(err error, note string) {
 // err and note, its stack starting skip frames above the caller: 0 is
 // PanicUnreachableFrom's own caller.
 func PanicUnreachableFrom(skip int, err error, note string) {
-	panic(NewUnreachableError(deeper(skip), err, note))
+	doPanicUnreachable(skip, err, note)
+}
+
+// doPanicUnreachable is [PanicUnreachableFrom] less its own frame: 0 is
+// the caller of the function calling it. It stays out of line so that
+// PanicUnreachableFrom is cheap enough to inline into its callers.
+//
+//go:noinline
+func doPanicUnreachable(skip int, err error, note string) {
+	panic(NewUnreachableError(deeper(deeper(skip)), err, note))
 }
 
 // PanicUnreachablef emits the PanicError [NewUnreachableErrorf] makes of
@@ -187,10 +197,15 @@ func PanicUnreachablefFrom(skip int, err error, format string, args ...any) {
 // deeper accounts for the frame of the function calling it, so a skip of
 // 0 attributes to that function's own caller. A negative skip clamps to
 // 1, that same caller, instead of reaching [StackTrace], which rejects it
-// and captures nothing.
+// and captures nothing. A skip of math.MaxInt stays as it is, past the
+// top of any stack, instead of wrapping negative.
 func deeper(skip int) int {
-	if skip < 0 {
+	switch {
+	case skip < 0:
 		return 1
+	case skip == math.MaxInt:
+		return skip
+	default:
+		return skip + 1
 	}
-	return skip + 1
 }

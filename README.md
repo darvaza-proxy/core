@@ -160,6 +160,8 @@ Key distinctions from `IsZero`:
 * `TypeName[T]()` names a type parameter itself, an interface type
   included, where `%T` on a value can only name the dynamic type it
   holds.
+* `TypeNameOf(v)` names the type of the value `v` holds, as `%T` does,
+  spelling the empty interface `any` as `TypeName` does.
 
 ### Type Conversion
 
@@ -649,7 +651,7 @@ be diffed by eye.
   `AssertNoPanic(t, fn, name...)` - panic testing with type-aware matching.
 * `AssertTopFrame(t, v, want, name...)` - the call stack `v` carries (a
   recovered `PanicError`, for one) starts at the function `want`, named as
-  `Frame.FuncName()` names it.
+  `Frame.FuncName()` names it, less a generic function's `[...]`.
 
 #### Channel and Timing Assertions
 

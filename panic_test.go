@@ -810,7 +810,7 @@ func (tc mustTestCase[V]) Test(t *testing.T) {
 	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
 	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
 	core.AssertErrorIs(t, panicErr, tc.err, "error in chain")
-	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	core.AssertTopFrame(t, panicErr, "callMust", "top frame")
 }
 
 func mustTestCases() []core.TestCase {
@@ -955,7 +955,7 @@ func (tc mustOKTestCase[V]) Test(t *testing.T) {
 	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
 	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
 	core.AssertContains(t, panicErr.Error(), "operation failed", "reason")
-	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	core.AssertTopFrame(t, panicErr, "callMustOK", "top frame")
 }
 
 func mustOKTestCases() []core.TestCase {
@@ -1113,7 +1113,7 @@ func (tc mustTTestCase[T]) Test(t *testing.T) {
 	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
 	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
 	core.AssertContains(t, panicErr.Error(), tc.reason, "reason")
-	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	core.AssertTopFrame(t, panicErr, "callMustT", "top frame")
 }
 
 // mustTValueTestCases are the rows where the input holds the target
@@ -1144,6 +1144,8 @@ func mustTPanicTestCases() []core.TestCase {
 			"failed to convert string to error"),
 		newMustTTestCasePanic[fmt.Stringer]("int to fmt.Stringer", 42,
 			"failed to convert int to fmt.Stringer"),
+		newMustTTestCasePanic[string]("any slice to string", []any{},
+			"failed to convert []any to string"),
 		newMustTTestCasePanic[string]("nil to string", nil,
 			"failed to convert <nil> to string"),
 		newMustTTestCasePanic[int]("nil to int", nil,
@@ -1158,6 +1160,17 @@ func mustTPanicTestCases() []core.TestCase {
 func TestMustT(t *testing.T) {
 	core.RunTestCases(t, mustTValueTestCases())
 	core.RunTestCases(t, mustTPanicTestCases())
+}
+
+// TestMustTAllocs states that a value passed to MustT stays on the
+// caller's stack.
+func TestMustTAllocs(t *testing.T) {
+	v := [2]uint64{1, 2}
+
+	var got [2]uint64
+	allocs := testing.AllocsPerRun(100, func() { got = core.MustT[[2]uint64](v) })
+	core.AssertEqual(t, v, got, "value")
+	core.AssertEqual(t, 0.0, allocs, "allocations")
 }
 
 // maybeTTestCase states what MaybeT returns for one target type: the

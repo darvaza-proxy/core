@@ -69,6 +69,12 @@ func (tc assertTopFrameTestCase) Test(t *testing.T) {
 	core.AssertMustContinuedForTest(t, mustMock, mustOK)
 }
 
+// newGenericPanicPayload builds a *PanicError whose stack starts in this
+// generic function.
+func newGenericPanicPayload[T any]() *core.PanicError {
+	return core.NewPanicError(0, core.ErrSentinelForTest)
+}
+
 // assertTopFrameTestCases lists the values AssertTopFrame passes, then
 // the ones it fails. NewPanicPayloadForTest builds a *PanicError whose
 // stack starts in NewPanicPayloadForTest itself; a zero PanicError
@@ -77,6 +83,8 @@ func assertTopFrameTestCases() []assertTopFrameTestCase {
 	return core.S(
 		newAssertTopFrameTestCase("PanicError",
 			core.NewPanicPayloadForTest(), "NewPanicPayloadForTest"),
+		newAssertTopFrameTestCase("generic function",
+			newGenericPanicPayload[int](), "newGenericPanicPayload"),
 		newAssertTopFrameTestCase("Catch of a plain panic",
 			core.Catch(core.PanicPlainForTest), "PanicPlainForTest"),
 

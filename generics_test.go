@@ -9,13 +9,16 @@ import (
 )
 
 // TestCase interface validations
-var _ core.TestCase = typeNameTestCase[int]{}
-var _ core.TestCase = coalesceTestCase[int]{}
-var _ core.TestCase = coalescePointerTestCase[int]{}
-var _ core.TestCase = iifTestCase{}
-var _ core.TestCase = iifStringTestCase{}
-var _ core.TestCase = iifPointerTestCase{}
-var _ core.TestCase = iifStructTestCase{}
+var (
+	_ core.TestCase = typeNameTestCase[int]{}
+	_ core.TestCase = typeNameOfTestCase{}
+	_ core.TestCase = coalesceTestCase[int]{}
+	_ core.TestCase = coalescePointerTestCase[int]{}
+	_ core.TestCase = iifTestCase{}
+	_ core.TestCase = iifStringTestCase{}
+	_ core.TestCase = iifPointerTestCase{}
+	_ core.TestCase = iifStructTestCase{}
+)
 
 // typeNameTestCase states what TypeName renders for one type.
 type typeNameTestCase[T any] struct {
@@ -57,6 +60,61 @@ func typeNameTestCases() []core.TestCase {
 
 func TestTypeName(t *testing.T) {
 	core.RunTestCases(t, typeNameTestCases())
+}
+
+// typeNameOfTestCase states what TypeNameOf renders for one value.
+type typeNameOfTestCase struct {
+	v    any
+	want string
+	name string
+}
+
+func newTypeNameOfTestCase(name string, v any, want string) core.TestCase {
+	return typeNameOfTestCase{
+		v:    v,
+		want: want,
+		name: name,
+	}
+}
+
+func (tc typeNameOfTestCase) Name() string {
+	return tc.name
+}
+
+func (tc typeNameOfTestCase) Test(t *testing.T) {
+	t.Helper()
+	core.AssertEqual(t, tc.want, core.TypeNameOf(tc.v), "name")
+}
+
+func typeNameOfTestCases() []core.TestCase {
+	var stringer fmt.Stringer = core.Stack{}
+
+	return core.S(
+		newTypeNameOfTestCase("builtin", 42, "int"),
+		newTypeNameOfTestCase("struct", core.PanicError{}, "core.PanicError"),
+		newTypeNameOfTestCase("pointer", &core.PanicError{}, "*core.PanicError"),
+		newTypeNameOfTestCase("typed nil pointer", (*core.PanicError)(nil),
+			"*core.PanicError"),
+		newTypeNameOfTestCase("slice", []string{}, "[]string"),
+		newTypeNameOfTestCase("any slice", []any{}, "[]any"),
+		newTypeNameOfTestCase("interface", stringer, "core.Stack"),
+		newTypeNameOfTestCase("nil", nil, "<nil>"),
+	)
+}
+
+func TestTypeNameOf(t *testing.T) {
+	core.RunTestCases(t, typeNameOfTestCases())
+}
+
+// TestTypeNameOfAllocs states that a value passed to TypeNameOf stays on
+// the caller's stack.
+func TestTypeNameOfAllocs(t *testing.T) {
+	v := [2]uint64{1, 2}
+
+	var name string
+	allocs := testing.AllocsPerRun(100, func() { name = core.TypeNameOf(v) })
+	core.AssertEqual(t, "[2]uint64", name, "name")
+	core.AssertEqual(t, 0.0, allocs, "allocations")
 }
 
 // coalesceTestCase tests Coalesce function with generic type support

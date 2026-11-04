@@ -10,8 +10,22 @@ import (
 // as itself where %T can only name the dynamic type a value holds,
 // and the empty interface as any where %T prints interface {}.
 func TypeName[T any]() string {
-	s := reflect.TypeFor[T]().String()
-	return strings.ReplaceAll(s, "interface {}", "any")
+	return doTypeName(reflect.TypeFor[T]())
+}
+
+// TypeNameOf returns the name of the type of the value v holds, as %T
+// renders it, but with the empty interface spelled any, as [TypeName]
+// spells it. A nil v gives <nil>.
+func TypeNameOf(v any) string {
+	if v == nil {
+		return "<nil>"
+	}
+	return doTypeName(reflect.TypeOf(v))
+}
+
+// doTypeName spells t as [TypeName] and [TypeNameOf] do.
+func doTypeName(t reflect.Type) string {
+	return strings.ReplaceAll(t.String(), "interface {}", "any")
 }
 
 // Coalesce returns the first non-zero argument

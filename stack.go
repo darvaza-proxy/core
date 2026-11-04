@@ -45,6 +45,10 @@ type Frame struct {
 	line int
 }
 
+// frameForPC resolves pc, as runtime.Callers returns it. That is the
+// address after the call, which can sit on a later line than the call,
+// or, for the caller of an inlined function, in the inlined body, so the
+// function, file and line all come from pc - 1, on the call itself.
 func frameForPC(pc uintptr) Frame {
 	var entry uintptr
 	var name string
@@ -54,7 +58,7 @@ func frameForPC(pc uintptr) Frame {
 	if fp := runtime.FuncForPC(pc - 1); fp != nil {
 		entry = fp.Entry()
 		name = fp.Name()
-		file, line = fp.FileLine(pc)
+		file, line = fp.FileLine(pc - 1)
 	} else {
 		name = "unknown"
 		file = "unknown"

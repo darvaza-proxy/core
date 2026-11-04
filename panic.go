@@ -161,10 +161,13 @@ func Maybe[V any](value V, _ error) V {
 //revive:disable-next-line:flag-parameter
 func MustOK[V any](value V, ok bool) V {
 	if !ok {
-		PanicUnreachableFrom(1, errors.New("operation failed"), "")
+		PanicUnreachableFrom(1, errMustOK, "")
 	}
 	return value
 }
+
+// errMustOK is the reason [MustOK] panics with.
+var errMustOK = errors.New("operation failed")
 
 // MaybeOK returns the value, ignoring the ok flag.
 // This is useful when you want to proceed with a default or zero value
@@ -199,10 +202,19 @@ func MaybeOK[V any](value V, _ bool) V {
 func MustT[T any](value any) T {
 	result, ok := value.(T)
 	if !ok {
-		err := fmt.Errorf("failed to convert %T to %s", value, TypeName[T]())
-		PanicUnreachableFrom(1, err, "")
+		doPanicMustT[T](value)
 	}
 	return result
+}
+
+// doPanicMustT is [MustT] for a value that is not a T. It stays out of
+// line to keep MustT's body to the type assertion and a call, and its
+// skip of 2 counts MustT, which calls it directly.
+//
+//go:noinline
+func doPanicMustT[T any](value any) {
+	err := fmt.Errorf("failed to convert %s to %s", TypeNameOf(value), TypeName[T]())
+	PanicUnreachableFrom(2, err, "")
 }
 
 // MaybeT returns the converted value if type conversion succeeds, otherwise
@@ -250,17 +262,25 @@ func MustNoError(err error) {
 // The panic value's top stack frame resolves to the caller, not to this
 // helper.
 func MustNoErrorExcept(err error, allowed ...error) {
+	if err != nil {
+		doMustNoErrorExcept(err, allowed)
+	}
+}
+
+// doMustNoErrorExcept is [MustNoErrorExcept] for a non-nil err. It stays
+// out of line so that MustNoErrorExcept is cheap enough to inline into
+// its callers, and its skip of 2 counts MustNoErrorExcept, which calls it
+// directly.
+//
+//go:noinline
+func doMustNoErrorExcept(err error, allowed []error) {
 	// IsError(err) with no filter returns true for any non-nil err. The
 	// len(allowed) > 0 guard below blocks that degenerate shape from
 	// silently swallowing the panic.
-	switch {
-	case err == nil:
+	if len(allowed) > 0 && IsError(err, allowed...) {
 		return
-	case len(allowed) > 0 && IsError(err, allowed...):
-		return
-	default:
-		PanicUnreachableFrom(1, err, "")
 	}
+	PanicUnreachableFrom(2, err, "")
 }
 
 // MustNoErrorExceptFn panics if err is non-nil and check accepts none of
@@ -272,15 +292,23 @@ func MustNoErrorExcept(err error, allowed ...error) {
 // then panics — the same degenerate shape as MustNoError. The panic
 // value's top stack frame resolves to the caller, not to this helper.
 func MustNoErrorExceptFn(err error, check func(error) bool) {
+	if err != nil {
+		doMustNoErrorExceptFn(err, check)
+	}
+}
+
+// doMustNoErrorExceptFn is [MustNoErrorExceptFn] for a non-nil err. It
+// stays out of line so that MustNoErrorExceptFn is cheap enough to inline
+// into its callers, and its skip of 2 counts MustNoErrorExceptFn, which
+// calls it directly.
+//
+//go:noinline
+func doMustNoErrorExceptFn(err error, check func(error) bool) {
 	// check != nil is a short-circuit, not load-bearing: IsErrorFn
 	// already returns false for a nil check, so a nil check still
 	// reaches the panic below.
-	switch {
-	case err == nil:
+	if check != nil && IsErrorFn(check, err) {
 		return
-	case check != nil && IsErrorFn(check, err):
-		return
-	default:
-		PanicUnreachableFrom(1, err, "")
 	}
+	PanicUnreachableFrom(2, err, "")
 }
