@@ -810,7 +810,7 @@ func (tc mustTestCase[V]) Test(t *testing.T) {
 	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
 	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
 	core.AssertErrorIs(t, panicErr, tc.err, "error in chain")
-	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	core.AssertTopFrame(t, panicErr, "callMust", "top frame")
 }
 
 func mustTestCases() []core.TestCase {
@@ -955,7 +955,7 @@ func (tc mustOKTestCase[V]) Test(t *testing.T) {
 	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
 	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
 	core.AssertContains(t, panicErr.Error(), "operation failed", "reason")
-	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	core.AssertTopFrame(t, panicErr, "callMustOK", "top frame")
 }
 
 func mustOKTestCases() []core.TestCase {
@@ -1113,7 +1113,7 @@ func (tc mustTTestCase[T]) Test(t *testing.T) {
 	panicErr := core.AssertMustTypeIs[*core.PanicError](t, recovered, "panic")
 	core.AssertErrorIs(t, panicErr, core.ErrUnreachable, "ErrUnreachable in chain")
 	core.AssertContains(t, panicErr.Error(), tc.reason, "reason")
-	core.AssertTrue(t, len(panicErr.CallStack()) > 0, "stack captured")
+	core.AssertTopFrame(t, panicErr, "callMustT", "top frame")
 }
 
 // mustTValueTestCases are the rows where the input holds the target
