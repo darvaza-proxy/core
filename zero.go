@@ -25,45 +25,45 @@ func Zero[T any](_ *T) T {
 	return zero
 }
 
-// IsZero reports whether vi is in a state where it can/should be initialized.
-// It answers the question: "Is this value uninitialized and ready to be set?"
+// IsZero reports whether vi is in a state where it can/should be initialised.
+// It answers the question: "Is this value uninitialised and ready to be set?"
 //
-// IsZero returns true for values that are in their uninitialized state:
+// IsZero returns true for values that are in their uninitialised state:
 //   - nil (untyped nil)
 //   - Zero values of basic types (0, "", false)
 //   - nil pointers, slices, maps, channels, and functions
 //   - Zero-valued structs (all fields are zero)
 //   - Values whose IsZero() method returns true
 //
-// IsZero returns false for values that have been explicitly initialized:
+// IsZero returns false for values that have been explicitly initialised:
 //   - Non-zero basic values (42, "hello", true)
-//   - Initialized empty collections ([]int{}, map[string]int{})
+//   - Initialised empty collections ([]int{}, map[string]int{})
 //   - Non-nil pointers (even if pointing to zero values)
 //   - Non-zero structs (any field is non-zero)
 //
 // The key insight: something set to nil but assignable is zero;
-// something explicitly initialized (even if empty) is not zero.
+// something explicitly initialised (even if empty) is not zero.
 //
-// Initialization semantics:
-//   - var slice []int        // nil slice, IsZero = true (needs initialization)
-//   - slice := []int{}       // empty but initialized, IsZero = false (already set)
-//   - var m map[string]int   // nil map, IsZero = true (needs initialization)
-//   - m := make(map[string]int) // empty but initialized, IsZero = false (already set)
+// Initialisation semantics:
+//   - var slice []int        // nil slice, IsZero = true (needs initialisation)
+//   - slice := []int{}       // empty but initialised, IsZero = false (already set)
+//   - var m map[string]int   // nil map, IsZero = true (needs initialisation)
+//   - m := make(map[string]int) // empty but initialised, IsZero = false (already set)
 //   - var ptr *int           // nil pointer, IsZero = true (can be assigned)
 //   - ptr := new(int)        // non-nil pointer, IsZero = false (already assigned)
 //
 // Example:
 //
-//	IsZero(nil)              // true  - uninitialized
+//	IsZero(nil)              // true  - uninitialised
 //	IsZero(0)                // true  - zero basic value
-//	IsZero(42)               // false - initialized basic value
+//	IsZero(42)               // false - initialised basic value
 //	IsZero("")               // true  - zero string
-//	IsZero("hello")          // false - initialized string
-//	IsZero([]int(nil))       // true  - nil slice (uninitialized)
-//	IsZero([]int{})          // false - empty slice (initialized)
-//	IsZero([]int{1, 2})      // false - non-empty slice (initialized)
-//	IsZero((*int)(nil))      // true  - nil pointer (uninitialized)
-//	IsZero(new(int))         // false - non-nil pointer (initialized)
+//	IsZero("hello")          // false - initialised string
+//	IsZero([]int(nil))       // true  - nil slice (uninitialised)
+//	IsZero([]int{})          // false - empty slice (initialised)
+//	IsZero([]int{1, 2})      // false - non-empty slice (initialised)
+//	IsZero((*int)(nil))      // true  - nil pointer (uninitialised)
+//	IsZero(new(int))         // false - non-nil pointer (initialised)
 func IsZero(vi any) bool {
 	switch p := vi.(type) {
 	case nil:
@@ -95,12 +95,12 @@ func IsZero(vi any) bool {
 // IsNil returns false for:
 //   - Zero values of basic types (0, "", false) - these are not nil
 //   - Non-nil pointers (even if pointing to zero values)
-//   - Initialized empty collections ([]int{}, map[string]int{})
+//   - Initialised empty collections ([]int{}, map[string]int{})
 //   - Non-nil interfaces containing zero values
 //   - Zero-valued structs (structs cannot be nil)
 //
 // The key distinction from IsZero: IsNil only checks for nil state,
-// while IsZero checks for uninitialized state (which includes nil).
+// while IsZero checks for uninitialised state (which includes nil).
 //
 // Comparison with IsZero:
 //   - IsNil(nil)              // true  - untyped nil
@@ -124,11 +124,11 @@ func IsZero(vi any) bool {
 //
 //	slice = []int{}
 //	IsNil(slice)                 // false - empty slice is not nil
-//	IsZero(slice)                // false - empty slice is initialized
+//	IsZero(slice)                // false - empty slice is initialised
 //
 //	var num int
 //	IsNil(num)                   // false - integers cannot be nil
-//	IsZero(num)                  // true  - zero integer is uninitialized
+//	IsZero(num)                  // true  - zero integer is uninitialised
 func IsNil(vi any) bool {
 	if vi == nil {
 		return true
@@ -280,8 +280,8 @@ func isSameNil(a, b any) (same, ok bool) {
 		// both nil
 		return true, true
 	case a == nil || b == nil:
-		return false, true
 		// one nil, one not
+		return false, true
 	default:
 		// neither is nil
 		return false, false
