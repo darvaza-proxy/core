@@ -447,7 +447,7 @@ func AreEqual(vvi ...any) (is, known bool) {
 	for _, vi := range vvi[1:] {
 		next := newComparableValue(vi)
 
-		switch is2, known2 := areEqual2(prev, next, true); {
+		switch is2, known2 := areEqual2(prev, next, nil); {
 		case known2 && !is2:
 			// one unequal pair settles the whole list
 			return false, true
@@ -469,10 +469,9 @@ func AreEqual(vvi ...any) (is, known bool) {
 }
 
 // areEqual2 decides equality for a single pair. known reports whether
-// the answer is settled. deep allows one level of element-wise slice
-// comparison; element pairs pass false so nested slices are not
-// walked.
-func areEqual2(a, b comparableValue, deep bool) (is, known bool) {
+// the answer is settled. path holds the types of the slices the walk
+// is inside, none for the pairs of [AreEqual]'s list.
+func areEqual2(a, b comparableValue, path []reflect.Type) (is, known bool) {
 	switch {
 	case a.t != b.t:
 		// different types are never equal
@@ -483,9 +482,9 @@ func areEqual2(a, b comparableValue, deep bool) (is, known bool) {
 	case a.ok && b.ok:
 		// == is attempted; a false == still defers to an Equal
 		// method, and a panic to the rules for values without ==
-		return areEqualComparable(a.v, b.v, deep)
+		return areEqualComparable(a.v, b.v, path)
 	default:
-		return areEqualFallback(a.v, b.v, deep)
+		return areEqualFallback(a.v, b.v, path)
 	}
 }
 
@@ -496,11 +495,11 @@ func areEqual2(a, b comparableValue, deep bool) (is, known bool) {
 // correctly. Without a decisive Equal method, == stands. Operands of a
 // comparable type holding a value == panics on are settled as those
 // without == are.
-func areEqualComparable(va, vb reflect.Value, deep bool) (is, known bool) {
+func areEqualComparable(va, vb reflect.Value, path []reflect.Type) (is, known bool) {
 	switch equal, settled := comparableEqual(va.Interface(), vb.Interface()); {
 	case !settled:
 		// == panicked
-		return areEqualFallback(va, vb, deep)
+		return areEqualFallback(va, vb, path)
 	case equal:
 		// authoritative
 		return true, true
@@ -518,13 +517,11 @@ func areEqualComparable(va, vb reflect.Value, deep bool) (is, known bool) {
 // areEqualFallback decides equality when == is unavailable: typed
 // nils and identity settle the question — nil only equals nil, and
 // identity proves equality — and the value's own Equal method stands
-// in for ==. When deep, slices left undecided get one level of
-// element-wise comparison. Anything else stays unknown — two distinct
+// in for ==. A slice left undecided outside any other is compared
+// element by element. Anything else stays unknown — two distinct
 // values may still be equal, and deciding that would take a deep
 // comparison.
-//
-//revive:disable-next-line:flag-parameter // deep bounds recursion, not two behaviours
-func areEqualFallback(va, vb reflect.Value, deep bool) (is, known bool) {
+func areEqualFallback(va, vb reflect.Value, path []reflect.Type) (is, known bool) {
 	if same, ok := isSameTypedNil(va, vb); ok {
 		// nil only equals nil
 		return same, true
@@ -535,26 +532,26 @@ func areEqualFallback(va, vb reflect.Value, deep bool) (is, known bool) {
 		return true, true
 	}
 
-	if is, known = equalMethod(va, vb); known || !deep {
-		return is, known
+	if is, known = equalMethod(va, vb); known {
+		return is, true
 	}
 
-	return areEqualSlice(va, vb)
+	return areEqualSlice(va, vb, path)
 }
 
 // areEqualSlice compares two slices of the same type element by
-// element. Lengths must match; anything that isn't a slice stays
-// unknown.
-func areEqualSlice(va, vb reflect.Value) (is, known bool) {
+// element. Lengths must match; anything that isn't a slice, and a
+// slice inside another, stays unknown.
+func areEqualSlice(va, vb reflect.Value, path []reflect.Type) (is, known bool) {
 	switch {
-	case va.Kind() != reflect.Slice:
-		// only slices are walked
+	case va.Kind() != reflect.Slice, len(path) > 0:
+		// only a slice outside any other is walked
 		return false, false
 	case va.Len() != vb.Len():
 		// different lengths are never equal
 		return false, true
 	default:
-		return areEqualSliceElements(va, vb)
+		return areEqualSliceElements(va, vb, append(path, va.Type()))
 	}
 }
 
@@ -562,10 +559,10 @@ func areEqualSlice(va, vb reflect.Value) (is, known bool) {
 // slices, aggregating like [AreEqual] does over its list: one unequal
 // element settles the pair, an undecided element leaves it unknown
 // unless a later element settles it.
-func areEqualSliceElements(va, vb reflect.Value) (is, known bool) {
+func areEqualSliceElements(va, vb reflect.Value, path []reflect.Type) (is, known bool) {
 	known = true
 	for i := range va.Len() {
-		switch is2, known2 := areEqualElement(va.Index(i), vb.Index(i)); {
+		switch is2, known2 := areEqualElement(va.Index(i), vb.Index(i), path); {
 		case known2 && !is2:
 			// one unequal element settles the whole pair
 			return false, true
@@ -587,10 +584,10 @@ func areEqualSliceElements(va, vb reflect.Value) (is, known bool) {
 // areEqualElement decides equality for one pair of slice elements,
 // judged like top-level operands — interface elements are unwrapped
 // first — but without walking nested slices.
-func areEqualElement(va, vb reflect.Value) (is, known bool) {
+func areEqualElement(va, vb reflect.Value, path []reflect.Type) (is, known bool) {
 	a := newComparableValue(unwrapInterface(va))
 	b := newComparableValue(unwrapInterface(vb))
-	return areEqual2(a, b, false)
+	return areEqual2(a, b, path)
 }
 
 // unwrapInterface returns the value held by an interface so its
