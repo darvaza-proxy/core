@@ -40,8 +40,6 @@ func (tc keysTestCase) Name() string {
 }
 
 func (tc keysTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.Keys(tc.input)
 	core.AssertEqual(t, tc.expected, len(got), "Keys(%v)", tc.input)
 
@@ -85,8 +83,6 @@ func (tc sortedKeysTestCase) Name() string {
 }
 
 func (tc sortedKeysTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.SortedKeys(tc.input)
 	core.AssertSliceEqual(t, tc.expected, got, "SortedKeys(%v)", tc.input)
 }
@@ -132,8 +128,6 @@ func (tc sortedValuesTestCase) Name() string {
 }
 
 func (tc sortedValuesTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.SortedValues(tc.input)
 	core.AssertSliceEqual(t, tc.expected, got, "SortedValues(%v)", tc.input)
 }
@@ -179,8 +173,6 @@ func (tc sortedValuesCondTestCase) Name() string {
 }
 
 func (tc sortedValuesCondTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.SortedValuesCond(tc.input, tc.predicate)
 	core.AssertSliceEqual(t, tc.expected, got, "SortedValuesCond(%v, _)", tc.input)
 }
@@ -240,8 +232,6 @@ func (tc mapValueTestCase) Name() string {
 }
 
 func (tc mapValueTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, found := core.MapValue(tc.m, tc.key, tc.def)
 	core.AssertEqual(t, tc.expected, got, "value")
 	core.AssertEqual(t, tc.found, found, "found")
@@ -320,8 +310,6 @@ func (tc mapContainsTestCase) Name() string {
 }
 
 func (tc mapContainsTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.MapContains(tc.m, tc.key)
 	core.AssertEqual(t, tc.expected, got, "MapContains(%v, %q)", tc.m, tc.key)
 }
@@ -388,7 +376,6 @@ func (tc mapListContainsTestCase) Name() string {
 }
 
 func (tc mapListContainsTestCase) Test(t *testing.T) {
-	t.Helper()
 	got := core.MapListContains(tc.m, tc.key, tc.value)
 	core.AssertEqual(t, tc.expected, got, "MapListContains(_, %q, %q)", tc.key, tc.value)
 }
@@ -547,7 +534,6 @@ func (tc mapListForEachElementTestCase) Name() string {
 }
 
 func (tc mapListForEachElementTestCase) Test(t *testing.T) {
-	t.Helper()
 	var values []string
 	core.MapListForEachElement(tc.m, tc.key, func(el *list.Element) bool {
 		if tc.fn != nil {
@@ -652,7 +638,6 @@ func (tc mapAllListContainsTestCase) Name() string {
 }
 
 func (tc mapAllListContainsTestCase) Test(t *testing.T) {
-	t.Helper()
 	got := core.MapAllListContains(tc.m, tc.value)
 	core.AssertEqual(t, tc.expected, got, "MapAllListContains(_, %q)", tc.value)
 }

@@ -44,7 +44,6 @@ func TestAsNetIP(t *testing.T) {
 }
 
 func testAsNetIPv4(t *testing.T) {
-	t.Helper()
 	addr := netip.MustParseAddr("192.168.1.1")
 	ip := asNetIP(addr)
 	expected := net.ParseIP("192.168.1.1").To4()
@@ -54,7 +53,6 @@ func testAsNetIPv4(t *testing.T) {
 }
 
 func testAsNetIPv6(t *testing.T) {
-	t.Helper()
 	addr := netip.MustParseAddr("2001:db8::1")
 	ip := asNetIP(addr)
 	expected := net.ParseIP("2001:db8::1")

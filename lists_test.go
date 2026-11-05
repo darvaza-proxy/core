@@ -51,8 +51,6 @@ func (tc listForEachTestCase) Name() string {
 }
 
 func (tc listForEachTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var result []int
 	tc.iterFn(listOf(tc.values...), func(v int) bool {
 		result = append(result, v)
@@ -98,8 +96,6 @@ func (tc listForEachElementTestCase) Name() string {
 }
 
 func (tc listForEachElementTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var result []int
 	tc.iterFn(listOf(tc.values...), func(e *list.Element) bool {
 		result = append(result, e.Value.(int))
@@ -185,8 +181,6 @@ func (tc listContainsTestCase) Name() string {
 }
 
 func (tc listContainsTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	l := list.New()
 	for _, v := range tc.values {
 		l.PushBack(v)
@@ -237,8 +231,6 @@ func (tc listCopyTestCase) Name() string {
 }
 
 func (tc listCopyTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	// Create original list
 	orig := list.New()
 	for _, v := range tc.values {
@@ -285,7 +277,6 @@ func TestListContainsFn(t *testing.T) {
 }
 
 func testListContainsFnCustomFunction(t *testing.T) {
-	t.Helper()
 	l := list.New()
 	l.PushBack(1)
 	l.PushBack(2)
@@ -299,7 +290,6 @@ func testListContainsFnCustomFunction(t *testing.T) {
 }
 
 func testListContainsFnNilList(t *testing.T) {
-	t.Helper()
 	result := core.ListContainsFn((*list.List)(nil), 42, func(a, b int) bool {
 		return a == b
 	})
@@ -307,7 +297,6 @@ func testListContainsFnNilList(t *testing.T) {
 }
 
 func testListContainsFnNilFunction(t *testing.T) {
-	t.Helper()
 	l := list.New()
 	l.PushBack(42)
 
@@ -324,7 +313,6 @@ func TestListCopyFn(t *testing.T) {
 }
 
 func testListCopyFnTransformation(t *testing.T) {
-	t.Helper()
 	l := list.New()
 	l.PushBack(1)
 	l.PushBack(2)
@@ -340,7 +328,6 @@ func testListCopyFnTransformation(t *testing.T) {
 }
 
 func testListCopyFnFiltering(t *testing.T) {
-	t.Helper()
 	l := list.New()
 	l.PushBack(1)
 	l.PushBack(2)
@@ -357,7 +344,6 @@ func testListCopyFnFiltering(t *testing.T) {
 }
 
 func testListCopyFnNilList(t *testing.T) {
-	t.Helper()
 	result := core.ListCopyFn((*list.List)(nil), func(v int) (int, bool) {
 		return v, true
 	})
@@ -366,7 +352,6 @@ func testListCopyFnNilList(t *testing.T) {
 }
 
 func testListCopyFnNilFunction(t *testing.T) {
-	t.Helper()
 	l := list.New()
 	l.PushBack(42)
 
@@ -488,7 +473,6 @@ type listForEachTypeMismatchTestCase struct {
 func (tc listForEachTypeMismatchTestCase) Name() string { return tc.name }
 
 func (tc listForEachTypeMismatchTestCase) Test(t *testing.T) {
-	t.Helper()
 	collected := make([]int, 0, len(tc.want))
 	tc.iter(tc.list, func(v int) bool {
 		collected = append(collected, v)

@@ -372,8 +372,6 @@ func (tc parseURLTestCase) Name() string {
 }
 
 func (tc parseURLTestCase) Test(t *testing.T) {
-    t.Helper()
-
     result, err := ParseURL(tc.input)
 
     if tc.wantErr {
@@ -499,7 +497,6 @@ t.Run("complex test", func(t *testing.T) {
 
 // ✅ CORRECT - Extract to named function
 func runTestComplexScenario(t *testing.T) {
-    t.Helper()
     setup := createTestData()
     result := ProcessComplex(setup)
     validateResult(t, result)
@@ -519,8 +516,6 @@ When test methods become complex, extract helper methods:
 
 ```go
 func (tc myTestCase) Test(t *testing.T) {
-    t.Helper()
-
     tc.setupTest(t)
     result := tc.runTest(t)
     tc.validateResult(t, result)
@@ -1137,7 +1132,9 @@ func (tc parseURLTestCase) Test(t *testing.T) {
 
 ### Clean Tests
 
-- Use `t.Helper()` in all helper functions.
+- Use `t.Helper()` in helper functions, but not in a `Test` method or a
+  function `t.Run` runs. Those are the test body, and a failure is
+  reported at the line in them that called the assertion.
 - Prefer table-driven tests with TestCase for multiple data variations.
 - Keep setup and clean-up minimal.
 - Use meaningful assertion descriptions.
@@ -1231,7 +1228,6 @@ func (tc myTestCase) Name() string {
 }
 
 func (tc myTestCase) Test(t *testing.T) {
-    t.Helper()
     core.AssertEqual(t, tc.expected, actual, "result")
 }
 
@@ -1255,7 +1251,6 @@ func TestMyFunction(t *testing.T) {
 
 // DO: Extract complex logic to helper methods
 func (tc myTestCase) Test(t *testing.T) {
-    t.Helper()
     tc.runTest(t)
 }
 

@@ -497,7 +497,6 @@ func (tc assertErrorAsTestCase[V]) Name() string {
 }
 
 func (tc assertErrorAsTestCase[V]) Test(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	out, ok := core.AssertErrorAs[V](mock, tc.err, "type")
@@ -570,7 +569,6 @@ func (tc assertTypeIsTestCase[V]) Name() string {
 }
 
 func (tc assertTypeIsTestCase[V]) Test(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	got, ok := core.AssertTypeIs[V](mock, tc.input, "type")
@@ -616,7 +614,6 @@ func (tc assertPanicTestCase) Name() string {
 }
 
 func (tc assertPanicTestCase) Test(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	result := core.AssertPanic(mock, tc.panicFn, tc.expected, tc.desc)
@@ -762,7 +759,6 @@ func (tc assertAbortTestCase) Name() string {
 }
 
 func (tc assertAbortTestCase) Test(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	ok := mock.Run(tc.name, func(mt core.T) {
 		fn := func() { tc.abort(mt) }
@@ -1014,7 +1010,6 @@ func TestRunBenchmark(t *testing.T) {
 }
 
 func testMockTInitialState(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	core.AssertFalse(t, mock.HasErrors(), "initial HasErrors")
@@ -1025,7 +1020,6 @@ func testMockTInitialState(t *testing.T) {
 }
 
 func testMockTHelper(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	mock.Helper()
@@ -1038,7 +1032,6 @@ func testMockTHelper(t *testing.T) {
 }
 
 func testMockTErrors(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	mock.Error("test error")
@@ -1052,7 +1045,6 @@ func testMockTErrors(t *testing.T) {
 }
 
 func testMockTLogs(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	mock.Log("test log")
@@ -1066,7 +1058,6 @@ func testMockTLogs(t *testing.T) {
 }
 
 func testMockTFail(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	// Test Fail() marks test as failed
@@ -1098,7 +1089,6 @@ func testMockTFail(t *testing.T) {
 }
 
 func testMockTFormatted(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	// Test Errorf
@@ -1125,7 +1115,6 @@ func testMockTFormatted(t *testing.T) {
 }
 
 func testMockTMultiple(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	mock.Error("first error")
@@ -1146,7 +1135,6 @@ func testMockTMultiple(t *testing.T) {
 }
 
 func testMockTReset(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	mock.Error("test error")
@@ -1168,7 +1156,6 @@ func testMockTReset(t *testing.T) {
 }
 
 func testMockTEmptyQueries(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	lastErr, ok := mock.LastError()
@@ -1193,7 +1180,6 @@ func testMockTEmptyQueries(t *testing.T) {
 }
 
 func testMockTCounts(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	mock.Error("first error")
@@ -1237,7 +1223,6 @@ func (tc mockTMessageAtTestCase) Name() string {
 }
 
 func (tc mockTMessageAtTestCase) Test(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	for _, msg := range core.S("first", "", "third") {
 		mock.Error(msg)
@@ -1254,7 +1239,6 @@ func (tc mockTMessageAtTestCase) Test(t *testing.T) {
 }
 
 func testMockTMessageAt(t *testing.T) {
-	t.Helper()
 	core.RunTestCases(t, core.S(
 		newMockTMessageAtTestCase("first", 0, "first", true),
 		newMockTMessageAtTestCase("empty message", 1, "", true),
@@ -1267,7 +1251,6 @@ func testMockTMessageAt(t *testing.T) {
 }
 
 func testMockTConcurrent(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	// Test concurrent access to MockT methods
@@ -1474,7 +1457,6 @@ func (tc mockTRunTestCase) Name() string {
 }
 
 func (tc mockTRunTestCase) Test(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	ok := mock.Run(tc.name, tc.fn)
 
@@ -1555,7 +1537,6 @@ func (tc mockTRunCarryOverTestCase) Name() string {
 }
 
 func (tc mockTRunCarryOverTestCase) Test(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	mock.Run("first", tc.first)
 	core.AssertMustEqual(t, tc.wantFailed, mock.Failed(), "failed before")
@@ -1636,7 +1617,6 @@ func (tc isMockTAbortTestCase) Name() string {
 }
 
 func (tc isMockTAbortTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.want, core.IsMockTAbort(tc.recovered), "aborted")
 }
 
@@ -1679,7 +1659,6 @@ func TestEarlyAbortPattern(t *testing.T) {
 }
 
 func testEarlyAbortSuccess(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	// Test successful assertion that continues execution
@@ -1700,7 +1679,6 @@ func testEarlyAbortSuccess(t *testing.T) {
 }
 
 func testEarlyAbortFailure(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	// Test failed assertion that aborts execution
@@ -1721,7 +1699,6 @@ func testEarlyAbortFailure(t *testing.T) {
 }
 
 func testEarlyAbortMultiple(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	// Test multiple assertions with early abort pattern
@@ -1748,7 +1725,6 @@ func testEarlyAbortMultiple(t *testing.T) {
 }
 
 func testEarlyAbortMixed(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	// Test mixing early abort pattern with regular assertions
@@ -1818,7 +1794,6 @@ func TestAssertMustFunctions(t *testing.T) {
 }
 
 func testAssertMustEqual(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1837,7 +1812,6 @@ func testAssertMustEqual(t *testing.T) {
 }
 
 func testAssertMustNotEqual(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1856,7 +1830,6 @@ func testAssertMustNotEqual(t *testing.T) {
 }
 
 func testAssertMustSliceEqual(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1875,7 +1848,6 @@ func testAssertMustSliceEqual(t *testing.T) {
 }
 
 func testAssertMustDeepEqual(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1894,7 +1866,6 @@ func testAssertMustDeepEqual(t *testing.T) {
 }
 
 func testAssertMustNotDeepEqual(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1913,7 +1884,6 @@ func testAssertMustNotDeepEqual(t *testing.T) {
 }
 
 func testAssertMustContains(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1932,7 +1902,6 @@ func testAssertMustContains(t *testing.T) {
 }
 
 func testAssertMustNotContain(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1951,7 +1920,6 @@ func testAssertMustNotContain(t *testing.T) {
 }
 
 func testAssertMustError(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1970,7 +1938,6 @@ func testAssertMustError(t *testing.T) {
 }
 
 func testAssertMustNoError(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -1989,7 +1956,6 @@ func testAssertMustNoError(t *testing.T) {
 }
 
 func testAssertMustPanic(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -2008,7 +1974,6 @@ func testAssertMustPanic(t *testing.T) {
 }
 
 func testAssertMustNoPanic(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -2027,7 +1992,6 @@ func testAssertMustNoPanic(t *testing.T) {
 }
 
 func testAssertMustTrue(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -2046,7 +2010,6 @@ func testAssertMustTrue(t *testing.T) {
 }
 
 func testAssertMustFalse(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -2065,7 +2028,6 @@ func testAssertMustFalse(t *testing.T) {
 }
 
 func testAssertMustErrorIs(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	baseErr := errors.New("base error")
 	wrappedErr := errors.Join(baseErr, errors.New("wrapped"))
@@ -2087,7 +2049,6 @@ func testAssertMustErrorIs(t *testing.T) {
 }
 
 func testAssertMustNotErrorIs(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	baseErr := errors.New("base error")
 	wrappedErr := errors.Join(baseErr, errors.New("wrapped"))
@@ -2109,7 +2070,6 @@ func testAssertMustNotErrorIs(t *testing.T) {
 }
 
 func testAssertMustErrorIsFn(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	baseErr := errors.New("base error")
 	wrappedErr := core.Wrap(baseErr, "wrapped")
@@ -2131,7 +2091,6 @@ func testAssertMustErrorIsFn(t *testing.T) {
 }
 
 func testAssertMustErrorAs(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 	wrapped := core.Wrap(errors.New("base error"), "note")
 
@@ -2152,7 +2111,6 @@ func testAssertMustErrorAs(t *testing.T) {
 }
 
 func testAssertMustTypeIs(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -2174,7 +2132,6 @@ func testAssertMustTypeIs(t *testing.T) {
 }
 
 func testAssertMustNil(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -2193,7 +2150,6 @@ func testAssertMustNil(t *testing.T) {
 }
 
 func testAssertMustNotNil(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	ok := mock.Run("success", func(mt core.T) {
@@ -2212,7 +2168,6 @@ func testAssertMustNotNil(t *testing.T) {
 }
 
 func testAssertMustSame(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	slice1 := []int{1, 2, 3}
@@ -2235,7 +2190,6 @@ func testAssertMustSame(t *testing.T) {
 }
 
 func testAssertMustNotSame(t *testing.T) {
-	t.Helper()
 	mock := &core.MockT{}
 
 	slice1 := []int{1, 2, 3}

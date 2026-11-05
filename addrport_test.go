@@ -107,8 +107,6 @@ func (tc addrPortTestCase) Name() string {
 }
 
 func (tc addrPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, ok := core.AddrPort(tc.input)
 	core.AssertEqual(t, tc.wantOK, ok, "ok")
 	core.AssertEqual(t, tc.want, got, "address")
@@ -125,8 +123,6 @@ func TestAddrPortInterfaceChaining(t *testing.T) {
 }
 
 func testRecursiveInterfaceResolution(t *testing.T) {
-	t.Helper()
-
 	// Create a provider that returns another provider
 	tcpAddr := &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 8080}
 	provider := addrProvider{tcpAddr}
@@ -139,8 +135,6 @@ func testRecursiveInterfaceResolution(t *testing.T) {
 }
 
 func testNilFromInterfaceMethods(t *testing.T) {
-	t.Helper()
-
 	nilProvider := addrProvider{nil}
 	got, ok := core.AddrPort(nilProvider)
 	core.AssertFalse(t, ok, "nil Addr() ok")

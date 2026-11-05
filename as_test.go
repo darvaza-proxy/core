@@ -57,8 +57,6 @@ func (tc asTestCase[V]) Name() string {
 }
 
 func (tc asTestCase[V]) Test(t *testing.T) {
-	t.Helper()
-
 	got, ok := core.As[any, V](tc.input)
 	core.AssertEqual(t, tc.wantOK, ok, "ok")
 	core.AssertEqual(t, tc.want, got, "value")
@@ -117,8 +115,6 @@ func (tc asFnTestCase) Name() string {
 }
 
 func (tc asFnTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, ok := core.AsFn(tc.fn, tc.input)
 	core.AssertEqual(t, tc.wantOK, ok, "ok")
 	core.AssertEqual(t, tc.want, got, "value")
@@ -164,8 +160,6 @@ func (tc sliceAsTestCase) Name() string {
 }
 
 func (tc sliceAsTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.SliceAs[any, string](tc.input)
 	core.AssertSliceEqual(t, tc.want, got, "slice")
 }
@@ -207,8 +201,6 @@ func (tc sliceAsFnTestCase) Name() string {
 }
 
 func (tc sliceAsFnTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.SliceAsFn(tc.fn, tc.input)
 	core.AssertSliceEqual(t, tc.want, got, "slice")
 }
@@ -288,8 +280,6 @@ func (tc asErrorTestCase) Name() string {
 }
 
 func (tc asErrorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.AsError(tc.input)
 	core.AssertEqual(t, tc.want, got, "error")
 }
@@ -338,8 +328,6 @@ func (tc asErrorsTestCase) Name() string {
 }
 
 func (tc asErrorsTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.AsErrors(tc.input)
 	core.AssertSliceEqual(t, tc.want, got, "errors")
 }

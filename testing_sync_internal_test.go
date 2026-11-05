@@ -49,7 +49,6 @@ func (tc awaitCloseAtDeadlineTestCase) Name() string {
 }
 
 func (tc awaitCloseAtDeadlineTestCase) Test(t *testing.T) {
-	t.Helper()
 	for range atDeadlineRuns {
 		count, closed := awaitClose(tc.setup(), closedDeadline())
 		AssertEqual(t, tc.count, count, "count")
@@ -124,7 +123,6 @@ func (tc awaitQuietAtDeadlineTestCase) Name() string {
 }
 
 func (tc awaitQuietAtDeadlineTestCase) Test(t *testing.T) {
-	t.Helper()
 	for range atDeadlineRuns {
 		got, quiet, closed := awaitQuiet(tc.setup(), closedDeadline())
 		AssertEqual(t, tc.got, got, "got")
@@ -183,7 +181,6 @@ func (tc receiveNAtDeadlineTestCase) Name() string {
 }
 
 func (tc receiveNAtDeadlineTestCase) Test(t *testing.T) {
-	t.Helper()
 	for range atDeadlineRuns {
 		got, closed := receiveN(tc.setup(), tc.n, closedDeadline())
 		AssertSliceEqual(t, tc.got, got, "got")

@@ -29,8 +29,6 @@ func (tc splitAddrPortTestCase) Name() string {
 }
 
 func (tc splitAddrPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	addr, port, err := core.SplitAddrPort(tc.addrPort)
 
 	core.AssertEqual(t, tc.addr, addr, "address")
@@ -104,8 +102,6 @@ func (tc splitHostPortTestCase) Name() string {
 }
 
 func (tc splitHostPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	host, port, err := core.SplitHostPort(tc.hostport)
 
 	core.AssertEqual(t, tc.host, host, "host")
@@ -196,8 +192,6 @@ func (tc makeHostPortTestCase) Name() string {
 }
 
 func (tc makeHostPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, err := core.MakeHostPort(tc.hostPort, tc.defaultPort)
 
 	core.AssertEqual(t, tc.expected, got, "host:port")
@@ -279,8 +273,6 @@ func (tc joinHostPortTestCase) Name() string {
 }
 
 func (tc joinHostPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, err := core.JoinHostPort(tc.host, tc.port)
 
 	core.AssertEqual(t, tc.expected, got, "host:port")

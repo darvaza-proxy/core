@@ -187,7 +187,6 @@ func (tc frameSplitNameTestCase) Name() string {
 }
 
 func (tc frameSplitNameTestCase) Test(t *testing.T) {
-	t.Helper()
 	pkgName, funcName := tc.frame.SplitName()
 	core.AssertEqual(t, tc.expectedPkgName, pkgName, "package name")
 	core.AssertEqual(t, tc.expectedFuncName, funcName, "function name")
@@ -225,7 +224,6 @@ func (tc frameNameTestCase) Name() string {
 }
 
 func (tc frameNameTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.expected, tc.frame.Name(), "frame name")
 }
 
@@ -260,7 +258,6 @@ func (tc framePkgNameTestCase) Name() string {
 }
 
 func (tc framePkgNameTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.expected, tc.frame.PkgName(), "package name")
 }
 
@@ -316,7 +313,6 @@ func (tc framePkgFileTestCase) Name() string {
 }
 
 func (tc framePkgFileTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.expected, tc.frame.PkgFile(), "PkgFile")
 }
 
@@ -405,7 +401,6 @@ func (tc frameFileLineTestCase) Name() string {
 }
 
 func (tc frameFileLineTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.expected, tc.frame.FileLine(), "FileLine")
 }
 
@@ -443,7 +438,6 @@ func (tc frameStringTestCase) Name() string {
 }
 
 func (tc frameStringTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.expected, tc.frame.String(), "String")
 }
 
@@ -481,7 +475,6 @@ func (tc frameFormatTestCase) Name() string {
 }
 
 func (tc frameFormatTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := fmt.Sprintf(tc.format, tc.frame)
 	core.AssertEqual(t, tc.expected, result, "formatted output")
 }
@@ -541,7 +534,6 @@ func (tc capturedFrameFormatTestCase) Name() string {
 }
 
 func (tc capturedFrameFormatTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := fmt.Sprintf(tc.format, tc.frame)
 	core.AssertEqual(t, tc.expected, result, "formatted output")
 }
@@ -645,8 +637,6 @@ func (tc capturedLineTestCase) Name() string {
 }
 
 func (tc capturedLineTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	core.AssertMustTrue(t, tc.index < len(tc.stack), "frame %v captured", tc.index)
 	if tc.callerOfInlined {
 		core.AssertMustTrue(t, tc.index > 0, "callee frame captured")
@@ -731,8 +721,6 @@ func (tc stackFormatTestCase) Name() string {
 }
 
 func (tc stackFormatTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := fmt.Sprintf(tc.format, tc.stack)
 	if tc.wantEmpty {
 		core.AssertEqual(t, "", result, "output")
@@ -807,7 +795,6 @@ func (tc stackStringTestCase) Name() string {
 }
 
 func (tc stackStringTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.expected, tc.stack.String(), "String")
 }
 
@@ -847,7 +834,6 @@ func (tc formatLineTestCase) Name() string {
 }
 
 func (tc formatLineTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := fmt.Sprintf("%d", tc.frame)
 	core.AssertEqual(t, tc.expected, result, "formatted line")
 }
@@ -916,7 +902,6 @@ func newStackTraceMaxDepthTestCase(name string, skip int) stackTraceMaxDepthTest
 func (tc stackTraceMaxDepthTestCase) Name() string { return tc.name }
 
 func (tc stackTraceMaxDepthTestCase) Test(t *testing.T) {
-	t.Helper()
 	stack := deepestStackTrace(core.MaxDepth, tc.skip)
 	core.AssertEqual(t, core.MaxDepth, len(stack), "stack length")
 }

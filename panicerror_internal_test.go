@@ -29,7 +29,6 @@ func (tc deeperTestCase) Name() string {
 }
 
 func (tc deeperTestCase) Test(t *testing.T) {
-	t.Helper()
 	AssertEqual(t, tc.want, deeper(tc.skip), "deeper(%d)", tc.skip)
 }
 

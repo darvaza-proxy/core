@@ -48,8 +48,6 @@ func (tc assertTopFrameTestCase) Name() string {
 }
 
 func (tc assertTopFrameTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	mock := &core.MockT{}
 	ok := core.AssertTopFrame(mock, tc.v, tc.want, "top frame")
 

@@ -66,7 +66,6 @@ func asRecoveredTestCases() []asRecoveredTestCase {
 func (tc asRecoveredTestCase) Name() string { return tc.name }
 
 func (tc asRecoveredTestCase) Test(t *testing.T) {
-	t.Helper()
 	rec := core.AssertMustTypeIs[core.Recovered](t, core.AsRecovered(tc.input), "result")
 
 	got := rec.Recovered()
@@ -173,8 +172,6 @@ func (tc catcherDoTestCase) fn() error {
 }
 
 func (tc catcherDoTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var catcher core.Catcher
 	err := catcher.Do(tc.fn)
 	if !tc.wantPanic {
@@ -296,8 +293,6 @@ func (tc catcherTryTestCase) fn() error {
 }
 
 func (tc catcherTryTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var catcher core.Catcher
 	err := catcher.Try(tc.fn)
 	rec := catcher.Recovered()
@@ -443,7 +438,6 @@ func (tc catcherAbortTestCase) Name() string {
 }
 
 func (tc catcherAbortTestCase) Test(t *testing.T) {
-	t.Helper()
 	var catcher core.Catcher
 	var continued bool
 	mock := &core.MockT{}
@@ -659,8 +653,6 @@ func (tc catchTestCase) fn() error {
 }
 
 func (tc catchTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	err := core.Catch(tc.fn)
 	if !tc.wantPanic {
 		core.AssertSame(t, tc.err, err, "error")
@@ -722,7 +714,6 @@ func (tc catchStackTestCase) Name() string {
 }
 
 func (tc catchStackTestCase) Test(t *testing.T) {
-	t.Helper()
 	_ = assertTopFrameIs(t, core.Catch(tc.fn), tc.wantFunc, 2)
 }
 
@@ -798,8 +789,6 @@ func (tc mustTestCase[V]) Name() string {
 }
 
 func (tc mustTestCase[V]) Test(t *testing.T) {
-	t.Helper()
-
 	got, recovered := callMust(tc.value, tc.err)
 	if !tc.wantPanic {
 		core.AssertNoError(t, recovered, "no panic")
@@ -860,8 +849,6 @@ func (tc maybeTestCase[V]) Name() string {
 }
 
 func (tc maybeTestCase[V]) Test(t *testing.T) {
-	t.Helper()
-
 	var got V
 	err := core.Catch(func() error {
 		got = core.Maybe(tc.value, tc.err)
@@ -943,8 +930,6 @@ func (tc mustOKTestCase[V]) Name() string {
 }
 
 func (tc mustOKTestCase[V]) Test(t *testing.T) {
-	t.Helper()
-
 	got, recovered := callMustOK(tc.value, tc.ok)
 	if !tc.wantPanic {
 		core.AssertNoError(t, recovered, "no panic")
@@ -1005,8 +990,6 @@ func (tc maybeOKTestCase[V]) Name() string {
 }
 
 func (tc maybeOKTestCase[V]) Test(t *testing.T) {
-	t.Helper()
-
 	var got V
 	err := core.Catch(func() error {
 		got = core.MaybeOK(tc.value, tc.ok)
@@ -1101,8 +1084,6 @@ func (tc mustTTestCase[T]) Name() string {
 }
 
 func (tc mustTTestCase[T]) Test(t *testing.T) {
-	t.Helper()
-
 	got, recovered := callMustT[T](tc.input)
 	if !tc.wantPanic {
 		core.AssertNoError(t, recovered, "no panic")
@@ -1195,8 +1176,6 @@ func (tc maybeTTestCase[T]) Name() string {
 }
 
 func (tc maybeTTestCase[T]) Test(t *testing.T) {
-	t.Helper()
-
 	core.AssertEqual(t, tc.want, core.MaybeT[T](tc.input), "value")
 }
 

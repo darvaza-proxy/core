@@ -26,8 +26,6 @@ func (tc doMakeHostPortTestCase) Name() string {
 }
 
 func (tc doMakeHostPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, ok := doMakeHostPort(tc.host, tc.port, tc.defaultPort)
 
 	AssertEqual(t, tc.expected, got, "host:port")
@@ -100,8 +98,6 @@ func (tc doJoinHostPortTestCase) Name() string {
 }
 
 func (tc doJoinHostPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, err := doJoinHostPort(tc.host, tc.port)
 
 	AssertEqual(t, tc.expected, got, "host:port")
@@ -163,8 +159,6 @@ func (tc ipForHostPortTestCase) Name() string {
 }
 
 func (tc ipForHostPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	addr, err := ParseAddr(tc.input)
 	AssertMustNoError(t, err, "ParseAddr")
 

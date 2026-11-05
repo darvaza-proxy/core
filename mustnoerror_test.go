@@ -52,7 +52,6 @@ func newMustNoErrorTestCase(name string, err error,
 func (tc mustNoErrorTestCase) Name() string { return tc.name }
 
 func (tc mustNoErrorTestCase) Test(t *testing.T) {
-	t.Helper()
 	fn := func() { core.MustNoError(tc.err) }
 	if !tc.wantPanic {
 		core.AssertNoPanic(t, fn, "MustNoError nil")
@@ -174,7 +173,6 @@ func newMustNoErrorExceptTestCase(name string, err error,
 func (tc mustNoErrorExceptTestCase) Name() string { return tc.name }
 
 func (tc mustNoErrorExceptTestCase) Test(t *testing.T) {
-	t.Helper()
 	fn := func() { core.MustNoErrorExcept(tc.err, tc.allowed...) }
 	if !tc.wantPanic {
 		core.AssertNoPanic(t, fn, "MustNoErrorExcept allowed")
@@ -248,7 +246,6 @@ func newMustNoErrorExceptFnTestCase(name string, err error,
 func (tc mustNoErrorExceptFnTestCase) Name() string { return tc.name }
 
 func (tc mustNoErrorExceptFnTestCase) Test(t *testing.T) {
-	t.Helper()
 	fn := func() { core.MustNoErrorExceptFn(tc.err, tc.check) }
 	if !tc.wantPanic {
 		core.AssertNoPanic(t, fn, "MustNoErrorExceptFn allowed")
@@ -433,7 +430,6 @@ func newAssertTopFrameIsTestCase(name string, r any, wantFunc string,
 func (tc assertTopFrameIsTestCase) Name() string { return tc.name }
 
 func (tc assertTopFrameIsTestCase) Test(t *testing.T) {
-	t.Helper()
 	pe, mock := runAssertTopFrameIs(tc.r, tc.wantFunc, tc.minDepth)
 	core.AssertMustEqual(t, tc.wantFailed, mock.Failed(),
 		"MockT.Failed()")

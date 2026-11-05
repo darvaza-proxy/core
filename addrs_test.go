@@ -70,8 +70,6 @@ func (tc parseAddrTestCase) Name() string {
 }
 
 func (tc parseAddrTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, err := core.ParseAddr(tc.input)
 	if tc.wantErr {
 		core.AssertError(t, err, "error")
@@ -117,8 +115,6 @@ func (tc parseNetIPTestCase) Name() string {
 }
 
 func (tc parseNetIPTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, err := core.ParseNetIP(tc.input)
 	if tc.wantErr {
 		core.AssertError(t, err, "error")
@@ -178,8 +174,6 @@ func (tc addrFromNetIPTestCase) Name() string {
 }
 
 func (tc addrFromNetIPTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, ok := core.AddrFromNetIP(tc.input)
 	core.AssertEqual(t, tc.ok, ok, "ok")
 	core.AssertEqual(t, tc.want, got, "address")
@@ -202,14 +196,12 @@ func TestGetStringIPAddresses(t *testing.T) {
 }
 
 func testSpecificInvalidInterface(t *testing.T) {
-	t.Helper()
 	// Try with a non-existent interface
 	_, err := core.GetStringIPAddresses("invalid-interface-name")
 	core.AssertError(t, err, "invalid interface")
 }
 
 func testLoopbackInterface(t *testing.T) {
-	t.Helper()
 	// Most systems have a loopback interface
 	loopbackNames := core.S("lo", "lo0", "Loopback Pseudo-Interface 1")
 
@@ -230,7 +222,6 @@ func testLoopbackInterface(t *testing.T) {
 }
 
 func testAllStringInterfaces(t *testing.T) {
-	t.Helper()
 	addrs, err := core.GetStringIPAddresses()
 	if err != nil {
 		// Some systems might not have any interfaces
@@ -255,7 +246,6 @@ func TestGetNetIPAddresses(t *testing.T) {
 }
 
 func testAllNetIPInterfaces(t *testing.T) {
-	t.Helper()
 	addrs, err := core.GetNetIPAddresses()
 	if err != nil {
 		// Some systems might not have any interfaces
@@ -273,7 +263,6 @@ func testAllNetIPInterfaces(t *testing.T) {
 }
 
 func testInvalidNetIPInterface(t *testing.T) {
-	t.Helper()
 	_, err := core.GetNetIPAddresses("invalid-interface-name")
 	core.AssertError(t, err, "invalid interface")
 }
@@ -285,7 +274,6 @@ func TestGetIPAddresses(t *testing.T) {
 }
 
 func testAllIPAddressInterfaces(t *testing.T) {
-	t.Helper()
 	addrs, err := core.GetIPAddresses()
 	if err != nil {
 		// Some systems might not have any interfaces
@@ -303,7 +291,6 @@ func testAllIPAddressInterfaces(t *testing.T) {
 }
 
 func testMultipleInterfacesWithError(t *testing.T) {
-	t.Helper()
 	// Try with one valid and one invalid interface
 	ifaces, err := core.GetInterfacesNames()
 	if err != nil || len(ifaces) == 0 {
@@ -340,8 +327,6 @@ func (tc getInterfacesNamesTestCase) Name() string {
 }
 
 func (tc getInterfacesNamesTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	names, err := core.GetInterfacesNames(tc.except...)
 	core.AssertNoError(t, err, "GetInterfacesNames")
 	core.AssertNotNil(t, names, "interface names slice")
@@ -367,7 +352,6 @@ func TestGetInterfacesNames(t *testing.T) {
 }
 
 func testExclusionRemovesInterfaces(t *testing.T) {
-	t.Helper()
 	all, err := core.GetInterfacesNames()
 	if err != nil || len(all) == 0 {
 		t.Skip("No interfaces available for testing")

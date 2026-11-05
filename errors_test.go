@@ -49,7 +49,6 @@ func (tc isErrorFnTestCase) Name() string {
 }
 
 func (tc isErrorFnTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := core.IsErrorFn(tc.checkFn, tc.errs...)
 	core.AssertEqual(t, tc.expected, result, "IsErrorFn result")
 }
@@ -98,7 +97,6 @@ func (tc isErrorFn2TestCase) Name() string {
 }
 
 func (tc isErrorFn2TestCase) Test(t *testing.T) {
-	t.Helper()
 	is, known := core.IsErrorFn2(tc.checkFn, tc.errs...)
 	core.AssertEqual(t, tc.expectedIs, is, "IsErrorFn2 is result")
 	core.AssertEqual(t, tc.expectedKnown, known, "IsErrorFn2 known result")
@@ -164,8 +162,6 @@ func (tc quietWrapTestCase) Name() string {
 }
 
 func (tc quietWrapTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := core.QuietWrap(tc.err, tc.format, tc.args...)
 
 	if tc.expected == "" {
@@ -214,8 +210,6 @@ func (tc coalesceErrorTestCase) Name() string {
 }
 
 func (tc coalesceErrorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := core.CoalesceError(tc.errs...)
 	core.AssertEqual(t, tc.expected, result, "CoalesceError")
 }
@@ -295,8 +289,6 @@ func (tc isErrorTestCase) Name() string {
 }
 
 func (tc isErrorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := core.IsError(tc.err, tc.errs...)
 	core.AssertEqual(t, tc.expected, result, "IsError result")
 }
@@ -366,7 +358,6 @@ func newCheckErrorIsInTestCase(name string, err error,
 func (tc checkErrorIsInTestCase) Name() string { return tc.name }
 
 func (tc checkErrorIsInTestCase) Test(t *testing.T) {
-	t.Helper()
 	check := core.NewCheckErrorIsIn(tc.targets)
 	core.AssertEqual(t, tc.want, check(tc.err), "check result")
 }
@@ -423,7 +414,6 @@ func newCheckErrorIsIn2TestCase(name string, err error,
 func (tc checkErrorIsIn2TestCase) Name() string { return tc.name }
 
 func (tc checkErrorIsIn2TestCase) Test(t *testing.T) {
-	t.Helper()
 	is, known := core.NewCheckErrorIsIn2(tc.targets)(tc.err)
 	core.AssertEqual(t, tc.wantIs, is, "is")
 	core.AssertEqual(t, tc.wantKnown, known, "known")
@@ -498,8 +488,6 @@ func (tc temporaryErrorTestCase) Name() string {
 }
 
 func (tc temporaryErrorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := tc.testFunc(tc.err)
 
 	// Test error message
@@ -609,8 +597,6 @@ func (tc permanentErrorTestCase) Name() string {
 }
 
 func (tc permanentErrorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	err := core.NewPermanentError(tc.cause)
 	pe := core.AssertMustTypeIs[*core.PermanentError](t, err, "type")
 	core.AssertEqual(t, tc.cause.Error(), pe.Error(), "message")
@@ -682,8 +668,6 @@ func (tc permanentErrorNilCauseTestCase) Name() string {
 }
 
 func (tc permanentErrorNilCauseTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	core.AssertEqual(t, "", tc.pe.Error(), "message")
 	core.AssertNil(t, tc.pe.Unwrap(), "Unwrap")
 	assertPermanentAnswers(t, tc.pe)
@@ -731,7 +715,6 @@ func (tc checkIsTemporaryTestCase) Name() string {
 }
 
 func (tc checkIsTemporaryTestCase) Test(t *testing.T) {
-	t.Helper()
 	is, known := core.CheckIsTemporary(tc.err)
 	core.AssertEqual(t, tc.expectedIs, is, "CheckIsTemporary is result")
 	core.AssertEqual(t, tc.expectedKnown, known, "CheckIsTemporary known result")
@@ -778,7 +761,6 @@ func (tc isTemporaryTestCase) Name() string {
 }
 
 func (tc isTemporaryTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := core.IsTemporary(tc.err)
 	core.AssertEqual(t, tc.expected, result, "IsTemporary result")
 }
@@ -824,7 +806,6 @@ func (tc checkIsTimeoutTestCase) Name() string {
 }
 
 func (tc checkIsTimeoutTestCase) Test(t *testing.T) {
-	t.Helper()
 	is, known := core.CheckIsTimeout(tc.err)
 	core.AssertEqual(t, tc.expectedIs, is, "CheckIsTimeout is result")
 	core.AssertEqual(t, tc.expectedKnown, known, "CheckIsTimeout known result")
@@ -871,7 +852,6 @@ func (tc isTimeoutTestCase) Name() string {
 }
 
 func (tc isTimeoutTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := core.IsTimeout(tc.err)
 	core.AssertEqual(t, tc.expected, result, "IsTimeout result")
 }
@@ -963,7 +943,6 @@ func newWrappedErrorTestCaseWrap(name string, cause error,
 func (tc wrappedErrorTestCase) Name() string { return tc.name }
 
 func (tc wrappedErrorTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.wantError, tc.err.Error(), "WrappedError.Error")
 	if tc.wantUnwrap == nil {
 		core.AssertNil(t, tc.err.Unwrap(), "WrappedError.Unwrap")
@@ -1005,7 +984,6 @@ func newUnwrapBranchesTestCase(name string, err error,
 func (tc unwrapBranchesTestCase) Name() string { return tc.name }
 
 func (tc unwrapBranchesTestCase) Test(t *testing.T) {
-	t.Helper()
 	got := core.Unwrap(tc.err)
 	core.AssertSliceEqual(t, tc.wantInner, got, "Unwrap")
 }

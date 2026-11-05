@@ -47,8 +47,6 @@ func (tc spinLockTryLockTestCase) Name() string {
 }
 
 func (tc spinLockTryLockTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	sl := tc.setup()
 	result := sl.TryLock()
 
@@ -86,8 +84,6 @@ func (tc spinLockLockTestCase) Name() string {
 }
 
 func (tc spinLockLockTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	sl := tc.setup()
 
 	if tc.name == "contended spinlock" {
@@ -164,8 +160,6 @@ func (tc spinLockUnlockTestCase) Name() string {
 }
 
 func (tc spinLockUnlockTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	sl := tc.setup()
 
 	if tc.shouldPanic {
@@ -180,13 +174,11 @@ func TestSpinLockUnlock(t *testing.T) {
 }
 
 func testSpinLockNilTryLock(t *testing.T) {
-	t.Helper()
 	var sl *core.SpinLock
 	core.AssertPanic(t, func() { sl.TryLock() }, nil, "nil TryLock")
 }
 
 func testSpinLockNilUnlock(t *testing.T) {
-	t.Helper()
 	var sl *core.SpinLock
 	core.AssertPanic(t, func() { sl.Unlock() }, nil, "nil Unlock")
 }
