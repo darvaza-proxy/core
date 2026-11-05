@@ -105,8 +105,6 @@ func (tc errGroupGoTestCase) Name() string {
 }
 
 func (tc errGroupGoTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var eg core.ErrGroup
 	eg.Go(tc.runFunc, tc.shutdownFunc)
 
@@ -185,8 +183,6 @@ func (tc errGroupGoCatchTestCase) Name() string {
 }
 
 func (tc errGroupGoCatchTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var eg core.ErrGroup
 	eg.GoCatch(tc.runFunc, tc.catchFunc)
 
@@ -213,7 +209,6 @@ func TestErrGroupGoCatchNilFunction(t *testing.T) {
 }
 
 func testErrGroupFirstCancellation(t *testing.T) {
-	t.Helper()
 	var eg core.ErrGroup
 
 	cause := errors.New("test error")
@@ -225,7 +220,6 @@ func testErrGroupFirstCancellation(t *testing.T) {
 }
 
 func testErrGroupSubsequentCancellation(t *testing.T) {
-	t.Helper()
 	var eg core.ErrGroup
 
 	// First cancellation
@@ -242,7 +236,6 @@ func testErrGroupSubsequentCancellation(t *testing.T) {
 }
 
 func testErrGroupNilCause(t *testing.T) {
-	t.Helper()
 	var eg core.ErrGroup
 
 	isFirst := eg.Cancel(nil)
@@ -385,7 +378,6 @@ func newErrGroupErrTestCase(name string, workerErr error) errGroupErrTestCase {
 func (tc errGroupErrTestCase) Name() string { return tc.name }
 
 func (tc errGroupErrTestCase) Test(t *testing.T) {
-	t.Helper()
 	var eg core.ErrGroup
 	if tc.workerErr != nil {
 		eg.Go(func(_ context.Context) error { return tc.workerErr }, nil)

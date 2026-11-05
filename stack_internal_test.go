@@ -33,7 +33,6 @@ func newWriteFormatPanicsTestCase(name string, w io.Writer,
 func (tc writeFormatPanicsTestCase) Name() string { return tc.name }
 
 func (tc writeFormatPanicsTestCase) Test(t *testing.T) {
-	t.Helper()
 	AssertPanic(t, func() { writeFormat(tc.w, "payload") }, tc.wantPanic, tc.name)
 }
 

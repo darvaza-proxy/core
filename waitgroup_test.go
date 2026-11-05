@@ -58,8 +58,6 @@ func (tc waitGroupGoTestCase) Name() string {
 }
 
 func (tc waitGroupGoTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var wg core.WaitGroup
 	wg.Go(tc.fn)
 
@@ -148,8 +146,6 @@ func (tc waitGroupGoCatchTestCase) Name() string {
 }
 
 func (tc waitGroupGoCatchTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var wg core.WaitGroup
 	wg.GoCatch(tc.fn, tc.catch)
 
@@ -231,8 +227,6 @@ func (tc waitGroupOnErrorTestCase) Name() string {
 }
 
 func (tc waitGroupOnErrorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	var wg core.WaitGroup
 	wg.OnError(tc.onErrorHandler)
 
@@ -273,7 +267,6 @@ func TestWaitGroupDone(t *testing.T) {
 }
 
 func testWaitGroupErrNoError(t *testing.T) {
-	t.Helper()
 	var wg core.WaitGroup
 	wg.Go(func() error { return nil })
 	core.AssertNoError(t, wg.Wait(), "wait")
@@ -281,7 +274,6 @@ func testWaitGroupErrNoError(t *testing.T) {
 }
 
 func testWaitGroupErrWithError(t *testing.T) {
-	t.Helper()
 	var wg core.WaitGroup
 	expectedErr := errors.New("test error")
 	wg.Go(func() error { return expectedErr })

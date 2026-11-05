@@ -38,7 +38,6 @@ func (tc sliceReverseTestCase) Name() string {
 }
 
 func (tc sliceReverseTestCase) Test(t *testing.T) {
-	t.Helper()
 	c := core.SliceCopy(tc.a)
 	core.SliceReverse(c)
 	core.AssertSliceEqual(t, tc.b, c, "SliceReverse(%v)", tc.a)
@@ -137,7 +136,6 @@ func (tc sliceMinusTestCase) Name() string {
 }
 
 func (tc sliceMinusTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := core.SliceMinus(tc.a, tc.b)
 	core.AssertSliceEqual(t, tc.expected, result, "SliceMinus(%v, %v)", tc.a, tc.b)
 }
@@ -178,7 +176,6 @@ func (tc sliceMinusFnTestCase) Name() string {
 }
 
 func (tc sliceMinusFnTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := core.SliceMinusFn(tc.a, tc.b, tc.equal)
 	core.AssertSliceEqual(t, tc.expected, result, "SliceMinusFn(%q, %q, _)", tc.a, tc.b)
 }
@@ -227,7 +224,6 @@ func (tc sliceRandomTestCase) Name() string {
 }
 
 func (tc sliceRandomTestCase) Test(t *testing.T) {
-	t.Helper()
 	if tc.name != "random" {
 		got, ok := core.SliceRandom(tc.input)
 		core.AssertEqual(t, tc.wantOK, ok, "SliceRandom ok for %s", tc.name)
@@ -271,8 +267,6 @@ func (tc sliceContainsTestCase) Name() string {
 }
 
 func (tc sliceContainsTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := core.SliceContains(tc.slice, tc.value)
 	core.AssertEqual(t, tc.expected, result, "SliceContains result")
 }
@@ -316,8 +310,6 @@ func (tc sliceMapTestCase[T1, T2]) Name() string {
 }
 
 func (tc sliceMapTestCase[T1, T2]) Test(t *testing.T) {
-	t.Helper()
-
 	result := core.SliceMap(tc.input, tc.fn)
 	core.AssertSliceEqual(t, tc.expected, result, "SliceMap")
 }
@@ -339,8 +331,6 @@ func TestSliceMap(t *testing.T) {
 }
 
 func runTestSliceMapIntToString(t *testing.T) {
-	t.Helper()
-
 	// Simple transformation: returns one element per input
 	intToString := func(_ []string, i int) []string {
 		return core.S(fmt.Sprintf("num_%d", i))
@@ -359,8 +349,6 @@ func runTestSliceMapIntToString(t *testing.T) {
 }
 
 func runTestSliceMapStringToInt(t *testing.T) {
-	t.Helper()
-
 	// Maps each string to its length and drops the empty ones, so a row
 	// can state a result shorter than its input and one that is nil
 	// though both the input and the function are not.
@@ -407,8 +395,6 @@ func (tc sliceReversedTestCase) Name() string {
 }
 
 func (tc sliceReversedTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	original := core.SliceCopy(tc.input)
 
 	result := core.SliceReversed(tc.input)
@@ -451,8 +437,6 @@ func (tc sliceReversedFnTestCase[T]) Name() string {
 }
 
 func (tc sliceReversedFnTestCase[T]) Test(t *testing.T) {
-	t.Helper()
-
 	result := core.SliceReversedFn(tc.input, tc.fn)
 	core.AssertSliceEqual(t, tc.expected, result, "SliceReversedFn")
 }
@@ -499,8 +483,6 @@ func (tc sliceSortFnTestCase[T]) Name() string {
 }
 
 func (tc sliceSortFnTestCase[T]) Test(t *testing.T) {
-	t.Helper()
-
 	// Make a copy to avoid modifying the original
 	result := core.SliceCopy(tc.input)
 	core.SliceSortFn(result, tc.less)
@@ -553,7 +535,6 @@ func TestSliceSortFn(t *testing.T) {
 }
 
 func testSliceSortFnNilFunction(t *testing.T) {
-	t.Helper()
 	original := core.S(3, 1, 2)
 	result := core.SliceCopy(original)
 	core.SliceSortFn(result, nil)
@@ -574,7 +555,6 @@ func (tc sliceSortTestCase) Name() string {
 }
 
 func (tc sliceSortTestCase) Test(t *testing.T) {
-	t.Helper()
 	result := core.SliceCopy(tc.input)
 	core.SliceSort(result, tc.compare)
 	core.AssertSliceEqual(t, tc.expected, result, "SliceSort")
@@ -613,8 +593,6 @@ func (tc sliceSortOrderedTestCase[T]) Name() string {
 }
 
 func (tc sliceSortOrderedTestCase[T]) Test(t *testing.T) {
-	t.Helper()
-
 	// Make a copy to avoid modifying the original
 	result := core.SliceCopy(tc.input)
 	core.SliceSortOrdered(result)
@@ -682,8 +660,6 @@ func (tc slicePIntTestCase) Name() string {
 }
 
 func (tc slicePIntTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	// Create a copy to test with unsorted data
 	inputCopy := core.SliceCopy(tc.input)
 
@@ -714,8 +690,6 @@ func (tc slicePFloatTestCase) Name() string {
 }
 
 func (tc slicePFloatTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	// Create a copy to test with unsorted data
 	inputCopy := core.SliceCopy(tc.input)
 
@@ -746,8 +720,6 @@ func (tc slicePStringTestCase) Name() string {
 }
 
 func (tc slicePStringTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	// Create a copy to test with unsorted data
 	inputCopy := core.SliceCopy(tc.input)
 
@@ -852,7 +824,6 @@ func (tc sliceReplaceFnNilFnTestCase) Name() string { return tc.name }
 
 // A nil function returns the slice it was given, untouched.
 func (tc sliceReplaceFnNilFnTestCase) Test(t *testing.T) {
-	t.Helper()
 	original := core.SliceCopy(tc.in)
 
 	result := core.SliceReplaceFn(tc.in, nil)

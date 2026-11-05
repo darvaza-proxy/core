@@ -74,8 +74,6 @@ func (tc typeSpecificAddrPortTestCase) Name() string {
 }
 
 func (tc typeSpecificAddrPortTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got, ok, known := typeSpecificAddrPort(tc.input)
 	AssertEqual(t, tc.wantKnown, known, "known")
 	AssertEqual(t, tc.wantOK, ok, "ok")

@@ -33,8 +33,6 @@ func (tc isNilTestCase) Name() string {
 }
 
 func (tc isNilTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := IsNil(tc.value)
 	assertComparable(t, tc.expected, result, "IsNil result")
 }
@@ -58,8 +56,6 @@ func TestIsNil(t *testing.T) {
 }
 
 func testIsNilBasic(t *testing.T) {
-	t.Helper()
-
 	nilTests := []isNilTestCase{
 		newIsNilTestCase("nil", nil, true),
 		newIsNilTestCase("non-nil int", 42, false),
@@ -74,8 +70,6 @@ func testIsNilBasic(t *testing.T) {
 }
 
 func testIsNilPointers(t *testing.T) {
-	t.Helper()
-
 	var nilPtr *int
 	nonNilPtr := new(int)
 
@@ -101,8 +95,6 @@ func (tc isNilVsIsZeroTestCase) Name() string {
 }
 
 func (tc isNilVsIsZeroTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	nilResult := IsNil(tc.value)
 	zeroResult := IsZero(tc.value)
 
@@ -199,8 +191,6 @@ func TestIsNilWithReflectValue(t *testing.T) {
 }
 
 func testIsNilSlices(t *testing.T) {
-	t.Helper()
-
 	var nilSlice []int
 	emptySlice := S[int]()
 	nonEmptySlice := S(1, 2, 3)
@@ -215,8 +205,6 @@ func testIsNilSlices(t *testing.T) {
 }
 
 func testIsNilMaps(t *testing.T) {
-	t.Helper()
-
 	var nilMap map[string]int
 	emptyMap := map[string]int{}
 	nonEmptyMap := map[string]int{"a": 1}
@@ -231,8 +219,6 @@ func testIsNilMaps(t *testing.T) {
 }
 
 func testIsNilChannels(t *testing.T) {
-	t.Helper()
-
 	var nilChan chan int
 	nonNilChan := make(chan int)
 
@@ -245,8 +231,6 @@ func testIsNilChannels(t *testing.T) {
 }
 
 func testIsNilFunctions(t *testing.T) {
-	t.Helper()
-
 	var nilFunc func()
 	nonNilFunc := func() {}
 
@@ -259,8 +243,6 @@ func testIsNilFunctions(t *testing.T) {
 }
 
 func testIsNilInterfaces(t *testing.T) {
-	t.Helper()
-
 	var nilInterface fmt.Stringer
 	var nonNilInterface fmt.Stringer = time.Second // time.Duration implements fmt.Stringer
 
@@ -322,8 +304,6 @@ func (tc isSameTestCase) Name() string {
 }
 
 func (tc isSameTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	result := IsSame(tc.a, tc.b)
 	assertComparable(t, tc.expected, result, "%s", tc.description)
 }
@@ -699,8 +679,6 @@ func (tc isSameStackOverflowTestCase) Name() string {
 }
 
 func (tc isSameStackOverflowTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	a, b := tc.setupFunc()
 	result := IsSame(a, b)
 	assertComparable(t, tc.expected, result, "%s", tc.description)
@@ -922,7 +900,6 @@ type areComparableTestCase struct {
 func (tc areComparableTestCase) Name() string { return tc.name }
 
 func (tc areComparableTestCase) Test(t *testing.T) {
-	t.Helper()
 	assertComparable(t, tc.want, AreComparable(tc.vvi...), "comparable")
 }
 
@@ -982,7 +959,6 @@ type comparableEqualTestCase struct {
 func (tc comparableEqualTestCase) Name() string { return tc.name }
 
 func (tc comparableEqualTestCase) Test(t *testing.T) {
-	t.Helper()
 	equal, known := comparableEqual(tc.a, tc.b)
 	plainEqual(t, tc.wantEqual, equal, "equal")
 	plainEqual(t, tc.wantKnown, known, "known")
@@ -1053,7 +1029,6 @@ type areEqualTestCase struct {
 func (tc areEqualTestCase) Name() string { return tc.name }
 
 func (tc areEqualTestCase) Test(t *testing.T) {
-	t.Helper()
 	is, known := AreEqual(tc.vvi...)
 	assertComparable(t, tc.wantIs, is, "is")
 	assertComparable(t, tc.wantKnown, known, "known")

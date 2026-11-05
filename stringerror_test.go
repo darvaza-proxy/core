@@ -41,8 +41,6 @@ func (tc stringErrorTestCase) Name() string {
 }
 
 func (tc stringErrorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	core.AssertEqual(t, tc.wantMsg, tc.input.Error(), "Error")
 	// OK(), IsZero() and a nil AsError() all track emptiness together.
 	core.AssertEqual(t, tc.wantNil, tc.input.OK(), "OK")
@@ -96,8 +94,6 @@ func (tc stringErrorIsTestCase) Name() string {
 }
 
 func (tc stringErrorIsTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	core.AssertEqual(t, tc.want, errors.Is(tc.err, tc.target), "errors.Is")
 	core.AssertEqual(t, tc.want, core.IsError(tc.err, tc.target), "IsError")
 }
@@ -145,8 +141,6 @@ func (tc stringErrorCtorTestCase) Name() string {
 }
 
 func (tc stringErrorCtorTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	err := core.NewStringError(tc.format, tc.args...)
 	if tc.wantNil {
 		core.AssertNil(t, err, "NewStringError")

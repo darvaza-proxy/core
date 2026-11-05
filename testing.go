@@ -1145,6 +1145,7 @@ func doMessage(
 
 // doError reports a test error with optional prefix formatting
 func doError(t T, prefixFormat string, prefixArgs []any, messageFormat string, messageArgs ...any) {
+	t.Helper()
 	doMessage(t, t.Error, prefixFormat, prefixArgs, messageFormat, messageArgs...)
 }
 
@@ -1152,6 +1153,7 @@ func doError(t T, prefixFormat string, prefixArgs []any, messageFormat string, m
 //
 //revive:disable-next-line:argument-limit
 func doLog(t T, prefixFormat string, prefixArgs []any, messageFormat string, messageArgs ...any) {
+	t.Helper()
 	doMessage(t, t.Log, prefixFormat, prefixArgs, messageFormat, messageArgs...)
 }
 

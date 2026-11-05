@@ -38,7 +38,6 @@ func (tc typeNameTestCase[T]) Name() string {
 }
 
 func (tc typeNameTestCase[T]) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.want, core.TypeName[T](), "name")
 }
 
@@ -82,7 +81,6 @@ func (tc typeNameOfTestCase) Name() string {
 }
 
 func (tc typeNameOfTestCase) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.want, core.TypeNameOf(tc.v), "name")
 }
 
@@ -129,8 +127,6 @@ func (tc coalesceTestCase[T]) Name() string {
 }
 
 func (tc coalesceTestCase[T]) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.Coalesce(tc.inputs...)
 	core.AssertEqual(t, tc.expected, got, "Coalesce")
 }
@@ -193,8 +189,6 @@ func (tc coalescePointerTestCase[T]) Name() string {
 }
 
 func (tc coalescePointerTestCase[T]) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.Coalesce(tc.inputs...)
 	core.AssertSame(t, tc.expected, got, "Coalesce")
 }
@@ -305,8 +299,6 @@ func (tc iifTestCase) Name() string {
 }
 
 func (tc iifTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.IIf(tc.cond, tc.yes, tc.no)
 	core.AssertEqual(t, tc.expected, got, "IIf")
 }
@@ -350,8 +342,6 @@ func (tc iifStringTestCase) Name() string {
 }
 
 func (tc iifStringTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.IIf(tc.cond, tc.yes, tc.no)
 	core.AssertEqual(t, tc.expected, got, "IIf")
 }
@@ -393,8 +383,6 @@ func (tc iifPointerTestCase) Name() string {
 }
 
 func (tc iifPointerTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.IIf(tc.cond, tc.yes, tc.no)
 	core.AssertSame(t, tc.expected, got, "IIf")
 }
@@ -444,8 +432,6 @@ func (tc iifStructTestCase) Name() string {
 }
 
 func (tc iifStructTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	got := core.IIf(tc.cond, tc.yes, tc.no)
 	core.AssertEqual(t, tc.expected, got, "IIf")
 }

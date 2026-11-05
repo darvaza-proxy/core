@@ -47,8 +47,6 @@ func (tc errGroupSetDefaultsTestCase) Name() string {
 }
 
 func (tc errGroupSetDefaultsTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	eg := &ErrGroup{Parent: tc.parent}
 	eg.SetDefaults()
 
@@ -79,7 +77,6 @@ func TestErrGroupSetDefaultsTwice(t *testing.T) {
 }
 
 func testErrGroupCatcherErrorWhenNotCancelled(t *testing.T) {
-	t.Helper()
 	var eg ErrGroup
 
 	testErr := errors.New("test error")
@@ -89,7 +86,6 @@ func testErrGroupCatcherErrorWhenNotCancelled(t *testing.T) {
 }
 
 func testErrGroupCatcherErrorWhenCancelled(t *testing.T) {
-	t.Helper()
 	var eg ErrGroup
 	eg.Cancel(errors.New("cancellation error"))
 
@@ -99,7 +95,6 @@ func testErrGroupCatcherErrorWhenCancelled(t *testing.T) {
 }
 
 func testErrGroupCatcherNilError(t *testing.T) {
-	t.Helper()
 	var eg ErrGroup
 
 	result := eg.defaultErrGroupCatcher(nil)

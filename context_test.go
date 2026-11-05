@@ -48,7 +48,6 @@ func (tc contextKeyStringTestCase[T]) Name() string {
 }
 
 func (tc contextKeyStringTestCase[T]) Test(t *testing.T) {
-	t.Helper()
 	core.AssertEqual(t, tc.want, tc.key.String(), "String")
 	core.AssertEqual(t, tc.wantGo, tc.key.GoString(), "GoString")
 }
@@ -180,7 +179,6 @@ func (tc withTimeoutNewTestCase[C]) Name() string {
 }
 
 func (tc withTimeoutNewTestCase[C]) Test(t *testing.T) {
-	t.Helper()
 	ctx, before, after := tc.call.run(t)
 	a := tc.call.args()
 
@@ -202,7 +200,6 @@ func (tc withTimeoutClampedTestCase[C]) Name() string {
 }
 
 func (tc withTimeoutClampedTestCase[C]) Test(t *testing.T) {
-	t.Helper()
 	ctx, _, _ := tc.call.run(t)
 	a := tc.call.args()
 
@@ -226,7 +223,6 @@ func (tc withTimeoutParentTestCase[C]) Name() string {
 }
 
 func (tc withTimeoutParentTestCase[C]) Test(t *testing.T) {
-	t.Helper()
 	ctx, _, _ := tc.call.run(t)
 
 	// AssertSame never holds for context.Background(), an empty
@@ -294,8 +290,6 @@ func withTimeoutTestCases(t *testing.T) []core.TestCase {
 }
 
 func testWithTimeoutExpiration(t *testing.T) {
-	t.Helper()
-
 	ctx, cancel := core.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
@@ -304,8 +298,6 @@ func testWithTimeoutExpiration(t *testing.T) {
 }
 
 func testWithTimeoutCancellation(t *testing.T) {
-	t.Helper()
-
 	ctx, cancel := core.WithTimeout(context.Background(), time.Hour)
 
 	core.AssertOpen(t, ctx.Done(), 0, "done before cancel")
@@ -379,8 +371,6 @@ func withTimeoutCauseTestCases(t *testing.T) []core.TestCase {
 }
 
 func testWithTimeoutCauseExpiration(t *testing.T) {
-	t.Helper()
-
 	testErr := errors.New("custom timeout cause")
 	ctx, cancel := core.WithTimeoutCause(context.Background(), 10*time.Millisecond, testErr)
 	defer cancel()
@@ -423,8 +413,6 @@ func (tc contextKeyGetTestCase) Name() string {
 }
 
 func (tc contextKeyGetTestCase) Test(t *testing.T) {
-	t.Helper()
-
 	value, ok := tc.key.Get(tc.ctx)
 	core.AssertEqual(t, tc.expectedValue, value, "Get value")
 	core.AssertEqual(t, tc.expectedOK, ok, "Get ok result")

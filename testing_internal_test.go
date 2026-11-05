@@ -45,7 +45,6 @@ func newAssertComparableTestCaseFails(name string, expected, actual any,
 func (tc assertComparableTestCase) Name() string { return tc.name }
 
 func (tc assertComparableTestCase) Test(t *testing.T) {
-	t.Helper()
 	mock := &MockT{}
 	ok := assertComparable(mock, tc.expected, tc.actual, "value %d", 1)
 

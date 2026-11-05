@@ -59,7 +59,6 @@ func (tc waitForCondTestCase) Name() string {
 }
 
 func (tc waitForCondTestCase) Test(t *testing.T) {
-	t.Helper()
 	got := core.WaitForCond(tc.cond(), ms(tc.budgetMS), tc.step)
 	core.AssertEqual(t, tc.want, got, "result")
 }
@@ -120,7 +119,6 @@ func (tc waitForCondContextTestCase) Name() string {
 }
 
 func (tc waitForCondContextTestCase) Test(t *testing.T) {
-	t.Helper()
 	got := core.WaitForCondContext(tc.ctx(t), tc.cond(), tc.step)
 	core.AssertEqual(t, tc.want, got, "result")
 }

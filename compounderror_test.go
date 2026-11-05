@@ -42,7 +42,6 @@ func (tc newCompoundErrorTestCase) Name() string {
 }
 
 func (tc newCompoundErrorTestCase) Test(t *testing.T) {
-	t.Helper()
 	ce := core.NewCompoundError(tc.errs...)
 
 	core.AssertMustNotNil(t, ce, "result")
@@ -111,7 +110,6 @@ func (tc compoundErrorErrorTestCase) Name() string {
 }
 
 func (tc compoundErrorErrorTestCase) Test(t *testing.T) {
-	t.Helper()
 	ce := &core.CompoundError{Errs: tc.errs}
 	result := ce.Error()
 
@@ -202,7 +200,6 @@ func (tc compoundErrorOKTestCase) Name() string {
 }
 
 func (tc compoundErrorOKTestCase) Test(t *testing.T) {
-	t.Helper()
 	ce := &core.CompoundError{Errs: tc.errs}
 
 	// Test both OK() and deprecated Ok() methods
@@ -245,7 +242,6 @@ func (tc compoundErrorAsErrorTestCase) Name() string {
 }
 
 func (tc compoundErrorAsErrorTestCase) Test(t *testing.T) {
-	t.Helper()
 	ce := &core.CompoundError{Errs: tc.errs}
 	result := ce.AsError()
 
@@ -309,7 +305,6 @@ func (tc compoundErrorAppendErrorTestCase) Name() string {
 }
 
 func (tc compoundErrorAppendErrorTestCase) Test(t *testing.T) {
-	t.Helper()
 	ce := &core.CompoundError{Errs: tc.initial}
 	result := ce.AppendError(tc.toAppend...)
 
@@ -414,7 +409,6 @@ func (tc compoundErrorAppendTestCase) Name() string {
 }
 
 func (tc compoundErrorAppendTestCase) Test(t *testing.T) {
-	t.Helper()
 	ce := new(core.CompoundError)
 	result := ce.Append(tc.err, tc.note, tc.args...)
 
@@ -510,7 +504,6 @@ func (tc compoundErrorAppendUnchangedTestCase) Name() string {
 }
 
 func (tc compoundErrorAppendUnchangedTestCase) Test(t *testing.T) {
-	t.Helper()
 	ce := new(core.CompoundError)
 	result := ce.Append(tc.err, tc.note, tc.args...)
 
