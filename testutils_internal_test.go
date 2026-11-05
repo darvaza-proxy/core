@@ -34,3 +34,12 @@ func plainContains(t *testing.T, s, substr, desc string) {
 		t.Errorf("%s: %q does not contain %q", desc, s, substr)
 	}
 }
+
+// MustNotZeroForTest refuses a zero value where a row declares a
+// non-zero one.
+func MustNotZeroForTest[T any](v T) T {
+	if IsZero(v) {
+		panic("row declares a zero value where a non-zero one is expected")
+	}
+	return v
+}

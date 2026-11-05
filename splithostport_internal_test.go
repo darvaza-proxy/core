@@ -40,7 +40,7 @@ func newDoMakeHostPortTestCase(name, host, port string, defaultPort uint16,
 		name:        name,
 		host:        host,
 		port:        port,
-		expected:    MustNotEmptyForTest(expected),
+		expected:    MustNotZeroForTest(expected),
 		defaultPort: defaultPort,
 	}
 }
@@ -121,7 +121,7 @@ func newDoJoinHostPortTestCase(name, host, port, expected string) doJoinHostPort
 		name:     name,
 		host:     host,
 		port:     port,
-		expected: MustNotEmptyForTest(expected),
+		expected: MustNotZeroForTest(expected),
 	}
 }
 

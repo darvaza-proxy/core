@@ -139,7 +139,7 @@ func newSplitHostPortTestCase(name, hostPort, host, port string) splitHostPortTe
 	return splitHostPortTestCase{
 		name:     name,
 		hostPort: hostPort,
-		host:     core.MustNotEmptyForTest(host),
+		host:     core.MustNotZeroForTest(host),
 		port:     port,
 	}
 }
@@ -282,7 +282,7 @@ func newMakeHostPortTestCase(name, hostPort string, defaultPort uint16, expected
 	return makeHostPortTestCase{
 		name:        name,
 		hostPort:    hostPort,
-		expected:    core.MustNotEmptyForTest(expected),
+		expected:    core.MustNotZeroForTest(expected),
 		defaultPort: defaultPort,
 	}
 }
@@ -382,7 +382,7 @@ func newJoinHostPortTestCase(name, host, port, expected string) joinHostPortTest
 		name:     name,
 		host:     host,
 		port:     port,
-		expected: core.MustNotEmptyForTest(expected),
+		expected: core.MustNotZeroForTest(expected),
 	}
 }
 
