@@ -15,7 +15,8 @@ import "reflect"
 //
 // When == is unavailable, the question is settled by typed nils, by
 // identity (the same underlying data, as [IsSame] sees it), and by the
-// Equal method standing in for ==.
+// Equal method standing in for ==. Functions those leave undecided
+// are unequal.
 //
 // A comparable type can still hold a value == panics on, as a struct
 // with an interface field holding a slice does. == is attempted all the
@@ -31,12 +32,12 @@ import "reflect"
 // empty slice is not its equal.
 //
 // known reports whether the answer is settled. A pair that is neither
-// comparable, nil, identical, decided by an Equal method, nor a slice
-// settled element by element leaves the list undecided — deciding
-// would take the deep comparison AreEqual deliberately avoids —
-// unless a later pair settles the whole list as unequal. Callers that
-// need a decision anyway can fall back to [reflect.DeepEqual] when
-// known is false.
+// comparable, nil, identical, decided by an Equal method, a function,
+// nor a slice settled element by element leaves the list undecided —
+// deciding would take the deep comparison AreEqual deliberately
+// avoids — unless a later pair settles the whole list as unequal.
+// Callers that need a decision anyway can fall back to
+// [reflect.DeepEqual] when known is false.
 //
 // Untyped nil only equals untyped nil, values of different types are
 // never equal, and a single value is vacuously equal. AreEqual
@@ -140,10 +141,10 @@ func areEqualComparable(va, vb reflect.Value, path areEqualPath) (is, known bool
 // areEqualFallback decides equality when == is unavailable: typed
 // nils and identity settle the question — nil only equals nil, and
 // identity proves equality — and the value's own Equal method stands
-// in for ==. A slice left undecided outside any other is compared
-// element by element. Anything else stays unknown — two distinct
-// values may still be equal, and deciding that would take a deep
-// comparison.
+// in for ==. A function left undecided is unequal. A slice left
+// undecided outside any other is compared element by element.
+// Anything else stays unknown — two distinct values may still be
+// equal, and deciding that would take a deep comparison.
 func areEqualFallback(va, vb reflect.Value, path areEqualPath) (is, known bool) {
 	if same, ok := isSameTypedNil(va, vb); ok {
 		// nil only equals nil
@@ -157,6 +158,11 @@ func areEqualFallback(va, vb reflect.Value, path areEqualPath) (is, known bool) 
 
 	if is, known = equalMethod(va, vb); known {
 		return is, true
+	}
+
+	if va.Kind() == reflect.Func {
+		// a function left undecided is unequal
+		return false, true
 	}
 
 	return areEqualSlice(va, vb, path)

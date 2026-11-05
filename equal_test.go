@@ -60,6 +60,12 @@ type boxed struct{ n int }
 
 func (b *boxed) Equal(o *boxed) bool { return b.n == o.n }
 
+// eqAlwaysFunc is a function type with an Equal method that always
+// matches.
+type eqAlwaysFunc func(float64) float64
+
+func (eqAlwaysFunc) Equal(eqAlwaysFunc) bool { return true }
+
 // newAdder returns a closure adding n, so every closure it returns
 // shares one function literal's code. It is kept out of line, as an
 // inlined call can carry a copy of the literal of its own.
@@ -303,6 +309,10 @@ func areEqualSettledIdentityTestCases() []areEqualTestCase {
 	return []areEqualTestCase{
 		newAreEqualSettledTestCase("same function",
 			core.S[any](math.Sin, math.Sin), true),
+		newAreEqualSettledTestCase("distinct functions",
+			core.S[any](math.Sin, math.Cos), false),
+		newAreEqualSettledTestCase("Equal rescues distinct functions",
+			core.S[any](eqAlwaysFunc(math.Sin), eqAlwaysFunc(math.Cos)), true),
 		newAreEqualSettledTestCase("closures of one literal",
 			core.S[any](newAdder(1), newAdder(2)), true),
 		newAreEqualSettledTestCase("identity ahead of a failing Equal",
