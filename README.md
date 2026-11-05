@@ -452,14 +452,23 @@ Special error types for network-style temporary and timeout conditions:
 * `NewTemporaryError(err)` - wrap error as temporary condition.
 * `NewTimeoutError(err)` - wrap error as timeout condition with both temporary
   and timeout properties.
-* `IsTemporary(err)` - recursively test if error chain contains temporary
-  condition via `Temporary()` or `IsTemporary()` methods.
-* `CheckIsTemporary(err)` - test single error for temporary condition without
-  unwrapping chain, returns (is, known) tuple.
-* `IsTimeout(err)` - recursively test if error chain contains timeout
-  condition via `Timeout()` or `IsTimeout()` methods.
-* `CheckIsTimeout(err)` - test single error for timeout condition without
-  unwrapping chain, returns (is, known) tuple.
+* `PermanentError` type - reports neither a temporary error nor a timeout,
+  whatever the error it wraps reports: its `Temporary()`, `IsTemporary()`,
+  `Timeout()` and `IsTimeout()` methods answer false, so `IsTemporary` and
+  `IsTimeout` stop at it, while `errors.Is` and `errors.As` reach the
+  wrapped error through `Unwrap()`.
+* `NewPermanentError(err)` - wrap error as neither temporary nor a timeout,
+  returning nil for a nil error.
+* `IsTemporary(err)` - walk the error chain for a temporary condition via
+  `CheckIsTemporary`, stopping at the first error that gives an answer.
+* `CheckIsTemporary(err)` - test single error for temporary condition via
+  `Temporary()` or `IsTemporary()` methods, falling back to `CheckIsTimeout`,
+  without unwrapping chain, returns (is, known) tuple.
+* `IsTimeout(err)` - walk the error chain for a timeout condition via
+  `CheckIsTimeout`, stopping at the first error that gives an answer.
+* `CheckIsTimeout(err)` - test single error for timeout condition via
+  `Timeout()` or `IsTimeout()` methods, without unwrapping chain, returns
+  (is, known) tuple.
 
 ### Error Testing and Utilities
 

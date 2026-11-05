@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"slices"
 )
 
@@ -37,6 +38,8 @@ var (
 
 var (
 	_ Unwrappable = (*WrappedError)(nil)
+	_ Unwrappable = (*PermanentError)(nil)
+	_ net.Error   = (*PermanentError)(nil)
 )
 
 // Unwrappable represents an error that can be Unwrap() to get the cause
@@ -173,6 +176,53 @@ func NewTemporaryError(err error) error {
 	return &TemporaryError{
 		cause: err,
 	}
+}
+
+// PermanentError is an error wrapper that reports neither a temporary
+// error nor a timeout, whatever the error it wraps reports. Its
+// Temporary, IsTemporary, Timeout and IsTimeout methods answer false,
+// so [CheckIsTemporary] and [CheckIsTimeout] give a known false for it,
+// and [IsTemporary] and [IsTimeout] stop their walk there. errors.Is
+// and errors.As still reach the wrapped error through Unwrap.
+type PermanentError struct {
+	cause error
+}
+
+// Error returns the wrapped error's text.
+func (w *PermanentError) Error() string {
+	if w == nil || w.cause == nil {
+		return ""
+	}
+	return w.cause.Error()
+}
+
+// Unwrap returns the wrapped error.
+func (w *PermanentError) Unwrap() error {
+	if w == nil {
+		return nil
+	}
+	return w.cause
+}
+
+// IsTemporary reports false, whatever the wrapped error reports.
+func (*PermanentError) IsTemporary() bool { return false }
+
+// IsTimeout reports false, whatever the wrapped error reports.
+func (*PermanentError) IsTimeout() bool { return false }
+
+// Temporary reports false, whatever the wrapped error reports.
+func (*PermanentError) Temporary() bool { return false }
+
+// Timeout reports false, whatever the wrapped error reports.
+func (*PermanentError) Timeout() bool { return false }
+
+// NewPermanentError wraps err as a PermanentError, and returns nil for
+// a nil err.
+func NewPermanentError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &PermanentError{cause: err}
 }
 
 // CoalesceError returns the first non-nil error argument.
@@ -442,8 +492,10 @@ func CheckIsTemporary(err error) (is, known bool) {
 //   - Detecting modern IsTemporary() bool implementations
 //   - Detecting timeout errors (which are also considered temporary)
 //
-// Returns true if any error in the chain indicates a temporary condition.
-// Returns false for nil errors or chains with no temporary indicators.
+// Returns the answer of the first error in the chain that gives one, so
+// an error that reports itself not temporary stops the walk before the
+// errors it wraps. Returns false for nil errors or chains with no
+// temporary indicators.
 //
 // Use this function when you need to determine if an operation should be
 // retried based on the error's temporary nature.
@@ -496,8 +548,10 @@ func CheckIsTimeout(err error) (is, known bool) {
 //   - Detecting legacy net.Error.Timeout() implementations
 //   - Detecting modern IsTimeout() bool implementations
 //
-// Returns true if any error in the chain indicates a timeout condition.
-// Returns false for nil errors or chains with no timeout indicators.
+// Returns the answer of the first error in the chain that gives one, so
+// an error that reports itself not a timeout stops the walk before the
+// errors it wraps. Returns false for nil errors or chains with no
+// timeout indicators.
 //
 // Use this function when you need to distinguish timeout errors from
 // other types of temporary errors for specialized retry logic or
