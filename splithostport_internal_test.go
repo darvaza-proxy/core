@@ -8,7 +8,7 @@ import (
 // Compile-time verification that test case types implement TestCase interface
 var (
 	_ TestCase = doMakeHostPortTestCase{}
-	_ TestCase = ipForHostPortTestCase{}
+	_ TestCase = joinHostPortUnsafeTestCase{}
 )
 
 type doMakeHostPortTestCase struct {
@@ -66,7 +66,7 @@ func doMakeHostPortTestCases() []doMakeHostPortTestCase {
 
 		// Without one, the default port is used.
 		newDoMakeHostPortTestCase("default port", "example.com", "", 8080, "example.com:8080"),
-		newDoMakeHostPortTestCase("default port IPv6", "[::1]", "", 8080, "[::1]:8080"),
+		newDoMakeHostPortTestCase("default port IPv6", "::1", "", 8080, "[::1]:8080"),
 
 		// Without either, the host comes back portless.
 		newDoMakeHostPortTestCase("no port hostname", "example.com", "", 0, "example.com"),
@@ -86,44 +86,56 @@ func TestDoMakeHostPort(t *testing.T) {
 	RunTestCases(t, doMakeHostPortTestCases())
 }
 
-type ipForHostPortTestCase struct {
+type joinHostPortUnsafeTestCase struct {
 	name     string
-	input    string
+	host     string
+	port     string
 	expected string
 }
 
-func (tc ipForHostPortTestCase) Name() string {
+func (tc joinHostPortUnsafeTestCase) Name() string {
 	return tc.name
 }
 
-func (tc ipForHostPortTestCase) Test(t *testing.T) {
-	addr, err := ParseAddr(tc.input)
-	AssertMustNoError(t, err, "ParseAddr")
-
-	AssertEqual(t, tc.expected, ipForHostPort(addr), "host form")
+func (tc joinHostPortUnsafeTestCase) Test(t *testing.T) {
+	AssertEqual(t, tc.expected, joinHostPortUnsafe(tc.host, tc.port), "host:port")
 }
 
-func newIPForHostPortTestCase(name, input, expected string) ipForHostPortTestCase {
-	return ipForHostPortTestCase{
+// newJoinHostPortUnsafeTestCase declares a pair by the string
+// joinHostPortUnsafe joins it into.
+func newJoinHostPortUnsafeTestCase(name, host, port, expected string) joinHostPortUnsafeTestCase {
+	return joinHostPortUnsafeTestCase{
 		name:     name,
-		input:    input,
+		host:     host,
+		port:     port,
 		expected: expected,
 	}
 }
 
-func ipForHostPortTestCases() []ipForHostPortTestCase {
+func joinHostPortUnsafeTestCases() []joinHostPortUnsafeTestCase {
 	return S(
-		// An IPv4 address comes back as it is.
-		newIPForHostPortTestCase("IPv4 localhost", "127.0.0.1", "127.0.0.1"),
+		// A port follows the host after a ':'.
+		newJoinHostPortUnsafeTestCase("name and port", "example.com", "80", "example.com:80"),
+		newJoinHostPortUnsafeTestCase("IPv4 and port", "127.0.0.1", "80", "127.0.0.1:80"),
 
-		// An IPv6 address comes back bracketed, a mapped one included.
-		newIPForHostPortTestCase("IPv6 localhost", "::1", "[::1]"),
-		newIPForHostPortTestCase("IPv6 mapped", "::ffff:192.0.2.1", "[::ffff:192.0.2.1]"),
+		// A host holding a ':' is bracketed before the port, a mapped
+		// or zoned IPv6 address included.
+		newJoinHostPortUnsafeTestCase("IPv6 and port", "::1", "80", "[::1]:80"),
+		newJoinHostPortUnsafeTestCase("IPv6 mapped and port", "::ffff:192.0.2.1", "80", "[::ffff:192.0.2.1]:80"),
+		newJoinHostPortUnsafeTestCase("IPv6 zone and port", "fe80::1%eth0", "80", "[fe80::1%eth0]:80"),
+
+		// Without a port, the host comes back alone, unbracketed.
+		newJoinHostPortUnsafeTestCase("name no port", "example.com", "", "example.com"),
+		newJoinHostPortUnsafeTestCase("IPv6 no port", "::1", "", "::1"),
+
+		// Neither the host nor the port is validated.
+		newJoinHostPortUnsafeTestCase("invalid host and port", "bad host", "port", "bad host:port"),
+		newJoinHostPortUnsafeTestCase("empty host and port", "", "", ""),
 	)
 }
 
-func TestIPForHostPort(t *testing.T) {
-	RunTestCases(t, ipForHostPortTestCases())
+func TestJoinHostPortUnsafe(t *testing.T) {
+	RunTestCases(t, joinHostPortUnsafeTestCases())
 }
 
 // TestAddrErr states what addrErr hands its callers: a *net.AddrError

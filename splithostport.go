@@ -35,18 +35,7 @@ func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	}
 
 	// port is either valid or empty
-	// host is either a valid hostname or a valid IP address
-
-	if ip, _ := ParseAddr(host); ip.IsValid() {
-		// IP address
-
-		if port == "" && defaultPort == 0 {
-			// portless IP
-			return ip.String(), nil
-		}
-
-		host = ipForHostPort(ip)
-	}
+	// host is either a valid hostname or a valid IP address, cleaned
 
 	s, ok := doMakeHostPort(host, port, defaultPort)
 	if !ok {
@@ -57,24 +46,27 @@ func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	return s, nil
 }
 
-// doMakeHostPort joins a cleaned host and port, the port in canonical
-// decimal form, and reports false for a port it refuses.
+// doMakeHostPort joins a cleaned, unbracketed host and its port, the
+// port in canonical decimal form, using defaultPort when port is empty,
+// and returns the host alone when both are unset. It reports false for
+// a port that does not parse, or parses to 0.
 func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
-	if port == "" {
-		if defaultPort == 0 {
-			// portless hostname
-			return host, true
+	switch {
+	case port != "":
+		n, err := parsePort(port)
+		if err != nil || n == 0 {
+			// bad port, or 0 in any spelling
+			return "", false
 		}
-		return host + ":" + formatPort(defaultPort), true
+		port = formatPort(n)
+	case defaultPort != 0:
+		// default port
+		port = formatPort(defaultPort)
+	default:
+		// neither port nor default, portless
 	}
 
-	n, err := parsePort(port)
-	if err != nil || n == 0 {
-		// bad port, or 0 in any spelling
-		return "", false
-	}
-
-	return host + ":" + formatPort(n), true
+	return joinHostPortUnsafe(host, port), true
 }
 
 // JoinHostPort is like the standard net.JoinHostPort, but
@@ -103,42 +95,31 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
 //   - JoinHostPort("invalid host", "80") → error
 //   - JoinHostPort("example.com", "99999") → error (port out of range)
 func JoinHostPort(host, port string) (string, error) {
-	ip, _ := ParseAddr(host)
+	s, ok := validHost(host)
 	switch {
-	case ip.IsValid():
-		if port == "" {
-			// portless IP ready
-			return ip.String(), nil
-		}
-
-		host = ipForHostPort(ip)
+	case !ok:
+		// bad host
+		return "", addrErr(host, "invalid host")
+	case port == "":
+		// portless host
+		return s, nil
 	default:
-		// not IP address
-		s, ok := validName(host)
-		switch {
-		case !ok:
-			// bad host name
-			return "", addrErr(host, "invalid host")
-		case port == "":
-			// portless host
-			return s, nil
-		default:
-			// good name
-			host = s
-		}
+		// good host
+		return doJoinHostPort(s, port)
 	}
-
-	return doJoinHostPort(host, port)
 }
 
+// doJoinHostPort joins a cleaned, unbracketed host and a port, the port
+// in canonical decimal form. It refuses a port that does not parse, and
+// the error names the host and port joined as passed.
 func doJoinHostPort(host, port string) (string, error) {
 	s, ok := canonicalPort(port)
 	if !ok {
 		// bad port
-		return "", addrErr(host+":"+port, "invalid port")
+		return "", addrErr(joinHostPortUnsafe(host, port), "invalid port")
 	}
 
-	return host + ":" + s, nil
+	return joinHostPortUnsafe(host, s), nil
 }
 
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
@@ -183,13 +164,8 @@ func SplitHostPort(hostPort string) (host, port string, err error) {
 		port = s
 	}
 
-	if s, ok := validIP(host); ok {
-		// valid IP
-		return s, port, nil
-	}
-
-	if s, ok := validName(host); ok {
-		// valid name
+	if s, ok := validHost(host); ok {
+		// valid host
 		return s, port, nil
 	}
 
@@ -335,6 +311,17 @@ func canonicalPort(s string) (string, bool) {
 	return formatPort(n), true
 }
 
+// validHost validates a host as an IP address or a name, and returns it
+// cleaned: an IP in its canonical text, a name in Unicode and in lower
+// case.
+func validHost(s string) (string, bool) {
+	if ip, ok := validIP(s); ok {
+		// valid IP
+		return ip, true
+	}
+	return validName(s)
+}
+
 func validIP(s string) (string, bool) {
 	addr, err := ParseAddr(s)
 	if err == nil {
@@ -356,12 +343,15 @@ func validName(s string) (string, bool) {
 	return "", false
 }
 
-func ipForHostPort(ip netip.Addr) string {
-	if ip.Is6() {
-		return "[" + ip.String() + "]"
+// joinHostPortUnsafe joins a host and a port without validating either.
+// It returns the host alone when the port is empty, and otherwise joins
+// them through net.JoinHostPort.
+func joinHostPortUnsafe(host, port string) string {
+	if port == "" {
+		// portless
+		return host
 	}
-
-	return ip.String()
+	return net.JoinHostPort(host, port)
 }
 
 func addrErr(addr, why string) error {
