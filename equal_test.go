@@ -60,6 +60,19 @@ type boxed struct{ n int }
 
 func (b *boxed) Equal(o *boxed) bool { return b.n == o.n }
 
+// zeroBoxed compares its contents under Equal, a nil pointer counting
+// as the zero value.
+type zeroBoxed struct{ n int }
+
+func (b *zeroBoxed) Equal(o *zeroBoxed) bool { return b.value() == o.value() }
+
+func (b *zeroBoxed) value() int {
+	if b == nil {
+		return 0
+	}
+	return b.n
+}
+
 // eqAlwaysFunc is a function type with an Equal method that always
 // matches.
 type eqAlwaysFunc func(float64) float64
@@ -79,6 +92,11 @@ func newAdder(n int) func(int) int {
 // field, where it cannot be unwrapped via Interface().
 func makeReached[T any](v T) reflect.Value {
 	return reflect.ValueOf(struct{ v T }{v}).Field(0)
+}
+
+// makeInterfaceValue returns v as a reflect.Value of interface kind.
+func makeInterfaceValue(v any) reflect.Value {
+	return reflect.ValueOf(&v).Elem()
 }
 
 type areEqualTestCase struct {
@@ -152,13 +170,13 @@ func areEqualNilTestCases() []areEqualTestCase {
 func areEqualIdentityTestCases() []areEqualTestCase {
 	slice := core.S(1, 2, 3)
 	m := map[string]int{"a": 1}
-	o := reflect.ValueOf(core.NewOpaqueFieldsForTest(42, 1))
 
 	return []areEqualTestCase{
 		newAreEqualTestCase("same slice", core.S[any](slice, slice), true, true),
 		newAreEqualTestCase("same map", core.S[any](m, m), true, true),
-		newAreEqualTestCase("unexported fields stay unknown",
-			core.S[any](o.Field(1), o.Field(1)), false, false),
+		newAreEqualTestCase("reached distinct maps stay unknown",
+			core.S[any](makeReached(map[string]int{"a": 1}),
+				makeReached(map[string]int{"a": 1})), false, false),
 		newAreEqualTestCase("distinct maps",
 			core.S[any](map[string]int{}, map[string]int{}), false, false),
 		newAreEqualTestCase("undecided then settled",
@@ -181,6 +199,12 @@ func areEqualMethodTestCases() []areEqualTestCase {
 			core.S[any](oddEqSlice{1}, oddEqSlice{1}), true, true),
 		newAreEqualTestCase("panicking Equal without elements stays unknown",
 			core.S[any](panicEqMap{"a": 1}, panicEqMap{"a": 1}), false, false),
+		newAreEqualTestCase("Equal out of reach stays unknown",
+			core.S[any](makeReached(eqAlways(1)), makeReached(eqAlways(2))),
+			false, false),
+		newAreEqualTestCase("Equal out of reach behind an interface stays unknown",
+			core.S[any](makeReached[any](eqAlways(1)), makeReached[any](eqAlways(2))),
+			false, false),
 	}
 }
 
@@ -280,6 +304,9 @@ func areEqualSettledComparableTestCases() []areEqualTestCase {
 			core.S[any](epoch, epoch.In(elsewhere)), true),
 		newAreEqualSettledTestCase("Equal ignores the monotonic reading",
 			core.S[any](now, now.Round(0)), true),
+		newAreEqualSettledTestCase("Equal behind an interface value",
+			core.S[any](makeInterfaceValue(now),
+				makeInterfaceValue(now.Round(0))), true),
 		newAreEqualSettledTestCase("settled before an undecided pair",
 			core.S[any](1, 2, map[string]int{}), false),
 	}
@@ -295,6 +322,8 @@ func areEqualSettledNilTestCases() []areEqualTestCase {
 			core.S[any](map[string]int(nil), map[string]int{}), false),
 		newAreEqualSettledTestCase("nil ahead of a matching Equal",
 			core.S[any](core.EqSliceForTest(nil), core.EqSliceForTest{}), false),
+		newAreEqualSettledTestCase("nil pointer ahead of a matching Equal",
+			core.S[any]((*zeroBoxed)(nil), &zeroBoxed{}), false),
 		newAreEqualSettledTestCase("nil ahead of a failing Equal",
 			core.S[any](eqNeverSlice(nil), eqNeverSlice(nil)), true),
 		newAreEqualSettledTestCase("nil ahead of a panicking Equal",
@@ -345,10 +374,20 @@ func areEqualSettledReachedTestCases() []areEqualTestCase {
 	m := map[string]int{}
 
 	return []areEqualTestCase{
+		newAreEqualSettledTestCase("reached equal ints",
+			core.S[any](makeReached(1), makeReached(1)), true),
+		newAreEqualSettledTestCase("reached unequal ints",
+			core.S[any](makeReached(1), makeReached(2)), false),
+		newAreEqualSettledTestCase("reached equal interfaces",
+			core.S[any](makeReached[any](1), makeReached[any](1)), true),
+		newAreEqualSettledTestCase("reached unequal interfaces",
+			core.S[any](makeReached[any](1), makeReached[any](2)), false),
 		newAreEqualSettledTestCase("reached nil pointer against a set one",
 			core.S[any](makeReached((*int)(nil)), makeReached(p)), false),
 		newAreEqualSettledTestCase("reached same pointer",
 			core.S[any](makeReached(p), makeReached(p)), true),
+		newAreEqualSettledTestCase("reached nil ahead of an Equal out of reach",
+			core.S[any](makeReached((*boxed)(nil)), makeReached(&boxed{1})), false),
 		newAreEqualSettledTestCase("reached nil slices",
 			core.S[any](makeReached([]int(nil)), makeReached([]int(nil))), true),
 		newAreEqualSettledTestCase("reached same slice",
