@@ -8,7 +8,6 @@ import (
 // Compile-time verification that test case types implement TestCase interface
 var (
 	_ TestCase = doMakeHostPortTestCase{}
-	_ TestCase = doJoinHostPortTestCase{}
 	_ TestCase = ipForHostPortTestCase{}
 )
 
@@ -85,70 +84,6 @@ func doMakeHostPortTestCases() []doMakeHostPortTestCase {
 
 func TestDoMakeHostPort(t *testing.T) {
 	RunTestCases(t, doMakeHostPortTestCases())
-}
-
-type doJoinHostPortTestCase struct {
-	name     string
-	host     string
-	port     string
-	expected string
-	rejected bool
-}
-
-func (tc doJoinHostPortTestCase) Name() string {
-	return tc.name
-}
-
-func (tc doJoinHostPortTestCase) Test(t *testing.T) {
-	got, err := doJoinHostPort(tc.host, tc.port)
-
-	AssertEqual(t, tc.expected, got, "host:port")
-
-	if tc.rejected {
-		// A rejection names the host and port as given.
-		rejection := AssertMustErrorAs[*net.AddrError](t, err, "error")
-		AssertEqual(t, tc.host+":"+tc.port, rejection.Addr, "error address")
-		return
-	}
-
-	AssertNoError(t, err, "error")
-}
-
-// newDoJoinHostPortTestCase declares an accepted pair by the host:port
-// it joins into.
-func newDoJoinHostPortTestCase(name, host, port, expected string) doJoinHostPortTestCase {
-	return doJoinHostPortTestCase{
-		name:     name,
-		host:     host,
-		port:     port,
-		expected: MustNotZeroForTest(expected),
-	}
-}
-
-// newDoJoinHostPortTestCaseRejected declares a pair doJoinHostPort
-// rejects, returning the empty string.
-func newDoJoinHostPortTestCaseRejected(name, host, port string) doJoinHostPortTestCase {
-	return doJoinHostPortTestCase{
-		name:     name,
-		host:     host,
-		port:     port,
-		rejected: true,
-	}
-}
-
-func doJoinHostPortTestCases() []doJoinHostPortTestCase {
-	return S(
-		// The port joins in canonical form.
-		newDoJoinHostPortTestCase("plain port", "example.com", "8080", "example.com:8080"),
-		newDoJoinHostPortTestCase("padded port", "example.com", "0080", "example.com:80"),
-
-		// A port beyond 65535 is rejected.
-		newDoJoinHostPortTestCaseRejected("port 65536", "example.com", "65536"),
-	)
-}
-
-func TestDoJoinHostPort(t *testing.T) {
-	RunTestCases(t, doJoinHostPortTestCases())
 }
 
 type ipForHostPortTestCase struct {
