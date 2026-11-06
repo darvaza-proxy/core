@@ -1090,13 +1090,13 @@ func areEqualNilTestCases() []areEqualTestCase {
 func areEqualIdentityTestCases() []areEqualTestCase {
 	slice := S(1, 2, 3)
 	m := map[string]int{"a": 1}
-	o := reflect.ValueOf(opaqueFields{v: 42, n: 1})
 
 	return []areEqualTestCase{
 		newAreEqualTestCase("same slice", S[any](slice, slice), true, true),
 		newAreEqualTestCase("same map", S[any](m, m), true, true),
-		newAreEqualTestCase("unexported fields stay unknown",
-			S[any](o.Field(1), o.Field(1)), false, false),
+		newAreEqualTestCase("reached distinct maps stay unknown",
+			S[any](makeReached(map[string]int{"a": 1}),
+				makeReached(map[string]int{"a": 1})), false, false),
 		newAreEqualTestCase("distinct maps",
 			S[any](map[string]int{}, map[string]int{}), false, false),
 		newAreEqualTestCase("undecided then settled",
@@ -1119,6 +1119,12 @@ func areEqualMethodTestCases() []areEqualTestCase {
 			S[any](oddEqSlice{1}, oddEqSlice{1}), true, true),
 		newAreEqualTestCase("panicking Equal without elements stays unknown",
 			S[any](panicEqMap{"a": 1}, panicEqMap{"a": 1}), false, false),
+		newAreEqualTestCase("Equal out of reach stays unknown",
+			S[any](makeReached(eqAlways(1)), makeReached(eqAlways(2))),
+			false, false),
+		newAreEqualTestCase("Equal out of reach behind an interface stays unknown",
+			S[any](makeReached[any](eqAlways(1)), makeReached[any](eqAlways(2))),
+			false, false),
 	}
 }
 

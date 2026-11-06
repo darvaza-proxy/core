@@ -13,6 +13,19 @@ type boxed struct{ n int }
 
 func (b *boxed) Equal(o *boxed) bool { return b.n == o.n }
 
+// zeroBoxed compares its contents under Equal, a nil pointer counting
+// as the zero value.
+type zeroBoxed struct{ n int }
+
+func (b *zeroBoxed) Equal(o *zeroBoxed) bool { return b.value() == o.value() }
+
+func (b *zeroBoxed) value() int {
+	if b == nil {
+		return 0
+	}
+	return b.n
+}
+
 // eqAlwaysFunc is a function type with an Equal method that always
 // matches.
 type eqAlwaysFunc func(float64) float64
@@ -32,6 +45,11 @@ func newAdder(n int) func(int) int {
 // field, where it cannot be unwrapped via Interface().
 func makeReached[T any](v T) reflect.Value {
 	return reflect.ValueOf(struct{ v T }{v}).Field(0)
+}
+
+// makeInterfaceValue returns v as a reflect.Value of interface kind.
+func makeInterfaceValue(v any) reflect.Value {
+	return reflect.ValueOf(&v).Elem()
 }
 
 // newAreEqualSettledTestCase builds a row whose values AreEqual settles,
@@ -69,6 +87,9 @@ func areEqualSettledComparableTestCases() []areEqualTestCase {
 			S[any](epoch, epoch.In(elsewhere)), true),
 		newAreEqualSettledTestCase("Equal ignores the monotonic reading",
 			S[any](now, now.Round(0)), true),
+		newAreEqualSettledTestCase("Equal behind an interface value",
+			S[any](makeInterfaceValue(now),
+				makeInterfaceValue(now.Round(0))), true),
 		newAreEqualSettledTestCase("settled before an undecided pair",
 			S[any](1, 2, map[string]int{}), false),
 	}
@@ -84,6 +105,8 @@ func areEqualSettledNilTestCases() []areEqualTestCase {
 			S[any](map[string]int(nil), map[string]int{}), false),
 		newAreEqualSettledTestCase("nil ahead of a matching Equal",
 			S[any](EqSliceForTest(nil), EqSliceForTest{}), false),
+		newAreEqualSettledTestCase("nil pointer ahead of a matching Equal",
+			S[any]((*zeroBoxed)(nil), &zeroBoxed{}), false),
 		newAreEqualSettledTestCase("nil ahead of a failing Equal",
 			S[any](eqNeverSlice(nil), eqNeverSlice(nil)), true),
 		newAreEqualSettledTestCase("nil ahead of a panicking Equal",
@@ -134,10 +157,20 @@ func areEqualSettledReachedTestCases() []areEqualTestCase {
 	m := map[string]int{}
 
 	return []areEqualTestCase{
+		newAreEqualSettledTestCase("reached equal ints",
+			S[any](makeReached(1), makeReached(1)), true),
+		newAreEqualSettledTestCase("reached unequal ints",
+			S[any](makeReached(1), makeReached(2)), false),
+		newAreEqualSettledTestCase("reached equal interfaces",
+			S[any](makeReached[any](1), makeReached[any](1)), true),
+		newAreEqualSettledTestCase("reached unequal interfaces",
+			S[any](makeReached[any](1), makeReached[any](2)), false),
 		newAreEqualSettledTestCase("reached nil pointer against a set one",
 			S[any](makeReached((*int)(nil)), makeReached(p)), false),
 		newAreEqualSettledTestCase("reached same pointer",
 			S[any](makeReached(p), makeReached(p)), true),
+		newAreEqualSettledTestCase("reached nil ahead of an Equal out of reach",
+			S[any](makeReached((*boxed)(nil)), makeReached(&boxed{1})), false),
 		newAreEqualSettledTestCase("reached nil slices",
 			S[any](makeReached([]int(nil)), makeReached([]int(nil))), true),
 		newAreEqualSettledTestCase("reached same slice",

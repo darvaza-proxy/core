@@ -409,6 +409,11 @@ func isComparableValue(v reflect.Value) bool {
 //   - a pointer type that defines Equal compares identity under ==, its
 //     contents under Equal.
 //
+// A nil value, as [IsNil] sees it, equals only nil, whatever its Equal
+// method says. An Equal method that cannot be called, as on a value
+// reached through an unexported field, leaves a pair == calls unequal
+// undecided.
+//
 // When == is unavailable, the question is settled by typed nils, by
 // identity (the same underlying data, as [IsSame] sees it), and by the
 // Equal method standing in for ==. A function equals only itself.
@@ -430,7 +435,8 @@ func isComparableValue(v reflect.Value) bool {
 // comparable, nil, identical, decided by an Equal method, a function,
 // nor a slice settled element by element leaves the list undecided —
 // deciding would take the deep comparison AreEqual deliberately
-// avoids — unless a later pair settles the whole list as unequal.
+// avoids — as does a comparable pair whose Equal method is out of
+// reach, unless a later pair settles the whole list as unequal.
 // Callers that need a decision anyway can fall back to
 // [reflect.DeepEqual] when known is false.
 //
@@ -496,7 +502,7 @@ func areEqual2(a, b comparableValue, path []reflect.Type) (is, known bool) {
 // comparable type holding a value == panics on are settled as those
 // without == are.
 func areEqualComparable(va, vb reflect.Value, path []reflect.Type) (is, known bool) {
-	switch equal, settled := comparableEqual(va.Interface(), vb.Interface()); {
+	switch equal, settled := valueEqual(va, vb); {
 	case !settled:
 		// == panicked
 		return areEqualFallback(va, vb, path)
@@ -504,14 +510,50 @@ func areEqualComparable(va, vb reflect.Value, path []reflect.Type) (is, known bo
 		// authoritative
 		return true, true
 	default:
-		if is, known = equalMethod(va, vb); known {
-			// Equal rescues a pair == calls unequal
-			return is, true
-		}
-
-		// == is authoritative when no Equal method decides
-		return false, true
+		return areEqualRescue(va, vb)
 	}
+}
+
+// areEqualRescue settles a pair == calls unequal. Nil only equals nil,
+// whatever an Equal method says. Otherwise a decisive Equal method
+// rescues the pair, one out of reach leaves it unknown, and without
+// either == stands.
+func areEqualRescue(va, vb reflect.Value) (is, known bool) {
+	switch {
+	case isReflectValueNil(va) || isReflectValueNil(vb):
+		// == already called two nils equal
+		return false, true
+	case !va.CanInterface() || !vb.CanInterface():
+		// an Equal method cannot be called on a value reached through
+		// an unexported field, and could still rescue the pair
+		return false, !equalMethodOf(va, vb.Type()).IsValid()
+	}
+
+	if is, known = equalMethod(va, vb); known {
+		// Equal rescues a pair == calls unequal
+		return is, true
+	}
+
+	// == is authoritative when no Equal method decides
+	return false, true
+}
+
+// valueEqual compares two values of one comparable type with ==, through
+// [reflect.Value.Equal] for values that cannot be unwrapped via
+// Interface(), as reached through unexported struct fields. known is
+// false when the comparison panicked.
+func valueEqual(va, vb reflect.Value) (equal, known bool) {
+	if va.CanInterface() && vb.CanInterface() {
+		return comparableEqual(va.Interface(), vb.Interface())
+	}
+
+	defer func() {
+		if recover() != nil {
+			equal, known = false, false
+		}
+	}()
+
+	return va.Equal(vb), true
 }
 
 // areEqualFallback decides equality when == is unavailable: typed
@@ -587,12 +629,9 @@ func areEqualSliceElements(va, vb reflect.Value, path []reflect.Type) (is, known
 }
 
 // areEqualElement decides equality for one pair of slice elements,
-// judged like top-level operands — interface elements are unwrapped
-// first — but without walking nested slices.
+// judged like top-level operands but without walking nested slices.
 func areEqualElement(va, vb reflect.Value, path []reflect.Type) (is, known bool) {
-	a := newComparableValue(unwrapInterface(va))
-	b := newComparableValue(unwrapInterface(vb))
-	return areEqual2(a, b, path)
+	return areEqual2(newComparableValue(va), newComparableValue(vb), path)
 }
 
 // unwrapInterface returns the value held by an interface so its
@@ -616,13 +655,24 @@ func equalMethod(va, vb reflect.Value) (is, known bool) {
 		_ = recover()
 	}()
 
-	m := va.MethodByName("Equal")
-	if !m.IsValid() || !isEqualMethodType(m.Type(), vb.Type()) {
+	m := equalMethodOf(va, vb.Type())
+	if !m.IsValid() {
 		// unknown
 		return false, false
 	}
 
 	return m.Call([]reflect.Value{vb})[0].Bool(), true
+}
+
+// equalMethodOf returns v's Equal method when it follows the Equal(T)
+// bool convention for an operand of type t, and the zero Value
+// otherwise.
+func equalMethodOf(v reflect.Value, t reflect.Type) reflect.Value {
+	m := v.MethodByName("Equal")
+	if !m.IsValid() || !isEqualMethodType(m.Type(), t) {
+		return reflect.Value{}
+	}
+	return m
 }
 
 // isEqualMethodType reports whether a method signature matches
@@ -650,26 +700,26 @@ func comparableEqual[U comparable](a, b U) (equal, known bool) {
 type comparableValue struct {
 	t reflect.Type
 	v reflect.Value
-	// ok reports whether == can be attempted on v via Interface():
-	// its type is comparable and it can be unwrapped. A comparable
-	// type may still hold a value == panics on, which
-	// [comparableEqual] reports as unknown.
+	// ok reports whether == can be attempted on v: its type is
+	// comparable. A comparable type may still hold a value == panics
+	// on, which [valueEqual] reports as unknown.
 	ok bool
 }
 
-// newComparableValue captures the reflection state of one value.
-// Untyped nil yields a nil type and no direct == support; its
+// newComparableValue captures the reflection state of one value. A
+// value of interface kind is judged by the value it holds. Untyped nil,
+// and a nil interface, yield a nil type and no direct == support; their
 // equality is decided by type alone.
 func newComparableValue(vi any) comparableValue {
-	v := asReflectValue(vi)
+	v := unwrapInterface(asReflectValue(vi))
 	if !v.IsValid() {
-		// untyped nil
+		// untyped nil, or a nil interface
 		return comparableValue{v: v}
 	}
 
 	return comparableValue{
 		t:  v.Type(),
 		v:  v,
-		ok: v.Type().Comparable() && v.CanInterface(),
+		ok: v.Type().Comparable(),
 	}
 }
