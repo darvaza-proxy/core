@@ -52,8 +52,9 @@ Independent Base Functions:
 `comparableEqual` is `==` and a recover, and `AreEqual` attempts its
 comparisons through it as well. Its tests read their results with plain
 checks, so everything above it can rely on it as it relies on the `!=` of
-a plain check. `assertComparable` is private: it serves `AssertTrue`,
-`AssertFalse` and the tests of what `AssertEqual` is built on.
+a plain check. `assertComparable` is unexported and serves `AssertTrue`
+and `AssertFalse`. Tests read through it as `AssertComparableForTest`,
+which `testutils_internal_test.go` exports to package `core_test` as well.
 
 ### Testing Implications
 
@@ -68,11 +69,11 @@ func TestAssertEqual(t *testing.T) {
     core.AssertTrue(t, result, "result")
 }
 
-// The same for a utility: AssertTrue and AssertFalse do not reach IsNil
+// The same for a utility: AssertComparableForTest does not reach IsNil
 func TestIsNil(t *testing.T) {
     var p *int
-    core.AssertTrue(t, core.IsNil(p), "typed nil")
-    core.AssertFalse(t, core.IsNil(42), "non-nil")
+    core.AssertComparableForTest(t, true, core.IsNil(p), "typed nil")
+    core.AssertComparableForTest(t, false, core.IsNil(42), "non-nil")
 }
 ```
 
@@ -82,9 +83,7 @@ func TestIsNil(t *testing.T) {
 func TestAssertComparable(t *testing.T) {
     mock := &MockT{}
     result := assertComparable(mock, 42, 42, "test")
-    if !result {
-        t.Error("assertComparable should return true")
-    }
+    plainEqual(t, true, result, "result")
 }
 ```
 

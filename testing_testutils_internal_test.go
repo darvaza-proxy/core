@@ -7,7 +7,7 @@ func AssertLastLogForTest(t *testing.T, mock *MockT, expected, desc string) {
 	t.Helper()
 	lastLog, ok := mock.LastLog()
 	AssertTrue(t, ok, "%s last log", desc)
-	assertComparable(t, expected, lastLog, "%s log message", desc)
+	AssertComparableForTest(t, expected, lastLog, "%s log message", desc)
 }
 
 // AssertMustContinuedForTest checks that a Must assertion passed and let the
@@ -21,7 +21,7 @@ func AssertMustContinuedForTest(t *testing.T, mock *MockT, ok bool) {
 
 	lastLog, hasLog := mock.LastLog()
 	AssertTrue(t, hasLog, "Should have logged the assertion")
-	assertComparable(t, MustContinuationLogForTest, lastLog, "Should reach continuation log")
+	AssertComparableForTest(t, MustContinuationLogForTest, lastLog, "Should reach continuation log")
 }
 
 // MustContinuationLogForTest is what every Must success case logs after the
@@ -34,6 +34,6 @@ func AssertMustAbortedForTest(t *testing.T, mock *MockT, ok bool) {
 	t.Helper()
 	AssertFalse(t, ok, "Failure case should abort")
 	AssertTrue(t, mock.Failed(), "Should be marked as failed")
-	assertComparable(t, 1, mock.NumErrors(), "Should have error from failed assertion")
-	assertComparable(t, 0, mock.NumLogs(), "Should not reach continuation log")
+	AssertComparableForTest(t, 1, mock.NumErrors(), "Should have error from failed assertion")
+	AssertComparableForTest(t, 0, mock.NumLogs(), "Should not reach continuation log")
 }
