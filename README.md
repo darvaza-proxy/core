@@ -163,7 +163,7 @@ Key distinctions from `IsZero`:
   `==` would decide, without ever panicking, returning `(is, known bool)`.
   Values of the same comparable type are tested with `==`; otherwise typed
   nils, identity, or the value's own `Equal(T) bool` method settle the
-  answer, and slices are compared element by element, one level deep.
+  answer, and slices are compared element by element, nested ones too.
   Anything else is reported as unknown rather than resolved by deep
   comparison; callers that need a decision anyway can fall back to
   `reflect.DeepEqual` when it is not known.
@@ -649,8 +649,8 @@ both `*testing.T` and `MockT`:
 
 The `Equal` family delegates to `AreEqual`, so it accepts values that aren't
 comparable and honours an `Equal(T) bool` method. `AssertDeepEqual` and its
-`Must` form settle what it cannot decide — nested slices, and anything else
-needing a deep traversal — which the failure names as such.
+`Must` form settle what it cannot decide — anything needing a deep
+traversal, which the failure names as such.
 
 `AssertSliceEqual` settles shape before contents: a length difference is
 reported as a count, and nil-versus-empty by name, since only nil equals nil

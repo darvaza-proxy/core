@@ -94,6 +94,35 @@ func makeReached[T any](v T) reflect.Value {
 	return reflect.ValueOf(struct{ v T }{v}).Field(0)
 }
 
+// makeNested wraps v in depth levels of []any, each call building
+// slices of its own. Each level holds the one inside it first and is
+// one element longer, padded with nils, so no two levels share a
+// length.
+func makeNested(depth int, v any) any {
+	for n := range depth {
+		s := make([]any, n+1)
+		s[0] = v
+		v = s
+	}
+	return v
+}
+
+// makeShared wraps v in depth levels of []any, each level holding the
+// one inside it twice.
+func makeShared(depth int, v any) any {
+	for range depth {
+		v = core.S(v, v)
+	}
+	return v
+}
+
+// makeCycle returns a []any holding itself.
+func makeCycle() []any {
+	s := core.S[any](nil)
+	s[0] = s
+	return s
+}
+
 // makeInterfaceValue returns v as a reflect.Value of interface kind.
 func makeInterfaceValue(v any) reflect.Value {
 	return reflect.ValueOf(&v).Elem()
@@ -228,10 +257,20 @@ func areEqualSliceTestCases() []areEqualTestCase {
 			core.S[any](core.S[any](1), core.S[any]("a")), false, true),
 		newAreEqualTestCase("shared nested slice",
 			core.S[any](core.S[any](shared), core.S[any](shared)), true, true),
-		newAreEqualTestCase("distinct nested slices stay unknown",
-			core.S[any](core.S(core.S(1)), core.S(core.S(1))), false, false),
+		newAreEqualTestCase("distinct nested slices",
+			core.S[any](core.S(core.S(1)), core.S(core.S(1))), true, true),
 		newAreEqualTestCase("unknown element then settled",
-			core.S[any](core.S[any](core.S(1), 1), core.S[any](core.S(2), 2)), false, true),
+			core.S[any](core.S[any](map[string]int{"a": 1}, 1),
+				core.S[any](map[string]int{"a": 1}, 2)), false, true),
+		newAreEqualTestCase("nested slices of one shape stay unknown",
+			core.S[any](core.S[any](core.S[any](1)), core.S[any](core.S[any](1))), false, false),
+		newAreEqualTestCase("distinct cycles stay unknown",
+			core.S[any](makeCycle(), makeCycle()), false, false),
+		newAreEqualTestCase("shared children of one shape stay unknown",
+			core.S[any](makeShared(24, 1), makeShared(24, 1)), false, false),
+		newAreEqualTestCase("past the depth limit stays unknown",
+			core.S[any](makeNested(core.AreEqualMaxDepthForTest+1, 1),
+				makeNested(core.AreEqualMaxDepthForTest+1, 1)), false, false),
 	}
 }
 
@@ -355,6 +394,10 @@ func areEqualSettledSliceTestCases() []areEqualTestCase {
 	return []areEqualTestCase{
 		newAreEqualSettledTestCase("elements rescued by Equal",
 			core.S[any]([]eqAlways{1}, []eqAlways{2}), true),
+		newAreEqualSettledTestCase("nested slices told apart",
+			core.S[any](core.S(core.S(1)), core.S(core.S(2))), false),
+		newAreEqualSettledTestCase("nested interface elements",
+			core.S[any](makeNested(2, 1), makeNested(2, 1)), true),
 		newAreEqualSettledTestCase("nested slices settled by Equal",
 			core.S[any]([]core.EqSliceForTest{{1}}, []core.EqSliceForTest{{1}}), true),
 		newAreEqualSettledTestCase("nested slices told apart by Equal",
@@ -365,6 +408,12 @@ func areEqualSettledSliceTestCases() []areEqualTestCase {
 			core.S[any]([][]int{nil}, [][]int{{}}), false),
 		newAreEqualSettledTestCase("lengths differ around undecided elements",
 			core.S[any]([]map[string]int{{}}, []map[string]int{{}, {}}), false),
+		newAreEqualSettledTestCase("nested down to the depth limit",
+			core.S[any](makeNested(core.AreEqualMaxDepthForTest, 1),
+				makeNested(core.AreEqualMaxDepthForTest, 1)), true),
+		newAreEqualSettledTestCase("lengths differ past the depth limit",
+			core.S[any](makeNested(core.AreEqualMaxDepthForTest, core.S(1)),
+				makeNested(core.AreEqualMaxDepthForTest, core.S(1, 2))), false),
 	}
 }
 

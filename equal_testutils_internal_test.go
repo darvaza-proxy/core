@@ -2,6 +2,9 @@ package core
 
 import "slices"
 
+// AreEqualMaxDepthForTest is the depth AreEqual's walk stops at.
+const AreEqualMaxDepthForTest = areEqualMaxDepth
+
 // EqSliceForTest is non-comparable and follows the Equal(T) bool convention.
 type EqSliceForTest []int
 

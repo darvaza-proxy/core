@@ -30,18 +30,19 @@ import "reflect"
 // ==.
 //
 // Slices without a decisive Equal method are compared element by
-// element, one level deep: lengths must match, and each element pair
-// is decided by the same rules, except that nested slices are not
-// walked — those settle only by nil, identity, or their own Equal
-// method. A nil slice equals only nil — unlike slices.Equal, the
+// element: lengths must match, and each element pair is decided by the
+// same rules, nested slices included. The walk leaves undecided a pair
+// of slices of the type and length of one it is already inside, and a
+// pair inside 256 others, which keeps input nested from outside from
+// exhausting the stack; type, nil and length still settle a pair where
+// it stops. A nil slice equals only nil — unlike slices.Equal, the
 // empty slice is not its equal.
 //
 // known reports whether the answer is settled. A pair that is neither
 // comparable, nil, identical, decided by an Equal method, a function,
-// nor a slice settled element by element leaves the list undecided —
-// deciding would take the deep comparison AreEqual deliberately
-// avoids — as does a comparable pair whose Equal method is out of
-// reach, unless a later pair settles the whole list as unequal.
+// nor a slice settled element by element, as two distinct maps, leaves
+// the list undecided, as does a comparable pair whose Equal method is
+// out of reach, unless a later pair settles the whole list as unequal.
 // Callers that need a decision anyway can fall back to
 // [reflect.DeepEqual] when known is false.
 //
@@ -83,19 +84,26 @@ func AreEqual(vvi ...any) (is, known bool) {
 // outermost first.
 type areEqualPath []areEqualFingerprint
 
-// areEqualFingerprint describes a slice on an [areEqualPath].
+// areEqualFingerprint describes a slice on an [areEqualPath] by its
+// type and length.
 type areEqualFingerprint struct {
 	t reflect.Type
+	n int
 }
 
 // newAreEqualFingerprint returns the fingerprint of the slice v.
 func newAreEqualFingerprint(v reflect.Value) areEqualFingerprint {
-	return areEqualFingerprint{t: v.Type()}
+	return areEqualFingerprint{t: v.Type(), n: v.Len()}
 }
 
 // Append returns the path with the fingerprint of v appended.
 func (p areEqualPath) Append(v reflect.Value) areEqualPath {
 	return append(p, newAreEqualFingerprint(v))
+}
+
+// Contains reports whether the path holds the fingerprint of v.
+func (p areEqualPath) Contains(v reflect.Value) bool {
+	return SliceContains(p, newAreEqualFingerprint(v))
 }
 
 // areEqual2 decides equality for a single pair. known reports whether
@@ -184,9 +192,9 @@ func valueEqual(va, vb reflect.Value) (equal, known bool) {
 // nils and identity settle the question — nil only equals nil, and
 // identity proves equality — and the value's own Equal method stands
 // in for ==. A function left undecided is unequal. A slice left
-// undecided outside any other is compared element by element.
-// Anything else stays unknown — two distinct values may still be
-// equal, and deciding that would take a deep comparison.
+// undecided is compared element by element. Anything else stays
+// unknown — two distinct values may still be equal, and deciding that
+// would take a deep comparison.
 func areEqualFallback(va, vb reflect.Value, path areEqualPath) (is, known bool) {
 	if same, ok := isSameTypedNil(va, vb); ok {
 		// nil only equals nil
@@ -210,17 +218,27 @@ func areEqualFallback(va, vb reflect.Value, path areEqualPath) (is, known bool) 
 	return areEqualSlice(va, vb, path)
 }
 
+// areEqualMaxDepth is how many nested slices [AreEqual] walks.
+const areEqualMaxDepth = 256
+
 // areEqualSlice compares two slices of the same type element by
-// element. Lengths must match; anything that isn't a slice, and a
-// slice inside another, stays unknown.
+// element. Lengths must match. Anything that isn't a slice, a slice
+// shaped like one on the path, and a slice inside [areEqualMaxDepth]
+// others stay unknown.
 func areEqualSlice(va, vb reflect.Value, path areEqualPath) (is, known bool) {
 	switch {
-	case va.Kind() != reflect.Slice, len(path) > 0:
-		// only a slice outside any other is walked
+	case va.Kind() != reflect.Slice:
+		// unknown
 		return false, false
 	case va.Len() != vb.Len():
 		// different lengths are never equal
 		return false, true
+	case len(path) >= areEqualMaxDepth:
+		// too deep to walk
+		return false, false
+	case path.Contains(va):
+		// shaped like a slice the walk is inside
+		return false, false
 	default:
 		return areEqualSliceElements(va, vb, path.Append(va))
 	}
@@ -253,7 +271,7 @@ func areEqualSliceElements(va, vb reflect.Value, path areEqualPath) (is, known b
 }
 
 // areEqualElement decides equality for one pair of slice elements,
-// judged like top-level operands but without walking nested slices.
+// judged like top-level operands, inside the slices on path.
 func areEqualElement(va, vb reflect.Value, path areEqualPath) (is, known bool) {
 	return areEqual2(newComparableValue(va), newComparableValue(vb), path)
 }

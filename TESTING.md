@@ -163,13 +163,13 @@ Reach for `AssertEqual` first. It delegates to `core.AreEqual`, so it takes
 values that aren't comparable — a slice, a map — and honours an
 `Equal(T) bool` method where the type defines one.
 
-`AreEqual` walks a slice one level deep and no further. A pair it cannot
-settle fails the assertion, reporting that the values need a deep
-comparison. That is the signal to switch to `AssertDeepEqual`, or
-`AssertMustDeepEqual` where the assertion should abort. The failure names
-no function to call: a base assertion cannot tell whether its caller came
-through a `Must` wrapper, and sending a `Must` caller to a non-`Must`
-function would trade their abort away silently.
+`AreEqual` walks slices, nested ones too, but no map, struct or pointer.
+A pair it cannot settle fails the assertion, reporting that the values
+need a deep comparison. That is the signal to switch to `AssertDeepEqual`,
+or `AssertMustDeepEqual` where the assertion should abort. The failure
+names no function to call: a base assertion cannot tell whether its
+caller came through a `Must` wrapper, and sending a `Must` caller to a
+non-`Must` function would trade their abort away silently.
 
 The deep form is a fallback, not a stronger one. `reflect.DeepEqual` never
 asks the type, so a lenient `Equal` method passes `AssertEqual` and fails

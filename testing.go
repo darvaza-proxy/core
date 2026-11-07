@@ -389,7 +389,8 @@ func RunTestCases[T TestCase](t *testing.T, cases []T) {
 // AssertEqual compares two values and reports differences.
 // Equality is decided by [AreEqual], so the values need not be
 // comparable: typed nils, identity, an Equal(T) bool method, and
-// slices one level deep all settle the answer without panicking.
+// slices walked element by element all settle the answer without
+// panicking.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
 // [AssertDeepEqual] settles what [AreEqual] cannot decide.
@@ -445,8 +446,8 @@ func AssertNotEqual[U any](t T, expected, actual U, name string, args ...any) bo
 // known to differ is reported by index rather than as two whole slices.
 // The name parameter can include printf-style formatting.
 // Returns true if the assertion passed, false otherwise.
-// [AreEqual] walks one level deep. For nested or otherwise incomparable
-// elements, [AssertDeepEqual] takes a slice as readily as any other type.
+// For elements [AreEqual] leaves undecided, [AssertDeepEqual] takes a
+// slice as readily as any other type.
 //
 // Example usage:
 //
@@ -532,7 +533,7 @@ func doSliceDiffError[U any](t T, expected, actual []U, name string, args []any)
 // Example usage:
 //
 //	AssertDeepEqual(t, want, got, "parsed config")
-//	AssertDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+//	AssertDeepEqual(t, &want, got, "row %d", 1)
 func AssertDeepEqual[U any](t T, expected, actual U, name string, args ...any) bool {
 	t.Helper()
 	ok := reflect.DeepEqual(expected, actual)
@@ -553,7 +554,7 @@ func AssertDeepEqual[U any](t T, expected, actual U, name string, args ...any) b
 // Example usage:
 //
 //	AssertNotDeepEqual(t, want, got, "parsed config")
-//	AssertNotDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+//	AssertNotDeepEqual(t, &want, got, "row %d", 1)
 func AssertNotDeepEqual[U any](t T, expected, actual U, name string, args ...any) bool {
 	t.Helper()
 	ok := !reflect.DeepEqual(expected, actual)
@@ -1230,7 +1231,7 @@ func AssertMustNotEqual[U any](t T, expected, actual U, name string, args ...any
 // Example usage:
 //
 //	AssertMustDeepEqual(t, want, got, "parsed config")
-//	AssertMustDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+//	AssertMustDeepEqual(t, &want, got, "row %d", 1)
 func AssertMustDeepEqual[U any](t T, expected, actual U, name string, args ...any) {
 	t.Helper()
 	if !AssertDeepEqual(t, expected, actual, name, args...) {
@@ -1245,7 +1246,7 @@ func AssertMustDeepEqual[U any](t T, expected, actual U, name string, args ...an
 // Example usage:
 //
 //	AssertMustNotDeepEqual(t, want, got, "parsed config")
-//	AssertMustNotDeepEqual(t, S(S(1, 2)), rows, "row %d", 1)
+//	AssertMustNotDeepEqual(t, &want, got, "row %d", 1)
 func AssertMustNotDeepEqual[U any](t T, expected, actual U, name string, args ...any) {
 	t.Helper()
 	if !AssertNotDeepEqual(t, expected, actual, name, args...) {

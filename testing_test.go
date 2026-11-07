@@ -159,17 +159,16 @@ func TestAssertSliceEqual(t *testing.T) {
 	assertPassed(t, mock, core.AssertSliceEqual[int](mock, nil, nil,
 		"both nil test"), "both nil")
 
-	// AreEqual walks one level deep, so the inner slices are undecided.
 	// The message names the element type, the size being already settled.
 	mock.Reset()
-	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S(core.S(1)), core.S(core.S(1)),
-		"undecided test"), "undecided for []int elements", "undecided")
+	a, b := undecidedPair()
+	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S(a), core.S(b),
+		"undecided test"), "undecided for map[string]int elements", "undecided")
 
 	// An undecided element ahead of the mismatch must not be mistaken
 	// for it: what settles the slice is the pair that differs, and that
 	// is the index worth reporting.
 	mock.Reset()
-	a, b := undecidedPair()
 	assertFailed(t, mock, core.AssertSliceEqual(mock, core.S[any](a, 1), core.S[any](b, 2),
 		"mixed test"), "index 1: expected 1, got 2", "mixed")
 }
@@ -179,7 +178,8 @@ func TestAssertDeepEqual(t *testing.T) {
 	mock := &core.MockT{}
 
 	// Succeeds on a pair AssertEqual leaves undecided.
-	assertPassed(t, mock, core.AssertDeepEqual(mock, core.S(core.S(1)), core.S(core.S(1)),
+	a, b := undecidedPair()
+	assertPassed(t, mock, core.AssertDeepEqual(mock, a, b,
 		"deep equal test"), "equal")
 
 	mock.Reset()
