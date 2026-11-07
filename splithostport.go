@@ -3,12 +3,13 @@ package core
 import (
 	"net"
 	"net/netip"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"golang.org/x/net/idna"
 )
+
+const hostLabelChars = "abcdefghijklmnopqrstuvwxyz0123456789_-"
 
 // MakeHostPort turns a configured address into one to advertise,
 // filling in the default port when the input names none. The other side
@@ -76,7 +77,11 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
 //
 // Unlike net.JoinHostPort, this function:
 //   - Validates the host and returns it cleaned: an IP in its
-//     canonical text, a name in Unicode and in lower case
+//     canonical text, and a name in Unicode, case-folded as UTS 46
+//     maps it, whose ASCII form is an RFC 1123 host name, '_' allowed,
+//     within the lengths of RFC 1035. A name the mapping turns into an
+//     IP address comes back as that address, and any other name whose
+//     last label is a number is refused
 //   - Validates the port is in range 0-65535 and joins it in
 //     canonical decimal form
 //   - Returns host without port if port is empty
@@ -129,8 +134,11 @@ func doJoinHostPort(host, port string) (string, error) {
 // Unlike net.SplitHostPort, this function:
 //   - Accepts host:port strings without port (returns empty port)
 //   - Validates the host is a valid IP address or hostname, and returns
-//     it cleaned: an IP in its canonical text, a name in Unicode and in
-//     lower case
+//     it cleaned: an IP in its canonical text, and a name in Unicode,
+//     case-folded as UTS 46 maps it, whose ASCII form is an RFC 1123
+//     host name, '_' allowed, within the lengths of RFC 1035. A name
+//     the mapping turns into an IP address comes back as that address,
+//     and any other name whose last label is a number is refused
 //   - Validates the port is in range 0-65535 and returns it in
 //     canonical decimal form
 //   - Properly handles IPv6 addresses with and without brackets
@@ -149,6 +157,26 @@ func doJoinHostPort(host, port string) (string, error) {
 //   - SplitHostPort("invalid host") → error
 //   - SplitHostPort("example.com:99999") → error (port out of range)
 func SplitHostPort(hostPort string) (host, port string, err error) {
+	return doSplitHostPort(hostPort, validHost)
+}
+
+// SplitHostPortASCII splits and validates as SplitHostPort does, short
+// of decoding a name, which it returns in its ASCII form, a label
+// outside ASCII in punycode. An IP address comes back in its canonical
+// text, as from SplitHostPort.
+//
+// Examples:
+//   - SplitHostPortASCII("Hello.世界:443") → ("hello.xn--rhqv96g", "443", nil)
+//   - SplitHostPortASCII("example.com") → ("example.com", "", nil)
+//   - SplitHostPortASCII("[::1]:443") → ("::1", "443", nil)
+//   - SplitHostPortASCII("invalid host") → error
+func SplitHostPortASCII(hostPort string) (host, port string, err error) {
+	return doSplitHostPort(hostPort, validHostASCII)
+}
+
+// doSplitHostPort splits a host:port string, and returns the port in
+// canonical decimal form and the host as cleanHost returns it.
+func doSplitHostPort(hostPort string, cleanHost func(string) (string, bool)) (host, port string, err error) {
 	host, port, err = splitHostPortUnsafe(hostPort)
 	if err != nil {
 		// failed split
@@ -164,7 +192,7 @@ func SplitHostPort(hostPort string) (host, port string, err error) {
 		port = s
 	}
 
-	if s, ok := validHost(host); ok {
+	if s, ok := cleanHost(host); ok {
 		// valid host
 		return s, port, nil
 	}
@@ -177,7 +205,8 @@ func SplitHostPort(hostPort string) (host, port string, err error) {
 //
 // This function:
 //   - Accepts IP addresses with optional port numbers
-//   - Validates the address is a valid IPv4 or IPv6 address
+//   - Validates the address is a valid IPv4 or IPv6 address, or a host
+//     UTS 46 maps into one, which comes back as that address
 //   - Validates the port is in range 0-65535; the port is 0 when the
 //     string carries none, as it is when the string says 0
 //   - Properly handles IPv6 addresses with brackets
@@ -210,8 +239,8 @@ func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	}
 
 	// addr
-	addr, err = ParseAddr(host)
-	if err != nil {
+	addr, ok := validAddr(host)
+	if !ok {
 		// bad address
 		err = addrErr(addrPort, "invalid address")
 		return netip.Addr{}, 0, err
@@ -249,6 +278,7 @@ func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 		// :port
 		host = "::" // use undetermined host
 	default:
+		// host:port, as split
 	}
 
 	return host, port, err
@@ -312,35 +342,173 @@ func canonicalPort(s string) (string, bool) {
 }
 
 // validHost validates a host as an IP address or a name, and returns it
-// cleaned: an IP in its canonical text, a name in Unicode and in lower
-// case.
+// cleaned: an IP address in its canonical text, a name mapped through
+// UTS 46 and in Unicode. A name the mapping turns into an IP address
+// comes back as that address.
 func validHost(s string) (string, bool) {
-	if ip, ok := validIP(s); ok {
-		// valid IP
-		return ip, true
+	host, name, ok := doValidHost(s)
+	if !name {
+		// IP address, or refused
+		return host, ok
 	}
-	return validName(s)
+
+	u, err := nameProfile.ToUnicode(host)
+	if err != nil {
+		// idna refuses, once decoded, some names ToASCII accepts
+		return "", false
+	}
+	return u, true
 }
 
-func validIP(s string) (string, bool) {
-	addr, err := ParseAddr(s)
-	if err == nil {
-		return addr.String(), true
-	}
-	return "", false
+// validHostASCII validates a host as validHost does, short of decoding a
+// name, and returns the name in its ASCII form.
+func validHostASCII(s string) (string, bool) {
+	host, _, ok := doValidHost(s)
+	return host, ok
 }
 
-var nameRE = regexp.MustCompile(`^(([\p{L}\p{M}\p{N}_%+-]+\.)+)?[\p{L}\p{M}\p{N}-]+$`)
+// doValidHost validates a host as an IP address or a name, and returns
+// it cleaned in ASCII: an IP address in its canonical text, a name in
+// the ASCII form UTS 46 maps it into. It reports whether the host is a
+// name.
+func doValidHost(s string) (host string, name, ok bool) {
+	addr, ascii, ok := mapHost(s)
+	switch {
+	case !ok:
+		// refused by idna
+		return "", false, false
+	case addr.IsValid():
+		// IP address
+		return addr.String(), false, true
+	case !validHostName(ascii):
+		// not a host name
+		return "", false, false
+	default:
+		// name
+		return ascii, true, true
+	}
+}
 
-func validName(s string) (string, bool) {
-	if nameRE.MatchString(s) {
-		s, err := idna.Display.ToUnicode(s)
-		if err == nil {
-			return s, true
+// validAddr parses a host as an IP address, or as the IP address
+// UTS 46 maps it into.
+func validAddr(s string) (netip.Addr, bool) {
+	addr, _, _ := mapHost(s)
+	return addr, addr.IsValid()
+}
+
+// mapHost reads a host as an IP address, or maps it through UTS 46 and
+// reads the result as one. It returns the address where either is one,
+// and otherwise the ASCII form of the name, not yet checked by
+// validHostName. It reports false where idna refuses the host.
+func mapHost(s string) (netip.Addr, string, bool) {
+	if addr, err := ParseAddr(s); err == nil {
+		// IP address
+		return addr, "", true
+	}
+
+	ascii, err := nameProfile.ToASCII(s)
+	switch {
+	case err != nil:
+		// refused by idna
+		return netip.Addr{}, "", false
+	case ascii != s:
+		// mapped, maybe into an IP address
+		if addr, err := ParseAddr(ascii); err == nil {
+			return addr, "", true
+		}
+	default:
+		// unchanged, and already read as no IP address
+	}
+
+	// name
+	return netip.Addr{}, ascii, true
+}
+
+// nameProfile maps a name through UTS 46 for lookup, with the STD3 and
+// hyphen checks off, as validHostName checks characters and hyphens
+// instead.
+var nameProfile = idna.New(
+	idna.MapForLookup(),
+	idna.BidiRule(),
+	idna.StrictDomainName(false),
+	idna.CheckHyphens(false),
+)
+
+// validHostName reports whether an ASCII name is a host name: at most
+// 253 octets, as RFC 1035 allows, labels validHostLabel accepts, and a
+// last label that is not a number, as no top-level domain is.
+func validHostName(s string) bool {
+	if len(s) > 253 {
+		// too long
+		return false
+	}
+
+	for label := range strings.SplitSeq(s, ".") {
+		if !validHostLabel(label) {
+			// bad label
+			return false
 		}
 	}
+	return !isNumericLabel(lastLabel(s))
+}
 
-	return "", false
+// validHostLabel reports whether an ASCII label is an RFC 1123 host name
+// label, '_' allowed: 1 to 63 octets of lower-case letters, digits, '_'
+// and '-', neither starting nor ending with '-', nor decoding, as an
+// A-label, into a label that does.
+func validHostLabel(s string) bool {
+	switch {
+	case s == "", len(s) > 63:
+		// empty, or too long
+		return false
+	case s[0] == '-', s[len(s)-1] == '-':
+		// hyphen at an end
+		return false
+	case strings.Trim(s, hostLabelChars) != "":
+		// bad character
+		return false
+	default:
+		return validALabelHyphens(s)
+	}
+}
+
+// validALabelHyphens reports whether a label starting "xn--" decodes
+// into one neither starting nor ending with '-', which its ASCII form
+// does not show. It decodes only an A-label whose ASCII characters,
+// those before its last '-', start or end with one. Any other label
+// passes.
+func validALabelHyphens(s string) bool {
+	enc, ok := strings.CutPrefix(s, "xn--")
+	if !ok {
+		// not an A-label
+		return true
+	}
+
+	basic, _, _ := splitLastRune('-', enc)
+	if !strings.HasPrefix(basic, "-") && !strings.HasSuffix(basic, "-") {
+		// no hyphen at either end of its ASCII characters
+		return true
+	}
+
+	// nameProfile.ToASCII has already refused a label that fails to
+	// decode
+	u := Must(idna.Punycode.ToUnicode(s))
+	return !strings.HasPrefix(u, "-") && !strings.HasSuffix(u, "-")
+}
+
+// isNumericLabel reports whether a label is a number, one or more
+// digits or "0x" followed by hexadecimal digits, as the WHATWG URL
+// parser reads the last label of a host.
+func isNumericLabel(s string) bool {
+	if hex, ok := strings.CutPrefix(s, "0x"); ok {
+		return strings.Trim(hex, "0123456789abcdef") == ""
+	}
+	return s != "" && strings.Trim(s, "0123456789") == ""
+}
+
+// lastLabel returns the label after the last dot of a name.
+func lastLabel(s string) string {
+	return s[strings.LastIndexByte(s, '.')+1:]
 }
 
 // joinHostPortUnsafe joins a host and a port without validating either.

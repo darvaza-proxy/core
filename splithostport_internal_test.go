@@ -9,6 +9,7 @@ import (
 var (
 	_ TestCase = doMakeHostPortTestCase{}
 	_ TestCase = joinHostPortUnsafeTestCase{}
+	_ TestCase = isNumericLabelTestCase{}
 )
 
 type doMakeHostPortTestCase struct {
@@ -136,6 +137,59 @@ func joinHostPortUnsafeTestCases() []joinHostPortUnsafeTestCase {
 
 func TestJoinHostPortUnsafe(t *testing.T) {
 	RunTestCases(t, joinHostPortUnsafeTestCases())
+}
+
+type isNumericLabelTestCase struct {
+	name     string
+	label    string
+	expected bool
+}
+
+func (tc isNumericLabelTestCase) Name() string {
+	return tc.name
+}
+
+func (tc isNumericLabelTestCase) Test(t *testing.T) {
+	AssertEqual(t, tc.expected, isNumericLabel(tc.label), "numeric")
+}
+
+// newIsNumericLabelTestCaseNumber declares a label isNumericLabel reads
+// as a number.
+func newIsNumericLabelTestCaseNumber(name, label string) isNumericLabelTestCase {
+	return isNumericLabelTestCase{
+		name:     name,
+		label:    MustNotZeroForTest(label),
+		expected: true,
+	}
+}
+
+// newIsNumericLabelTestCaseNotNumber declares a label isNumericLabel
+// does not read as a number.
+func newIsNumericLabelTestCaseNotNumber(name, label string) isNumericLabelTestCase {
+	return isNumericLabelTestCase{
+		name:     name,
+		label:    label,
+		expected: false,
+	}
+}
+
+func isNumericLabelTestCases() []isNumericLabelTestCase {
+	return S(
+		// A number is one or more digits, or "0x" followed by
+		// hexadecimal digits, none at all included.
+		newIsNumericLabelTestCaseNumber("digits", "123"),
+		newIsNumericLabelTestCaseNumber("hexadecimal", "0x1f"),
+		newIsNumericLabelTestCaseNumber("bare 0x", "0x"),
+
+		// Anything else is not a number, an empty label included.
+		newIsNumericLabelTestCaseNotNumber("letters", "name"),
+		newIsNumericLabelTestCaseNotNumber("non-hexadecimal 0x", "0xg"),
+		newIsNumericLabelTestCaseNotNumber("empty", ""),
+	)
+}
+
+func TestIsNumericLabel(t *testing.T) {
+	RunTestCases(t, isNumericLabelTestCases())
 }
 
 // TestAddrErr states what addrErr hands its callers: a *net.AddrError

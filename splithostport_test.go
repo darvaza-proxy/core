@@ -1,5 +1,7 @@
 package core_test
 
+// cspell:words alef ｇｏｏｄ
+
 import (
 	"net"
 	"net/netip"
@@ -13,6 +15,7 @@ import (
 var (
 	_ core.TestCase = splitAddrPortTestCase{}
 	_ core.TestCase = splitHostPortTestCase{}
+	_ core.TestCase = splitHostPortASCIITestCase{}
 	_ core.TestCase = makeHostPortTestCase{}
 	_ core.TestCase = joinHostPortTestCase{}
 )
@@ -80,12 +83,18 @@ func splitAddrPortTestCases() []splitAddrPortTestCase {
 		// A port alone gets the undetermined host.
 		newSplitAddrPortTestCase("port only", ":6060", "::", 6060),
 
+		// A host UTS 46 maps into an IP address comes back as that
+		// address.
+		newSplitAddrPortTestCase("ideographic full stops IPv4", "１２７。０。０。１:80", "127.0.0.1", 80),
+		newSplitAddrPortTestCase("full-width IPv6", "：：１", "::1", 0),
+
 		// A port that is not a number is rejected.
 		newSplitAddrPortTestCaseRejected("bracketed IPv6 word port", "[::1]:port"),
 
 		// A host that is not an IP address is rejected, a valid name
 		// included.
 		newSplitAddrPortTestCaseRejected("name and port", "name:1234"),
+		newSplitAddrPortTestCaseRejected("invalid punycode", "xn--a:80"),
 
 		// The split rejects an empty input.
 		newSplitAddrPortTestCaseRejected("empty", ""),
@@ -157,7 +166,9 @@ func newSplitHostPortTestCaseRejected(name, hostPort string) splitHostPortTestCa
 func splitHostPortTestCases() []splitHostPortTestCase {
 	label63 := strings.Repeat("a", 63)
 	label64 := label63 + "a"
-	name255 := strings.Join(core.S(label63, label63, label63, label63), ".")
+	name253 := strings.Join(core.S(label63, label63, label63, label63[2:]), ".")
+	name254 := name253 + "a"
+	label66UTF8 := strings.Repeat("世", 22)
 
 	return core.S(
 		// A name splits from its port, which comes back in canonical
@@ -169,19 +180,37 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCase("name and port 65535", "name:65535", "name", "65535"),
 		newSplitHostPortTestCase("name and padded port", "name:0080", "name", "80"),
 
-		// A name comes back in Unicode, in lower case.
+		// A name comes back as UTS 46 maps it, in Unicode.
 		newSplitHostPortTestCase("international name", "Hello.世界", "hello.世界", ""),
+		newSplitHostPortTestCase("full-width name", "ｇｏｏｄ.name", "good.name", ""),
+		newSplitHostPortTestCase("ideographic full stop", "good。name", "good.name", ""),
 		newSplitHostPortTestCase("punycode name", "hello.xn--rhqv96g", "hello.世界", ""),
+		newSplitHostPortTestCase("punycode middle dot", "xn--ll-0ea", "l·l", ""),
+		newSplitHostPortTestCase("ignored rune", "a\u200Bb.name", "ab.name", ""),
+		newSplitHostPortTestCase("symbol", "☃.name", "☃.name", ""),
 
-		// A host that fails as an IP address is taken as a name.
-		newSplitHostPortTestCase("numeric name", "1234", "1234", ""),
-		newSplitHostPortTestCase("out-of-range IPv4 name", "256.1.1.1", "256.1.1.1", ""),
+		// A label holds letters, digits, '_' and '-', and only the last
+		// label of a name is judged as a number.
+		newSplitHostPortTestCase("underscore label", "a_b.name", "a_b.name", ""),
+		newSplitHostPortTestCase("double hyphen label", "ab--c.name", "ab--c.name", ""),
+		// A hyphen at an end of a label's ASCII characters is not at an
+		// end of the label when a character outside ASCII lies beyond it.
+		newSplitHostPortTestCase("hyphen after international character", "世-a.name", "世-a.name", ""),
+		newSplitHostPortTestCase("hyphen before international character", "a-世.name", "a-世.name", ""),
+		newSplitHostPortTestCase("numeric label", "123.name", "123.name", ""),
+		newSplitHostPortTestCase("non-hexadecimal 0x label", "name.0xg", "name.0xg", ""),
 
-		// Labels and names pass whatever their length, beyond what DNS
-		// allows.
+		// A label holds up to 63 octets, and a name up to 253, counted
+		// in the ASCII form.
 		newSplitHostPortTestCase("63-octet label", label63, label63, ""),
-		newSplitHostPortTestCase("64-octet label", label64, label64, ""),
-		newSplitHostPortTestCase("255-character name", name255, name255, ""),
+		newSplitHostPortTestCase("253-octet name", name253, name253, ""),
+		newSplitHostPortTestCase("66-octet UTF-8 label", label66UTF8, label66UTF8, ""),
+
+		// A name UTS 46 maps into an IP address comes back as that
+		// address.
+		newSplitHostPortTestCase("full-width zero", "０", "0.0.0.0", ""),
+		newSplitHostPortTestCase("ideographic full stops IPv4", "１２７。０。０。１", "127.0.0.1", ""),
+		newSplitHostPortTestCase("full-width IPv6", "：：１", "::1", ""),
 
 		// An IP address splits from its port and comes back in
 		// canonical text.
@@ -215,15 +244,41 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 
 		// A host that is not an IP address is a name, and is rejected
 		// unless it is a valid one.
-		newSplitHostPortTestCaseRejected("space", "bad name"),
 		newSplitHostPortTestCaseRejected("empty label", "bad..name"),
 		newSplitHostPortTestCaseRejected("leading dot", ".name"),
 		newSplitHostPortTestCaseRejected("trailing dot", "name."),
-		// nameRE lets these through, and idna refuses them.
-		newSplitHostPortTestCaseRejected("underscore label", "a_b.name"),
+		// idna drops a soft hyphen or a combining grapheme joiner, and
+		// the label it leaves empty is rejected.
+		newSplitHostPortTestCaseRejected("soft hyphen label", "bad.\u00AD.name"),
+		newSplitHostPortTestCaseRejected("combining grapheme joiner label", "bad.\u034F.name"),
+		// idna refuses these, the alef symbol only once the mapping has
+		// made it a Hebrew letter and the name is decoded.
+		newSplitHostPortTestCaseRejected("invalid punycode", "xn--a.name"),
+		newSplitHostPortTestCaseRejected("alef symbol label", "aℵ.name"),
+		newSplitHostPortTestCaseRejected("mixed direction label", "\u05D0a.name"),
+		// A label holds no other character, nor a hyphen at either end.
+		newSplitHostPortTestCaseRejected("space", "bad name"),
 		newSplitHostPortTestCaseRejected("percent label", "a%b.name"),
 		newSplitHostPortTestCaseRejected("plus label", "a+b.name"),
 		newSplitHostPortTestCaseRejected("leading hyphen", "-name"),
+		newSplitHostPortTestCaseRejected("trailing hyphen", "name-"),
+		// The hyphen is judged in the label as decoded, as its ASCII
+		// form, xn----9o6a for -世, does not show it.
+		newSplitHostPortTestCaseRejected("leading hyphen international label", "-世.name"),
+		newSplitHostPortTestCaseRejected("trailing hyphen international label", "世-.name"),
+		newSplitHostPortTestCaseRejected("leading hyphen punycode label", "xn----9o6a.name"),
+		// A label is rejected beyond 63 octets, and a name beyond 253.
+		newSplitHostPortTestCaseRejected("64-octet label", label64),
+		newSplitHostPortTestCaseRejected("254-octet name", name254),
+		// A name whose last label is a number, all digits or "0x" and
+		// hexadecimal digits, is rejected unless it is an IP address.
+		newSplitHostPortTestCaseRejected("numeric name", "1234"),
+		newSplitHostPortTestCaseRejected("out-of-range IPv4", "256.1.1.1"),
+		newSplitHostPortTestCaseRejected("numeric last label", "name.1"),
+		newSplitHostPortTestCaseRejected("hexadecimal last label", "name.0x1f"),
+		newSplitHostPortTestCaseRejected("bare 0x last label", "name.0x"),
+		newSplitHostPortTestCaseRejected("hexadecimal IPv4", "0x7f.1"),
+		newSplitHostPortTestCaseRejected("full-width hexadecimal IPv4", "０ｘ７ｆ。１"),
 		// An empty bracket pair holds an empty host, which is rejected,
 		// where ":port" alone gets the undetermined host.
 		newSplitHostPortTestCaseRejected("empty brackets", "[]"),
@@ -239,6 +294,104 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 
 func TestSplitHostPort(t *testing.T) {
 	core.RunTestCases(t, splitHostPortTestCases())
+}
+
+type splitHostPortASCIITestCase struct {
+	name     string
+	hostPort string
+	host     string
+	port     string
+	rejected bool
+}
+
+func (tc splitHostPortASCIITestCase) Name() string {
+	return tc.name
+}
+
+func (tc splitHostPortASCIITestCase) Test(t *testing.T) {
+	host, port, err := core.SplitHostPortASCII(tc.hostPort)
+
+	core.AssertEqual(t, tc.host, host, "host")
+	core.AssertEqual(t, tc.port, port, "port")
+
+	if tc.rejected {
+		// A rejection names the whole input, which SplitHostPort
+		// rejects as well.
+		rejection := core.AssertMustErrorAs[*net.AddrError](t, err, "error")
+		core.AssertEqual(t, tc.hostPort, rejection.Addr, "error address")
+		_, _, err = core.SplitHostPort(tc.hostPort)
+		core.AssertError(t, err, "unicode error")
+		return
+	}
+
+	core.AssertMustNoError(t, err, "error")
+
+	// The ASCII host splits back unchanged, and SplitHostPort decodes it
+	// into the host it gives for the input.
+	again, _, err := core.SplitHostPortASCII(host)
+	core.AssertMustNoError(t, err, "resplit error")
+	core.AssertEqual(t, host, again, "resplit host")
+	want, _, err := core.SplitHostPort(tc.hostPort)
+	core.AssertMustNoError(t, err, "unicode error")
+	decoded, _, err := core.SplitHostPort(host)
+	core.AssertMustNoError(t, err, "decode error")
+	core.AssertEqual(t, want, decoded, "decoded host")
+}
+
+// newSplitHostPortASCIITestCase declares an accepted input by the host
+// and port it splits into; the port is empty where the input carries
+// none.
+func newSplitHostPortASCIITestCase(name, hostPort, host, port string) splitHostPortASCIITestCase {
+	return splitHostPortASCIITestCase{
+		name:     name,
+		hostPort: hostPort,
+		host:     core.MustNotZeroForTest(host),
+		port:     port,
+	}
+}
+
+// newSplitHostPortASCIITestCaseRejected declares an input
+// SplitHostPortASCII rejects, returning empty strings.
+func newSplitHostPortASCIITestCaseRejected(name, hostPort string) splitHostPortASCIITestCase {
+	return splitHostPortASCIITestCase{
+		name:     name,
+		hostPort: hostPort,
+		rejected: true,
+	}
+}
+
+func splitHostPortASCIITestCases() []splitHostPortASCIITestCase {
+	return core.S(
+		// A name comes back as UTS 46 maps it, in ASCII, the port in
+		// canonical form.
+		newSplitHostPortASCIITestCase("name and padded port", "Name:0080", "name", "80"),
+		newSplitHostPortASCIITestCase("international name", "Hello.世界", "hello.xn--rhqv96g", ""),
+		newSplitHostPortASCIITestCase("punycode name", "hello.xn--rhqv96g", "hello.xn--rhqv96g", ""),
+		newSplitHostPortASCIITestCase("full-width name", "ｇｏｏｄ.name", "good.name", ""),
+		newSplitHostPortASCIITestCase("middle dot", "l·l", "xn--ll-0ea", ""),
+
+		// A label holds letters, digits, '_' and '-'.
+		newSplitHostPortASCIITestCase("underscore label", "a_b.name", "a_b.name", ""),
+		newSplitHostPortASCIITestCase("double hyphen label", "ab--c.name", "ab--c.name", ""),
+
+		// An IP address comes back in canonical text, a host UTS 46 maps
+		// into one included.
+		newSplitHostPortASCIITestCase("non-canonical IPv6", "[2001:DB8:0::1]:80", "2001:db8::1", "80"),
+		newSplitHostPortASCIITestCase("ideographic full stops IPv4", "１２７。０。０。１:80", "127.0.0.1", "80"),
+		newSplitHostPortASCIITestCase("port only", ":6060", "::", "6060"),
+
+		// What SplitHostPort rejects before decoding a name,
+		// SplitHostPortASCII rejects.
+		newSplitHostPortASCIITestCaseRejected("invalid punycode", "xn--a.name"),
+		newSplitHostPortASCIITestCaseRejected("leading hyphen punycode label", "xn----9o6a.name"),
+		newSplitHostPortASCIITestCaseRejected("numeric name", "1234"),
+		newSplitHostPortASCIITestCaseRejected("name non-numeric port", "name:port"),
+		newSplitHostPortASCIITestCaseRejected("empty", ""),
+	)
+}
+
+func TestSplitHostPortASCII(t *testing.T) {
+	core.RunTestCases(t, splitHostPortASCIITestCases())
 }
 
 type makeHostPortTestCase struct {
@@ -317,6 +470,10 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		newMakeHostPortTestCase("punycode name", "hello.xn--rhqv96g:80", 443, "hello.世界:80"),
 		newMakeHostPortTestCase("name default port", "example.com", 443, "example.com:443"),
 		newMakeHostPortTestCase("name no port", "example.com", 0, "example.com"),
+
+		// A name UTS 46 maps into an IP address comes back as that
+		// address.
+		newMakeHostPortTestCase("ideographic full stops IPv4", "１２７。０。０。１", 80, "127.0.0.1:80"),
 
 		// What SplitHostPort rejects, MakeHostPort rejects.
 		newMakeHostPortTestCaseRejected("empty input", "", 8080),
@@ -415,6 +572,10 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 		newJoinHostPortTestCase("name mixed case no port", "Example.com", "", "example.com"),
 		newJoinHostPortTestCase("punycode name", "hello.xn--rhqv96g", "443", "hello.世界:443"),
 		newJoinHostPortTestCase("padded port", "example.com", "0080", "example.com:80"),
+
+		// A name UTS 46 maps into an IP address joins as that address,
+		// an IPv6 one bracketed when a port follows it.
+		newJoinHostPortTestCase("full-width IPv6 with port", "：：１", "80", "[::1]:80"),
 
 		// Port 0 joins, where MakeHostPort rejects it in its input.
 		newJoinHostPortTestCase("port 0", "example.com", "0", "example.com:0"),
