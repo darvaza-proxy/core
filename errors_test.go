@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"net"
 	"os"
 	"sync"
 	"syscall"
@@ -29,6 +31,7 @@ var (
 	_ core.TestCase = isTemporaryTestCase{}
 	_ core.TestCase = checkIsTimeoutTestCase{}
 	_ core.TestCase = isTimeoutTestCase{}
+	_ core.TestCase = stdErrorAnswersTestCase{}
 	_ core.TestCase = wrappedErrorTestCase{}
 	_ core.TestCase = unwrapBranchesTestCase{}
 )
@@ -305,6 +308,23 @@ func (nonComparableErrorWithIs) Error() string {
 
 func (nonComparableErrorWithIs) Is(error) bool { return true }
 
+// newOpError wraps err as the net package wraps a failed operation.
+func newOpError(op string, err error) error {
+	return &net.OpError{Op: op, Net: "tcp", Err: err}
+}
+
+// newSyscallOpError wraps errno as the net package wraps a failed
+// system call.
+func newSyscallOpError(op string, errno syscall.Errno) error {
+	return newOpError(op, os.NewSyscallError(op, errno))
+}
+
+// newPathError wraps err as the os package wraps a failed file
+// operation.
+func newPathError(op string, err error) error {
+	return &fs.PathError{Op: op, Path: "file", Err: err}
+}
+
 // Test cases for IsError function
 type isErrorTestCase struct {
 	name     string
@@ -337,8 +357,7 @@ func TestIsError(t *testing.T) {
 	err3 := errors.New("error 3")
 	wrappedErr := fmt.Errorf("wrapped: %w", err1)
 	errIs := &errorWithIs{target: err2}
-	pathErr := &fs.PathError{Op: "open", Path: "missing",
-		Err: syscall.ENOENT}
+	pathErr := newPathError("open", syscall.ENOENT)
 	errNonComparable := nonComparableError{codes: []int{1}}
 	errNonComparableIs := nonComparableErrorWithIs{codes: []int{2}}
 
@@ -835,6 +854,10 @@ func checkIsTemporaryTestCases() []checkIsTemporaryTestCase {
 		newCheckIsTemporaryTestCase("regular error", regularErr, false, false),
 		newCheckIsTemporaryTestCase("IsTemporary-only interface",
 			&isTemporaryOnlyError{}, true, true),
+		newCheckIsTemporaryTestCase("timeout without Temporary or IsTemporary",
+			newPathError("read", os.ErrDeadlineExceeded), true, true),
+		newCheckIsTemporaryTestCase("timeout with Temporary false",
+			newTLSPermanentError(timeoutErr), false, true),
 	)
 }
 
@@ -879,6 +902,8 @@ func isTemporaryTestCases() []isTemporaryTestCase {
 		newIsTemporaryTestCase("timeout error", timeoutErr, true),
 		newIsTemporaryTestCase("wrapped temporary error", wrappedTempErr, true),
 		newIsTemporaryTestCase("regular error", regularErr, false),
+		newIsTemporaryTestCase("timeout with Temporary false",
+			newTLSPermanentError(timeoutErr), false),
 	)
 }
 
@@ -970,12 +995,114 @@ func isTimeoutTestCases() []isTimeoutTestCase {
 		newIsTimeoutTestCase("timeout error", timeoutErr, true),
 		newIsTimeoutTestCase("wrapped timeout error", wrappedTimeoutErr, true),
 		newIsTimeoutTestCase("regular error", regularErr, false),
+		newIsTimeoutTestCase("timeout with Temporary false",
+			newTLSPermanentError(timeoutErr), true),
 	)
 }
 
 // Test IsTimeout function
 func TestIsTimeout(t *testing.T) {
 	core.RunTestCases(t, isTimeoutTestCases())
+}
+
+// tlsPermanentError has the shape of crypto/tls's permanentError: its
+// Temporary answers false whatever it wraps, while Timeout and Unwrap
+// pass through to the error it wraps.
+type tlsPermanentError struct{ err net.Error }
+
+// newTLSPermanentError wraps err, which must implement net.Error, as
+// crypto/tls wraps the error that failed a write.
+func newTLSPermanentError(err error) error {
+	return &tlsPermanentError{err: core.MustT[net.Error](err)}
+}
+
+func (e *tlsPermanentError) Error() string { return e.err.Error() }
+func (e *tlsPermanentError) Unwrap() error { return e.err }
+func (e *tlsPermanentError) Timeout() bool { return e.err.Timeout() }
+func (*tlsPermanentError) Temporary() bool { return false }
+
+// stdErrorAnswersTestCase checks what IsTemporary and IsTimeout answer
+// for an error the standard library returns, bare or wrapped as the
+// standard library wraps it.
+type stdErrorAnswersTestCase struct {
+	err           error
+	name          string
+	wantTemporary bool
+	wantTimeout   bool
+}
+
+func newStdErrorAnswersTestCase(name string, err error,
+	wantTemporary, wantTimeout bool) stdErrorAnswersTestCase {
+	return stdErrorAnswersTestCase{
+		err:           err,
+		name:          name,
+		wantTemporary: wantTemporary,
+		wantTimeout:   wantTimeout,
+	}
+}
+
+// newTemporaryTimeoutCase takes an error that is temporary and a timeout.
+func newTemporaryTimeoutCase(name string, err error) stdErrorAnswersTestCase {
+	return newStdErrorAnswersTestCase(name, err, true, true)
+}
+
+// newTemporaryNotTimeoutCase takes an error that is temporary but not a
+// timeout.
+func newTemporaryNotTimeoutCase(name string, err error) stdErrorAnswersTestCase {
+	return newStdErrorAnswersTestCase(name, err, true, false)
+}
+
+// newNotTemporaryNotTimeoutCase takes an error that is neither temporary
+// nor a timeout.
+func newNotTemporaryNotTimeoutCase(name string, err error) stdErrorAnswersTestCase {
+	return newStdErrorAnswersTestCase(name, err, false, false)
+}
+
+func (tc stdErrorAnswersTestCase) Name() string {
+	return tc.name
+}
+
+func (tc stdErrorAnswersTestCase) Test(t *testing.T) {
+	core.AssertEqual(t, tc.wantTemporary, core.IsTemporary(tc.err), "IsTemporary")
+	core.AssertEqual(t, tc.wantTimeout, core.IsTimeout(tc.err), "IsTimeout")
+}
+
+func stdErrorAnswersTestCases() []stdErrorAnswersTestCase {
+	return core.S(
+		newTemporaryTimeoutCase("os.ErrDeadlineExceeded", os.ErrDeadlineExceeded),
+		newTemporaryTimeoutCase("os.ErrDeadlineExceeded in OpError",
+			newOpError("read", os.ErrDeadlineExceeded)),
+		newTemporaryTimeoutCase("os.ErrDeadlineExceeded in PathError",
+			newPathError("read", os.ErrDeadlineExceeded)),
+		newTemporaryTimeoutCase("context.DeadlineExceeded", context.DeadlineExceeded),
+		newTemporaryTimeoutCase("ETIMEDOUT in SyscallError in OpError",
+			newSyscallOpError("read", syscall.ETIMEDOUT)),
+
+		newTemporaryNotTimeoutCase("EINTR", syscall.EINTR),
+		newTemporaryNotTimeoutCase("EINTR in SyscallError in OpError",
+			newSyscallOpError("read", syscall.EINTR)),
+		newTemporaryNotTimeoutCase("EMFILE", syscall.EMFILE),
+		newTemporaryNotTimeoutCase("EMFILE in SyscallError in OpError",
+			newSyscallOpError("accept", syscall.EMFILE)),
+
+		newNotTemporaryNotTimeoutCase("context.Canceled", context.Canceled),
+		newNotTemporaryNotTimeoutCase("io.EOF", io.EOF),
+		newNotTemporaryNotTimeoutCase("net.ErrClosed", net.ErrClosed),
+		newNotTemporaryNotTimeoutCase("net.ErrClosed in OpError",
+			newOpError("read", net.ErrClosed)),
+		newNotTemporaryNotTimeoutCase("ECONNRESET in SyscallError in OpError",
+			newSyscallOpError("read", syscall.ECONNRESET)),
+		newNotTemporaryNotTimeoutCase("ENOENT in PathError",
+			newPathError("open", syscall.ENOENT)),
+		newNotTemporaryNotTimeoutCase("ECHILD in SyscallError",
+			os.NewSyscallError("wait", syscall.ECHILD)),
+	)
+}
+
+// TestStdErrorAnswers checks IsTemporary and IsTimeout against errors the
+// standard library returns.
+func TestStdErrorAnswers(t *testing.T) {
+	core.RunTestCases(t, stdErrorAnswersTestCases())
 }
 
 // emptyMessageError returns "" from Error() so that WrappedError.Error()
