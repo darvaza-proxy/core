@@ -8,8 +8,8 @@ import (
 // Compile-time verification that test case types implement TestCase interface
 var (
 	_ TestCase = doMakeHostPortTestCase{}
-	_ TestCase = doJoinHostPortTestCase{}
-	_ TestCase = ipForHostPortTestCase{}
+	_ TestCase = joinHostPortUnsafeTestCase{}
+	_ TestCase = isNumericLabelTestCase{}
 )
 
 type doMakeHostPortTestCase struct {
@@ -40,7 +40,7 @@ func newDoMakeHostPortTestCase(name, host, port string, defaultPort uint16,
 		name:        name,
 		host:        host,
 		port:        port,
-		expected:    MustNotEmptyForTest(expected),
+		expected:    MustNotZeroForTest(expected),
 		defaultPort: defaultPort,
 	}
 }
@@ -59,25 +59,27 @@ func newDoMakeHostPortTestCaseRejected(name, host, port string, defaultPort uint
 
 func doMakeHostPortTestCases() []doMakeHostPortTestCase {
 	return S(
-		// Valid cases with explicit port
-		newDoMakeHostPortTestCase("explicit port used", "example.com", "8080", 9000, "example.com:8080"),
+		// An explicit port wins over the default, in canonical form.
+		newDoMakeHostPortTestCase("explicit port", "example.com", "8080", 9000, "example.com:8080"),
+		// MakeHostPort passes on the port the split made canonical, so
+		// this row hands doMakeHostPort a padded one directly.
 		newDoMakeHostPortTestCase("explicit port padded", "example.com", "0080", 9000, "example.com:80"),
 
-		// Valid cases with default port
-		newDoMakeHostPortTestCase("default port used", "example.com", "", 8080, "example.com:8080"),
+		// Without one, the default port is used.
+		newDoMakeHostPortTestCase("default port", "example.com", "", 8080, "example.com:8080"),
+		newDoMakeHostPortTestCase("default port IPv6", "::1", "", 8080, "[::1]:8080"),
 
-		// Valid cases with no port
+		// Without either, the host comes back portless.
 		newDoMakeHostPortTestCase("no port hostname", "example.com", "", 0, "example.com"),
-		newDoMakeHostPortTestCase("no port IPv6", "[::1]", "", 0, "[::1]"),
 
-		// Invalid cases
-		newDoMakeHostPortTestCaseRejected("port 0 not allowed", "example.com", "0", 8080),
-		// MakeHostPort never hands over a padded port, the split having
-		// made it canonical, so only a direct call reaches this.
+		// Port 0 is rejected, in any spelling, and so is a bad port.
+		newDoMakeHostPortTestCaseRejected("port 0", "example.com", "0", 8080),
+		// As "explicit port padded" does, this row hands doMakeHostPort
+		// a padded port directly.
 		newDoMakeHostPortTestCaseRejected("port 0 padded", "example.com", "00", 8080),
-		// MakeHostPort never hands over a bad port, the split having
-		// refused it, so only a direct call reaches this.
-		newDoMakeHostPortTestCaseRejected("bad port", "example.com", "invalid", 8080),
+		// This row hands doMakeHostPort the bad port that the split
+		// refuses before MakeHostPort sees it.
+		newDoMakeHostPortTestCaseRejected("word port", "example.com", "invalid", 8080),
 	)
 }
 
@@ -85,107 +87,109 @@ func TestDoMakeHostPort(t *testing.T) {
 	RunTestCases(t, doMakeHostPortTestCases())
 }
 
-type doJoinHostPortTestCase struct {
+type joinHostPortUnsafeTestCase struct {
 	name     string
 	host     string
 	port     string
 	expected string
-	rejected bool
 }
 
-func (tc doJoinHostPortTestCase) Name() string {
+func (tc joinHostPortUnsafeTestCase) Name() string {
 	return tc.name
 }
 
-func (tc doJoinHostPortTestCase) Test(t *testing.T) {
-	got, err := doJoinHostPort(tc.host, tc.port)
-
-	AssertEqual(t, tc.expected, got, "host:port")
-
-	if tc.rejected {
-		// A rejection names the host and port as given.
-		rejection := AssertMustErrorAs[*net.AddrError](t, err, "error")
-		AssertEqual(t, tc.host+":"+tc.port, rejection.Addr, "error address")
-	} else {
-		AssertNoError(t, err, "error")
-	}
+func (tc joinHostPortUnsafeTestCase) Test(t *testing.T) {
+	AssertEqual(t, tc.expected, joinHostPortUnsafe(tc.host, tc.port), "host:port")
 }
 
-// newDoJoinHostPortTestCase declares an accepted pair by the host:port
-// it joins into.
-func newDoJoinHostPortTestCase(name, host, port, expected string) doJoinHostPortTestCase {
-	return doJoinHostPortTestCase{
+// newJoinHostPortUnsafeTestCase declares a pair by the string
+// joinHostPortUnsafe joins it into.
+func newJoinHostPortUnsafeTestCase(name, host, port, expected string) joinHostPortUnsafeTestCase {
+	return joinHostPortUnsafeTestCase{
 		name:     name,
 		host:     host,
 		port:     port,
-		expected: MustNotEmptyForTest(expected),
-	}
-}
-
-// newDoJoinHostPortTestCaseRejected declares a pair doJoinHostPort
-// rejects, returning the empty string.
-func newDoJoinHostPortTestCaseRejected(name, host, port string) doJoinHostPortTestCase {
-	return doJoinHostPortTestCase{
-		name:     name,
-		host:     host,
-		port:     port,
-		rejected: true,
-	}
-}
-
-func doJoinHostPortTestCases() []doJoinHostPortTestCase {
-	return S(
-		// Valid cases
-		newDoJoinHostPortTestCase("valid hostname", "example.com", "8080", "example.com:8080"),
-		newDoJoinHostPortTestCase("padded port", "example.com", "0080", "example.com:80"),
-
-		// Invalid cases
-		newDoJoinHostPortTestCaseRejected("port out of range high", "example.com", "65536"),
-	)
-}
-
-func TestDoJoinHostPort(t *testing.T) {
-	RunTestCases(t, doJoinHostPortTestCases())
-}
-
-type ipForHostPortTestCase struct {
-	name     string
-	input    string
-	expected string
-}
-
-func (tc ipForHostPortTestCase) Name() string {
-	return tc.name
-}
-
-func (tc ipForHostPortTestCase) Test(t *testing.T) {
-	addr, err := ParseAddr(tc.input)
-	AssertMustNoError(t, err, "ParseAddr")
-
-	AssertEqual(t, tc.expected, ipForHostPort(addr), "host form")
-}
-
-func newIPForHostPortTestCase(name, input, expected string) ipForHostPortTestCase {
-	return ipForHostPortTestCase{
-		name:     name,
-		input:    input,
 		expected: expected,
 	}
 }
 
-func ipForHostPortTestCases() []ipForHostPortTestCase {
+func joinHostPortUnsafeTestCases() []joinHostPortUnsafeTestCase {
 	return S(
-		// IPv4 addresses (should not be bracketed)
-		newIPForHostPortTestCase("IPv4 localhost", "127.0.0.1", "127.0.0.1"),
+		// A port follows the host after a ':'.
+		newJoinHostPortUnsafeTestCase("name and port", "example.com", "80", "example.com:80"),
+		newJoinHostPortUnsafeTestCase("IPv4 and port", "127.0.0.1", "80", "127.0.0.1:80"),
 
-		// IPv6 addresses (should be bracketed)
-		newIPForHostPortTestCase("IPv6 localhost", "::1", "[::1]"),
-		newIPForHostPortTestCase("IPv6 mapped", "::ffff:192.0.2.1", "[::ffff:192.0.2.1]"),
+		// A host holding a ':' is bracketed before the port, a mapped
+		// or zoned IPv6 address included.
+		newJoinHostPortUnsafeTestCase("IPv6 and port", "::1", "80", "[::1]:80"),
+		newJoinHostPortUnsafeTestCase("IPv6 mapped and port", "::ffff:192.0.2.1", "80", "[::ffff:192.0.2.1]:80"),
+		newJoinHostPortUnsafeTestCase("IPv6 zone and port", "fe80::1%eth0", "80", "[fe80::1%eth0]:80"),
+
+		// Without a port, the host comes back alone, unbracketed.
+		newJoinHostPortUnsafeTestCase("name no port", "example.com", "", "example.com"),
+		newJoinHostPortUnsafeTestCase("IPv6 no port", "::1", "", "::1"),
+
+		// Neither the host nor the port is validated.
+		newJoinHostPortUnsafeTestCase("invalid host and port", "bad host", "port", "bad host:port"),
+		newJoinHostPortUnsafeTestCase("empty host and port", "", "", ""),
 	)
 }
 
-func TestIPForHostPort(t *testing.T) {
-	RunTestCases(t, ipForHostPortTestCases())
+func TestJoinHostPortUnsafe(t *testing.T) {
+	RunTestCases(t, joinHostPortUnsafeTestCases())
+}
+
+type isNumericLabelTestCase struct {
+	name     string
+	label    string
+	expected bool
+}
+
+func (tc isNumericLabelTestCase) Name() string {
+	return tc.name
+}
+
+func (tc isNumericLabelTestCase) Test(t *testing.T) {
+	AssertEqual(t, tc.expected, isNumericLabel(tc.label), "numeric")
+}
+
+// newIsNumericLabelTestCaseNumber declares a label isNumericLabel reads
+// as a number.
+func newIsNumericLabelTestCaseNumber(name, label string) isNumericLabelTestCase {
+	return isNumericLabelTestCase{
+		name:     name,
+		label:    MustNotZeroForTest(label),
+		expected: true,
+	}
+}
+
+// newIsNumericLabelTestCaseNotNumber declares a label isNumericLabel
+// does not read as a number.
+func newIsNumericLabelTestCaseNotNumber(name, label string) isNumericLabelTestCase {
+	return isNumericLabelTestCase{
+		name:     name,
+		label:    label,
+		expected: false,
+	}
+}
+
+func isNumericLabelTestCases() []isNumericLabelTestCase {
+	return S(
+		// A number is one or more digits, or "0x" followed by
+		// hexadecimal digits, none at all included.
+		newIsNumericLabelTestCaseNumber("digits", "123"),
+		newIsNumericLabelTestCaseNumber("hexadecimal", "0x1f"),
+		newIsNumericLabelTestCaseNumber("bare 0x", "0x"),
+
+		// Anything else is not a number, an empty label included.
+		newIsNumericLabelTestCaseNotNumber("letters", "name"),
+		newIsNumericLabelTestCaseNotNumber("non-hexadecimal 0x", "0xg"),
+		newIsNumericLabelTestCaseNotNumber("empty", ""),
+	)
+}
+
+func TestIsNumericLabel(t *testing.T) {
+	RunTestCases(t, isNumericLabelTestCases())
 }
 
 // TestAddrErr states what addrErr hands its callers: a *net.AddrError

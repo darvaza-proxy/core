@@ -61,20 +61,35 @@ Generic type constraints for use with Go generics:
 
 ### Host/Port Functions
 
-Where the standard library only splits and joins, these validate and
-clean: the host comes back as canonical IP text or a Unicode name,
-and the port in canonical decimal form, so `0080` is returned as `80`.
-Port 0 is accepted everywhere but in `MakeHostPort`'s input.
+Where the standard library only splits and joins, `SplitHostPort`,
+`SplitHostPortASCII`, `SplitAddrPort`, `JoinHostPort` and `MakeHostPort` also
+validate and clean. `SplitHostPort`, `JoinHostPort` and `MakeHostPort` return
+the host as canonical IP text or a Unicode name, case-folded as [UTS 46][uts46]
+maps it, whose ASCII form is an [RFC 1123][rfc1123] host name, `_` allowed,
+within the lengths of [RFC 1035][rfc1035], and the port in canonical decimal
+form, so `0080` is returned as `80`. A name the mapping turns into an IP
+address is returned as that address, and any other name whose last label is a
+number is refused. `SplitAddrPort` takes an IP address rather than a name, a
+host the mapping turns into one included, and returns it as a `netip.Addr`
+with the port as a `uint16`. Port 0 is accepted everywhere but in
+`MakeHostPort`'s input, where it leaves the port to be picked when a listener
+binds, a value `MakeHostPort` has no way to fill.
 
 #### Parsing and Splitting
 
-* `SplitHostPort(hostport)` - enhanced version of `net.SplitHostPort` that
+* `SplitHostPort(hostPort)` - enhanced version of `net.SplitHostPort` that
   accepts portless strings and validates both host and port, returning
   them cleaned. Supports IPv6 addresses, international domain names, and
   descriptive error messages.
-* `SplitAddrPort(addrport)` - splits IP address and optional port into
+* `SplitHostPortASCII(hostPort)` - splits and validates as `SplitHostPort`
+  does, short of decoding a name, which it returns in its ASCII form,
+  punycode for a label outside ASCII, for a caller that needs the name in
+  ASCII rather than as a person reads it.
+* `SplitAddrPort(addrPort)` - splits IP address and optional port into
   `netip.Addr` and `uint16`. Validates address format and port range
   (0-65535); the port is 0 when the string carries none.
+* `AddrPort(v)` - extracts `netip.AddrPort` from various network types
+  (`*net.TCPAddr`, `*net.UDPAddr`, etc.), returns `(AddrPort, bool)`.
 
 #### Joining and Construction
 
@@ -82,11 +97,9 @@ Port 0 is accepted everywhere but in `MakeHostPort`'s input.
   validates inputs, joins the port in canonical form, and returns a
   portless host when port is empty. Properly handles IPv6 bracketing and
   international domain names.
-* `MakeHostPort(hostport, defaultPort)` - constructs validated host:port
+* `MakeHostPort(hostPort, defaultPort)` - constructs validated host:port
   string from input with optional default port. Rejects port 0 in input
   in any spelling, supports portless output when default is 0.
-* `AddrPort(v)` - extracts `netip.AddrPort` from various network types
-  (`*net.TCPAddr`, `*net.UDPAddr`, etc.), returns `(AddrPort, bool)`.
 
 ### Interface Functions
 
@@ -864,7 +877,10 @@ make tidy   # Format and tidy (run before committing)
 
 [cache]: https://pkg.go.dev/darvaza.org/cache
 [resolver]: https://pkg.go.dev/darvaza.org/resolver
+[rfc1035]: https://www.rfc-editor.org/rfc/rfc1035
+[rfc1123]: https://www.rfc-editor.org/rfc/rfc1123
 [slog]: https://pkg.go.dev/darvaza.org/slog
+[uts46]: https://www.unicode.org/reports/tr46/
 [x-cmp]: https://pkg.go.dev/darvaza.org/x/cmp
 [x-config]: https://pkg.go.dev/darvaza.org/x/config
 [x-container]: https://pkg.go.dev/darvaza.org/x/container
