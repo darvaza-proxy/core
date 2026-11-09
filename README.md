@@ -73,7 +73,9 @@ number is refused. `SplitAddrPort` takes an IP address rather than a name, a
 host the mapping turns into one included, and returns it as a `netip.Addr`
 with the port as a `uint16`. Port 0 is accepted everywhere but in
 `MakeHostPort`'s input, where it leaves the port to be picked when a listener
-binds, a value `MakeHostPort` has no way to fill.
+binds, a value `MakeHostPort` has no way to fill. A port alone, `:6060`,
+splits into an empty host, or the zero `netip.Addr` from `SplitAddrPort`, and
+an empty host joins with a port as `:6060` again.
 
 #### Parsing and Splitting
 

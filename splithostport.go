@@ -36,7 +36,8 @@ func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	}
 
 	// port is either valid or empty
-	// host is either a valid hostname or a valid IP address, cleaned
+	// host is either a valid hostname or a valid IP address, cleaned,
+	// or empty for a port alone
 
 	s, ok := doMakeHostPort(host, port, defaultPort)
 	if !ok {
@@ -47,10 +48,10 @@ func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	return s, nil
 }
 
-// doMakeHostPort joins a cleaned, unbracketed host and its port, the
-// port in canonical decimal form, using defaultPort when port is empty,
-// and returns the host alone when both are unset. It reports false for
-// a port that does not parse, or parses to 0.
+// doMakeHostPort joins a cleaned, unbracketed host, or an empty one, and
+// its port, the port in canonical decimal form, using defaultPort when
+// port is empty, and returns the host alone when both are unset. It
+// reports false for a port that does not parse, or parses to 0.
 func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
 	switch {
 	case port != "":
@@ -85,6 +86,7 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
 //   - Validates the port is in range 0-65535 and joins it in
 //     canonical decimal form
 //   - Returns host without port if port is empty
+//   - Returns ":port" if host is empty and port is not
 //   - Properly handles IPv6 addresses with bracketing
 //   - Supports international domain names
 //   - Returns descriptive errors for invalid inputs
@@ -97,9 +99,15 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
 //   - JoinHostPort("::1", "") → "::1"
 //   - JoinHostPort("example.com", "0080") → "example.com:80"
 //   - JoinHostPort("example.com", "0") → "example.com:0" (port 0 allowed)
+//   - JoinHostPort("", "8080") → ":8080"
 //   - JoinHostPort("invalid host", "80") → error
 //   - JoinHostPort("example.com", "99999") → error (port out of range)
 func JoinHostPort(host, port string) (string, error) {
+	if host == "" && port != "" {
+		// port alone
+		return doJoinHostPort("", port)
+	}
+
 	s, ok := validHost(host)
 	switch {
 	case !ok:
@@ -114,9 +122,10 @@ func JoinHostPort(host, port string) (string, error) {
 	}
 }
 
-// doJoinHostPort joins a cleaned, unbracketed host and a port, the port
-// in canonical decimal form. It refuses a port that does not parse, and
-// the error names the host and port joined as passed.
+// doJoinHostPort joins a cleaned, unbracketed host, or an empty one, and
+// a port, the port in canonical decimal form. It refuses a port that
+// does not parse, and the error names the host and port joined as
+// passed.
 func doJoinHostPort(host, port string) (string, error) {
 	s, ok := canonicalPort(port)
 	if !ok {
@@ -133,6 +142,7 @@ func doJoinHostPort(host, port string) (string, error) {
 //
 // Unlike net.SplitHostPort, this function:
 //   - Accepts host:port strings without port (returns empty port)
+//   - Accepts a port alone, ":port" (returns empty host)
 //   - Validates the host is a valid IP address or hostname, and returns
 //     it cleaned: an IP in its canonical text, and a name in Unicode,
 //     case-folded as UTS 46 maps it, whose ASCII form is an RFC 1123
@@ -154,6 +164,7 @@ func doJoinHostPort(host, port string) (string, error) {
 //   - SplitHostPort("::1") → ("::1", "", nil)
 //   - SplitHostPort("example.com") → ("example.com", "", nil)
 //   - SplitHostPort("Hello.世界") → ("hello.世界", "", nil)
+//   - SplitHostPort(":8080") → ("", "8080", nil)
 //   - SplitHostPort("invalid host") → error
 //   - SplitHostPort("example.com:99999") → error (port out of range)
 func SplitHostPort(hostPort string) (host, port string, err error) {
@@ -175,7 +186,8 @@ func SplitHostPortASCII(hostPort string) (host, port string, err error) {
 }
 
 // doSplitHostPort splits a host:port string, and returns the port in
-// canonical decimal form and the host as cleanHost returns it.
+// canonical decimal form and the host as cleanHost returns it, or empty
+// for a port alone.
 func doSplitHostPort(hostPort string, cleanHost func(string) (string, bool)) (host, port string, err error) {
 	host, port, err = splitHostPortUnsafe(hostPort)
 	if err != nil {
@@ -190,6 +202,11 @@ func doSplitHostPort(hostPort string, cleanHost func(string) (string, bool)) (ho
 			return "", "", addrErr(hostPort, "invalid port")
 		}
 		port = s
+	}
+
+	if host == "" {
+		// port alone
+		return "", port, nil
 	}
 
 	if s, ok := cleanHost(host); ok {
@@ -209,6 +226,7 @@ func doSplitHostPort(hostPort string, cleanHost func(string) (string, bool)) (ho
 //     UTS 46 maps into one, which comes back as that address
 //   - Validates the port is in range 0-65535; the port is 0 when the
 //     string carries none, as it is when the string says 0
+//   - Accepts a port alone, returning the zero netip.Addr with it
 //   - Properly handles IPv6 addresses with brackets
 //   - Returns zero values and error for invalid inputs
 //
@@ -218,6 +236,7 @@ func doSplitHostPort(hostPort string, cleanHost func(string) (string, bool)) (ho
 //   - SplitAddrPort("[::1]:443") → (::1, 443, nil)
 //   - SplitAddrPort("::1") → (::1, 0, nil)
 //   - SplitAddrPort("127.0.0.1:80") → (127.0.0.1, 80, nil)
+//   - SplitAddrPort(":8080") → (netip.Addr{}, 8080, nil)
 //   - SplitAddrPort("invalid") → error
 //   - SplitAddrPort("192.168.1.1:99999") → error (port out of range)
 func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
@@ -236,6 +255,11 @@ func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 			err = addrErr(addrPort, "invalid port")
 			return netip.Addr{}, 0, err
 		}
+	}
+
+	if host == "" {
+		// port alone
+		return netip.Addr{}, port, nil
 	}
 
 	// addr
@@ -275,8 +299,7 @@ func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 		// host:
 		err = addrErr(hostPort, "missing port after ':'")
 	case host == "":
-		// :port
-		host = "::" // use undetermined host
+		// :port, no host
 	default:
 		// host:port, as split
 	}
@@ -291,6 +314,9 @@ func splitHostPortBracketed(hostPort string) (host, port string, err error) {
 		// [host
 		host = ""
 		err = addrErr(hostPort, "missing ']' in address")
+	case host == "":
+		// []...
+		err = addrErr(hostPort, "missing address in brackets")
 	case s == "":
 		// [host]
 	case s[0] == ':':
