@@ -59,6 +59,17 @@ func newSplitAddrPortTestCase(name, addrPort, addr string, port uint16) splitAdd
 	}
 }
 
+// newSplitAddrPortTestCasePortOnly declares an accepted input carrying a
+// port alone, which splits into the zero netip.Addr and that port.
+func newSplitAddrPortTestCasePortOnly(name, addrPort string, port uint16) splitAddrPortTestCase {
+	return splitAddrPortTestCase{
+		addr:     netip.Addr{},
+		name:     name,
+		addrPort: addrPort,
+		port:     port,
+	}
+}
+
 // newSplitAddrPortTestCaseRejected declares an input SplitAddrPort
 // rejects, returning its zero values.
 func newSplitAddrPortTestCaseRejected(name, addrPort string) splitAddrPortTestCase {
@@ -80,8 +91,8 @@ func splitAddrPortTestCases() []splitAddrPortTestCase {
 		newSplitAddrPortTestCase("bracketed IPv6 and port 0", "[::1]:0", "::1", 0),
 		newSplitAddrPortTestCase("IPv6 zone", "[fe80::1%eth0]:80", "fe80::1%eth0", 80),
 		newSplitAddrPortTestCase("unspecified IPv6", "[::]:6060", "::", 6060),
-		// A port alone gets the undetermined host.
-		newSplitAddrPortTestCase("port only", ":6060", "::", 6060),
+		// A port alone splits with no address.
+		newSplitAddrPortTestCasePortOnly("port only", ":6060", 6060),
 
 		// A host UTS 46 maps into an IP address comes back as that
 		// address.
@@ -150,6 +161,17 @@ func newSplitHostPortTestCase(name, hostPort, host, port string) splitHostPortTe
 		hostPort: hostPort,
 		host:     core.MustNotZeroForTest(host),
 		port:     port,
+	}
+}
+
+// newSplitHostPortTestCasePortOnly declares an accepted input carrying
+// a port alone, which splits into an empty host and that port.
+func newSplitHostPortTestCasePortOnly(name, hostPort, port string) splitHostPortTestCase {
+	return splitHostPortTestCase{
+		name:     name,
+		hostPort: hostPort,
+		host:     "",
+		port:     core.MustNotZeroForTest(port),
 	}
 }
 
@@ -226,8 +248,9 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCase("non-canonical IPv6", "[2001:DB8:0::1]:80", "2001:db8::1", "80"),
 		newSplitHostPortTestCase("IPv6 zone", "[fe80::1%eth0]:80", "fe80::1%eth0", "80"),
 		newSplitHostPortTestCase("unspecified IPv6", "[::]:6060", "::", "6060"),
-		// A port alone gets the undetermined host.
-		newSplitHostPortTestCase("port only", ":6060", "::", "6060"),
+		// A port alone splits with an empty host.
+		newSplitHostPortTestCasePortOnly("port only", ":6060", "6060"),
+		newSplitHostPortTestCasePortOnly("port only padded", ":0080", "80"),
 
 		// Brackets come off any host, a name or an IPv4 address as well
 		// as an IPv6 one.
@@ -279,9 +302,10 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCaseRejected("bare 0x last label", "name.0x"),
 		newSplitHostPortTestCaseRejected("hexadecimal IPv4", "0x7f.1"),
 		newSplitHostPortTestCaseRejected("full-width hexadecimal IPv4", "０ｘ７ｆ。１"),
-		// An empty bracket pair holds an empty host, which is rejected,
-		// where ":port" alone gets the undetermined host.
+		// An empty bracket pair is rejected, with a port or without,
+		// where a port alone splits with an empty host.
 		newSplitHostPortTestCaseRejected("empty brackets", "[]"),
+		newSplitHostPortTestCaseRejected("empty brackets and port", "[]:6060"),
 
 		// Brackets close, followed by nothing or a ':' and a port.
 		newSplitHostPortTestCaseRejected("incomplete bracketed IPv6", "[::1:1234"),
@@ -326,14 +350,18 @@ func (tc splitHostPortASCIITestCase) Test(t *testing.T) {
 
 	core.AssertMustNoError(t, err, "error")
 
-	// The ASCII host splits back unchanged, and SplitHostPort decodes it
-	// into the host it gives for the input.
-	again, _, err := core.SplitHostPortASCII(host)
+	// JoinHostPort joins the host and port again, into a string that
+	// splits back into the same pair, and to which SplitHostPort gives
+	// the host it gives the input.
+	joined, err := core.JoinHostPort(host, port)
+	core.AssertMustNoError(t, err, "join error")
+	againHost, againPort, err := core.SplitHostPortASCII(joined)
 	core.AssertMustNoError(t, err, "resplit error")
-	core.AssertEqual(t, host, again, "resplit host")
+	core.AssertEqual(t, host, againHost, "resplit host")
+	core.AssertEqual(t, port, againPort, "resplit port")
 	want, _, err := core.SplitHostPort(tc.hostPort)
 	core.AssertMustNoError(t, err, "unicode error")
-	decoded, _, err := core.SplitHostPort(host)
+	decoded, _, err := core.SplitHostPort(joined)
 	core.AssertMustNoError(t, err, "decode error")
 	core.AssertEqual(t, want, decoded, "decoded host")
 }
@@ -347,6 +375,17 @@ func newSplitHostPortASCIITestCase(name, hostPort, host, port string) splitHostP
 		hostPort: hostPort,
 		host:     core.MustNotZeroForTest(host),
 		port:     port,
+	}
+}
+
+// newSplitHostPortASCIITestCasePortOnly declares an accepted input
+// carrying a port alone, which splits into an empty host and that port.
+func newSplitHostPortASCIITestCasePortOnly(name, hostPort, port string) splitHostPortASCIITestCase {
+	return splitHostPortASCIITestCase{
+		name:     name,
+		hostPort: hostPort,
+		host:     "",
+		port:     core.MustNotZeroForTest(port),
 	}
 }
 
@@ -378,7 +417,9 @@ func splitHostPortASCIITestCases() []splitHostPortASCIITestCase {
 		// into one included.
 		newSplitHostPortASCIITestCase("non-canonical IPv6", "[2001:DB8:0::1]:80", "2001:db8::1", "80"),
 		newSplitHostPortASCIITestCase("ideographic full stops IPv4", "１２７。０。０。１:80", "127.0.0.1", "80"),
-		newSplitHostPortASCIITestCase("port only", ":6060", "::", "6060"),
+
+		// A port alone splits with an empty host.
+		newSplitHostPortASCIITestCasePortOnly("port only", ":6060", "6060"),
 
 		// What SplitHostPort rejects before decoding a name,
 		// SplitHostPortASCII rejects.
@@ -459,8 +500,8 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		newMakeHostPortTestCase("IPv6 bracketed no port", "[::1]", 0, "::1"),
 		newMakeHostPortTestCase("IPv6 unbracketed default port", "::1", 8080, "[::1]:8080"),
 		newMakeHostPortTestCase("IPv6 zone", "[fe80::1%eth0]:80", 0, "[fe80::1%eth0]:80"),
-		// A port alone gets the undetermined host.
-		newMakeHostPortTestCase("port only", ":6060", 0, "[::]:6060"),
+		// A port alone comes back with no host.
+		newMakeHostPortTestCase("port only", ":6060", 0, ":6060"),
 
 		// A name comes back cleaned, with its own port, else the
 		// default one, else portless.
@@ -577,11 +618,14 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 		// an IPv6 one bracketed when a port follows it.
 		newJoinHostPortTestCase("full-width IPv6 with port", "：：１", "80", "[::1]:80"),
 
+		// An empty host joins as a port alone.
+		newJoinHostPortTestCase("port only", "", "8080", ":8080"),
+
 		// Port 0 joins, where MakeHostPort rejects it in its input.
 		newJoinHostPortTestCase("port 0", "example.com", "0", "example.com:0"),
 
 		// A rejected host is named alone, before the port is read.
-		newJoinHostPortTestCaseRejected("empty host", "", "8080", ""),
+		newJoinHostPortTestCaseRejected("empty host and port", "", "", ""),
 		newJoinHostPortTestCaseRejected("space", "invalid host", "8080", "invalid host"),
 		newJoinHostPortTestCaseRejected("space and word port", "invalid host", "invalid", "invalid host"),
 		// Brackets belong to a host:port string, and a host carrying
@@ -593,6 +637,7 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 		newJoinHostPortTestCaseRejected("port 65536", "example.com", "65536", "example.com:65536"),
 		newJoinHostPortTestCaseRejected("word port mixed case", "Example.com", "invalid", "example.com:invalid"),
 		newJoinHostPortTestCaseRejected("word port IPv6", "::1", "invalid", "[::1]:invalid"),
+		newJoinHostPortTestCaseRejected("word port no host", "", "invalid", ":invalid"),
 	)
 }
 
