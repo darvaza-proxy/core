@@ -182,8 +182,8 @@ func NewTemporaryError(err error) error {
 // error nor a timeout, whatever the error it wraps reports. Its
 // Temporary, IsTemporary, Timeout and IsTimeout methods answer false,
 // so [CheckIsTemporary] and [CheckIsTimeout] give a known false for it,
-// and [IsTemporary] and [IsTimeout] stop their walk there. errors.Is
-// and errors.As still reach the wrapped error through Unwrap.
+// and [IsTemporary] and [IsTimeout] look no further down its chain.
+// errors.Is and errors.As still reach the wrapped error through Unwrap.
 type PermanentError struct {
 	cause error
 }
@@ -346,9 +346,10 @@ func checkIsErrorFnLayer(check func(error) bool, e error) bool {
 // certain answer from the check function, testing the errors
 // themselves before descending into their unwrapped layers.
 // As opposed to IsErrorFn, IsErrorFn2 will stop when it has certainty
-// of a false result.
+// of a false result. A nil check function, or no errors besides nil
+// ones, gives a certain false.
 func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) {
-	if check == nil || len(errs) == 0 {
+	if check == nil {
 		return false, true
 	} else if is, known := checkIsErrorFn2Shallow(check, errs); known {
 		return is, true
@@ -362,14 +363,22 @@ func IsErrorFn2(check func(error) (bool, bool), errs ...error) (is, known bool) 
 
 // checkIsErrorFn2Shallow tests the errors themselves against the
 // check function, without unwrapping, stopping at the first known
-// answer.
+// answer. With no error to check, nil ones aside, it gives a certain
+// false.
 func checkIsErrorFn2Shallow(check func(error) (bool, bool), errs []error) (is, known bool) {
+	var checked bool
 	for _, e := range errs {
 		if e != nil {
+			checked = true
 			if is, known = check(e); known {
 				return is, true
 			}
 		}
+	}
+
+	if !checked {
+		// no error to check: a certain false
+		return false, true
 	}
 
 	// unknown
@@ -394,18 +403,64 @@ func checkIsErrorFn2Unwrapped(check func(error) (bool, bool), errs []error) (is,
 }
 
 // checkIsErrorFn2Layer tests the layer e wraps, recursing via IsErrorFn2.
-// An empty layer gives no answer.
+// An empty layer, or one of nil errors alone, gives no answer, as
+// IsErrorFn2 would give it a certain false.
 func checkIsErrorFn2Layer(check func(error) (bool, bool), e error) (is, known bool) {
 	errs, one := doUnwrap(e)
 	switch {
 	case one != nil:
 		return IsErrorFn2(check, one)
-	case len(errs) == 0:
+	case CoalesceError(errs...) == nil:
 		// unknown
 		return false, false
 	default:
 		return IsErrorFn2(check, errs...)
 	}
+}
+
+// IsErrorFn3 recursively checks whether the check function gives a
+// certain yes, (true, true), for any of the given errors or the errors
+// they wrap, testing the errors themselves before descending into their
+// unwrapped layers. A certain no, (false, true), for an error ends the
+// walk down its own chain, and an error without a known answer is
+// descended into. As opposed to IsErrorFn2, a certain no from one error
+// does not hide a certain yes from another.
+func IsErrorFn3(check func(error) (bool, bool), errs ...error) bool {
+	if check == nil {
+		return false
+	}
+
+	for len(errs) > 0 {
+		var is bool
+		if is, errs = checkIsErrorFn3Shallow(check, errs); is {
+			return true
+		}
+	}
+
+	return false
+}
+
+// checkIsErrorFn3Shallow tests the errors themselves against the
+// check function, reporting a certain yes, or else returning the errors
+// wrapped by those without a known answer.
+func checkIsErrorFn3Shallow(check func(error) (bool, bool), errs []error) (is bool, next []error) {
+	for _, e := range errs {
+		if e == nil {
+			continue
+		}
+
+		switch yes, known := check(e); {
+		case known && yes:
+			return true, nil
+		case known:
+			// a certain no ends the walk down this error's chain
+		default:
+			// no known answer; the errors it wraps may give one
+			next = append(next, Unwrap(e)...)
+		}
+	}
+
+	return false, next
 }
 
 // NewCheckErrorIsIn builds the [IsErrorFn] predicate for IsError: the
@@ -514,8 +569,7 @@ func CheckIsTemporary(err error) (is, known bool) {
 }
 
 // IsTemporary tests an error chain for temporary conditions recursively.
-// It traverses wrapped error chains using IsErrorFn2 to find any error
-// that implements temporary condition interfaces.
+// It traverses wrapped error chains using IsErrorFn3.
 //
 // This function provides comprehensive temporary error detection by:
 //   - Checking each error in the unwrapping chain via CheckIsTemporary
@@ -524,16 +578,16 @@ func CheckIsTemporary(err error) (is, known bool) {
 //   - Detecting modern IsTemporary() bool implementations
 //   - Detecting timeout errors (which are also considered temporary)
 //
-// Returns the answer of the first error in the chain that gives one, so
-// an error that reports itself not temporary stops the walk before the
-// errors it wraps. Returns false for nil errors or chains with no
-// temporary indicators.
+// Returns true when the walk finds an error that reports itself
+// temporary. An error that reports itself not temporary ends the walk
+// down its own chain, before the errors it wraps, while the errors beside
+// it, as in a joined error, are still checked. Returns false for nil
+// errors or chains with no temporary indicators.
 //
 // Use this function when you need to determine if an operation should be
 // retried based on the error's temporary nature.
 func IsTemporary(err error) bool {
-	is, _ := IsErrorFn2(CheckIsTemporary, err)
-	return is
+	return IsErrorFn3(CheckIsTemporary, err)
 }
 
 // CheckIsTimeout tests an error for timeout conditions without unwrapping.
@@ -571,8 +625,7 @@ func CheckIsTimeout(err error) (is, known bool) {
 }
 
 // IsTimeout tests an error chain for timeout conditions recursively.
-// It traverses wrapped error chains using IsErrorFn2 to find any error
-// that implements timeout condition interfaces.
+// It traverses wrapped error chains using IsErrorFn3.
 //
 // This function provides comprehensive timeout error detection by:
 //   - Checking each error in the unwrapping chain via CheckIsTimeout
@@ -580,15 +633,15 @@ func CheckIsTimeout(err error) (is, known bool) {
 //   - Detecting legacy net.Error.Timeout() implementations
 //   - Detecting modern IsTimeout() bool implementations
 //
-// Returns the answer of the first error in the chain that gives one, so
-// an error that reports itself not a timeout stops the walk before the
-// errors it wraps. Returns false for nil errors or chains with no
-// timeout indicators.
+// Returns true when the walk finds an error that reports itself a
+// timeout. An error that reports itself not a timeout ends the walk down
+// its own chain, before the errors it wraps, while the errors beside it,
+// as in a joined error, are still checked. Returns false for nil errors
+// or chains with no timeout indicators.
 //
 // Use this function when you need to distinguish timeout errors from
 // other types of temporary errors for specialized retry logic or
 // timeout-specific error handling.
 func IsTimeout(err error) bool {
-	is, _ := IsErrorFn2(CheckIsTimeout, err)
-	return is
+	return IsErrorFn3(CheckIsTimeout, err)
 }

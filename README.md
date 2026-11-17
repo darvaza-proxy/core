@@ -476,17 +476,21 @@ Special error types for network-style temporary and timeout conditions:
 * `PermanentError` type - reports neither a temporary error nor a timeout,
   whatever the error it wraps reports: its `Temporary()`, `IsTemporary()`,
   `Timeout()` and `IsTimeout()` methods answer false, so `IsTemporary` and
-  `IsTimeout` stop at it, while `errors.Is` and `errors.As` reach the
-  wrapped error through `Unwrap()`.
+  `IsTimeout` look no further down its chain, while `errors.Is` and
+  `errors.As` reach the wrapped error through `Unwrap()`.
 * `NewPermanentError(err)` - wrap error as neither temporary nor a timeout,
   returning nil for a nil error.
-* `IsTemporary(err)` - walk the error chain for a temporary condition via
-  `CheckIsTemporary`, stopping at the first error that gives an answer.
+* `IsTemporary(err)` - walk the error chain via `CheckIsTemporary` for an
+  error that reports itself temporary; one that reports itself not
+  temporary ends the walk down its own chain, while the errors beside it
+  are still checked.
 * `CheckIsTemporary(err)` - test single error for temporary condition via
   `Temporary()` or `IsTemporary()` methods, falling back to `CheckIsTimeout`,
   without unwrapping chain, returns (is, known) tuple.
-* `IsTimeout(err)` - walk the error chain for a timeout condition via
-  `CheckIsTimeout`, stopping at the first error that gives an answer.
+* `IsTimeout(err)` - walk the error chain via `CheckIsTimeout` for an error
+  that reports itself a timeout; one that reports itself not a timeout
+  ends the walk down its own chain, while the errors beside it are still
+  checked.
 * `CheckIsTimeout(err)` - test single error for timeout condition via
   `Timeout()` or `IsTimeout()` methods, without unwrapping chain, returns
   (is, known) tuple.
@@ -498,6 +502,9 @@ Special error types for network-style temporary and timeout conditions:
   method.
 * `IsErrorFn(check, errs...)` / `IsErrorFn2(check, errs...)` - recursive
   error testing with custom checker functions.
+* `IsErrorFn3(check, errs...)` - recursive error testing for a certain yes
+  from a checker returning (is, known): a certain no for an error ends the
+  walk down its own chain, while the errors beside it are still checked.
 * `NewCheckErrorIsIn(targets)` / `NewCheckErrorIsIn2(targets)` - build the
   per-node check functions behind `IsError`, for composing the same
   identity-or-`Is` matching with `IsErrorFn` / `IsErrorFn2`.

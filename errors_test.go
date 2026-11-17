@@ -28,6 +28,7 @@ var (
 	_ core.TestCase = isErrorTestCase{}
 	_ core.TestCase = isErrorFnTestCase{}
 	_ core.TestCase = isErrorFn2TestCase{}
+	_ core.TestCase = isErrorFn3TestCase{}
 	_ core.TestCase = checkErrorIsInTestCase{}
 	_ core.TestCase = checkErrorIsIn2TestCase{}
 	_ core.TestCase = temporaryErrorTestCase{}
@@ -44,7 +45,8 @@ var (
 
 const emptyString = ""
 
-// Test cases for IsErrorFn function
+// isErrorFnTestCase checks what IsErrorFn answers for the given check
+// function and errors, and that it passes the check no nil error.
 type isErrorFnTestCase struct {
 	checkFn  func(error) bool
 	name     string
@@ -57,8 +59,25 @@ func (tc isErrorFnTestCase) Name() string {
 }
 
 func (tc isErrorFnTestCase) Test(t *testing.T) {
-	result := core.IsErrorFn(tc.checkFn, tc.errs...)
+	var nilCalls int
+	result := core.IsErrorFn(tc.countedCheck(&nilCalls), tc.errs...)
 	core.AssertEqual(t, tc.expected, result, "IsErrorFn result")
+	core.AssertEqual(t, 0, nilCalls, "check calls with nil")
+}
+
+// countedCheck wraps checkFn to count its calls with a nil error,
+// keeping a nil checkFn nil.
+func (tc isErrorFnTestCase) countedCheck(nilCalls *int) func(error) bool {
+	if tc.checkFn == nil {
+		return nil
+	}
+
+	return func(err error) bool {
+		if err == nil {
+			*nilCalls++
+		}
+		return tc.checkFn(err)
+	}
 }
 
 func newIsErrorFnTestCase(name string, checkFn func(error) bool, expected bool, errs ...error) isErrorFnTestCase {
@@ -75,8 +94,10 @@ func TestIsErrorFn(t *testing.T) {
 	differentErr := errors.New("different error")
 	wrappedErr := fmt.Errorf("wrapped: %w", testErr)
 
+	// isTestErr matches testErr by identity, leaving the unwrapping to
+	// IsErrorFn
 	isTestErr := func(err error) bool {
-		return errors.Is(err, testErr)
+		return err == testErr
 	}
 
 	// isTestErrNode leaves the unwrapping to IsErrorFn.
@@ -96,12 +117,15 @@ func TestIsErrorFn(t *testing.T) {
 			errors.Join(differentErr, testErr)),
 		newIsErrorFnTestCase("non-matching joined error, by node", isTestErrNode, false,
 			errors.Join(differentErr)),
+		newIsErrorFnTestCase("nil error, then wrapped error", isTestErr, true,
+			nil, wrappedErr),
 	}
 
 	core.RunTestCases(t, testCases)
 }
 
-// Test cases for IsErrorFn2 function
+// isErrorFn2TestCase checks what IsErrorFn2 answers for the given check
+// function and errors, and that it passes the check no nil error.
 type isErrorFn2TestCase struct {
 	checkFn       func(error) (bool, bool)
 	name          string
@@ -115,9 +139,26 @@ func (tc isErrorFn2TestCase) Name() string {
 }
 
 func (tc isErrorFn2TestCase) Test(t *testing.T) {
-	is, known := core.IsErrorFn2(tc.checkFn, tc.errs...)
+	var nilCalls int
+	is, known := core.IsErrorFn2(tc.countedCheck(&nilCalls), tc.errs...)
 	core.AssertEqual(t, tc.expectedIs, is, "IsErrorFn2 is result")
 	core.AssertEqual(t, tc.expectedKnown, known, "IsErrorFn2 known result")
+	core.AssertEqual(t, 0, nilCalls, "check calls with nil")
+}
+
+// countedCheck wraps checkFn to count its calls with a nil error,
+// keeping a nil checkFn nil.
+func (tc isErrorFn2TestCase) countedCheck(nilCalls *int) func(error) (bool, bool) {
+	if tc.checkFn == nil {
+		return nil
+	}
+
+	return func(err error) (bool, bool) {
+		if err == nil {
+			*nilCalls++
+		}
+		return tc.checkFn(err)
+	}
 }
 
 func newIsErrorFn2TestCase(name string, checkFn func(error) (bool, bool),
@@ -135,12 +176,21 @@ func TestIsErrorFn2(t *testing.T) {
 	testErr := errors.New("test error")
 	differentErr := errors.New("different error")
 	wrappedErr := fmt.Errorf("wrapped: %w", testErr)
+	wrappedDifferentErr := fmt.Errorf("wrapped: %w", differentErr)
+	wrapsNilErr := &core.CompoundError{Errs: []error{nil}}
 
+	// isTestErr answers by identity: a certain yes for testErr, a certain
+	// no for differentErr, and no known answer for any other error,
+	// leaving the unwrapping to IsErrorFn2
 	isTestErr := func(err error) (bool, bool) {
-		if err == nil {
+		switch err {
+		case testErr:
+			return true, true
+		case differentErr:
+			return false, true
+		default:
 			return false, false
 		}
-		return errors.Is(err, testErr), true
 	}
 
 	// isTestErrNode answers for testErr alone, leaving the unwrapping to
@@ -169,9 +219,118 @@ func TestIsErrorFn2(t *testing.T) {
 			&singleUnwrapError{}, wrappedErr),
 		newIsErrorFn2TestCase("past a layer of nil errors, by node", isTestErrNode, true, true,
 			&core.CompoundError{Errs: []error{nil}}, wrappedErr),
+		newIsErrorFn2TestCase("nil error", isTestErr, false, true, nil),
+		newIsErrorFn2TestCase("nil error in slice", isTestErr, true, true, nil, testErr),
+		newIsErrorFn2TestCase("nil error, then wrapped error", isTestErr, true, true,
+			nil, wrappedErr),
+		newIsErrorFn2TestCase("wraps nil, then wrapped error", isTestErr, true, true,
+			wrapsNilErr, wrappedErr),
+		newIsErrorFn2TestCase("join of no a level below and yes", isTestErr, true, true,
+			errors.Join(wrappedDifferentErr, testErr)),
 	}
 
 	core.RunTestCases(t, testCases)
+}
+
+// isErrorFn3TestCase checks what IsErrorFn3 answers for the given check
+// function and errors, and that it passes the check no nil error.
+type isErrorFn3TestCase struct {
+	checkFn  func(error) (bool, bool)
+	name     string
+	errs     []error
+	expected bool
+}
+
+func newIsErrorFn3TestCase(name string, checkFn func(error) (bool, bool),
+	expected bool, errs ...error) isErrorFn3TestCase {
+	return isErrorFn3TestCase{
+		checkFn:  checkFn,
+		name:     name,
+		errs:     errs,
+		expected: expected,
+	}
+}
+
+func (tc isErrorFn3TestCase) Name() string {
+	return tc.name
+}
+
+func (tc isErrorFn3TestCase) Test(t *testing.T) {
+	var nilCalls int
+	got := core.IsErrorFn3(tc.countedCheck(&nilCalls), tc.errs...)
+	core.AssertEqual(t, tc.expected, got, "IsErrorFn3")
+	core.AssertEqual(t, 0, nilCalls, "check calls with nil")
+}
+
+// countedCheck wraps checkFn to count its calls with a nil error,
+// keeping a nil checkFn nil.
+func (tc isErrorFn3TestCase) countedCheck(nilCalls *int) func(error) (bool, bool) {
+	if tc.checkFn == nil {
+		return nil
+	}
+
+	return func(err error) (bool, bool) {
+		if err == nil {
+			*nilCalls++
+		}
+		return tc.checkFn(err)
+	}
+}
+
+func isErrorFn3TestCases() []isErrorFn3TestCase {
+	yesErr := errors.New("yes")
+	noErr := errors.New("no")
+	maybeErr := errors.New("maybe")
+	maybeYesErr := errors.New("maybe yes")
+	noOverYesErr := &singleUnwrapError{inner: yesErr}
+	maybeYesOverYesErr := &singleUnwrapError{inner: yesErr}
+
+	// check answers by identity: a certain yes, a certain no, or a yes
+	// that is not known, and no known answer for any other error
+	check := func(err error) (bool, bool) {
+		switch err {
+		case yesErr:
+			return true, true
+		case noErr, noOverYesErr:
+			return false, true
+		case maybeYesErr, maybeYesOverYesErr:
+			return true, false
+		default:
+			return false, false
+		}
+	}
+
+	return core.S(
+		newIsErrorFn3TestCase("yes", check, true, yesErr),
+		newIsErrorFn3TestCase("no", check, false, noErr),
+		newIsErrorFn3TestCase("no known answer", check, false, maybeErr),
+		newIsErrorFn3TestCase("yes not known", check, false, maybeYesErr),
+		newIsErrorFn3TestCase("yes under no known answer", check, true,
+			fmt.Errorf("wrapped: %w", yesErr)),
+		newIsErrorFn3TestCase("yes under a yes not known", check, true,
+			maybeYesOverYesErr),
+		newIsErrorFn3TestCase("yes under a no", check, false, noOverYesErr),
+		newIsErrorFn3TestCase("no under no known answer", check, false,
+			fmt.Errorf("wrapped: %w", noErr)),
+		newIsErrorFn3TestCase("no, then yes", check, true, noErr, yesErr),
+		newIsErrorFn3TestCase("yes, then no", check, true, yesErr, noErr),
+		newIsErrorFn3TestCase("join of no and yes", check, true,
+			errors.Join(noErr, yesErr)),
+		newIsErrorFn3TestCase("join of yes and no", check, true,
+			errors.Join(yesErr, noErr)),
+		newIsErrorFn3TestCase("join of no and yes a level below", check, true,
+			errors.Join(noErr, fmt.Errorf("wrapped: %w", yesErr))),
+		newIsErrorFn3TestCase("nil check function", nil, false, yesErr),
+		newIsErrorFn3TestCase("no errors", check, false),
+		newIsErrorFn3TestCase("nil error", check, false, nil),
+		newIsErrorFn3TestCase("nil error, then yes", check, true, nil, yesErr),
+	)
+}
+
+// TestIsErrorFn3 checks that IsErrorFn3 answers true for a certain yes
+// anywhere it walks, and false otherwise.
+func TestIsErrorFn3(t *testing.T) {
+	core.RunTestCases(t, isErrorFn3TestCases())
 }
 
 // Test cases for QuietWrap function
@@ -901,6 +1060,7 @@ func isTemporaryTestCases() []isTemporaryTestCase {
 	timeoutErr := core.NewTimeoutError(errors.New("timeout error"))
 	wrappedTempErr := fmt.Errorf("wrapped: %w", tempErr)
 	regularErr := errors.New("regular error")
+	permanentErr := core.NewPermanentError(regularErr)
 
 	return core.S(
 		newIsTemporaryTestCase("nil error", nil, false),
@@ -910,6 +1070,12 @@ func isTemporaryTestCases() []isTemporaryTestCase {
 		newIsTemporaryTestCase("regular error", regularErr, false),
 		newIsTemporaryTestCase("timeout with Temporary false",
 			newTLSPermanentError(timeoutErr), false),
+		newIsTemporaryTestCase("temporary error joined after a permanent one",
+			errors.Join(permanentErr, tempErr), true),
+		newIsTemporaryTestCase("temporary error joined before a permanent one",
+			errors.Join(tempErr, permanentErr), true),
+		newIsTemporaryTestCase("wrapped temporary error joined after a permanent one",
+			errors.Join(permanentErr, wrappedTempErr), true),
 	)
 }
 
@@ -994,6 +1160,7 @@ func isTimeoutTestCases() []isTimeoutTestCase {
 	timeoutErr := core.NewTimeoutError(errors.New("timeout error"))
 	wrappedTimeoutErr := fmt.Errorf("wrapped: %w", timeoutErr)
 	regularErr := errors.New("regular error")
+	permanentErr := core.NewPermanentError(regularErr)
 
 	return core.S(
 		newIsTimeoutTestCase("nil error", nil, false),
@@ -1003,6 +1170,12 @@ func isTimeoutTestCases() []isTimeoutTestCase {
 		newIsTimeoutTestCase("regular error", regularErr, false),
 		newIsTimeoutTestCase("timeout with Temporary false",
 			newTLSPermanentError(timeoutErr), true),
+		newIsTimeoutTestCase("timeout error joined after a permanent one",
+			errors.Join(permanentErr, timeoutErr), true),
+		newIsTimeoutTestCase("timeout error joined before a permanent one",
+			errors.Join(timeoutErr, permanentErr), true),
+		newIsTimeoutTestCase("wrapped timeout error joined after a permanent one",
+			errors.Join(permanentErr, wrappedTimeoutErr), true),
 	)
 }
 
