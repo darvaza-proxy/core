@@ -183,12 +183,15 @@ func SliceReplaceFn[T any](s []T,
 // SliceCopyFn makes a copy of a slice, optionally modifying in-flight
 // the items using a function. If no function is provided,
 // the destination will be a shallow copy of the source slice.
+// A nil slice gives an empty one.
 func SliceCopyFn[T any](s []T,
 	fn func(partial []T, before T) (after T, include bool),
 ) []T {
 	//
 	if fn == nil {
-		return SliceCopy(s)
+		result := make([]T, len(s))
+		copy(result, s)
+		return result
 	}
 
 	result := make([]T, 0, len(s))
@@ -201,16 +204,12 @@ func SliceCopyFn[T any](s []T,
 	return result
 }
 
-// SliceCopy makes a shallow copy of a given slice
+// SliceCopy makes a shallow copy of a given slice.
+// A nil slice gives an empty one.
 //
 // Deprecated: Use [slices.Clone] instead.
 func SliceCopy[T any](s []T) []T {
-	l := len(s)
-	result := make([]T, l)
-	if l > 0 {
-		copy(result, s)
-	}
-	return result
+	return SliceCopyFn(s, nil)
 }
 
 // SliceMap takes a []T1 and uses a function to produce a []T2

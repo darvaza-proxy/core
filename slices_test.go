@@ -26,6 +26,7 @@ var (
 	_ core.TestCase = slicePFloatTestCase{}
 	_ core.TestCase = slicePStringTestCase{}
 	_ core.TestCase = sliceReplaceFnNilFnTestCase{}
+	_ core.TestCase = sliceCopyFnNilFnTestCase{}
 )
 
 type sliceReverseTestCase struct {
@@ -841,5 +842,33 @@ func TestSliceReplaceFnNilFn(t *testing.T) {
 		// IsSame compares a slice by its backing array, which an empty
 		// slice only has when it was given capacity.
 		newSliceReplaceFnNilFnTestCase("empty", make([]int, 0, 1)),
+	})
+}
+
+type sliceCopyFnNilFnTestCase struct {
+	name     string
+	in       []int
+	expected []int
+}
+
+func (tc sliceCopyFnNilFnTestCase) Name() string { return tc.name }
+
+// A nil function gives a copy of the slice, never the slice itself, and
+// a nil slice gives an empty one.
+func (tc sliceCopyFnNilFnTestCase) Test(t *testing.T) {
+	result := core.SliceCopyFn(tc.in, nil)
+	core.AssertSliceEqual(t, tc.expected, result, "copy")
+	core.AssertNotSame(t, tc.in, result, "identity")
+}
+
+func newSliceCopyFnNilFnTestCase(name string, in, expected []int) sliceCopyFnNilFnTestCase {
+	return sliceCopyFnNilFnTestCase{name: name, in: in, expected: expected}
+}
+
+func TestSliceCopyFnNilFn(t *testing.T) {
+	core.RunTestCases(t, []sliceCopyFnNilFnTestCase{
+		newSliceCopyFnNilFnTestCase("nil slice", nil, core.S[int]()),
+		newSliceCopyFnNilFnTestCase("empty slice", core.S[int](), core.S[int]()),
+		newSliceCopyFnNilFnTestCase("slice with elements", core.S(1, 2, 3), core.S(1, 2, 3)),
 	})
 }
