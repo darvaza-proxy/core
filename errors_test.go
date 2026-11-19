@@ -241,6 +241,17 @@ func (*errorWithIs) Error() string { return "error with Is" }
 
 func (e *errorWithIs) Is(target error) bool { return target == e.target }
 
+// errNilSafeIsTarget is the target nilSafeIsError's Is method matches.
+var errNilSafeIsTarget = errors.New("nil-safe Is target")
+
+// nilSafeIsError matches errNilSafeIsTarget via an Is method that does
+// not use its receiver, so a nil pointer to it answers too.
+type nilSafeIsError struct{}
+
+func (*nilSafeIsError) Error() string { return "nil-safe Is" }
+
+func (*nilSafeIsError) Is(target error) bool { return target == errNilSafeIsTarget }
+
 // nonComparableError is a value-typed error carrying a slice, so its
 // dynamic type does not support ==: comparing two of them panics
 // rather than reporting false. It pins that IsError degrades the
@@ -364,6 +375,8 @@ func checkErrorIsInTestCases() []checkErrorIsInTestCase {
 	err1 := errors.New("error 1")
 	err2 := errors.New("error 2")
 	errIs := &errorWithIs{target: err2}
+	var typedNil *typedNilError
+	var nilSafeIs *nilSafeIsError
 
 	return []checkErrorIsInTestCase{
 		newCheckErrorIsInTestCase("identity match",
@@ -374,6 +387,18 @@ func checkErrorIsInTestCases() []checkErrorIsInTestCase {
 			errIs, []error{err1, err2}, true),
 		newCheckErrorIsInTestCase("nil target never matches",
 			err1, []error{nil}, false),
+		newCheckErrorIsInTestCase("nil error, nil target",
+			nil, []error{nil}, false),
+		newCheckErrorIsInTestCase("nil error, real target",
+			nil, []error{err1}, false),
+		newCheckErrorIsInTestCase("typed nil target matches itself",
+			typedNil, []error{typedNil}, true),
+		newCheckErrorIsInTestCase("typed nil target, nil error",
+			nil, []error{typedNil}, false),
+		newCheckErrorIsInTestCase("typed nil error, nil target",
+			typedNil, []error{nil}, false),
+		newCheckErrorIsInTestCase("typed nil error, nil-safe Is",
+			nilSafeIs, []error{errNilSafeIsTarget}, true),
 		newCheckErrorIsInTestCase("no targets",
 			err1, nil, false),
 		newCheckErrorIsInTestCase("no unwrapping",
@@ -386,6 +411,19 @@ func checkErrorIsInTestCases() []checkErrorIsInTestCase {
 // belongs to IsErrorFn.
 func TestNewCheckErrorIsIn(t *testing.T) {
 	core.RunTestCases(t, checkErrorIsInTestCases())
+}
+
+// TestNewCheckErrorIsInCopiesTargets checks that the closure keeps its
+// own copy of the targets: changing the caller's slice after building it
+// changes nothing.
+func TestNewCheckErrorIsInCopiesTargets(t *testing.T) {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	targets := []error{err1}
+	check := core.NewCheckErrorIsIn(targets)
+
+	targets[0] = err2
+	core.AssertTrue(t, check(err1), "match")
 }
 
 // Test cases for the NewCheckErrorIsIn2 per-node closure
@@ -421,6 +459,8 @@ func checkErrorIsIn2TestCases() []checkErrorIsIn2TestCase {
 	err1 := errors.New("error 1")
 	err2 := errors.New("error 2")
 	errIs := &errorWithIs{target: err2}
+	var typedNil *typedNilError
+	var nilSafeIs *nilSafeIsError
 
 	return []checkErrorIsIn2TestCase{
 		newCheckErrorIsIn2TestCase("identity match",
@@ -435,6 +475,18 @@ func checkErrorIsIn2TestCases() []checkErrorIsIn2TestCase {
 			err1, []error{nil}, false, true),
 		newCheckErrorIsIn2TestCase("nil beside real target",
 			err1, []error{nil, err2}, false, false),
+		newCheckErrorIsIn2TestCase("nil error, nil target",
+			nil, []error{nil}, false, true),
+		newCheckErrorIsIn2TestCase("nil error, real target",
+			nil, []error{err1}, false, false),
+		newCheckErrorIsIn2TestCase("typed nil target matches itself",
+			typedNil, []error{typedNil}, true, true),
+		newCheckErrorIsIn2TestCase("typed nil target, nil error",
+			nil, []error{typedNil}, false, false),
+		newCheckErrorIsIn2TestCase("typed nil error, nil target",
+			typedNil, []error{nil}, false, true),
+		newCheckErrorIsIn2TestCase("typed nil error, nil-safe Is",
+			nilSafeIs, []error{errNilSafeIsTarget}, true, true),
 		newCheckErrorIsIn2TestCase("no targets final miss",
 			err1, nil, false, true),
 		newCheckErrorIsIn2TestCase("no unwrapping",
@@ -448,6 +500,21 @@ func checkErrorIsIn2TestCases() []checkErrorIsIn2TestCase {
 // deeper nodes either.
 func TestNewCheckErrorIsIn2(t *testing.T) {
 	core.RunTestCases(t, checkErrorIsIn2TestCases())
+}
+
+// TestNewCheckErrorIsIn2CopiesTargets checks that the closure keeps its
+// own copy of the targets: changing the caller's slice after building it
+// changes nothing.
+func TestNewCheckErrorIsIn2CopiesTargets(t *testing.T) {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	targets := []error{err1}
+	check := core.NewCheckErrorIsIn2(targets)
+
+	targets[0] = err2
+	is, known := check(err1)
+	core.AssertTrue(t, is, "is")
+	core.AssertTrue(t, known, "known")
 }
 
 // TestNewCheckErrorIsIn2Compose pins composition with IsErrorFn2: a
