@@ -542,6 +542,19 @@ func TestNewCheckErrorIsIn(t *testing.T) {
 	core.RunTestCases(t, checkErrorIsInTestCases())
 }
 
+// TestNewCheckErrorIsInCopiesTargets checks that the closure keeps its
+// own copy of the targets: changing the caller's slice after building it
+// changes nothing.
+func TestNewCheckErrorIsInCopiesTargets(t *testing.T) {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	targets := []error{err1}
+	check := core.NewCheckErrorIsIn(targets)
+
+	targets[0] = err2
+	core.AssertTrue(t, check(err1), "match")
+}
+
 // Test cases for the NewCheckErrorIsIn2 per-node closure
 type checkErrorIsIn2TestCase struct {
 	err     error
@@ -602,6 +615,21 @@ func checkErrorIsIn2TestCases() []checkErrorIsIn2TestCase {
 // deeper nodes either.
 func TestNewCheckErrorIsIn2(t *testing.T) {
 	core.RunTestCases(t, checkErrorIsIn2TestCases())
+}
+
+// TestNewCheckErrorIsIn2CopiesTargets checks that the closure keeps its
+// own copy of the targets: changing the caller's slice after building it
+// changes nothing.
+func TestNewCheckErrorIsIn2CopiesTargets(t *testing.T) {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	targets := []error{err1}
+	check := core.NewCheckErrorIsIn2(targets)
+
+	targets[0] = err2
+	is, known := check(err1)
+	core.AssertTrue(t, is, "is")
+	core.AssertTrue(t, known, "known")
 }
 
 // TestNewCheckErrorIsIn2Compose pins composition with IsErrorFn2: a

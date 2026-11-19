@@ -430,12 +430,17 @@ func checkIsErrorFn3Shallow(check func(error) (bool, bool), errs []error) (is bo
 
 // NewCheckErrorIsIn builds the [IsErrorFn] predicate for IsError: the
 // returned closure reports whether a chain node matches any of the
-// targets, by identity or the node's own Is(error) bool method.
+// targets, by identity or the node's own Is(error) bool method. The
+// closure keeps its own copy of the targets, leaving out nil ones.
 func NewCheckErrorIsIn(targets []error) func(error) bool {
+	targets = SliceCopyFn(targets, notNilError)
+	if len(targets) == 0 {
+		return func(error) bool { return false }
+	}
+
 	return func(err error) bool {
 		return slices.ContainsFunc(targets, func(target error) bool {
-			is, _ := errorIs(target, err)
-			return is
+			return errorIs(target, err)
 		})
 	}
 }
@@ -443,64 +448,57 @@ func NewCheckErrorIsIn(targets []error) func(error) bool {
 // NewCheckErrorIsIn2 is the [IsErrorFn2] counterpart of
 // [NewCheckErrorIsIn]: the returned closure reports whether a chain
 // node matches any of the targets, and whether that answer is final.
-// A match is final; a miss is final only when no target could match
-// deeper nodes either — e.g. every target is nil — so IsErrorFn2 can
-// stop early without missing a wrapped match.
+// It keeps its own copy of the targets, as [NewCheckErrorIsIn] does.
+// A match is final. A miss is final when every target is nil, or there
+// are none, as no deeper node can match either; otherwise IsErrorFn2
+// goes on to the wrapped errors.
 func NewCheckErrorIsIn2(targets []error) func(error) (bool, bool) {
-	return func(err error) (is, known bool) {
-		known = true
-		for _, target := range targets {
-			is2, known2 := errorIs(target, err)
-			if is2 {
-				return true, true
-			}
-			known = known && known2
-		}
-		return false, known
+	targets = SliceCopyFn(targets, notNilError)
+	if len(targets) == 0 {
+		return func(error) (bool, bool) { return false, true }
 	}
+
+	return func(err error) (is, known bool) {
+		if slices.ContainsFunc(targets, func(target error) bool {
+			return errorIs(target, err)
+		}) {
+			return true, true
+		}
+		return false, false
+	}
+}
+
+// notNilError is a [SliceCopyFn] filter that leaves out nil errors.
+//
+//revive:disable-next-line:error-return // the order SliceCopyFn requires
+func notNilError(_ []error, err error) (error, bool) {
+	return err, err != nil
 }
 
 // errorIs tests a single node against a target: identity first via
 // errorEq, then the node's own Is(error) bool method — the same
 // per-node test [errors.Is] applies. Unwrapping is the caller's
-// concern. known follows the [IsErrorFn2] convention, reporting
-// whether the answer is final for the whole chain: a match is final,
-// and so is a nil operand — nil matches nothing deeper either. A miss
-// stays unknown because a wrapped error may still match.
-func errorIs(target, err error) (is, known bool) {
-	if is, known := errorEq(target, err); known {
-		return is, true
+// concern.
+func errorIs(target, err error) bool {
+	if errorEq(target, err) {
+		return true
 	}
 
 	// try the Is(error) bool interface, if implemented
-	if e, ok := err.(interface{ Is(error) bool }); ok && e.Is(target) {
-		return true, true
-	}
-
-	// no match here; deeper nodes may still match
-	return false, false
+	e, ok := err.(interface{ Is(error) bool })
+	return ok && e.Is(target)
 }
 
-// errorEq compares two errors by identity. known is true only when
-// identity settles the match question: the errors are equal, or one
-// is nil — nil only ever matches nil. Inequality stays unknown, as an
-// Is method may still match, and so does a panicking comparison of a
-// shared non-comparable dynamic type — the case [errors.Is] sidesteps
-// via reflection.
-func errorEq(a, b error) (is, known bool) {
-	// a panicking comparison leaves the zero (false, false)
+// errorEq compares two errors by identity. A panicking comparison, of
+// a shared non-comparable dynamic type, gives false — the case
+// [errors.Is] sidesteps via reflection.
+func errorEq(a, b error) (eq bool) {
+	// a panicking comparison leaves the zero false
 	defer func() {
 		_ = recover()
 	}()
 
-	switch {
-	case a == nil, b == nil:
-		return a == b, true
-	case a == b:
-		return true, true
-	default:
-		return false, false
-	}
+	return a == b
 }
 
 // CheckIsTemporary tests an error for temporary conditions without unwrapping.
