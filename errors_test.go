@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -69,6 +70,11 @@ func TestIsErrorFn(t *testing.T) {
 		return errors.Is(err, testErr)
 	}
 
+	// isTestErrNode leaves the unwrapping to IsErrorFn.
+	isTestErrNode := func(err error) bool {
+		return err == testErr
+	}
+
 	testCases := []isErrorFnTestCase{
 		newIsErrorFnTestCase("matching error", isTestErr, true, testErr),
 		newIsErrorFnTestCase("non-matching error", isTestErr, false, differentErr),
@@ -76,6 +82,11 @@ func TestIsErrorFn(t *testing.T) {
 		newIsErrorFnTestCase("no errors", isTestErr, false),
 		newIsErrorFnTestCase("wrapped error", isTestErr, true, wrappedErr),
 		newIsErrorFnTestCase("nil error in slice", isTestErr, true, nil, testErr),
+		newIsErrorFnTestCase("wrapped error, by node", isTestErrNode, true, wrappedErr),
+		newIsErrorFnTestCase("joined error, by node", isTestErrNode, true,
+			errors.Join(differentErr, testErr)),
+		newIsErrorFnTestCase("non-matching joined error, by node", isTestErrNode, false,
+			errors.Join(differentErr)),
 	}
 
 	core.RunTestCases(t, testCases)
@@ -123,6 +134,15 @@ func TestIsErrorFn2(t *testing.T) {
 		return errors.Is(err, testErr), true
 	}
 
+	// isTestErrNode answers for testErr alone, leaving the unwrapping to
+	// IsErrorFn2.
+	isTestErrNode := func(err error) (bool, bool) {
+		if err == testErr {
+			return true, true
+		}
+		return false, false
+	}
+
 	testCases := []isErrorFn2TestCase{
 		newIsErrorFn2TestCase("matching error", isTestErr, true, true, testErr),
 		newIsErrorFn2TestCase("non-matching error", isTestErr, false, true, differentErr),
@@ -131,6 +151,15 @@ func TestIsErrorFn2(t *testing.T) {
 		newIsErrorFn2TestCase("wrapped error", isTestErr, true, true, wrappedErr),
 		newIsErrorFn2TestCase("unknown error type",
 			func(_ error) (bool, bool) { return false, false }, false, false, testErr),
+		newIsErrorFn2TestCase("wrapped error, by node", isTestErrNode, true, true, wrappedErr),
+		newIsErrorFn2TestCase("joined error, by node", isTestErrNode, true, true,
+			errors.Join(differentErr, testErr)),
+		newIsErrorFn2TestCase("non-matching joined error, by node", isTestErrNode, false, false,
+			errors.Join(differentErr)),
+		newIsErrorFn2TestCase("past an empty layer, by node", isTestErrNode, true, true,
+			&singleUnwrapError{}, wrappedErr),
+		newIsErrorFn2TestCase("past a layer of nil errors, by node", isTestErrNode, true, true,
+			&core.CompoundError{Errs: []error{nil}}, wrappedErr),
 	}
 
 	core.RunTestCases(t, testCases)
@@ -1034,7 +1063,7 @@ func TestWrappedError(t *testing.T) {
 
 // unwrapBranchesTestCase covers the three Unwrap type-switch arms plus
 // the default branch, asserting that the returned slice contains the
-// expected inner error(s).
+// expected inner error(s) and has no room past them.
 type unwrapBranchesTestCase struct {
 	err       error
 	name      string
@@ -1051,6 +1080,13 @@ func (tc unwrapBranchesTestCase) Name() string { return tc.name }
 func (tc unwrapBranchesTestCase) Test(t *testing.T) {
 	got := core.Unwrap(tc.err)
 	core.AssertSliceEqual(t, tc.wantInner, got, "Unwrap")
+	core.AssertEqual(t, len(got), cap(got), "capacity")
+}
+
+// makeErrorsWithRoom returns errs in a slice with room past them, as one
+// grown by append has.
+func makeErrorsWithRoom(errs ...error) []error {
+	return append(make([]error, 0, len(errs)+1), errs...)
 }
 
 func unwrapBranchesTestCases() []unwrapBranchesTestCase {
@@ -1058,10 +1094,18 @@ func unwrapBranchesTestCases() []unwrapBranchesTestCase {
 	return core.S(
 		newUnwrapBranchesTestCase("Unwrap []error branch",
 			&core.CompoundError{Errs: []error{inner}}, []error{inner}),
+		newUnwrapBranchesTestCase("Unwrap []error branch with nil",
+			&core.CompoundError{Errs: []error{nil, inner}}, []error{inner}),
+		newUnwrapBranchesTestCase("Unwrap []error branch with room",
+			&core.CompoundError{Errs: makeErrorsWithRoom(inner)}, []error{inner}),
+		newUnwrapBranchesTestCase("Unwrap []error branch, empty",
+			&core.CompoundError{Errs: []error{}}, nil),
 		newUnwrapBranchesTestCase("Errors() branch",
 			&errorsOnlyError{errs: []error{inner}}, []error{inner}),
 		newUnwrapBranchesTestCase("Unwrap error branch",
 			&singleUnwrapError{inner: inner}, []error{inner}),
+		newUnwrapBranchesTestCase("Unwrap error branch with nil",
+			&singleUnwrapError{}, nil),
 		newUnwrapBranchesTestCase("default branch",
 			errors.New("plain"), nil),
 	)
@@ -1070,6 +1114,37 @@ func unwrapBranchesTestCases() []unwrapBranchesTestCase {
 // Test Unwrap(err) hits all three type-switch branches and the default.
 func TestUnwrapBranches(t *testing.T) {
 	core.RunTestCases(t, unwrapBranchesTestCases())
+}
+
+// TestUnwrapLeavesSlice checks that Unwrap leaves the slice of the error
+// it unwraps as it was, nil entries included.
+func TestUnwrapLeavesSlice(t *testing.T) {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	ce := &core.CompoundError{Errs: []error{err1, nil, err2}}
+
+	core.Unwrap(ce)
+	core.AssertSliceEqual(t, []error{err1, nil, err2}, ce.Errs, "Errs")
+}
+
+// TestUnwrapConcurrent unwraps one joined error from two goroutines, so
+// the race detector sees any write Unwrap makes into it, and checks what
+// each got.
+func TestUnwrapConcurrent(t *testing.T) {
+	err1 := errors.New("error 1")
+	err2 := errors.New("error 2")
+	err := errors.Join(err1, err2)
+
+	var got [2][]error
+	var wg sync.WaitGroup
+	for i := range got {
+		wg.Go(func() { got[i] = core.Unwrap(err) })
+	}
+	wg.Wait()
+
+	for i := range got {
+		core.AssertSliceEqual(t, []error{err1, err2}, got[i], "goroutine %d", i)
+	}
 }
 
 // Test ErrInvalid is an alias of the standard sentinel, so errors.Is

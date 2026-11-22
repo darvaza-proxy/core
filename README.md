@@ -338,7 +338,7 @@ Error wrapping functions:
 * `Wrap(err, note)` - wrap with simple string note.
 * `Wrapf(err, format, args...)` - wrap with formatted note.
 * `QuietWrap(err, note)` - wrap without including original error text.
-* `Unwrap(err) []error` - extract all sub-errors from wrapped errors.
+* `Unwrap(err) []error` - unwrap one layer of `err`, without nil entries.
 
 ### Compound Errors
 

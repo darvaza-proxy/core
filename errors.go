@@ -240,31 +240,41 @@ func CoalesceError(errs ...error) error {
 // Unwrap unwraps one layer of a compound error,
 // ensuring there are no nil entries.
 func Unwrap(err error) []error {
-	var errs []error
-
-	if err == nil {
-		return nil
+	errs, one := doUnwrap(err)
+	switch {
+	case one != nil:
+		return []error{one}
+	case slices.Contains(errs, nil):
+		errs = SliceCopyFn(errs, notNilError)
+	default:
+		// a slice without nil entries, or none
 	}
 
+	if len(errs) == 0 {
+		return nil
+	}
+	return slices.Clip(errs)
+}
+
+// doUnwrap returns the layer err wraps, as its method gives it.
+func doUnwrap(err error) (errs []error, one error) {
 	switch w := err.(type) {
 	case interface {
 		Unwrap() []error
 	}:
-		errs = w.Unwrap()
+		return w.Unwrap(), nil
 	case interface {
 		Errors() []error
 	}:
-		errs = w.Errors()
+		return w.Errors(), nil
 	case interface {
 		Unwrap() error
 	}:
-		errs = append(errs, w.Unwrap())
+		return nil, w.Unwrap()
 	default:
+		// nil, or an error that wraps nothing
+		return nil, nil
 	}
-
-	return SliceReplaceFn(errs, func(_ []error, err error) (error, bool) {
-		return err, err != nil
-	})
 }
 
 // IsError recursively checks if the given error is in the given list,
@@ -315,14 +325,21 @@ func checkIsErrorFnShallow(check func(error) bool, errs []error) bool {
 // recursing via IsErrorFn.
 func checkIsErrorFnUnwrapped(check func(error) bool, errs []error) bool {
 	for _, e := range errs {
-		if errs := Unwrap(e); len(errs) > 0 {
-			if IsErrorFn(check, errs...) {
-				return true
-			}
+		if e != nil && checkIsErrorFnLayer(check, e) {
+			return true
 		}
 	}
 
 	return false
+}
+
+// checkIsErrorFnLayer tests the layer e wraps, recursing via IsErrorFn.
+func checkIsErrorFnLayer(check func(error) bool, e error) bool {
+	errs, one := doUnwrap(e)
+	if one != nil {
+		return IsErrorFn(check, one)
+	}
+	return IsErrorFn(check, errs...)
 }
 
 // IsErrorFn2 recursively checks if any of the given errors gets a
@@ -363,15 +380,32 @@ func checkIsErrorFn2Shallow(check func(error) (bool, bool), errs []error) (is, k
 // recursing via IsErrorFn2, stopping at the first known answer.
 func checkIsErrorFn2Unwrapped(check func(error) (bool, bool), errs []error) (is, known bool) {
 	for _, e := range errs {
-		if errs := Unwrap(e); len(errs) > 0 {
-			if is, known = IsErrorFn2(check, errs...); known {
-				return is, true
-			}
+		if e == nil {
+			continue
+		}
+
+		if is, known = checkIsErrorFn2Layer(check, e); known {
+			return is, true
 		}
 	}
 
 	// unknown
 	return false, false
+}
+
+// checkIsErrorFn2Layer tests the layer e wraps, recursing via IsErrorFn2.
+// An empty layer gives no answer.
+func checkIsErrorFn2Layer(check func(error) (bool, bool), e error) (is, known bool) {
+	errs, one := doUnwrap(e)
+	switch {
+	case one != nil:
+		return IsErrorFn2(check, one)
+	case len(errs) == 0:
+		// unknown
+		return false, false
+	default:
+		return IsErrorFn2(check, errs...)
+	}
 }
 
 // NewCheckErrorIsIn builds the [IsErrorFn] predicate for IsError: the
