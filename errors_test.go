@@ -1,7 +1,5 @@
 package core_test
 
-// cspell:words Errno ENOENT
-
 import (
 	"context"
 	"errors"
