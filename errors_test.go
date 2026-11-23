@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"math/big"
 	"net"
+	"net/url"
 	"os"
 	"sync"
 	"syscall"
@@ -488,6 +489,11 @@ func newSyscallOpError(op string, errno syscall.Errno) error {
 // operation.
 func newPathError(op string, err error) error {
 	return &fs.PathError{Op: op, Path: "file", Err: err}
+}
+
+// newURLError wraps err as the net/http client wraps a failed request.
+func newURLError(op string, err error) error {
+	return &url.Error{Op: op, URL: "http://example.com", Err: err}
 }
 
 // Test cases for IsError function
@@ -1021,8 +1027,16 @@ func checkIsTemporaryTestCases() []checkIsTemporaryTestCase {
 			&isTemporaryOnlyError{}, true, true),
 		newCheckIsTemporaryTestCase("timeout without Temporary or IsTemporary",
 			newPathError("read", os.ErrDeadlineExceeded), true, true),
+		newCheckIsTemporaryTestCase("not a timeout, without Temporary or IsTemporary",
+			newPathError("open", syscall.ENOENT), false, false),
+		newCheckIsTemporaryTestCase("Timeout false, without Temporary or IsTemporary",
+			newNotTimeoutError(tempErr), false, false),
 		newCheckIsTemporaryTestCase("timeout with Temporary false",
 			newTLSPermanentError(timeoutErr), false, true),
+		newCheckIsTemporaryTestCase("OpError with Temporary false",
+			newOpError("read", net.ErrClosed), false, false),
+		newCheckIsTemporaryTestCase("connection reset from accept in OpError",
+			newOpError("accept", connectionReset), true, true),
 	)
 }
 
@@ -1070,6 +1084,8 @@ func isTemporaryTestCases() []isTemporaryTestCase {
 		newIsTemporaryTestCase("regular error", regularErr, false),
 		newIsTemporaryTestCase("timeout with Temporary false",
 			newTLSPermanentError(timeoutErr), false),
+		newIsTemporaryTestCase("temporary error in Timeout false",
+			newNotTimeoutError(tempErr), true),
 		newIsTemporaryTestCase("temporary error joined after a permanent one",
 			errors.Join(permanentErr, tempErr), true),
 		newIsTemporaryTestCase("temporary error joined before a permanent one",
@@ -1123,6 +1139,12 @@ func checkIsTimeoutTestCases() []checkIsTimeoutTestCase {
 		newCheckIsTimeoutTestCase("regular error", regularErr, false, false),
 		newCheckIsTimeoutTestCase("IsTimeout-only interface",
 			&isTimeoutOnlyError{}, true, true),
+		newCheckIsTimeoutTestCase("timeout in PathError",
+			newPathError("read", os.ErrDeadlineExceeded), true, true),
+		newCheckIsTimeoutTestCase("not a timeout in PathError",
+			newPathError("open", syscall.ENOENT), false, false),
+		newCheckIsTimeoutTestCase("not a timeout in SyscallError",
+			os.NewSyscallError("wait", syscall.ECHILD), false, false),
 	)
 }
 
@@ -1199,6 +1221,19 @@ func (e *tlsPermanentError) Error() string { return e.err.Error() }
 func (e *tlsPermanentError) Unwrap() error { return e.err }
 func (e *tlsPermanentError) Timeout() bool { return e.err.Timeout() }
 func (*tlsPermanentError) Temporary() bool { return false }
+
+// notTimeoutError answers Timeout false and has neither Temporary nor
+// IsTemporary, while Unwrap passes through to the error it wraps.
+type notTimeoutError struct{ err error }
+
+// newNotTimeoutError wraps err in a notTimeoutError.
+func newNotTimeoutError(err error) error {
+	return &notTimeoutError{err: err}
+}
+
+func (e *notTimeoutError) Error() string { return e.err.Error() }
+func (e *notTimeoutError) Unwrap() error { return e.err }
+func (*notTimeoutError) Timeout() bool   { return false }
 
 // tlsTestTimeout bounds the TLS handshake newTLSPipe runs.
 const tlsTestTimeout = 5 * time.Second
@@ -1337,6 +1372,8 @@ func stdErrorAnswersTestCases(t *testing.T) []stdErrorAnswersTestCase {
 		newTemporaryTimeoutCase("context.DeadlineExceeded", context.DeadlineExceeded),
 		newTemporaryTimeoutCase("ETIMEDOUT in SyscallError in OpError",
 			newSyscallOpError("read", syscall.ETIMEDOUT)),
+		newTemporaryTimeoutCase("wrapped context.DeadlineExceeded in PathError",
+			newPathError("read", fmt.Errorf("wrapped: %w", context.DeadlineExceeded))),
 
 		newTemporaryNotTimeoutCase("EINTR", syscall.EINTR),
 		newTemporaryNotTimeoutCase("EINTR in SyscallError in OpError",
@@ -1344,6 +1381,14 @@ func stdErrorAnswersTestCases(t *testing.T) []stdErrorAnswersTestCase {
 		newTemporaryNotTimeoutCase("EMFILE", syscall.EMFILE),
 		newTemporaryNotTimeoutCase("EMFILE in SyscallError in OpError",
 			newSyscallOpError("accept", syscall.EMFILE)),
+		newTemporaryNotTimeoutCase("EMFILE in SyscallError",
+			os.NewSyscallError("pipe2", syscall.EMFILE)),
+		newTemporaryNotTimeoutCase("EMFILE in PathError",
+			newPathError("open", syscall.EMFILE)),
+		newTemporaryNotTimeoutCase("wrapped EMFILE in url.Error",
+			newURLError("Get", fmt.Errorf("wrapped: %w", syscall.EMFILE))),
+		newTemporaryNotTimeoutCase("wrapped EMFILE in OpError",
+			newOpError("dial", fmt.Errorf("wrapped: %w", syscall.EMFILE))),
 
 		newNotTemporaryTimeoutCase("tls.Conn write past its deadline",
 			newTLSWriteDeadlineError(t)),

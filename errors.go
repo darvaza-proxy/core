@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/fs"
 	"net"
+	"net/url"
+	"os"
 	"slices"
 )
 
@@ -536,6 +538,19 @@ func errorEq(a, b error) (eq bool) {
 	return a == b
 }
 
+// isStandardWrapper reports whether err is one of the standard library's
+// wrappers whose Timeout, and Temporary where they have it, answer from
+// the errors they wrap, so their false may mean only that the wrapped
+// error has no such method.
+func isStandardWrapper(err error) bool {
+	switch err.(type) {
+	case *fs.PathError, *os.SyscallError, *url.Error, *net.OpError:
+		return true
+	default:
+		return false
+	}
+}
+
 // CheckIsTemporary tests an error for temporary conditions without unwrapping.
 // It checks if the error implements Temporary() bool or IsTemporary() bool
 // interfaces directly, without traversing wrapped error chains.
@@ -543,14 +558,18 @@ func errorEq(a, b error) (eq bool) {
 // The function examines the error in the following priority order:
 //   - Temporary() bool interface (legacy net.Error style)
 //   - IsTemporary() bool interface (modern style)
-//   - Falls back to CheckIsTimeout for timeout-based temporary errors
+//   - Falls back to CheckIsTimeout, where a timeout counts as temporary
 //
 // Returns:
 //   - is: true if the error indicates a temporary condition
-//   - known: true if the error type implements a recognized interface
+//   - known: true if the error gives an answer, false to leave it to the
+//     errors it wraps
 //
 // For nil errors, returns (false, true) indicating definitively not temporary.
-// For errors with no recognized interface, returns result from CheckIsTimeout.
+// A false from *fs.PathError, *os.SyscallError, *url.Error or *net.OpError,
+// which answer from the errors they wrap, gives (false, false).
+// For errors with neither method, returns (true, true) for a timeout and
+// (false, false) otherwise, leaving IsTemporary to check the errors it wraps.
 func CheckIsTemporary(err error) (is, known bool) {
 	switch e := err.(type) {
 	case nil:
@@ -558,13 +577,18 @@ func CheckIsTemporary(err error) (is, known bool) {
 	case interface {
 		Temporary() bool
 	}:
-		return e.Temporary(), true
+		is := e.Temporary()
+		return is, is || !isStandardWrapper(err)
 	case interface {
 		IsTemporary() bool
 	}:
 		return e.IsTemporary(), true
 	default:
-		return CheckIsTimeout(err)
+		if is, _ := CheckIsTimeout(err); is {
+			return true, true
+		}
+		// not known to be a timeout, which says nothing about being temporary
+		return false, false
 	}
 }
 
@@ -579,10 +603,10 @@ func CheckIsTemporary(err error) (is, known bool) {
 //   - Detecting timeout errors (which are also considered temporary)
 //
 // Returns true when the walk finds an error that reports itself
-// temporary. An error that reports itself not temporary ends the walk
-// down its own chain, before the errors it wraps, while the errors beside
-// it, as in a joined error, are still checked. Returns false for nil
-// errors or chains with no temporary indicators.
+// temporary. A known false from CheckIsTemporary for an error ends the
+// walk down its own chain, before the errors it wraps, while the errors
+// beside it, as in a joined error, are still checked. Returns false for
+// nil errors or chains with no temporary indicators.
 //
 // Use this function when you need to determine if an operation should be
 // retried based on the error's temporary nature.
@@ -600,10 +624,13 @@ func IsTemporary(err error) bool {
 //
 // Returns:
 //   - is: true if the error indicates a timeout condition
-//   - known: true if the error type implements a recognized timeout interface
+//   - known: true if the error gives an answer, false to leave it to the
+//     errors it wraps
 //
 // For nil errors, returns (false, true) indicating definitively not a timeout.
-// For errors with no recognized timeout interface, returns (false, false).
+// A false from *fs.PathError, *os.SyscallError, *url.Error or *net.OpError,
+// which answer from the errors they wrap, gives (false, false).
+// For errors with neither method, returns (false, false).
 //
 // Note that timeout errors are typically also considered temporary conditions,
 // but this function specifically tests for timeout semantics only.
@@ -614,7 +641,8 @@ func CheckIsTimeout(err error) (is, known bool) {
 	case interface {
 		Timeout() bool
 	}:
-		return e.Timeout(), true
+		is := e.Timeout()
+		return is, is || !isStandardWrapper(err)
 	case interface {
 		IsTimeout() bool
 	}:
@@ -634,10 +662,10 @@ func CheckIsTimeout(err error) (is, known bool) {
 //   - Detecting modern IsTimeout() bool implementations
 //
 // Returns true when the walk finds an error that reports itself a
-// timeout. An error that reports itself not a timeout ends the walk down
-// its own chain, before the errors it wraps, while the errors beside it,
-// as in a joined error, are still checked. Returns false for nil errors
-// or chains with no timeout indicators.
+// timeout. A known false from CheckIsTimeout for an error ends the walk
+// down its own chain, before the errors it wraps, while the errors beside
+// it, as in a joined error, are still checked. Returns false for nil
+// errors or chains with no timeout indicators.
 //
 // Use this function when you need to distinguish timeout errors from
 // other types of temporary errors for specialized retry logic or

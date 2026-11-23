@@ -89,7 +89,8 @@
     "Unreachablef",
     "Unwrappable",
     "waitgroup",
-    "Wrapf"
+    "Wrapf",
+    "WSAECONNRESET"
   ],
   "ignorePaths": [
     "**/*.lock",
