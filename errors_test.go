@@ -838,7 +838,7 @@ func checkIsTemporaryTestCases() []checkIsTemporaryTestCase {
 	)
 }
 
-// Test CheckIsTemporary function (0% coverage)
+// Test CheckIsTemporary function
 func TestCheckIsTemporary(t *testing.T) {
 	core.RunTestCases(t, checkIsTemporaryTestCases())
 }
@@ -882,7 +882,7 @@ func isTemporaryTestCases() []isTemporaryTestCase {
 	)
 }
 
-// Test IsTemporary function (0% coverage)
+// Test IsTemporary function
 func TestIsTemporary(t *testing.T) {
 	core.RunTestCases(t, isTemporaryTestCases())
 }
@@ -929,7 +929,7 @@ func checkIsTimeoutTestCases() []checkIsTimeoutTestCase {
 	)
 }
 
-// Test CheckIsTimeout function (0% coverage)
+// Test CheckIsTimeout function
 func TestCheckIsTimeout(t *testing.T) {
 	core.RunTestCases(t, checkIsTimeoutTestCases())
 }
@@ -973,7 +973,7 @@ func isTimeoutTestCases() []isTimeoutTestCase {
 	)
 }
 
-// Test IsTimeout function (0% coverage)
+// Test IsTimeout function
 func TestIsTimeout(t *testing.T) {
 	core.RunTestCases(t, isTimeoutTestCases())
 }

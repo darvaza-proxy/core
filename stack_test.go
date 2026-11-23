@@ -279,12 +279,12 @@ func framePkgNameTestCases() []framePkgNameTestCase {
 	}
 }
 
-// Test Frame.PkgName method (0% coverage)
+// Test Frame.PkgName method
 func TestFramePkgName(t *testing.T) {
 	core.RunTestCases(t, framePkgNameTestCases())
 }
 
-// Test Frame.File method (0% coverage)
+// Test Frame.File method
 func TestFrameFile(t *testing.T) {
 	frame := core.Here()
 	file := frame.File()
@@ -372,7 +372,7 @@ func TestFramePkgFile(t *testing.T) {
 	core.RunTestCases(t, tests)
 }
 
-// Test Frame.Line method (0% coverage)
+// Test Frame.Line method
 func TestFrameLine(t *testing.T) {
 	frame := core.Here()
 	line := frame.Line()
@@ -421,7 +421,7 @@ func frameFileLineTestCases() []frameFileLineTestCase {
 	)
 }
 
-// Test Frame.FileLine method (0% coverage)
+// Test Frame.FileLine method
 func TestFrameFileLine(t *testing.T) {
 	core.RunTestCases(t, frameFileLineTestCases())
 }
@@ -515,7 +515,7 @@ func frameFormatTestCases() []frameFormatTestCase {
 	)
 }
 
-// Test Frame.Format method and helper functions (0% coverage)
+// Test Frame.Format method and helper functions
 func TestFrameFormat(t *testing.T) {
 	core.RunTestCases(t, frameFormatTestCases())
 }
@@ -778,7 +778,7 @@ func stackFormatTestCases() []stackFormatTestCase {
 	)
 }
 
-// Test Stack.Format method (0% coverage)
+// Test Stack.Format method
 func TestStackFormat(t *testing.T) {
 	core.RunTestCases(t, stackFormatTestCases())
 }
@@ -853,7 +853,7 @@ func formatLineTestCases() []formatLineTestCase {
 	)
 }
 
-// Test formatLine function directly (0% coverage)
+// Test formatLine function directly
 func TestFormatLineMethod(t *testing.T) {
 	core.RunTestCases(t, formatLineTestCases())
 }
