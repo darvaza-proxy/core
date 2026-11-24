@@ -125,7 +125,7 @@ func joinHostPortUnsafeTestCases() []joinHostPortUnsafeTestCase {
 		newJoinHostPortUnsafeTestCase("IPv6 mapped and port", "::ffff:192.0.2.1", "80", "[::ffff:192.0.2.1]:80"),
 		newJoinHostPortUnsafeTestCase("IPv6 zone and port", "fe80::1%eth0", "80", "[fe80::1%eth0]:80"),
 
-		// Without a port, the host comes back alone, unbracketed.
+		// Without a port, the host comes back alone, without brackets.
 		newJoinHostPortUnsafeTestCase("name no port", "example.com", "", "example.com"),
 		newJoinHostPortUnsafeTestCase("IPv6 no port", "::1", "", "::1"),
 

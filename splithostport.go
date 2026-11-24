@@ -48,7 +48,7 @@ func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	return s, nil
 }
 
-// doMakeHostPort joins a cleaned, unbracketed host, or an empty one, and
+// doMakeHostPort joins a cleaned host without brackets, or an empty one, and
 // its port, the port in canonical decimal form, using defaultPort when
 // port is empty, and returns the host alone when both are unset. It
 // reports false for a port that does not parse, or parses to 0.
@@ -122,7 +122,7 @@ func JoinHostPort(host, port string) (string, error) {
 	}
 }
 
-// doJoinHostPort joins a cleaned, unbracketed host, or an empty one, and
+// doJoinHostPort joins a cleaned host without brackets, or an empty one, and
 // a port, the port in canonical decimal form. It refuses a port that
 // does not parse, and the error names the host and port joined as
 // passed.
@@ -286,7 +286,7 @@ func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 		// [host]:port [host]
 		return splitHostPortBracketed(hostPort)
 	case strings.Count(hostPort, ":") > 1:
-		// unbracketed IPv6
+		// IPv6 without brackets
 		return hostPort, "", nil
 	}
 

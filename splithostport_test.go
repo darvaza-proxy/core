@@ -240,7 +240,7 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		// "0" is read as an IP address before it can be taken as a name.
 		newSplitHostPortTestCase("unspecified IPv4 short", "0:6060", "0.0.0.0", "6060"),
 		newSplitHostPortTestCase("IPv6 no port", "::1", "::1", ""),
-		// An unbracketed IPv6 address is read whole, its last group
+		// An IPv6 address without brackets is read whole, its last group
 		// included, so a port needs the brackets.
 		newSplitHostPortTestCase("IPv6 trailing group", "::1:8080", "::1:8080", ""),
 		newSplitHostPortTestCase("bracketed IPv6 no port", "[::1]", "::1", ""),
@@ -498,7 +498,7 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		// bracketed when a port follows it.
 		newMakeHostPortTestCase("unspecified IPv4 short", "0", 80, "0.0.0.0:80"),
 		newMakeHostPortTestCase("IPv6 bracketed no port", "[::1]", 0, "::1"),
-		newMakeHostPortTestCase("IPv6 unbracketed default port", "::1", 8080, "[::1]:8080"),
+		newMakeHostPortTestCase("IPv6 without brackets default port", "::1", 8080, "[::1]:8080"),
 		newMakeHostPortTestCase("IPv6 zone", "[fe80::1%eth0]:80", 0, "[fe80::1%eth0]:80"),
 		// A port alone comes back with no host.
 		newMakeHostPortTestCase("port only", ":6060", 0, ":6060"),
