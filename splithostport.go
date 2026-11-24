@@ -168,13 +168,13 @@ func doJoinHostPort(host, port string) (string, error) {
 //   - SplitHostPort("invalid host") → error
 //   - SplitHostPort("example.com:99999") → error (port out of range)
 func SplitHostPort(hostPort string) (host, port string, err error) {
-	return doSplitHostPort(hostPort, validHost)
+	_, _, host, port, err = doSplitHostPort(hostPort)
+	return host, port, err
 }
 
-// SplitHostPortASCII splits and validates as SplitHostPort does, short
-// of decoding a name, which it returns in its ASCII form, a label
-// outside ASCII in punycode. An IP address comes back in its canonical
-// text, as from SplitHostPort.
+// SplitHostPortASCII splits and validates as SplitHostPort does, and
+// returns a name in its ASCII form, a label outside ASCII in punycode.
+// An IP address comes back in its canonical text, as from SplitHostPort.
 //
 // Examples:
 //   - SplitHostPortASCII("Hello.世界:443") → ("hello.xn--rhqv96g", "443", nil)
@@ -182,39 +182,62 @@ func SplitHostPort(hostPort string) (host, port string, err error) {
 //   - SplitHostPortASCII("[::1]:443") → ("::1", "443", nil)
 //   - SplitHostPortASCII("invalid host") → error
 func SplitHostPortASCII(hostPort string) (host, port string, err error) {
-	return doSplitHostPort(hostPort, validHostASCII)
+	_, host, _, port, err = doSplitHostPort(hostPort)
+	return host, port, err
 }
 
-// doSplitHostPort splits a host:port string, and returns the port in
-// canonical decimal form and the host as cleanHost returns it, or empty
-// for a port alone.
-func doSplitHostPort(hostPort string, cleanHost func(string) (string, bool)) (host, port string, err error) {
-	host, port, err = splitHostPortUnsafe(hostPort)
-	if err != nil {
-		// failed split
-		return "", "", err
-	}
+// SplitAddrPortASCII splits and validates as SplitHostPort does, and
+// returns the host in ASCII, and as an IP address where it is one. A
+// host that is an IP address, or that UTS 46 maps into one, comes back
+// as addr, as ParseAddr reads it, and as host in addr's text. Any other
+// host is a name, and comes back as host in its ASCII form, a label
+// outside ASCII in punycode, with the zero netip.Addr. A port alone
+// comes back with neither. The port is in canonical decimal form, or
+// empty where the input carries none.
+//
+// Examples:
+//   - SplitAddrPortASCII("[::1]:443") → (::1, "::1", "443", nil)
+//   - SplitAddrPortASCII("192.168.1.1") → (192.168.1.1, "192.168.1.1", "", nil)
+//   - SplitAddrPortASCII("Hello.世界:443") → (netip.Addr{}, "hello.xn--rhqv96g", "443", nil)
+//   - SplitAddrPortASCII(":8080") → (netip.Addr{}, "", "8080", nil)
+//   - SplitAddrPortASCII("invalid host") → error
+//
+//revive:disable-next-line:function-result-limit // the address and the host, beside the port
+func SplitAddrPortASCII(addrPort string) (addr netip.Addr, host, port string, err error) {
+	addr, host, _, port, err = doSplitHostPort(addrPort)
+	return addr, host, port, err
+}
 
+// doSplitHostPort splits and validates a host and port for
+// SplitHostPort, SplitHostPortASCII and SplitAddrPortASCII. It returns
+// the host as validHostForms does, nothing for a port alone, and the
+// port in canonical decimal form.
+//
+//revive:disable-next-line:function-result-limit // the host in its forms, beside the port
+func doSplitHostPort(hostPort string) (addr netip.Addr, ascii, unicode, port string, err error) {
+	var ok bool
+
+	// a failed split returns neither host nor port
+	host, port, err := splitHostPortUnsafe(hostPort)
 	if port != "" {
-		s, ok := canonicalPort(port)
+		// canonicalPort returns no port for a bad one
+		port, ok = canonicalPort(port)
 		if !ok {
-			// bad port
-			return "", "", addrErr(hostPort, "invalid port")
+			// bad port, leaving no host to check
+			host, err = "", addrErr(hostPort, "invalid port")
 		}
-		port = s
 	}
 
-	if host == "" {
-		// port alone
-		return "", port, nil
+	if host != "" {
+		// validHostForms returns nothing for a bad host
+		addr, ascii, unicode, ok = validHostForms(host)
+		if !ok {
+			// bad host
+			port, err = "", addrErr(hostPort, "invalid address")
+		}
 	}
 
-	if s, ok := cleanHost(host); ok {
-		// valid host
-		return s, port, nil
-	}
-
-	return "", "", addrErr(hostPort, "invalid address")
+	return addr, ascii, unicode, port, err
 }
 
 // SplitAddrPort splits a string containing an IP address and an optional port,
@@ -240,40 +263,33 @@ func doSplitHostPort(hostPort string, cleanHost func(string) (string, bool)) (ho
 //   - SplitAddrPort("invalid") → error
 //   - SplitAddrPort("192.168.1.1:99999") → error (port out of range)
 func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
-	// split
-	host, sPort, err := splitHostPortUnsafe(addrPort)
-	if err != nil {
-		// failed to split
-		return netip.Addr{}, 0, err
-	}
+	var ok bool
 
-	// port
+	// a failed split returns neither host nor port
+	host, sPort, err := splitHostPortUnsafe(addrPort)
 	if sPort != "" {
+		// parsePort returns 0 for a bad port
 		port, err = parsePort(sPort)
 		if err != nil {
-			// bad port
-			err = addrErr(addrPort, "invalid port")
-			return netip.Addr{}, 0, err
+			// bad port, leaving no address to check
+			host, err = "", addrErr(addrPort, "invalid port")
 		}
 	}
 
-	if host == "" {
-		// port alone
-		return netip.Addr{}, port, nil
+	if host != "" {
+		// validAddr returns the zero netip.Addr for a bad address
+		addr, ok = validAddr(host)
+		if !ok {
+			// bad address
+			port, err = 0, addrErr(addrPort, "invalid address")
+		}
 	}
 
-	// addr
-	addr, ok := validAddr(host)
-	if !ok {
-		// bad address
-		err = addrErr(addrPort, "invalid address")
-		return netip.Addr{}, 0, err
-	}
-
-	// success
-	return addr, port, nil
+	return addr, port, err
 }
 
+// splitHostPortUnsafe splits a host and port without validating either,
+// brackets removed. On failure it returns the error alone.
 func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 	var ok bool
 
@@ -281,23 +297,24 @@ func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 	case hostPort == "":
 		// empty
 		err = addrErr(hostPort, "empty address")
-		return "", "", err
+		return host, port, err
 	case hostPort[0] == '[':
 		// [host]:port [host]
 		return splitHostPortBracketed(hostPort)
 	case strings.Count(hostPort, ":") > 1:
 		// IPv6 without brackets
 		return hostPort, "", nil
+	default:
+		// at most one ':', split below
 	}
 
 	host, port, ok = splitLastRune(':', hostPort)
 	switch {
 	case !ok:
-		// host without port
-		host, port = hostPort, ""
+		// host without port, as split
 	case port == "":
 		// host:
-		err = addrErr(hostPort, "missing port after ':'")
+		host, err = "", addrErr(hostPort, "missing port after ':'")
 	case host == "":
 		// :port, no host
 	default:
@@ -312,8 +329,7 @@ func splitHostPortBracketed(hostPort string) (host, port string, err error) {
 	switch {
 	case !ok:
 		// [host
-		host = ""
-		err = addrErr(hostPort, "missing ']' in address")
+		host, err = "", addrErr(hostPort, "missing ']' in address")
 	case host == "":
 		// []...
 		err = addrErr(hostPort, "missing address in brackets")
@@ -324,12 +340,11 @@ func splitHostPortBracketed(hostPort string) (host, port string, err error) {
 		port = s[1:]
 		if port == "" {
 			// [host]:
-			err = addrErr(hostPort, "missing port after ':'")
+			host, err = "", addrErr(hostPort, "missing port after ':'")
 		}
 	default:
 		// [host]...
-		host = ""
-		err = addrErr(hostPort, "invalid character after ']'")
+		host, err = "", addrErr(hostPort, "invalid character after ']'")
 	}
 
 	return host, port, err
@@ -372,47 +387,46 @@ func canonicalPort(s string) (string, bool) {
 // UTS 46 and in Unicode. A name the mapping turns into an IP address
 // comes back as that address.
 func validHost(s string) (string, bool) {
-	host, name, ok := doValidHost(s)
-	if !name {
-		// IP address, or refused
-		return host, ok
-	}
-
-	u, err := nameProfile.ToUnicode(host)
-	if err != nil {
-		// idna refuses, once decoded, some names ToASCII accepts
-		return "", false
-	}
-	return u, true
+	_, _, unicode, ok := validHostForms(s)
+	return unicode, ok
 }
 
-// validHostASCII validates a host as validHost does, short of decoding a
-// name, and returns the name in its ASCII form.
-func validHostASCII(s string) (string, bool) {
-	host, _, ok := doValidHost(s)
-	return host, ok
-}
-
-// doValidHost validates a host as an IP address or a name, and returns
-// it cleaned in ASCII: an IP address in its canonical text, a name in
-// the ASCII form UTS 46 maps it into. It reports whether the host is a
-// name.
-func doValidHost(s string) (host string, name, ok bool) {
-	addr, ascii, ok := mapHost(s)
+// validHostForms validates a host as an IP address or a name, and
+// returns it in its forms. Where the host is an IP address, or UTS 46
+// maps it into one, it returns the address, and its canonical text as
+// both ascii and unicode. A name comes back with the zero netip.Addr,
+// in the ASCII form the mapping gives, and decoded into Unicode, which
+// only a name with a label in punycode needs. A host it refuses comes
+// back as nothing but false.
+//
+//revive:disable-next-line:function-result-limit // the host in its forms
+func validHostForms(s string) (addr netip.Addr, ascii, unicode string, ok bool) {
+	addr, ascii, ok = mapHost(s)
 	switch {
 	case !ok:
-		// refused by idna
-		return "", false, false
+		// refused by idna, nothing to return
 	case addr.IsValid():
 		// IP address
-		return addr.String(), false, true
+		ascii = addr.String()
+		unicode = ascii
 	case !validHostName(ascii):
 		// not a host name
-		return "", false, false
+		ascii, ok = "", false
+	case !hasALabel(ascii):
+		// name in plain ASCII, its own Unicode form
+		unicode = ascii
 	default:
-		// name
-		return ascii, true, true
+		// international name
+		var err error
+		unicode, err = nameProfile.ToUnicode(ascii)
+		if err != nil {
+			// idna refuses, once decoded, some names ToASCII
+			// accepts, the bidi rule among others
+			ascii, unicode, ok = "", "", false
+		}
 	}
+
+	return addr, ascii, unicode, ok
 }
 
 // validAddr parses a host as an IP address, or as the IP address
@@ -496,6 +510,12 @@ func validHostLabel(s string) bool {
 	default:
 		return validALabelHyphens(s)
 	}
+}
+
+// hasALabel reports whether an ASCII name has a label in punycode, an
+// A-label, one starting "xn--".
+func hasALabel(s string) bool {
+	return strings.HasPrefix(s, "xn--") || strings.Contains(s, ".xn--")
 }
 
 // validALabelHyphens reports whether a label starting "xn--" decodes

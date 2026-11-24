@@ -16,6 +16,7 @@ var (
 	_ core.TestCase = splitAddrPortTestCase{}
 	_ core.TestCase = splitHostPortTestCase{}
 	_ core.TestCase = splitHostPortASCIITestCase{}
+	_ core.TestCase = splitAddrPortASCIITestCase{}
 	_ core.TestCase = makeHostPortTestCase{}
 	_ core.TestCase = joinHostPortTestCase{}
 )
@@ -101,6 +102,7 @@ func splitAddrPortTestCases() []splitAddrPortTestCase {
 
 		// A port that is not a number is rejected.
 		newSplitAddrPortTestCaseRejected("bracketed IPv6 word port", "[::1]:port"),
+		newSplitAddrPortTestCaseRejected("bracketed IPv6 empty port", "[::1]:"),
 
 		// A host that is not an IP address is rejected, a valid name
 		// included.
@@ -215,6 +217,7 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		// label of a name is judged as a number.
 		newSplitHostPortTestCase("underscore label", "a_b.name", "a_b.name", ""),
 		newSplitHostPortTestCase("double hyphen label", "ab--c.name", "ab--c.name", ""),
+		newSplitHostPortTestCase("xn-- inside a label", "axn--b.name", "axn--b.name", ""),
 		// A hyphen at an end of a label's ASCII characters is not at an
 		// end of the label when a character outside ASCII lies beyond it.
 		newSplitHostPortTestCase("hyphen after international character", "世-a.name", "世-a.name", ""),
@@ -421,9 +424,11 @@ func splitHostPortASCIITestCases() []splitHostPortASCIITestCase {
 		// A port alone splits with an empty host.
 		newSplitHostPortASCIITestCasePortOnly("port only", ":6060", "6060"),
 
-		// What SplitHostPort rejects before decoding a name,
-		// SplitHostPortASCII rejects.
+		// What SplitHostPort rejects, SplitHostPortASCII rejects, the
+		// alef symbol included, which the mapping makes a Hebrew letter
+		// whose label fails the bidi rule once decoded.
 		newSplitHostPortASCIITestCaseRejected("invalid punycode", "xn--a.name"),
+		newSplitHostPortASCIITestCaseRejected("alef symbol label", "aℵ.name"),
 		newSplitHostPortASCIITestCaseRejected("leading hyphen punycode label", "xn----9o6a.name"),
 		newSplitHostPortASCIITestCaseRejected("numeric name", "1234"),
 		newSplitHostPortASCIITestCaseRejected("name non-numeric port", "name:port"),
@@ -433,6 +438,129 @@ func splitHostPortASCIITestCases() []splitHostPortASCIITestCase {
 
 func TestSplitHostPortASCII(t *testing.T) {
 	core.RunTestCases(t, splitHostPortASCIITestCases())
+}
+
+type splitAddrPortASCIITestCase struct {
+	addr     netip.Addr
+	name     string
+	addrPort string
+	host     string
+	port     string
+	rejected bool
+}
+
+func (tc splitAddrPortASCIITestCase) Name() string {
+	return tc.name
+}
+
+func (tc splitAddrPortASCIITestCase) Test(t *testing.T) {
+	addr, host, port, err := core.SplitAddrPortASCII(tc.addrPort)
+
+	core.AssertEqual(t, tc.addr, addr, "address")
+	core.AssertEqual(t, tc.host, host, "host")
+	core.AssertEqual(t, tc.port, port, "port")
+
+	if tc.rejected {
+		// A rejection names the whole input.
+		rejection := core.AssertMustErrorAs[*net.AddrError](t, err, "error")
+		core.AssertEqual(t, tc.addrPort, rejection.Addr, "error address")
+		return
+	}
+
+	core.AssertNoError(t, err, "error")
+}
+
+// newSplitAddrPortASCIITestCaseAddr declares an accepted input whose host
+// is an IP address, by the address and port it splits into, the host
+// being the address's text as given; MustParseAddr refuses an empty
+// address.
+func newSplitAddrPortASCIITestCaseAddr(name, addrPort, addr, port string) splitAddrPortASCIITestCase {
+	return splitAddrPortASCIITestCase{
+		addr:     netip.MustParseAddr(addr),
+		name:     name,
+		addrPort: addrPort,
+		host:     addr,
+		port:     port,
+	}
+}
+
+// newSplitAddrPortASCIITestCaseName declares an accepted input whose host
+// is a name, by the ASCII name and port it splits into, with the zero
+// netip.Addr.
+func newSplitAddrPortASCIITestCaseName(name, addrPort, host, port string) splitAddrPortASCIITestCase {
+	return splitAddrPortASCIITestCase{
+		addr:     netip.Addr{},
+		name:     name,
+		addrPort: addrPort,
+		host:     core.MustNotZeroForTest(host),
+		port:     port,
+	}
+}
+
+// newSplitAddrPortASCIITestCasePortOnly declares an accepted input
+// carrying a port alone, which splits into neither address nor host, and
+// that port.
+func newSplitAddrPortASCIITestCasePortOnly(name, addrPort, port string) splitAddrPortASCIITestCase {
+	return splitAddrPortASCIITestCase{
+		addr:     netip.Addr{},
+		name:     name,
+		addrPort: addrPort,
+		host:     "",
+		port:     core.MustNotZeroForTest(port),
+	}
+}
+
+// newSplitAddrPortASCIITestCaseRejected declares an input
+// SplitAddrPortASCII rejects, returning its zero values.
+func newSplitAddrPortASCIITestCaseRejected(name, addrPort string) splitAddrPortASCIITestCase {
+	return splitAddrPortASCIITestCase{
+		name:     name,
+		addrPort: addrPort,
+		rejected: true,
+	}
+}
+
+func splitAddrPortASCIITestCases() []splitAddrPortASCIITestCase {
+	return core.S(
+		// An IP address comes back as ParseAddr reads it, and as the
+		// host in its text, the port in canonical form.
+		newSplitAddrPortASCIITestCaseAddr("IPv4 and port", "192.0.2.1:80", "192.0.2.1", "80"),
+		newSplitAddrPortASCIITestCaseAddr("IPv4 no port", "192.0.2.1", "192.0.2.1", ""),
+		newSplitAddrPortASCIITestCaseAddr("unspecified IPv4 short", "0:80", "0.0.0.0", "80"),
+		newSplitAddrPortASCIITestCaseAddr("IPv6 no port", "::1", "::1", ""),
+		newSplitAddrPortASCIITestCaseAddr("bracketed IPv6 and padded port", "[2001:DB8::1]:0443", "2001:db8::1", "443"),
+		newSplitAddrPortASCIITestCaseAddr("IPv6 zone", "[fe80::1%eth0]:80", "fe80::1%eth0", "80"),
+		newSplitAddrPortASCIITestCaseAddr("IPv4-mapped IPv6", "[::ffff:192.0.2.1]:80", "::ffff:192.0.2.1", "80"),
+
+		// A host UTS 46 maps into an IP address comes back as that
+		// address.
+		newSplitAddrPortASCIITestCaseAddr("ideographic full stops IPv4", "１２７。０。０。１:80", "127.0.0.1", "80"),
+		newSplitAddrPortASCIITestCaseAddr("full-width IPv6", "：：１", "::1", ""),
+
+		// Any other host is a name, and comes back as UTS 46 maps it, in
+		// ASCII, with no address.
+		newSplitAddrPortASCIITestCaseName("name and port", "Name:80", "name", "80"),
+		newSplitAddrPortASCIITestCaseName("name no port", "name", "name", ""),
+		newSplitAddrPortASCIITestCaseName("international name", "Hello.世界:443", "hello.xn--rhqv96g", "443"),
+
+		// A port alone splits with neither address nor host.
+		newSplitAddrPortASCIITestCasePortOnly("port only", ":0080", "80"),
+
+		// A bad port, a bad host or a failed split is rejected.
+		newSplitAddrPortASCIITestCaseRejected("name non-numeric port", "name:port"),
+		newSplitAddrPortASCIITestCaseRejected("port out of range", "name:65536"),
+		newSplitAddrPortASCIITestCaseRejected("invalid punycode", "xn--a.name"),
+		// The mapping makes the alef symbol a Hebrew letter, whose label
+		// fails the bidi rule once decoded.
+		newSplitAddrPortASCIITestCaseRejected("alef symbol label", "aℵ.name"),
+		newSplitAddrPortASCIITestCaseRejected("numeric name", "1234"),
+		newSplitAddrPortASCIITestCaseRejected("missing port", "name:"),
+		newSplitAddrPortASCIITestCaseRejected("empty", ""),
+	)
+}
+
+func TestSplitAddrPortASCII(t *testing.T) {
+	core.RunTestCases(t, splitAddrPortASCIITestCases())
 }
 
 type makeHostPortTestCase struct {
