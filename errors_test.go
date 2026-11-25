@@ -2,15 +2,21 @@ package core_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"math/big"
 	"net"
 	"os"
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"darvaza.org/core"
 )
@@ -1021,6 +1027,81 @@ func (e *tlsPermanentError) Unwrap() error { return e.err }
 func (e *tlsPermanentError) Timeout() bool { return e.err.Timeout() }
 func (*tlsPermanentError) Temporary() bool { return false }
 
+// tlsTestTimeout bounds the TLS handshake newTLSPipe runs.
+const tlsTestTimeout = 5 * time.Second
+
+// newTLSWriteDeadlineError returns what a write past its deadline gets
+// from a crypto/tls connection: the deadline error, in crypto/tls's
+// permanentError.
+func newTLSWriteDeadlineError(t *testing.T) error {
+	t.Helper()
+	client := newTLSPipe(t)
+	core.AssertMustNoError(t,
+		client.SetWriteDeadline(time.Now().Add(-time.Second)), "write deadline")
+
+	_, err := client.Write([]byte("x"))
+	core.AssertMustErrorIs(t, err, os.ErrDeadlineExceeded, "write")
+	return err
+}
+
+// newTLSPipe completes a TLS handshake over a net.Pipe and returns its
+// client end. The test's clean-up closes both ends.
+func newTLSPipe(t *testing.T) *tls.Conn {
+	t.Helper()
+	clientConfig, serverConfig := newTLSTestConfigs(t)
+	c, s := net.Pipe()
+	t.Cleanup(func() {
+		_ = c.Close()
+		_ = s.Close()
+	})
+
+	deadline := time.Now().Add(tlsTestTimeout)
+	core.AssertMustNoError(t, c.SetDeadline(deadline), "client deadline")
+	core.AssertMustNoError(t, s.SetDeadline(deadline), "server deadline")
+
+	client, server := tls.Client(c, clientConfig), tls.Server(s, serverConfig)
+	done := make(chan error, 1)
+	go func() { done <- server.Handshake() }()
+	core.AssertMustNoError(t, client.Handshake(), "client handshake")
+	core.AssertMustNoError(t, <-done, "server handshake")
+	return client
+}
+
+// newTLSTestConfigs returns a client and a server configuration for
+// TLS 1.3, the server presenting a self-signed certificate for
+// example.com that the client trusts. The server sends no session
+// tickets, which would block its handshake on a net.Pipe until the
+// client read them.
+func newTLSTestConfigs(t *testing.T) (client, server *tls.Config) {
+	t.Helper()
+	const name = "example.com"
+
+	pub, key, err := ed25519.GenerateKey(rand.Reader)
+	core.AssertMustNoError(t, err, "key")
+
+	now := time.Now()
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		DNSNames:     []string{name},
+		NotBefore:    now.Add(-time.Hour),
+		NotAfter:     now.Add(time.Hour),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, pub, key)
+	core.AssertMustNoError(t, err, "certificate")
+	cert, err := x509.ParseCertificate(der)
+	core.AssertMustNoError(t, err, "parsed certificate")
+
+	roots := x509.NewCertPool()
+	roots.AddCert(cert)
+	client = &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots, ServerName: name}
+	server = &tls.Config{
+		MinVersion:             tls.VersionTLS13,
+		Certificates:           []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}},
+		SessionTicketsDisabled: true,
+	}
+	return client, server
+}
+
 // stdErrorAnswersTestCase checks what IsTemporary and IsTimeout answer
 // for an error the standard library returns, bare or wrapped as the
 // standard library wraps it.
@@ -1052,6 +1133,12 @@ func newTemporaryNotTimeoutCase(name string, err error) stdErrorAnswersTestCase 
 	return newStdErrorAnswersTestCase(name, err, true, false)
 }
 
+// newNotTemporaryTimeoutCase takes an error that is a timeout but not
+// temporary.
+func newNotTemporaryTimeoutCase(name string, err error) stdErrorAnswersTestCase {
+	return newStdErrorAnswersTestCase(name, err, false, true)
+}
+
 // newNotTemporaryNotTimeoutCase takes an error that is neither temporary
 // nor a timeout.
 func newNotTemporaryNotTimeoutCase(name string, err error) stdErrorAnswersTestCase {
@@ -1067,7 +1154,7 @@ func (tc stdErrorAnswersTestCase) Test(t *testing.T) {
 	core.AssertEqual(t, tc.wantTimeout, core.IsTimeout(tc.err), "IsTimeout")
 }
 
-func stdErrorAnswersTestCases() []stdErrorAnswersTestCase {
+func stdErrorAnswersTestCases(t *testing.T) []stdErrorAnswersTestCase {
 	return core.S(
 		newTemporaryTimeoutCase("os.ErrDeadlineExceeded", os.ErrDeadlineExceeded),
 		newTemporaryTimeoutCase("os.ErrDeadlineExceeded in OpError",
@@ -1084,6 +1171,9 @@ func stdErrorAnswersTestCases() []stdErrorAnswersTestCase {
 		newTemporaryNotTimeoutCase("EMFILE", syscall.EMFILE),
 		newTemporaryNotTimeoutCase("EMFILE in SyscallError in OpError",
 			newSyscallOpError("accept", syscall.EMFILE)),
+
+		newNotTemporaryTimeoutCase("tls.Conn write past its deadline",
+			newTLSWriteDeadlineError(t)),
 
 		newNotTemporaryNotTimeoutCase("context.Canceled", context.Canceled),
 		newNotTemporaryNotTimeoutCase("io.EOF", io.EOF),
@@ -1102,7 +1192,7 @@ func stdErrorAnswersTestCases() []stdErrorAnswersTestCase {
 // TestStdErrorAnswers checks IsTemporary and IsTimeout against errors the
 // standard library returns.
 func TestStdErrorAnswers(t *testing.T) {
-	core.RunTestCases(t, stdErrorAnswersTestCases())
+	core.RunTestCases(t, stdErrorAnswersTestCases(t))
 }
 
 // emptyMessageError returns "" from Error() so that WrappedError.Error()
