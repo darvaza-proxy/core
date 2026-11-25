@@ -30,7 +30,7 @@ const hostLabelChars = "abcdefghijklmnopqrstuvwxyz0123456789_-"
 //   - MakeHostPort("example.com:00", 80) → error (port 0 invalid)
 func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 	// a failed parse returns the error alone
-	host, port, err := parseHostPort(hostPort)
+	host, zone, port, err := parseHostPort(hostPort)
 	if err != nil {
 		// bad syntax
 		return "", err
@@ -47,14 +47,14 @@ func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
 		return formatValidHostPort(netip.Addr{}, "", port), nil
 	}
 
-	addr, _, name, ok := mapValidHostForms(host)
+	addr, _, name, ok := mapValidHostForms(host, zone)
 	switch {
 	case !ok:
-		// bad host
+		// bad host or zone
 		return "", addrErr(hostPort, "invalid address")
 	case addr.IsValid():
-		// IP address, as given in host
-		return formatValidHostPort(addr, host, port), nil
+		// IP address and its zone, as given in host where it has none
+		return formatValidHostPort(addr.WithZone(zone), host, port), nil
 	default:
 		// name, in Unicode
 		return formatValidHostPort(addr, name, port), nil
@@ -120,7 +120,8 @@ func JoinHostPort(host, port string) (string, error) {
 		return formatHostPort(netip.Addr{}, "", port)
 	}
 
-	addr, _, name, ok := mapValidHostForms(host)
+	// the host whole, a zone in it read onto the address by ParseAddr
+	addr, _, name, ok := mapValidHostForms(host, "")
 	switch {
 	case !ok:
 		// bad host
@@ -203,6 +204,10 @@ func formatValidHostPort(addr netip.Addr, host, port string) string {
 //     host name, '_' allowed, within the lengths of RFC 1035. A name
 //     the mapping turns into an IP address comes back as that address,
 //     and any other name whose last label is a number is refused
+//   - Returns a valid zone of an IPv6 address unmodified, after a '%',
+//     or a '％' or '﹪', which UTS 46 maps into one; the address before
+//     it goes through the mapping, the zone does not. A zone holding a
+//     bracket, a ':', a separator or NUL is refused
 //   - Validates the port is in range 0-65535 and returns it in
 //     canonical decimal form
 //   - Properly handles IPv6 addresses with and without brackets
@@ -216,6 +221,7 @@ func formatValidHostPort(addr netip.Addr, host, port string) string {
 //   - SplitHostPort("192.168.1.1:80") → ("192.168.1.1", "80", nil)
 //   - SplitHostPort("[::1]:443") → ("::1", "443", nil)
 //   - SplitHostPort("::1") → ("::1", "", nil)
+//   - SplitHostPort("[fe80::1%ETH0]:80") → ("fe80::1%ETH0", "80", nil)
 //   - SplitHostPort("example.com") → ("example.com", "", nil)
 //   - SplitHostPort("Hello.世界") → ("hello.世界", "", nil)
 //   - SplitHostPort(":8080") → ("", "8080", nil)
@@ -271,8 +277,8 @@ func SplitAddrPortASCII(addrPort string) (addr netip.Addr, host, port string, er
 func doSplitHostPort(hostPort string) (addr netip.Addr, ascii, unicode, port string, err error) {
 	var ok bool
 
-	// a failed parse returns neither host nor port
-	host, port, err := parseHostPort(hostPort)
+	// a failed parse returns neither host, zone nor port
+	host, zone, port, err := parseHostPort(hostPort)
 	if port != "" {
 		// canonicalPort returns no port for a bad one
 		port, ok = canonicalPort(port)
@@ -283,8 +289,8 @@ func doSplitHostPort(hostPort string) (addr netip.Addr, ascii, unicode, port str
 	}
 
 	if host != "" {
-		// validHostForms returns nothing for a bad host
-		addr, ascii, unicode, ok = validHostForms(host)
+		// validHostForms returns nothing for a bad host or zone
+		addr, ascii, unicode, ok = validHostForms(host, zone)
 		if !ok {
 			// bad host
 			port, err = "", addrErr(hostPort, "invalid address")
@@ -301,6 +307,8 @@ func doSplitHostPort(hostPort string) (addr netip.Addr, ascii, unicode, port str
 //   - Accepts IP addresses with optional port numbers
 //   - Validates the address is a valid IPv4 or IPv6 address, or a host
 //     UTS 46 maps into one, which comes back as that address
+//   - Returns a valid zone of an IPv6 address unmodified, as
+//     SplitHostPort does
 //   - Validates the port is in range 0-65535; the port is 0 when the
 //     string carries none, as it is when the string says 0
 //   - Accepts a port alone, returning the zero netip.Addr with it
@@ -319,8 +327,8 @@ func doSplitHostPort(hostPort string) (addr netip.Addr, ascii, unicode, port str
 func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	var ok bool
 
-	// a failed parse returns neither host nor port
-	host, sPort, err := parseHostPort(addrPort)
+	// a failed parse returns neither host, zone nor port
+	host, zone, sPort, err := parseHostPort(addrPort)
 	if sPort != "" {
 		// parsePort returns 0 for a bad port
 		port, err = parsePort(sPort)
@@ -331,8 +339,8 @@ func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	}
 
 	if host != "" {
-		// validAddr returns the zero netip.Addr for a bad address
-		addr, ok = validAddr(host)
+		// validAddr returns the zero netip.Addr for a bad address or zone
+		addr, ok = validAddr(host, zone)
 		if !ok {
 			// bad address
 			port, err = 0, addrErr(addrPort, "invalid address")
@@ -342,71 +350,23 @@ func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	return addr, port, err
 }
 
-// parseHostPort reads the syntax of a host and port, and returns the
-// host and the port, brackets removed. It refuses broken syntax, and
-// leaves what the host and the port hold unchecked. On failure it
-// returns the error alone.
-func parseHostPort(hostPort string) (host, port string, err error) {
-	var ok bool
-
-	switch {
-	case hostPort == "":
-		// empty
-		err = addrErr(hostPort, "empty address")
-		return host, port, err
-	case hostPort[0] == '[':
-		// [host]:port [host]
-		return parseHostPortBracketed(hostPort)
-	case strings.Count(hostPort, ":") > 1:
-		// IPv6 without brackets
-		return hostPort, "", nil
-	default:
-		// at most one ':', split below
-	}
-
-	host, port, ok = splitLastRune(':', hostPort)
-	switch {
-	case !ok:
-		// host without port, as split
-	case port == "":
-		// host:
-		host, err = "", addrErr(hostPort, "missing port after ':'")
-	case host == "":
-		// :port, no host
-	default:
-		// host:port, as split
-	}
-
-	return host, port, err
+// validZone reports whether a zone holds no bracket, ':', zone
+// separator or NUL. A bracket leaves an address joined in brackets that
+// does not split back, no Linux interface name holds a ':', RFC 4007
+// keeps the separator out of a zone, and RFC 9844 keeps NUL out.
+func validZone(zone string) bool {
+	return !strings.ContainsFunc(zone, invalidZoneRune)
 }
 
-// parseHostPortBracketed reads a host in brackets: the host, which runs
-// to the last ']', the ']' and a ':' and the port. On failure it
-// returns the error alone.
-func parseHostPortBracketed(hostPort string) (host, port string, err error) {
-	host, s, ok := splitLastRune(']', hostPort[1:])
-	switch {
-	case !ok:
-		// [host
-		host, err = "", addrErr(hostPort, "missing ']' in address")
-	case host == "":
-		// []...
-		err = addrErr(hostPort, "missing address in brackets")
-	case s == "":
-		// [host]
-	case s[0] == ':':
-		// [host]:...
-		port = s[1:]
-		if port == "" {
-			// [host]:
-			host, err = "", addrErr(hostPort, "missing port after ':'")
-		}
+// invalidZoneRune reports whether a rune is one a zone may not hold: a
+// bracket, a ':', NUL, or a zone separator, '%', '％' or '﹪'.
+func invalidZoneRune(r rune) bool {
+	switch r {
+	case '[', ']', ':', 0, '%', fullWidthPercent, smallPercent:
+		return true
 	default:
-		// [host]...
-		host, err = "", addrErr(hostPort, "invalid character after ']'")
+		return false
 	}
-
-	return host, port, err
 }
 
 func splitLastRune(r rune, s string) (before, after string, found bool) {
@@ -449,16 +409,17 @@ func canonicalPort(s string) (string, bool) {
 	}
 }
 
-// validHostForms validates a host as mapValidHostForms does, and
-// returns it in its forms. An IP address comes back with its canonical
-// text as both ascii and unicode. A name comes back as
-// mapValidHostForms returns it.
+// validHostForms validates a host and its zone, as mapValidHostForms
+// does, and returns the host in its forms. An IP address comes back
+// with the zone on it, and its canonical text, zone included, as both
+// ascii and unicode. A name comes back as mapValidHostForms returns it.
 //
 //revive:disable-next-line:function-result-limit // the host in its forms
-func validHostForms(s string) (addr netip.Addr, ascii, unicode string, ok bool) {
-	addr, ascii, unicode, ok = mapValidHostForms(s)
+func validHostForms(s, zone string) (addr netip.Addr, ascii, unicode string, ok bool) {
+	addr, ascii, unicode, ok = mapValidHostForms(s, zone)
 	if addr.IsValid() {
-		// IP address, written once it is final
+		// IP address and its zone, written once the zone is on
+		addr = addr.WithZone(zone)
 		ascii = addr.String()
 		unicode = ascii
 	}
@@ -466,19 +427,27 @@ func validHostForms(s string) (addr netip.Addr, ascii, unicode string, ok bool) 
 }
 
 // mapValidHostForms maps a host as mapHost does, and validates it as an
-// IP address or a name. Where the host is an IP address, or UTS 46 maps
-// it into one, it returns the address and no text. A name comes back
-// with the zero netip.Addr, in the forms validNameForms returns. A host
-// it refuses comes back as nothing but false.
+// IP address or a name, and a zone after it, which only an IPv6 address
+// may have. Where the host is an IP address, or UTS 46 maps it into
+// one, it returns the address, the zone not put on it, and no text. A name
+// comes back with the zero netip.Addr, in the forms validNameForms
+// returns. A host it refuses, or a zone after an IPv4 address or a
+// name, comes back as nothing but false.
 //
 //revive:disable-next-line:function-result-limit // the host in its forms
-func mapValidHostForms(s string) (addr netip.Addr, ascii, unicode string, ok bool) {
+func mapValidHostForms(s, zone string) (addr netip.Addr, ascii, unicode string, ok bool) {
 	addr, ascii, ok = mapHost(s)
 	switch {
 	case !ok:
 		// refused by idna, nothing to return
+	case addr.IsValid() && !zoneMayFollow(addr, zone):
+		// a zone after an IPv4 address
+		addr, ok = netip.Addr{}, false
 	case addr.IsValid():
-		// IP address, no text
+		// IP address, without the zone, no text
+	case zone != "":
+		// a zone after a name
+		ascii, ok = "", false
 	default:
 		// name
 		ascii, unicode, ok = validNameForms(ascii)
@@ -513,10 +482,22 @@ func validNameForms(name string) (ascii, unicode string, ok bool) {
 }
 
 // validAddr parses a host as an IP address, or as the IP address
-// UTS 46 maps it into.
-func validAddr(s string) (netip.Addr, bool) {
+// UTS 46 maps it into, and returns it with the zone on it, as given. A
+// host that is no IP address, or a zone that may not follow it, as
+// zoneMayFollow reports, comes back as the zero netip.Addr and false.
+func validAddr(s, zone string) (netip.Addr, bool) {
 	addr, _, _ := mapHost(s)
-	return addr, addr.IsValid()
+	if !addr.IsValid() || !zoneMayFollow(addr, zone) {
+		// a name, refused by idna, or a zone after an IPv4 address
+		return netip.Addr{}, false
+	}
+	return addr.WithZone(zone), true
+}
+
+// zoneMayFollow reports whether a zone may follow an IP address: none,
+// or one after an IPv6 address.
+func zoneMayFollow(addr netip.Addr, zone string) bool {
+	return zone == "" || addr.Is6()
 }
 
 // mapHost reads a host as an IP address, or maps it through UTS 46 and

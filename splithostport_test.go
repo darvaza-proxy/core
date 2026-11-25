@@ -100,6 +100,30 @@ func splitAddrPortTestCases() []splitAddrPortTestCase {
 		newSplitAddrPortTestCase("ideographic full stops IPv4", "１２７。０。０。１:80", "127.0.0.1", 80),
 		newSplitAddrPortTestCase("full-width IPv6", "：：１", "::1", 0),
 
+		// A zone comes back as written, case included, where the address
+		// before it goes through UTS 46, and '％' and '﹪' separate it as
+		// '%' does.
+		newSplitAddrPortTestCase("full-width IPv6 zone", "[fe80::１%ETH0]:80", "fe80::1%ETH0", 80),
+		newSplitAddrPortTestCase("full-width percent zone", "[fe80::1％ETH0]:80", "fe80::1%ETH0", 80),
+		newSplitAddrPortTestCase("small percent zone", "[fe80::1﹪ETH0]:80", "fe80::1%ETH0", 80),
+		newSplitAddrPortTestCase("IPv6 zone without brackets", "fe80::１%ETH0", "fe80::1%ETH0", 0),
+		newSplitAddrPortTestCase("IPv4-mapped IPv6 zone", "[::ffff:192.0.2.1%eth0]:80", "::ffff:192.0.2.1%eth0", 80),
+		// A zone may be an interface's index, or hold a '.', as the name
+		// of a Linux VLAN interface does.
+		newSplitAddrPortTestCase("numeric zone", "[fe80::1%14]:80", "fe80::1%14", 80),
+		newSplitAddrPortTestCase("dotted zone without brackets", "fe80::1%eth0.100", "fe80::1%eth0.100", 0),
+
+		// A zone after anything but an IPv6 address is rejected.
+		newSplitAddrPortTestCaseRejected("zone after IPv4", "192.0.2.1%eth0:80"),
+		newSplitAddrPortTestCaseRejected("zone after a name", "name%eth0:80"),
+		// A zone holds no bracket, ':', separator or NUL.
+		newSplitAddrPortTestCaseRejected("zone with a ']'", "fe80::1%a]"),
+		newSplitAddrPortTestCaseRejected("zone with a '['", "[fe80::1%a[b]:80"),
+		newSplitAddrPortTestCaseRejected("zone with a ':'", "[fe80::1%a:b]:80"),
+		newSplitAddrPortTestCaseRejected("zone with a ':' without brackets", "fe80::1%a:b"),
+		newSplitAddrPortTestCaseRejected("zone with a separator", "[fe80::1%a%b]:80"),
+		newSplitAddrPortTestCaseRejected("zone with a NUL", "[fe80::1%a\x00b]:80"),
+
 		// A port that is not a number is rejected.
 		newSplitAddrPortTestCaseRejected("bracketed IPv6 word port", "[::1]:port"),
 		newSplitAddrPortTestCaseRejected("bracketed IPv6 empty port", "[::1]:"),
@@ -116,6 +140,20 @@ func splitAddrPortTestCases() []splitAddrPortTestCase {
 
 func TestSplitAddrPort(t *testing.T) {
 	core.RunTestCases(t, splitAddrPortTestCases())
+}
+
+func BenchmarkSplitAddrPort(b *testing.B) {
+	b.Run("IPv6 zone", benchSplitAddrPort("[fe80::1%eth0]:80"))
+	b.Run("full-width IPv6 zone", benchSplitAddrPort("[fe80::１%eth0]:80"))
+}
+
+func benchSplitAddrPort(addrPort string) func(*testing.B) {
+	return func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _, _ = core.SplitAddrPort(addrPort)
+		}
+	}
 }
 
 type splitHostPortTestCase struct {
@@ -245,13 +283,31 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCase("unspecified IPv4 short", "0:6060", "0.0.0.0", "6060"),
 		newSplitHostPortTestCase("IPv6 no port", "::1", "::1", ""),
 		// An IPv6 address without brackets is read whole, its last group
-		// included, so a port needs the brackets.
+		// included, however its ':'s are spelt, so a port needs the
+		// brackets.
 		newSplitHostPortTestCase("IPv6 trailing group", "::1:8080", "::1:8080", ""),
+		newSplitHostPortTestCase("full-width IPv6 trailing group", "：：１:8080", "::1:8080", ""),
 		newSplitHostPortTestCase("bracketed IPv6 no port", "[::1]", "::1", ""),
 		newSplitHostPortTestCase("bracketed IPv6 and port", "[::1]:1234", "::1", "1234"),
 		newSplitHostPortTestCase("non-canonical IPv6", "[2001:DB8:0::1]:80", "2001:db8::1", "80"),
 		newSplitHostPortTestCase("IPv6 zone", "[fe80::1%eth0]:80", "fe80::1%eth0", "80"),
 		newSplitHostPortTestCase("unspecified IPv6", "[::]:6060", "::", "6060"),
+
+		// A zone comes back as written, case included, where the address
+		// before it goes through UTS 46, and '％' and '﹪', which the
+		// mapping turns into '%', separate it as '%' does.
+		newSplitHostPortTestCase("IPv6 zone in capitals", "[fe80::1%ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitHostPortTestCase("full-width IPv6 zone", "[fe80::１%ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitHostPortTestCase("full-width percent zone", "[fe80::1％ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitHostPortTestCase("small percent zone", "[fe80::1﹪ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitHostPortTestCase("IPv6 zone without brackets", "fe80::１%ETH0", "fe80::1%ETH0", ""),
+		newSplitHostPortTestCase("bracketed IPv6 zone no port", "[fe80::1%ETH0]", "fe80::1%ETH0", ""),
+		newSplitHostPortTestCase("IPv4-mapped IPv6 zone", "[::ffff:192.0.2.1%eth0]:80", "::ffff:192.0.2.1%eth0", "80"),
+		// A zone may be an interface's index, or hold a '.', as the name
+		// of a Linux VLAN interface does.
+		newSplitHostPortTestCase("numeric zone", "[fe80::1%14]:80", "fe80::1%14", "80"),
+		newSplitHostPortTestCase("dotted zone without brackets", "fe80::1%eth0.100", "fe80::1%eth0.100", ""),
+
 		// A port alone splits with an empty host.
 		newSplitHostPortTestCasePortOnly("port only", ":6060", "6060"),
 		newSplitHostPortTestCasePortOnly("port only padded", ":0080", "80"),
@@ -285,7 +341,6 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCaseRejected("mixed direction label", "\u05D0a.name"),
 		// A label holds no other character, nor a hyphen at either end.
 		newSplitHostPortTestCaseRejected("space", "bad name"),
-		newSplitHostPortTestCaseRejected("percent label", "a%b.name"),
 		newSplitHostPortTestCaseRejected("plus label", "a+b.name"),
 		newSplitHostPortTestCaseRejected("leading hyphen", "-name"),
 		newSplitHostPortTestCaseRejected("trailing hyphen", "name-"),
@@ -306,10 +361,30 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCaseRejected("bare 0x last label", "name.0x"),
 		newSplitHostPortTestCaseRejected("hexadecimal IPv4", "0x7f.1"),
 		newSplitHostPortTestCaseRejected("full-width hexadecimal IPv4", "０ｘ７ｆ。１"),
+		// UTS 46 maps '⩴' into "::=", whose '=' no host holds.
+		newSplitHostPortTestCaseRejected("double colon equal", "fe80⩴1"),
 		// An empty bracket pair is rejected, with a port or without,
 		// where a port alone splits with an empty host.
 		newSplitHostPortTestCaseRejected("empty brackets", "[]"),
 		newSplitHostPortTestCaseRejected("empty brackets and port", "[]:6060"),
+
+		// A zone follows an IPv6 address, and is not empty. A '%' after
+		// a name starts a zone, so the name is rejected for that.
+		newSplitHostPortTestCaseRejected("zone after IPv4", "192.0.2.1%eth0:80"),
+		newSplitHostPortTestCaseRejected("zone after a name", "a%b:80"),
+		newSplitHostPortTestCaseRejected("percent label", "a%b.name"),
+		newSplitHostPortTestCaseRejected("full-width percent label", "a％b.name"),
+		newSplitHostPortTestCaseRejected("empty zone", "[fe80::1%]:80"),
+		// The bracket closes at the first ']', leaving the rest to the
+		// port, and a zone holds no bracket, ':', separator or NUL.
+		newSplitHostPortTestCaseRejected("zone with a ']'", "fe80::1%a]"),
+		newSplitHostPortTestCaseRejected("zone before a second ']'", "[fe80::1%x]:80]:9"),
+		newSplitHostPortTestCaseRejected("zone with a '['", "[fe80::1%a[b]:80"),
+		newSplitHostPortTestCaseRejected("zone with a ':'", "[fe80::1%a:b]:80"),
+		newSplitHostPortTestCaseRejected("zone with a ':' without brackets", "fe80::1%a:b"),
+		newSplitHostPortTestCaseRejected("zone with a separator", "[fe80::1%a%b]:80"),
+		newSplitHostPortTestCaseRejected("zone with a full-width percent", "[fe80::1%a％b]:80"),
+		newSplitHostPortTestCaseRejected("zone with a NUL", "[fe80::1%a\x00b]:80"),
 
 		// Brackets close, followed by nothing or a ':' and a port.
 		newSplitHostPortTestCaseRejected("incomplete bracketed IPv6", "[::1:1234"),
@@ -322,6 +397,22 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 
 func TestSplitHostPort(t *testing.T) {
 	core.RunTestCases(t, splitHostPortTestCases())
+}
+
+func BenchmarkSplitHostPort(b *testing.B) {
+	b.Run("name", benchSplitHostPort("example.com:80"))
+	b.Run("IPv6 zone", benchSplitHostPort("[fe80::1%eth0]:80"))
+	b.Run("full-width IPv6 zone", benchSplitHostPort("[fe80::１%eth0]:80"))
+	b.Run("punycode name", benchSplitHostPort("hello.xn--rhqv96g:80"))
+}
+
+func benchSplitHostPort(hostPort string) func(*testing.B) {
+	return func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _, _ = core.SplitHostPort(hostPort)
+		}
+	}
 }
 
 type splitHostPortASCIITestCase struct {
@@ -421,6 +512,12 @@ func splitHostPortASCIITestCases() []splitHostPortASCIITestCase {
 		// into one included.
 		newSplitHostPortASCIITestCase("non-canonical IPv6", "[2001:DB8:0::1]:80", "2001:db8::1", "80"),
 		newSplitHostPortASCIITestCase("ideographic full stops IPv4", "１２７。０。０。１:80", "127.0.0.1", "80"),
+		// A zone comes back as written, case included, after any of its
+		// separators.
+		newSplitHostPortASCIITestCase("full-width IPv6 zone", "[fe80::１%ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitHostPortASCIITestCase("full-width percent zone", "[fe80::1％ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitHostPortASCIITestCase("small percent zone", "[fe80::1﹪ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitHostPortASCIITestCase("IPv6 zone without brackets", "fe80::１%ETH0", "fe80::1%ETH0", ""),
 
 		// A port alone splits with an empty host.
 		newSplitHostPortASCIITestCasePortOnly("port only", ":6060", "6060"),
@@ -439,6 +536,22 @@ func splitHostPortASCIITestCases() []splitHostPortASCIITestCase {
 
 func TestSplitHostPortASCII(t *testing.T) {
 	core.RunTestCases(t, splitHostPortASCIITestCases())
+}
+
+func BenchmarkSplitHostPortASCII(b *testing.B) {
+	b.Run("name", benchSplitHostPortASCII("example.com:80"))
+	b.Run("IPv6 zone", benchSplitHostPortASCII("[fe80::1%eth0]:80"))
+	b.Run("full-width IPv6 zone", benchSplitHostPortASCII("[fe80::１%eth0]:80"))
+	b.Run("punycode name", benchSplitHostPortASCII("hello.xn--rhqv96g:80"))
+}
+
+func benchSplitHostPortASCII(hostPort string) func(*testing.B) {
+	return func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _, _ = core.SplitHostPortASCII(hostPort)
+		}
+	}
 }
 
 type splitAddrPortASCIITestCase struct {
@@ -537,6 +650,12 @@ func splitAddrPortASCIITestCases() []splitAddrPortASCIITestCase {
 		// address.
 		newSplitAddrPortASCIITestCaseAddr("ideographic full stops IPv4", "１２７。０。０。１:80", "127.0.0.1", "80"),
 		newSplitAddrPortASCIITestCaseAddr("full-width IPv6", "：：１", "::1", ""),
+		// A zone comes back as written, case included, after any of its
+		// separators.
+		newSplitAddrPortASCIITestCaseAddr("full-width IPv6 zone", "[fe80::１%ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitAddrPortASCIITestCaseAddr("full-width percent zone", "[fe80::1％ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitAddrPortASCIITestCaseAddr("small percent zone", "[fe80::1﹪ETH0]:80", "fe80::1%ETH0", "80"),
+		newSplitAddrPortASCIITestCaseAddr("IPv6 zone without brackets", "fe80::１%ETH0", "fe80::1%ETH0", ""),
 
 		// Any other host is a name, and comes back as UTS 46 maps it, in
 		// ASCII, with no address.
@@ -562,6 +681,22 @@ func splitAddrPortASCIITestCases() []splitAddrPortASCIITestCase {
 
 func TestSplitAddrPortASCII(t *testing.T) {
 	core.RunTestCases(t, splitAddrPortASCIITestCases())
+}
+
+func BenchmarkSplitAddrPortASCII(b *testing.B) {
+	b.Run("name", benchSplitAddrPortASCII("example.com:80"))
+	b.Run("IPv6 zone", benchSplitAddrPortASCII("[fe80::1%eth0]:80"))
+	b.Run("full-width IPv6 zone", benchSplitAddrPortASCII("[fe80::１%eth0]:80"))
+	b.Run("punycode name", benchSplitAddrPortASCII("hello.xn--rhqv96g:80"))
+}
+
+func benchSplitAddrPortASCII(addrPort string) func(*testing.B) {
+	return func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _, _, _ = core.SplitAddrPortASCII(addrPort)
+		}
+	}
 }
 
 type makeHostPortTestCase struct {
@@ -644,7 +779,11 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		// A name UTS 46 maps into an IP address comes back as that
 		// address.
 		newMakeHostPortTestCase("ideographic full stops IPv4", "１２７。０。０。１", 80, "127.0.0.1:80"),
-		newMakeHostPortTestCase("full-width IPv6 zone", "[fe80::１%eth0]:80", 0, "[fe80::1%eth0]:80"),
+		// A zone comes back as written, case included, after any of its
+		// separators.
+		newMakeHostPortTestCase("full-width IPv6 zone", "fe80::１%ETH0", 80, "[fe80::1%ETH0]:80"),
+		newMakeHostPortTestCase("full-width percent zone", "[fe80::1％ETH0]:80", 0, "[fe80::1%ETH0]:80"),
+		newMakeHostPortTestCase("small percent zone", "[fe80::1﹪ETH0]:80", 0, "[fe80::1%ETH0]:80"),
 
 		// What SplitHostPort rejects, MakeHostPort rejects.
 		newMakeHostPortTestCaseRejected("empty input", "", 8080),

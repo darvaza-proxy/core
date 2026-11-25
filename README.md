@@ -77,7 +77,10 @@ form instead. `SplitAddrPortASCII` returns the host as `SplitHostPortASCII`
 does, and an IP address as a `netip.Addr` too. `SplitAddrPort` refuses a name,
 and returns the address as a `netip.Addr` with the port as a `uint16`. A port
 alone, `:6060`, splits with no host, and an empty host joins with a port as
-`:6060` again.
+`:6060` again. The splits, and `MakeHostPort` through `SplitHostPort`, return
+a valid zone of an IPv6 address unmodified, after a `%`, or a `％` or `﹪`,
+which UTS 46 maps into one: the address goes through the mapping, the zone
+does not. They refuse a zone holding a bracket, a `:`, a separator or NUL.
 
 #### Parsing and Splitting
 
