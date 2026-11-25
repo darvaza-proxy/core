@@ -61,21 +61,23 @@ Generic type constraints for use with Go generics:
 
 ### Host/Port Functions
 
-Where the standard library only splits and joins, `SplitHostPort`,
-`SplitHostPortASCII`, `SplitAddrPort`, `JoinHostPort` and `MakeHostPort` also
-validate and clean. `SplitHostPort`, `JoinHostPort` and `MakeHostPort` return
-the host as canonical IP text or a Unicode name, case-folded as [UTS 46][uts46]
-maps it, whose ASCII form is an [RFC 1123][rfc1123] host name, `_` allowed,
-within the lengths of [RFC 1035][rfc1035], and the port in canonical decimal
-form, so `0080` is returned as `80`. A name the mapping turns into an IP
-address is returned as that address, and any other name whose last label is a
-number is refused. `SplitAddrPort` takes an IP address rather than a name, a
-host the mapping turns into one included, and returns it as a `netip.Addr`
-with the port as a `uint16`. Port 0 is accepted everywhere but in
-`MakeHostPort`'s input, where it leaves the port to be picked when a listener
-binds, a value `MakeHostPort` has no way to fill. A port alone, `:6060`,
-splits into an empty host, or the zero `netip.Addr` from `SplitAddrPort`, and
-an empty host joins with a port as `:6060` again.
+Where the standard library only splits and joins, the functions below also
+validate and clean. A host is an IP address or a name, case-folded as
+[UTS 46][uts46] maps it, whose ASCII form is an [RFC 1123][rfc1123] host name,
+`_` allowed, within the lengths of [RFC 1035][rfc1035]. A name the mapping
+turns into an IP address is taken as that address, and any other name whose
+last label is a number is refused. A port is in the range 0-65535. Port 0 is
+accepted everywhere but in `MakeHostPort`'s input, where it leaves the port to
+be picked when a listener binds, a value `MakeHostPort` has no way to fill.
+
+`SplitHostPort`, `JoinHostPort` and `MakeHostPort` return the host as
+canonical IP text or a Unicode name, and the port in canonical decimal form, so
+`0080` comes back as `80`. `SplitHostPortASCII` returns the name in its ASCII
+form instead. `SplitAddrPortASCII` returns the host as `SplitHostPortASCII`
+does, and an IP address as a `netip.Addr` too. `SplitAddrPort` refuses a name,
+and returns the address as a `netip.Addr` with the port as a `uint16`. A port
+alone, `:6060`, splits with no host, and an empty host joins with a port as
+`:6060` again.
 
 #### Parsing and Splitting
 
@@ -84,9 +86,13 @@ an empty host joins with a port as `:6060` again.
   them cleaned. Supports IPv6 addresses, international domain names, and
   descriptive error messages.
 * `SplitHostPortASCII(hostPort)` - splits and validates as `SplitHostPort`
-  does, short of decoding a name, which it returns in its ASCII form,
-  punycode for a label outside ASCII, for a caller that needs the name in
-  ASCII rather than as a person reads it.
+  does, and returns a name in its ASCII form, punycode for a label
+  outside ASCII, for a caller that needs the name in ASCII rather than as
+  a person reads it.
+* `SplitAddrPortASCII(addrPort)` - splits and validates as
+  `SplitHostPortASCII` does, returning the host as it does, and an IP
+  address as a `netip.Addr` too, for a caller that needs the address as
+  a value rather than as text to parse again.
 * `SplitAddrPort(addrPort)` - splits IP address and optional port into
   `netip.Addr` and `uint16`. Validates address format and port range
   (0-65535); the port is 0 when the string carries none.
