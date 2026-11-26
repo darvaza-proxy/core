@@ -203,6 +203,7 @@ func splitHostPortTestCases() []splitHostPortTestCase {
 		newSplitHostPortTestCase("name and port 0", "name:0", "name", "0"),
 		newSplitHostPortTestCase("name and port 65535", "name:65535", "name", "65535"),
 		newSplitHostPortTestCase("name and padded port", "name:0080", "name", "80"),
+		newSplitHostPortTestCase("name and padded port 0", "name:00", "name", "0"),
 
 		// A name comes back as UTS 46 maps it, in Unicode.
 		newSplitHostPortTestCase("international name", "Hello.世界", "hello.世界", ""),

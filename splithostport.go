@@ -378,13 +378,21 @@ func formatPort(n uint16) string {
 }
 
 // canonicalPort validates a port string and returns it in canonical
-// decimal form, so a spelling such as "0080" comes back as "80".
+// decimal form: as given, or written again where it starts with a '0'
+// beyond port 0 itself, so a spelling such as "0080" comes back as "80".
 func canonicalPort(s string) (string, bool) {
 	n, err := parsePort(s)
-	if err != nil {
+	switch {
+	case err != nil:
+		// bad port
 		return "", false
+	case len(s) > 1 && s[0] == '0':
+		// leading zeros
+		return formatPort(n), true
+	default:
+		// canonical as given
+		return s, true
 	}
-	return formatPort(n), true
 }
 
 // validHost validates a host as an IP address or a name, and returns it
