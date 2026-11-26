@@ -734,6 +734,10 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 		newJoinHostPortTestCase("non-canonical IPv6 with port", "2001:DB8:0::1", "80", "[2001:db8::1]:80"),
 		newJoinHostPortTestCase("non-canonical IPv6 no port", "2001:DB8:0::1", "", "2001:db8::1"),
 		newJoinHostPortTestCase("IPv6 zone", "fe80::1%eth0", "80", "[fe80::1%eth0]:80"),
+		newJoinHostPortTestCase("IPv4 with port", "192.0.2.1", "80", "192.0.2.1:80"),
+		newJoinHostPortTestCase("IPv4 no port", "192.0.2.1", "", "192.0.2.1"),
+		newJoinHostPortTestCase("unspecified IPv4 short", "0", "80", "0.0.0.0:80"),
+		newJoinHostPortTestCase("IPv4-mapped IPv6 with port", "::ffff:192.0.2.1", "80", "[::ffff:192.0.2.1]:80"),
 
 		// A name joins cleaned, the port in canonical form.
 		newJoinHostPortTestCase("name with port", "example.com", "443", "example.com:443"),
@@ -746,6 +750,7 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 		// A name UTS 46 maps into an IP address joins as that address,
 		// an IPv6 one bracketed when a port follows it.
 		newJoinHostPortTestCase("full-width IPv6 with port", "：：１", "80", "[::1]:80"),
+		newJoinHostPortTestCase("full-width IPv6 zone", "fe80::１%eth0", "80", "[fe80::1%eth0]:80"),
 
 		// An empty host joins as a port alone.
 		newJoinHostPortTestCase("port only", "", "8080", ":8080"),
@@ -772,4 +777,26 @@ func joinHostPortTestCases() []joinHostPortTestCase {
 
 func TestJoinHostPort(t *testing.T) {
 	core.RunTestCases(t, joinHostPortTestCases())
+}
+
+func BenchmarkJoinHostPort(b *testing.B) {
+	b.Run("name", benchJoinHostPort("example.com"))
+	b.Run("IPv6 zone", benchJoinHostPort("fe80::1%eth0"))
+	b.Run("full-width IPv6 zone", benchJoinHostPort("fe80::１%eth0"))
+	b.Run("punycode name", benchJoinHostPort("hello.xn--rhqv96g"))
+}
+
+// benchJoinHostPort joins the host with port 80, once before the timed
+// loop to stop the benchmark where the join fails.
+func benchJoinHostPort(host string) func(*testing.B) {
+	return func(b *testing.B) {
+		if _, err := core.JoinHostPort(host, "80"); err != nil {
+			b.Fatal(err)
+		}
+
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _ = core.JoinHostPort(host, "80")
+		}
+	}
 }

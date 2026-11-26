@@ -105,35 +105,77 @@ func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
 func JoinHostPort(host, port string) (string, error) {
 	if host == "" && port != "" {
 		// port alone
-		return doJoinHostPort("", port)
+		return formatHostPort(netip.Addr{}, "", port)
 	}
 
-	s, ok := validHost(host)
+	addr, _, name, ok := mapValidHostForms(host)
 	switch {
 	case !ok:
 		// bad host
 		return "", addrErr(host, "invalid host")
-	case port == "":
-		// portless host
-		return s, nil
+	case addr.IsValid():
+		// IP address, as given in host
+		return formatHostPort(addr, host, port)
 	default:
-		// good host
-		return doJoinHostPort(s, port)
+		// name, in Unicode
+		return formatHostPort(addr, name, port)
 	}
 }
 
-// doJoinHostPort joins a cleaned host without brackets, or an empty one, and
-// a port, the port in canonical decimal form. It refuses a port that
-// does not parse, and the error names the host and port joined as
-// passed.
-func doJoinHostPort(host, port string) (string, error) {
+// formatHostPort checks a port, and joins it to a valid host as
+// formatValidHostPort does, the port in canonical decimal form. It
+// refuses a port that does not parse, and the error names the host, as
+// formatValidHostPort writes it, and the port as passed.
+func formatHostPort(addr netip.Addr, host, port string) (string, error) {
+	if port == "" {
+		// portless
+		return formatValidHostPort(addr, host, ""), nil
+	}
+
 	s, ok := canonicalPort(port)
 	if !ok {
 		// bad port
-		return "", addrErr(joinHostPortUnsafe(host, port), "invalid port")
+		return "", addrErr(formatValidHostPort(addr, host, port), "invalid port")
 	}
 
-	return joinHostPortUnsafe(host, s), nil
+	return formatValidHostPort(addr, host, s), nil
+}
+
+// formatValidHostPort joins a valid host and a port, either of them
+// possibly empty, in one go, and returns the host alone when the port is
+// empty. An IP address comes as addr, and is written in its canonical
+// text, in brackets where it is IPv6 and a port follows; where host
+// already holds that text, host stands for it. Anything else, a name or
+// nothing, comes as host, and is joined as it is.
+func formatValidHostPort(addr netip.Addr, host, port string) string {
+	var open, colon string
+	switch {
+	case port == "":
+		// portless
+	case addr.Is6():
+		// IPv6 address before a port
+		open, colon = "[", "]:"
+	default:
+		// IPv4 address, name or nothing before a port
+		colon = ":"
+	}
+
+	if !addr.IsValid() {
+		// a name, or nothing
+		return host + colon + port
+	}
+
+	// the longest text of an IP address without a zone, which a zone
+	// may outgrow
+	var buf [len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")]byte
+	text := addr.AppendTo(buf[:0])
+	if string(text) == host {
+		// as written
+		return open + host + colon + port
+	}
+
+	// address written again
+	return open + string(text) + colon + port
 }
 
 // SplitHostPort is like net.SplitHostPort but doesn't fail if the
@@ -393,15 +435,6 @@ func canonicalPort(s string) (string, bool) {
 		// canonical as given
 		return s, true
 	}
-}
-
-// validHost validates a host as an IP address or a name, and returns it
-// cleaned: an IP address in its canonical text, a name mapped through
-// UTS 46 and in Unicode. A name the mapping turns into an IP address
-// comes back as that address.
-func validHost(s string) (string, bool) {
-	_, _, unicode, ok := validHostForms(s)
-	return unicode, ok
 }
 
 // validHostForms validates a host as mapValidHostForms does, and
