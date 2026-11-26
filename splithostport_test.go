@@ -644,6 +644,7 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		// A name UTS 46 maps into an IP address comes back as that
 		// address.
 		newMakeHostPortTestCase("ideographic full stops IPv4", "１２７。０。０。１", 80, "127.0.0.1:80"),
+		newMakeHostPortTestCase("full-width IPv6 zone", "[fe80::１%eth0]:80", 0, "[fe80::1%eth0]:80"),
 
 		// What SplitHostPort rejects, MakeHostPort rejects.
 		newMakeHostPortTestCaseRejected("empty input", "", 8080),
@@ -656,8 +657,7 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 		// With no default, port 0 is still rejected, where
 		// "example.com" alone comes back portless.
 		newMakeHostPortTestCaseRejected("port 0 without default", "example.com:0", 0),
-		// Port 0 is judged after the split has cleaned the host and the
-		// port, and the error names the input.
+		// The error names the input as given, not as cleaned.
 		newMakeHostPortTestCaseRejected("port 0 cleaned name", "Example.com:0", 8080),
 		newMakeHostPortTestCaseRejected("port 0 no host", ":0", 8080),
 	)
@@ -665,6 +665,29 @@ func makeHostPortTestCases() []makeHostPortTestCase {
 
 func TestMakeHostPort(t *testing.T) {
 	core.RunTestCases(t, makeHostPortTestCases())
+}
+
+func BenchmarkMakeHostPort(b *testing.B) {
+	b.Run("name", benchMakeHostPort("example.com:80"))
+	b.Run("IPv6 zone", benchMakeHostPort("[fe80::1%eth0]:80"))
+	b.Run("full-width IPv6 zone", benchMakeHostPort("[fe80::１%eth0]:80"))
+	b.Run("punycode name", benchMakeHostPort("hello.xn--rhqv96g:80"))
+}
+
+// benchMakeHostPort makes the input into an address to advertise, with
+// default port 443, once before the timed loop to stop the benchmark
+// where it fails.
+func benchMakeHostPort(hostPort string) func(*testing.B) {
+	return func(b *testing.B) {
+		if _, err := core.MakeHostPort(hostPort, 443); err != nil {
+			b.Fatal(err)
+		}
+
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _ = core.MakeHostPort(hostPort, 443)
+		}
+	}
 }
 
 type joinHostPortTestCase struct {

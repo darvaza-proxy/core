@@ -29,46 +29,58 @@ const hostLabelChars = "abcdefghijklmnopqrstuvwxyz0123456789_-"
 //   - MakeHostPort("example.com:0", 80) → error (port 0 invalid)
 //   - MakeHostPort("example.com:00", 80) → error (port 0 invalid)
 func MakeHostPort(hostPort string, defaultPort uint16) (string, error) {
-	host, port, err := SplitHostPort(hostPort)
+	// a failed parse returns the error alone
+	host, port, err := parseHostPort(hostPort)
 	if err != nil {
-		// bad input
+		// bad syntax
 		return "", err
 	}
 
-	// port is either valid or empty
-	// host is either a valid hostname or a valid IP address, cleaned,
-	// or empty for a port alone
-
-	s, ok := doMakeHostPort(host, port, defaultPort)
+	port, ok := makePort(port, defaultPort)
 	if !ok {
-		// port 0 in any spelling
+		// bad port, or 0 in any spelling
 		return "", addrErr(hostPort, "invalid port")
 	}
 
-	return s, nil
+	if host == "" {
+		// port alone
+		return formatValidHostPort(netip.Addr{}, "", port), nil
+	}
+
+	addr, _, name, ok := mapValidHostForms(host)
+	switch {
+	case !ok:
+		// bad host
+		return "", addrErr(hostPort, "invalid address")
+	case addr.IsValid():
+		// IP address, as given in host
+		return formatValidHostPort(addr, host, port), nil
+	default:
+		// name, in Unicode
+		return formatValidHostPort(addr, name, port), nil
+	}
 }
 
-// doMakeHostPort joins a cleaned host without brackets, or an empty one, and
-// its port, the port in canonical decimal form, using defaultPort when
-// port is empty, and returns the host alone when both are unset. It
-// reports false for a port that does not parse, or parses to 0.
-func doMakeHostPort(host, port string, defaultPort uint16) (string, bool) {
+// makePort returns the port MakeHostPort joins, in canonical decimal
+// form: port, or defaultPort where port is empty, or nothing where both
+// are unset. A port that does not parse, or parses to 0, comes back as
+// nothing but false.
+func makePort(port string, defaultPort uint16) (string, bool) {
 	switch {
 	case port != "":
-		n, err := parsePort(port)
-		if err != nil || n == 0 {
+		s, ok := canonicalPort(port)
+		if !ok || s == "0" {
 			// bad port, or 0 in any spelling
 			return "", false
 		}
-		port = formatPort(n)
+		return s, true
 	case defaultPort != 0:
 		// default port
-		port = formatPort(defaultPort)
+		return formatPort(defaultPort), true
 	default:
 		// neither port nor default, portless
+		return "", true
 	}
-
-	return joinHostPortUnsafe(host, port), true
 }
 
 // JoinHostPort is like the standard net.JoinHostPort, but
@@ -626,17 +638,6 @@ func isNumericLabel(s string) bool {
 // lastLabel returns the label after the last dot of a name.
 func lastLabel(s string) string {
 	return s[strings.LastIndexByte(s, '.')+1:]
-}
-
-// joinHostPortUnsafe joins a host and a port without validating either.
-// It returns the host alone when the port is empty, and otherwise joins
-// them through net.JoinHostPort.
-func joinHostPortUnsafe(host, port string) string {
-	if port == "" {
-		// portless
-		return host
-	}
-	return net.JoinHostPort(host, port)
 }
 
 func addrErr(addr, why string) error {
