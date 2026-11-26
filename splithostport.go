@@ -217,8 +217,8 @@ func SplitAddrPortASCII(addrPort string) (addr netip.Addr, host, port string, er
 func doSplitHostPort(hostPort string) (addr netip.Addr, ascii, unicode, port string, err error) {
 	var ok bool
 
-	// a failed split returns neither host nor port
-	host, port, err := splitHostPortUnsafe(hostPort)
+	// a failed parse returns neither host nor port
+	host, port, err := parseHostPort(hostPort)
 	if port != "" {
 		// canonicalPort returns no port for a bad one
 		port, ok = canonicalPort(port)
@@ -265,8 +265,8 @@ func doSplitHostPort(hostPort string) (addr netip.Addr, ascii, unicode, port str
 func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	var ok bool
 
-	// a failed split returns neither host nor port
-	host, sPort, err := splitHostPortUnsafe(addrPort)
+	// a failed parse returns neither host nor port
+	host, sPort, err := parseHostPort(addrPort)
 	if sPort != "" {
 		// parsePort returns 0 for a bad port
 		port, err = parsePort(sPort)
@@ -288,9 +288,11 @@ func SplitAddrPort(addrPort string) (addr netip.Addr, port uint16, err error) {
 	return addr, port, err
 }
 
-// splitHostPortUnsafe splits a host and port without validating either,
-// brackets removed. On failure it returns the error alone.
-func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
+// parseHostPort reads the syntax of a host and port, and returns the
+// host and the port, brackets removed. It refuses broken syntax, and
+// leaves what the host and the port hold unchecked. On failure it
+// returns the error alone.
+func parseHostPort(hostPort string) (host, port string, err error) {
 	var ok bool
 
 	switch {
@@ -300,7 +302,7 @@ func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 		return host, port, err
 	case hostPort[0] == '[':
 		// [host]:port [host]
-		return splitHostPortBracketed(hostPort)
+		return parseHostPortBracketed(hostPort)
 	case strings.Count(hostPort, ":") > 1:
 		// IPv6 without brackets
 		return hostPort, "", nil
@@ -324,7 +326,10 @@ func splitHostPortUnsafe(hostPort string) (host, port string, err error) {
 	return host, port, err
 }
 
-func splitHostPortBracketed(hostPort string) (host, port string, err error) {
+// parseHostPortBracketed reads a host in brackets: the host, which runs
+// to the last ']', the ']' and a ':' and the port. On failure it
+// returns the error alone.
+func parseHostPortBracketed(hostPort string) (host, port string, err error) {
 	host, s, ok := splitLastRune(']', hostPort[1:])
 	switch {
 	case !ok:
@@ -391,42 +396,67 @@ func validHost(s string) (string, bool) {
 	return unicode, ok
 }
 
-// validHostForms validates a host as an IP address or a name, and
-// returns it in its forms. Where the host is an IP address, or UTS 46
-// maps it into one, it returns the address, and its canonical text as
-// both ascii and unicode. A name comes back with the zero netip.Addr,
-// in the ASCII form the mapping gives, and decoded into Unicode, which
-// only a name with a label in punycode needs. A host it refuses comes
-// back as nothing but false.
+// validHostForms validates a host as mapValidHostForms does, and
+// returns it in its forms. An IP address comes back with its canonical
+// text as both ascii and unicode. A name comes back as
+// mapValidHostForms returns it.
 //
 //revive:disable-next-line:function-result-limit // the host in its forms
 func validHostForms(s string) (addr netip.Addr, ascii, unicode string, ok bool) {
+	addr, ascii, unicode, ok = mapValidHostForms(s)
+	if addr.IsValid() {
+		// IP address, written once it is final
+		ascii = addr.String()
+		unicode = ascii
+	}
+	return addr, ascii, unicode, ok
+}
+
+// mapValidHostForms maps a host as mapHost does, and validates it as an
+// IP address or a name. Where the host is an IP address, or UTS 46 maps
+// it into one, it returns the address and no text. A name comes back
+// with the zero netip.Addr, in the forms validNameForms returns. A host
+// it refuses comes back as nothing but false.
+//
+//revive:disable-next-line:function-result-limit // the host in its forms
+func mapValidHostForms(s string) (addr netip.Addr, ascii, unicode string, ok bool) {
 	addr, ascii, ok = mapHost(s)
 	switch {
 	case !ok:
 		// refused by idna, nothing to return
 	case addr.IsValid():
-		// IP address
-		ascii = addr.String()
-		unicode = ascii
-	case !validHostName(ascii):
-		// not a host name
-		ascii, ok = "", false
-	case !hasALabel(ascii):
-		// name in plain ASCII, its own Unicode form
-		unicode = ascii
+		// IP address, no text
 	default:
-		// international name
-		var err error
-		unicode, err = nameProfile.ToUnicode(ascii)
-		if err != nil {
-			// idna refuses, once decoded, some names ToASCII
-			// accepts, the bidi rule among others
-			ascii, unicode, ok = "", "", false
-		}
+		// name
+		ascii, unicode, ok = validNameForms(ascii)
 	}
 
 	return addr, ascii, unicode, ok
+}
+
+// validNameForms validates a name, in the ASCII form UTS 46 maps it
+// into, as a host name, and returns it in that form and decoded into
+// Unicode, which only a name with a label in punycode needs. A name it
+// refuses comes back as nothing but false.
+func validNameForms(name string) (ascii, unicode string, ok bool) {
+	switch {
+	case !validHostName(name):
+		// not a host name
+		return "", "", false
+	case !hasALabel(name):
+		// name in plain ASCII, its own Unicode form
+		return name, name, true
+	default:
+		// international name
+		var err error
+		unicode, err = nameProfile.ToUnicode(name)
+		if err != nil {
+			// idna refuses, once decoded, some names ToASCII
+			// accepts, the bidi rule among others
+			return "", "", false
+		}
+		return name, unicode, true
+	}
 }
 
 // validAddr parses a host as an IP address, or as the IP address
